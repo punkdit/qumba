@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Use group theory to build surface codes, color codes, etc.
+stabilizer codes & symplectic geometry
 """
 
 import string, os
