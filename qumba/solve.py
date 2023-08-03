@@ -110,6 +110,8 @@ def parse(s):
     for c in ' [],':
         s = s.replace(c, '')
     s = s.replace('.', '0')
+    s = s.replace('X', '1')
+    s = s.replace('Z', '1')
     lines = s.split()
     lines = [l.strip() for l in lines if l.strip()]
     rows = [list(int(c) for c in l) for l in lines]

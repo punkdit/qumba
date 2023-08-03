@@ -243,25 +243,6 @@ class QCode(object):
         H.shape = (self.m, 2*self.n)
         return shortstr(H)
 
-    @property
-    def deepH(self):
-        H = self.H.view()
-        m, n = self.shape
-        H.shape = m, n, 2
-        return H
-
-    @property
-    def deepL(self):
-        L = self.L.view()
-        L.shape = 2*self.k, self.n, 2
-        return L
-
-    @property
-    def deepT(self):
-        T = self.T.view()
-        T.shape = self.m, self.n, 2
-        return T
-
     def check(self):
         H = self.H
         m, n = self.shape
@@ -285,10 +266,29 @@ class QCode(object):
         F = dot2(A, symplectic_form(n), A.transpose())
         assert eq2(F, symplectic_form(n))
 
-    def dual(self):
-        D = array2([[0,1],[1,0]])
-        H = dot(self.H, D) % 2
-        return QCode(H)
+    @property
+    def deepH(self):
+        H = self.H.view()
+        m, n = self.shape
+        H.shape = m, n, 2
+        return H
+
+    @property
+    def deepL(self):
+        L = self.L.view()
+        L.shape = 2*self.k, self.n, 2
+        return L
+
+    @property
+    def deepT(self):
+        T = self.T.view()
+        T.shape = self.m, self.n, 2
+        return T
+
+#    def dual(self):
+#        D = array2([[0,1],[1,0]])
+#        H = dot(self.H, D) % 2
+#        return QCode(H)
 
     def overlap(self, other):
         F = symplectic_form(self.n)
@@ -296,6 +296,16 @@ class QCode(object):
         #A = dot2(self.L, other.L.transpose())
         A = dot2(symplectic_form(self.k), A)
         return A
+
+    def equiv(self, other):
+        H1, H2 = self.H.transpose(), other.H.transpose()
+        U = solve2(H1, H2)
+        if U is None:
+            return False
+        U = solve2(H2, H1)
+        if U is None:
+            return False
+        return True
 
     def permute(self, f):
         n = self.n
@@ -347,6 +357,17 @@ class QCode(object):
         A = identity2(2*n)
         A[2*idx, 2*jdx+1] = 1
         A[2*jdx, 2*idx+1] = 1
+        H = dot2(self.H, A)
+        T = dot2(self.T, A)
+        L = dot2(self.L, A)
+        return QCode(H, T, L)
+
+    def apply_CNOT(self, idx, jdx):
+        assert idx != jdx
+        n = self.n
+        A = identity2(2*n)
+        A[2*jdx+1, 2*idx+1] = 1
+        A[2*idx, 2*jdx] = 1
         H = dot2(self.H, A)
         T = dot2(self.T, A)
         L = dot2(self.L, A)
@@ -462,6 +483,15 @@ class QCode(object):
             w = monte_carlo(H, u)
             d = min(w, d)
         return d
+
+    def get_symplectic(self):
+        self.build()
+        H, T, L = self.H, self.T, self.L
+        HT = array2(list(zip(H, T)))
+        m, n = self.shape
+        HT.shape = 2*m, 2*n
+        M = numpy.concatenate((HT, L))
+        return M
 
 
 

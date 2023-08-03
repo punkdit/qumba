@@ -3,10 +3,12 @@
 from time import time
 start_time = time()
 
+import numpy
+
 from qumba.algebraic import Matrix, Algebraic
-from qumba.solve import parse, shortstr, linear_independent, eq2
+from qumba.solve import parse, shortstr, linear_independent, eq2, dot2, identity2
 from qumba.isomorph import Tanner, search
-from qumba.qcode import QCode
+from qumba.qcode import QCode, symplectic_form
 from qumba.argv import argv
 
 
@@ -52,8 +54,7 @@ def find_zx_duality(Ax, Az):
     return dual_n
 
 
-def main():
-
+def main_bring():
     # Bring's code
     Ax = parse("""
     ......1......1.......1.1...1..
@@ -83,29 +84,129 @@ def main():
     ...1.........1.1.........1.1..
     1.11................1.1.......
     """)
+    find(Ax, Az)
+
+
+def main_10_2_3():
+    Ax = parse("""
+    X..X..XX..
+    .X..X..XX.
+    X.X.....XX
+    .X.X.X...X
+    ..X.XXX...
+    """)
+
+    Az = parse("""
+    .ZZ..Z..Z.
+    ..ZZ..Z..Z
+    ...ZZZ.Z..
+    Z...Z.Z.Z.
+    ZZ.....Z.Z
+    """)
+
+    Hx = linear_independent(Ax)
+    Hz = linear_independent(Az)
+    code = QCode.build_css(Hx, Hz)
+
+    print(code)
+    print()
+    """
+    0123456789
+    X..X..XX..
+    .X..X..XX.
+    X.X.....XX
+    .X.X.X...X
+    ..X.XXX...
+    ..ZZ..Z..Z
+    ...ZZZ.Z..
+    Z...Z.Z.Z.
+    ZZ.....Z.Z
+    """
+
+    idxs = list(range(code.n))
+    pairs = [(i,j) for i in idxs for j in idxs if i!=j]
+    print(len(pairs))
+    assert code.equiv(code)
+
+    N = len(pairs)
+    for idx in range(N):
+     print("idx =", idx)
+     ci = code.apply_CNOT(*pairs[idx])
+     for jdx in range(idx+1, N):
+      cj = ci.apply_CNOT(*pairs[jdx])
+      for kdx in range(jdx+1, N):
+        ck = cj.apply_CNOT(*pairs[kdx])
+        #print(c)
+        if ck.equiv(code):
+            print("FOUND!")
+            return
+
+    #find(Ax, Az)
+
+
+def find(Ax, Az):
 
     print(Ax.shape)
 
     autos = find_autos_css(Ax, Az)
-    print(len(autos))
+    print("autos:", len(autos))
 
     duality = find_zx_duality(Ax, Az)
-    print(duality)
+    print("duality:", duality)
 
     Hx = linear_independent(Ax)
     Hz = linear_independent(Az)
-    qcode = QCode.build_css(Hx, Hz)
+    code = QCode.build_css(Hx, Hz)
 
-    #print(qcode)
+    print(code)
+    print()
 
-    F = qcode.overlap(qcode)
+    M = code.get_symplectic()
+    #print(shortstr(M))
+
+    F = symplectic_form(code.n)
+    assert eq2(F, dot2(M, F, M.transpose()))
+
+    I = identity2(2*code.n)
+    assert eq2(dot2(F, F), I) # self inverse
+
+    Mi = dot2(F, M.transpose(), F)
+    assert eq2(dot2(M, Mi), I)
+
+    Hx = code.H
+    Tz = code.T
+    Lx = code.L[0::2, :]
+    Lz = code.L[1::2, :]
+
+    # encoder
+    E = numpy.concatenate((Tz, Lz)).transpose()
+
+    # decoder
+    D = numpy.concatenate((Hx, Lx))
+    D = dot2(D, F)
+
+    DE = dot2(D, E)
+    assert eq2(DE, identity2(code.n))
+    
+    return
+
+    F = code.overlap(code)
     print(shortstr(F))
 
     for g in autos:
-        tgt = qcode.permute(g)
-        F = qcode.overlap(tgt)
-        print(shortstr(F))
+        tgt = code.permute(g)
+        F = code.overlap(tgt)
+        #print(shortstr(F))
 
+
+def test():
+    c = QCode.fromstr("XI IZ")
+    c.build()
+    print(c)
+    print()
+
+    c1 = c.apply_CNOT(0, 1)
+    print(c1)
 
 
 
