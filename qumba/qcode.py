@@ -352,24 +352,27 @@ class QCode(object):
     def get_iso(self, other):
         import pynauty
         lhs = self.get_graph()
-        print(lhs)
+        #print(lhs)
         rhs = other.get_graph()
-        print(rhs)
-        #if not pynauty.isomorphic(lhs, rhs):
-        #    assert 0
+        #print(rhs)
+        if not pynauty.isomorphic(lhs, rhs):
+            assert 0
         #    return # assert 0 ?
         # See https://github.com/pdobsan/pynauty/issues/31
         f = pynauty.canon_label(lhs) # lhs--f-->C
         g = pynauty.canon_label(rhs) # rhs--g-->C
-        gi = [None]*len(g)
-        for (idx, i) in enumerate(g):
-            gi[i] = idx
-        assert [gi[g[i]] for i in range(len(g))] == list(range(len(g)))
-        print("f:", f)
-        print("g:", g)
-        print("gi:", gi)
-        iso = [gi[f[i]] for i in range(len(f))]
-        print("iso:", iso)
+        #gi = [None]*len(g)
+        #for (idx, i) in enumerate(g):
+        #    gi[i] = idx
+        #assert [gi[g[i]] for i in range(len(g))] == list(range(len(g)))
+        #print("f:", f)
+        #print("g:", g)
+        #print("gi:", gi)
+        #iso = [gi[f[i]] for i in range(len(f))]
+        iso = [None]*len(f)
+        for i in range(len(f)):
+            iso[f[i]] = g[i]
+        #print("iso:", iso)
 
         n = self.n
         for bit in range(n):

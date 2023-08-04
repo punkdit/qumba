@@ -107,7 +107,7 @@ def test_iso():
     dode = code.permute([1,0])
 
     iso = code.get_iso(dode)
-
+    print(iso)
 
 
 def main_10_2_3():
@@ -141,11 +141,17 @@ def main_10_2_3():
     assert code.equiv(dode)
 
     dode = code.apply_H()
+    print("dode:")
     print(dode)
     assert not code.equiv(dode)
 
-    #iso = code.get_iso(dode)
-    #print(iso)
+    iso = code.get_iso(dode)
+    print(iso)
+    eode = code.permute(iso)
+    assert eode.equiv(dode)
+
+    print("eode:")
+    print(eode)
 
     return
 
