@@ -307,6 +307,78 @@ class QCode(object):
             return False
         return True
 
+    def get_graph(self):
+        "encode into a pynauty Graph"
+        from pynauty import Graph
+        H = self.H
+        rows = [v for v in span(H) if v.sum()]
+        V = array2(rows)
+        m, nn = V.shape
+        n = nn//2
+        g = Graph(nn+m, True) # bits + checks
+        for bit in range(nn):
+            checks = [nn+check for check in range(m) if V[check, bit]]
+            g.connect_vertex(bit, checks)
+        for bit in range(n):
+            g.connect_vertex(2*bit, [2*bit+1])
+        #g.set_vertex_coloring([
+        #    set(i for i in range(nn)), 
+        #    set(range(nn, m+nn))
+        #])
+        g.set_vertex_coloring([
+            set(2*i for i in range(n)), 
+            set(2*i+1 for i in range(n)), 
+            set(range(nn, m+nn))
+        ])
+        return g
+
+    def get_autos(self):
+        from pynauty import Graph, autgrp
+        g = self.get_graph()
+        aut = autgrp(g)
+        gen = aut[0]
+        N = int(aut[1])
+        n = self.n
+        perms = []
+        for perm in gen:
+            for bit in range(n):
+                assert perm[2*bit]%2 == 0
+                assert perm[2*bit+1]%2 == 1
+                assert perm[2*bit]+1 == perm[2*bit+1]
+            perm = [perm[2*bit]//2 for bit in range(n)]
+            perms.append(perm)
+        return N, perms
+
+    def get_iso(self, other):
+        import pynauty
+        lhs = self.get_graph()
+        print(lhs)
+        rhs = other.get_graph()
+        print(rhs)
+        #if not pynauty.isomorphic(lhs, rhs):
+        #    assert 0
+        #    return # assert 0 ?
+        # See https://github.com/pdobsan/pynauty/issues/31
+        f = pynauty.canon_label(lhs) # lhs--f-->C
+        g = pynauty.canon_label(rhs) # rhs--g-->C
+        gi = [None]*len(g)
+        for (idx, i) in enumerate(g):
+            gi[i] = idx
+        assert [gi[g[i]] for i in range(len(g))] == list(range(len(g)))
+        print("f:", f)
+        print("g:", g)
+        print("gi:", gi)
+        iso = [gi[f[i]] for i in range(len(f))]
+        print("iso:", iso)
+
+        n = self.n
+        for bit in range(n):
+            assert iso[2*bit]%2 == 0
+            assert iso[2*bit+1]%2 == 1
+            assert iso[2*bit]+1 == iso[2*bit+1]
+        iso = [iso[2*bit]//2 for bit in range(n)]
+        return iso
+
     def permute(self, f):
         n = self.n
         H = self.deepH[:, [f[i] for i in range(n)], :].copy()

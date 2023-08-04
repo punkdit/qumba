@@ -87,6 +87,29 @@ def main_bring():
     find(Ax, Az)
 
 
+def main_5_1_3():
+    H = """
+    XZZX.
+    .XZZX
+    X.XZZ
+    ZX.XZ
+    """
+    #H = "XX ZZ"
+    code = QCode.fromstr(H)
+    print(code)
+
+    N, perms = code.get_autos()
+    assert N==10 # dihedral group
+
+
+def test_iso():
+    code = QCode.fromstr("X. .Z")
+    dode = code.permute([1,0])
+
+    iso = code.get_iso(dode)
+
+
+
 def main_10_2_3():
     Ax = parse("""
     X..X..XX..
@@ -110,6 +133,22 @@ def main_10_2_3():
 
     print(code)
     print()
+
+    N, perms = code.get_autos()
+    assert N==20
+
+    dode = code.permute(perms[0])
+    assert code.equiv(dode)
+
+    dode = code.apply_H()
+    print(dode)
+    assert not code.equiv(dode)
+
+    #iso = code.get_iso(dode)
+    #print(iso)
+
+    return
+
     """
     0123456789
     X..X..XX..
