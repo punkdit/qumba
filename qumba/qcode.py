@@ -333,6 +333,7 @@ class QCode(object):
         return g
 
     def get_autos(self):
+        assert self.m <= 20, "um... ??"
         from pynauty import Graph, autgrp
         g = self.get_graph()
         aut = autgrp(g)
