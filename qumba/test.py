@@ -6,7 +6,8 @@ start_time = time()
 import numpy
 
 from qumba.algebraic import Matrix, Algebraic
-from qumba.solve import parse, shortstr, linear_independent, eq2, dot2, identity2
+from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
+    rank, rand2, pseudo_inverse, kernel)
 from qumba.isomorph import Tanner, search
 from qumba.qcode import QCode, symplectic_form
 from qumba.argv import argv
@@ -54,7 +55,7 @@ def find_zx_duality(Ax, Az):
     return dual_n
 
 
-def main_bring():
+def test_bring():
     # Bring's code
     Ax = parse("""
     ......1......1.......1.1...1..
@@ -87,7 +88,7 @@ def main_bring():
     find(Ax, Az)
 
 
-def main_5_1_3():
+def test_5_1_3():
     H = """
     XZZX.
     .XZZX
@@ -101,6 +102,15 @@ def main_5_1_3():
     N, perms = code.get_autos()
     assert N==10 # dihedral group
 
+def test_autos():
+    codes = QCode.load_codetables()
+    for code in codes:
+        print("[[%s, %s, %s]]"%(code.n, code.k, code.d), end=" ", flush=True)
+        N, perms = code.get_autos()
+        print("perms:", N)
+        if code.n > 10:
+            break
+
 
 def test_iso():
     code = QCode.fromstr("X. .Z")
@@ -110,7 +120,7 @@ def test_iso():
     print(iso)
 
 
-def main_10_2_3():
+def test_10_2_3():
     Ax = parse("""
     X..X..XX..
     .X..X..XX.
@@ -188,9 +198,9 @@ def main_10_2_3():
 
     #find(Ax, Az)
 
-def main_m24():
+def get_m24():
     # Golay code:
-    H0 = parse("""
+    H = parse("""
     1...........11...111.1.1
     .1...........11...111.11
     ..1.........1111.11.1...
@@ -204,9 +214,46 @@ def main_m24():
     ..........1.1..1..11111.
     ...........11...111.1.11
     """)
+    return QCode.build_css(H, H)
 
+
+def test_code(code):
+    M = code.get_symplectic()
+    dode = QCode.from_symplectic(M, code.m)
+    assert code == dode
+
+    N, perms = code.get_autos()
+    print(N)
+
+    E = code.get_encoder()
+    #print(shortstr(E))
+    #print(E.shape)
+    D = code.get_decoder()
+
+    E = code.get_symplectic()
+    space = code.space
+    F = space.F
+    assert space.is_symplectic(E)
+
+    #E = code.H.transpose()
+    #D = dot2(E.transpose(), F)
+
+    E = code.get_encoder()
+    D = code.get_decoder()
+
+    for f in perms:
+        A = space.get_perm(f)
+        #print(f)
+        #print(shortstr(A))
+        #print()
+        A1 = dot2(D, A, E)
+        print(shortstr(A1))
+        print()
+
+
+def test():
     # RM [[16,6,4]]
-    H1 = parse("""
+    H = parse("""
     11111111........
     ....11111111....
     ........11111111
@@ -214,12 +261,81 @@ def main_m24():
     .11..11..11..11.
     """)
 
-    code = QCode.build_css(H1, H1)
+    code = QCode.build_css(H, H)
+    #print(code)
+
+    assert code.is_css()
+
+    #for code in QCode.load_codetables():
+    #    print(code, code.is_css())
+    code = QCode.fromstr("""
+    X..X..XX..
+    .X..X..XX.
+    X.X.....XX
+    .X.X.X...X
+    ..ZZ..Z..Z
+    ...ZZZ.Z..
+    Z...Z.Z.Z.
+    YZ.X..XY.Z
+    """)
+    assert code.is_css()
+
+
+    return
+
+    code = QCode.fromstr("ZI IZ")
+    print(code.longstr())
+
+    space = code.space
+    F = space.F
+    M = code.get_symplectic()
+    M = dot2(F, M)
+    print(M)
+    assert space.is_symplectic(M)
+
+    #test_code(code)
+
+    return
+
+    code = get_m24()
     print(code)
+    H = code.H
+    T = code.T
+    n = code.n
+    F = code.space.F
+    I = identity2(n)
 
-    N, perms = code.get_autos()
-    print(N)
-
+#    A = dot2(code.T, F)
+#    print(A.shape, rank(A))
+#    print(kernel(A))
+#
+#    return
+#
+#    print(H.shape, T.shape)
+#    while 1:
+#        U = rand2(n, n)
+#        if rank(U) == n:
+#            break
+#    H1 = dot2(U, H)
+#    dode = QCode(H1)
+#    assert eq2( dot2(dode.T, F, dode.H.transpose()), I )
+#    T1 = dode.T
+#    Ui = pseudo_inverse(U)
+#    assert eq2(dot2(Ui, U), I)
+#    UiH1 = dot2(Ui, H1)
+#    assert eq2(UiH1, H)
+#
+#    Ut = U.transpose()
+#    Uti = pseudo_inverse(Ut)
+#
+#    print(shortstr(T))
+#    print()
+#    assert eq2( dot2(Uti, T, F, H.transpose(), Ut), I )
+#    print(eq2(H1.transpose(), dot2(H.transpose(), Ut)))
+#    print(eq2(dot2(Uti, T), dode.T))
+#    print(shortstr(dode.T))
+#    
+#    #print(shortstr(dot2(T, F, H.transpose())))
 
 def find(Ax, Az):
 
@@ -276,7 +392,7 @@ def find(Ax, Az):
         #print(shortstr(F))
 
 
-def test():
+def test_2():
     c = QCode.fromstr("XI IZ")
     c.build()
     print(c)
@@ -288,13 +404,14 @@ def test():
 
 
 
+
 if __name__ == "__main__":
 
     start_time = time()
 
 
     profile = argv.profile
-    name = argv.next() or "main"
+    name = argv.next() or "test"
     _seed = argv.get("seed")
     if _seed is not None:
         print("seed(%s)"%(_seed))

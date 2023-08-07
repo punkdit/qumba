@@ -16,7 +16,7 @@ from numpy import alltrue, zeros, dot
 
 from qumba import solve 
 from qumba.solve import (
-    array2, zeros2, shortstr, dot2, solve2, linear_independent, row_reduce, find_kernel,
+    array2, zeros2, shortstr, dot2, solve2, linear_independent, row_reduce, kernel,
     span, intersect, rank, enum2, shortstrx, identity2, eq2, pseudo_inverse)
 from qumba.argv import argv
 from qumba.smap import SMap
@@ -54,6 +54,16 @@ def flatten(H):
         m, n, _ = H.shape
         H.shape = m, 2*n
     return H
+
+
+def direct_sum(A, B):
+    assert A is not None
+    assert B is not None
+    AB = zeros2(A.shape[0] + B.shape[0], A.shape[1] + B.shape[1])
+    AB[:A.shape[0], :A.shape[1]] = A
+    AB[A.shape[0]:, A.shape[1]:] = B
+    return AB
+
 
 def complement(H):
     H = flatten(H)
@@ -157,6 +167,71 @@ def symplectic_form(n):
     return F
 
 
+class SymplecticSpace(object):
+    def __init__(self, n):
+        assert 0<=n
+        self.n = n
+        self.F = symplectic_form(n)
+
+    def is_symplectic(self, M):
+        nn = 2*self.n
+        F = self.F
+        assert M.shape == (nn, nn)
+        return eq2(F, dot2(M, F, M.transpose()))
+
+    def get_perm(self, f):
+        n, nn = self.n, 2*self.n
+        assert len(f) == n
+        assert set([f[i] for i in range(n)]) == set(range(n))
+        A = zeros2(nn, nn)
+        for i in range(n):
+            A[2*i, 2*f[i]] = 1
+            A[2*i+1, 2*f[i]+1] = 1
+        assert self.is_symplectic(A)
+        return A
+
+    def get(self, M, idx=None):
+        M = array2(M)
+        assert M.shape == (2,2)
+        n = self.n
+        A = identity2(2*n)
+        idxs = list(range(n)) if idx is None else [idx]
+        for i in idxs:
+            A[2*i:2*i+2, 2*i:2*i+2] = M
+        return A
+
+    def get_H(self, idx=None):
+        # swap X<-->Z on bit idx
+        H = array2([[0,1],[1,0]])
+        return self.get(H, idx)
+
+    def get_S(self, idx=None):
+        # swap X<-->Y
+        S = array2([[1,1],[0,1]])
+        return self.get(S, idx)
+
+    def get_SH(self, idx=None):
+        # X-->Z-->Y-->X 
+        SH = array2([[0,1],[1,1]])
+        return self.get(SH, idx)
+
+    def get_CZ(self, idx, jdx):
+        assert idx != jdx
+        n = self.n
+        A = identity2(2*n)
+        A[2*idx, 2*jdx+1] = 1
+        A[2*jdx, 2*idx+1] = 1
+        return A
+
+    def get_CNOT(self, idx, jdx):
+        assert idx != jdx
+        n = self.n
+        A = identity2(2*n)
+        A[2*jdx+1, 2*idx+1] = 1
+        A[2*idx, 2*jdx] = 1
+        return A
+
+
 class QCode(object):
     def __init__(self, H, T=None, L=None, J=None, d=None, check=True):
         assert H.max() <= 1
@@ -173,9 +248,11 @@ class QCode(object):
         self.J = J # gauge generators
         self.m = m
         self.n = n
+        self.nn = nn
         self.k = n - m # logicals
         self.d = d
         self.shape = m, n
+        self.space = SymplecticSpace(n)
         if L is not None:
             assert L.shape == (2*self.k, nn)
         if T is not None:
@@ -183,21 +260,34 @@ class QCode(object):
         if check:
             self.check()
 
+    def __eq__(self, other):
+        assert isinstance(other, QCode)
+        eq = lambda A, B : (A is None and B is None) or A is not None and B is not None and eq2(A, B)
+        return (
+            eq(self.H, other.H) and eq(self.T, other.T) and
+            eq(self.L, other.L) and eq(self.J, other.J))
+
+    def __add__(self, other):
+        H = direct_sum(self.H, other.H)
+        T = direct_sum(self.T, other.T)
+        L = direct_sum(self.L, other.L)
+        return QCode(H, T, L)
+
     @classmethod
-    def build_css(cls, Hx, Hz, Lx=None, Lz=None, Jx=None, Jz=None):
+    def build_css(cls, Hx, Hz, Lx=None, Lz=None, Jx=None, Jz=None, **kw):
         H = css_to_isotropic(Hx, Hz)
         L = css_to_symplectic(Lx, Lz) if Lx is not None else None
         J = css_to_symplectic(Jx, Jz) if Jx is not None else None
         T = None
-        return QCode(H, T, L, J)
+        return QCode(H, T, L, J, **kw)
 
     @classmethod
-    def build_gauge(cls, J):
+    def build_gauge(cls, J, **kw):
         m, n, _ = J.shape
         J1 = J.copy()
         J1[:, :, :] = J1[:, :, [1,0]]
         J1.shape = (m, 2*n)
-        K = find_kernel(J1)
+        K = kernel(J1)
         #print("K:", K.shape)
         #print(shortstr(K))
         J = J.view()
@@ -206,17 +296,17 @@ class QCode(object):
         #print("H:", H.shape)
         #H.shape = len(H), n, 2
         #J.shape = len(J), n, 2
-        code = QCode(H, None, None, J)
+        code = QCode(H, None, None, J, **kw)
         return code
 
     @classmethod
-    def build_gauge_css(cls, Jx, Jz):
+    def build_gauge_css(cls, Jx, Jz, **kw):
         J = css_to_isotropic(Jx, Jz)
-        code = cls.build_gauge(J)
+        code = cls.build_gauge(J, **kw)
         return code
 
     @classmethod
-    def fromstr(cls, Hs, Ls=None, check=True):
+    def fromstr(cls, Hs, Ls=None, check=True, **kw):
         stabs = Hs.split()
         H = []
         I, X, Z, Y = [0,0], [1,0], [0,1], [1,1]
@@ -225,9 +315,13 @@ class QCode(object):
             row = [lookup[c] for c in stab]
             H.append(row)
         H = array2(H)
-        return QCode(H, check=check)
+        return QCode(H, check=check, **kw)
 
     def __str__(self):
+        d = self.d if self.d is not None else '?'
+        return "[[%s, %s, %s]]"%(self.n, self.k, d)
+
+    def longstr(self):
         s = "H =\n%s"%strop(self.H)
         T = self.T
         if T is not None and len(T):
@@ -236,7 +330,6 @@ class QCode(object):
         if L is not None and len(L):
             s += "\nL =\n%s"%strop(L)
         return s
-    __repr__ = __str__
 
     def shortstr(self):
         H = self.H.view()
@@ -313,6 +406,7 @@ class QCode(object):
         H = self.H
         rows = [v for v in span(H) if v.sum()]
         V = array2(rows)
+        #print(V.sum(0)) # not much help..
         m, nn = V.shape
         n = nn//2
         g = Graph(nn+m, True) # bits + checks
@@ -333,7 +427,7 @@ class QCode(object):
         return g
 
     def get_autos(self):
-        assert self.m <= 20, "um... ??"
+        assert self.m <= 20, "um... too big ??"
         from pynauty import Graph, autgrp
         g = self.get_graph()
         aut = autgrp(g)
@@ -466,7 +560,7 @@ class QCode(object):
         L = []
         for i in range(k):
             M = dot2(H, symplectic_form(n))
-            K = find_kernel(M) # XXX do this incrementally for more speed XXX
+            K = kernel(M) # XXX do this incrementally for more speed XXX
             J = dot2(K, symplectic_form(n), K.transpose())
             for (row, col) in zip(*numpy.where(J)):
                 break
@@ -569,5 +663,53 @@ class QCode(object):
         M = numpy.concatenate((HT, L))
         return M
 
+    @classmethod
+    def from_symplectic(cls, M, m, **kw):
+        nn = len(M)
+        assert M.shape == (nn, nn)
+        assert 0<=2*m<=nn
+        HT = M[:2*m, :]
+        L = M[2*m:, :]
+        H = HT[0::2, :]
+        T = HT[1::2, :]
+        code = QCode(H, T, L, **kw)
+        return code
+
+    def get_encoder(self):
+        Hx = self.H
+        Tz = self.T
+        Lz = self.L[1::2, :]
+        E = numpy.concatenate((Tz, Lz)).transpose()
+        return E
+
+    def get_decoder(self):
+        Hx = self.H
+        Lx = self.L[0::2, :]
+        D = numpy.concatenate((Hx, Lx))
+        F = symplectic_form(self.n)
+        D = dot2(D, F)
+        return D
+
+    @classmethod
+    def load_codetables(cls):
+        f = open("codetables.txt")
+        #data = {}
+        for line in f:
+            record = json.loads(line)
+            n = record['n']
+            k = record['k']
+            #data[n,k] = record
+            stabs = record["stabs"]
+            code = QCode.fromstr(stabs, d=record["d"])
+            yield code
+
+    def is_css(self):
+        "check for transversal CNOT"
+        n = self.n
+        src = self + self
+        tgt = src
+        for i in range(n):
+            tgt = tgt.apply_CNOT(i, n+i)
+        return src.equiv(tgt)
 
 
