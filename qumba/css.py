@@ -5,6 +5,7 @@ from qumba.isomorph import Tanner, search
 
 
 def find_autos(Ax, Az):
+    # find automorphisms of the XZ-Tanner graph
     ax, n = Ax.shape
     az, _ = Az.shape
 
@@ -24,7 +25,7 @@ def find_autos(Ax, Az):
 
 
 def find_zx_duality(Ax, Az):
-    # find a zx duality
+    # Find a zx duality
     ax, n = Ax.shape
     az, _ = Az.shape
     U = Tanner.build2(Ax, Az)

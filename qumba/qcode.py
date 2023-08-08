@@ -383,12 +383,12 @@ class QCode(object):
 #        H = dot(self.H, D) % 2
 #        return QCode(H)
 
-    def overlap(self, other):
-        F = symplectic_form(self.n)
-        A = dot2(dot2(self.L, F), other.L.transpose())
-        #A = dot2(self.L, other.L.transpose())
-        A = dot2(symplectic_form(self.k), A)
-        return A
+#    def overlap(self, other):
+#        F = symplectic_form(self.n)
+#        A = dot2(dot2(self.L, F), other.L.transpose())
+#        #A = dot2(self.L, other.L.transpose())
+#        A = dot2(symplectic_form(self.k), A)
+#        return A
 
     def equiv(self, other):
         H1, H2 = self.H.transpose(), other.H.transpose()
@@ -681,20 +681,20 @@ class QCode(object):
         code = QCode(H, T, L, **kw)
         return code
 
-    def get_encoder(self):
-        Hx = self.H
-        Tz = self.T
-        Lz = self.L[1::2, :]
-        E = numpy.concatenate((Tz, Lz)).transpose()
-        return E
-
-    def get_decoder(self):
-        Hx = self.H
-        Lx = self.L[0::2, :]
-        D = numpy.concatenate((Hx, Lx))
-        F = symplectic_form(self.n)
-        D = dot2(D, F)
-        return D
+#    def get_encoder(self):
+#        Hx = self.H
+#        Tz = self.T
+#        Lz = self.L[1::2, :]
+#        E = numpy.concatenate((Tz, Lz)).transpose()
+#        return E
+#
+#    def get_decoder(self):
+#        Hx = self.H
+#        Lx = self.L[0::2, :]
+#        D = numpy.concatenate((Hx, Lx))
+#        F = symplectic_form(self.n)
+#        D = dot2(D, F)
+#        return D
 
     @classmethod
     def load_codetables(cls):
