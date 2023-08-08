@@ -198,7 +198,7 @@ class SymplecticSpace(object):
         idxs = list(range(n)) if idx is None else [idx]
         for i in idxs:
             A[2*i:2*i+2, 2*i:2*i+2] = M
-        return A
+        return A.transpose()
 
     def get_H(self, idx=None):
         # swap X<-->Z on bit idx
@@ -221,7 +221,7 @@ class SymplecticSpace(object):
         A = identity2(2*n)
         A[2*idx, 2*jdx+1] = 1
         A[2*jdx, 2*idx+1] = 1
-        return A
+        return A.transpose()
 
     def get_CNOT(self, idx, jdx):
         assert idx != jdx
@@ -229,7 +229,7 @@ class SymplecticSpace(object):
         A = identity2(2*n)
         A[2*jdx+1, 2*idx+1] = 1
         A[2*idx, 2*jdx] = 1
-        return A
+        return A.transpose()
 
 
 class QCode(object):
@@ -427,7 +427,7 @@ class QCode(object):
         return g
 
     def get_autos(self):
-        assert self.m <= 20, "um... too big ??"
+        assert self.m <= 20, ("um... %s is too big ??"%(self.m))
         from pynauty import Graph, autgrp
         g = self.get_graph()
         aut = autgrp(g)
@@ -477,7 +477,7 @@ class QCode(object):
         iso = [iso[2*bit]//2 for bit in range(n)]
         return iso
 
-    def permute(self, f):
+    def apply_perm(self, f):
         n = self.n
         H = self.deepH[:, [f[i] for i in range(n)], :].copy()
         L = self.deepL
@@ -538,6 +538,8 @@ class QCode(object):
         A = identity2(2*n)
         A[2*jdx+1, 2*idx+1] = 1
         A[2*idx, 2*jdx] = 1
+        #print("apply_CNOT")
+        #print(A)
         H = dot2(self.H, A)
         T = dot2(self.T, A)
         L = dot2(self.L, A)
@@ -661,13 +663,17 @@ class QCode(object):
         m, n = self.shape
         HT.shape = 2*m, 2*n
         M = numpy.concatenate((HT, L))
-        return M
+        return M.transpose()
 
     @classmethod
-    def from_symplectic(cls, M, m, **kw):
+    def from_symplectic(cls, M, m=None, **kw):
         nn = len(M)
         assert M.shape == (nn, nn)
+        assert nn%2 == 0
+        if m is None:
+            m = nn//2
         assert 0<=2*m<=nn
+        M = M.transpose()
         HT = M[:2*m, :]
         L = M[2*m:, :]
         H = HT[0::2, :]

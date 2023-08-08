@@ -2,57 +2,135 @@
 
 from time import time
 start_time = time()
+from random import shuffle
 
 import numpy
 
-from qumba.algebraic import Matrix, Algebraic
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel)
-from qumba.isomorph import Tanner, search
-from qumba.qcode import QCode, symplectic_form
+from qumba.qcode import QCode, SymplecticSpace
+from qumba import css
 from qumba.argv import argv
 
 
-def find_autos_css(Ax, Az):
-    ax, n = Ax.shape
-    az, _ = Az.shape
 
-    U = Tanner.build2(Ax, Az)
-    V = Tanner.build2(Ax, Az)
-    perms = []
-    for g in search(U, V):
-        # each perm acts on ax+az+n in that order
-        assert len(g) == n+ax+az
-        for i in range(ax):
-            assert 0<=g[i]<ax
-        for i in range(ax, ax+az):
-            assert ax<=g[i]<ax+az
-        g = [g[i]-ax-az for i in range(ax+az, ax+az+n)]
-        perms.append(g)
-    return perms
+def find_logical_autos(code):
+    K = SymplecticSpace(code.k)
+    kk = 2*code.k
+
+    space = code.space
+    N, perms = code.get_autos()
+    M = code.get_symplectic()
+    Mi = dot2(space.F, M.transpose(), space.F)
+    I = identity2(code.nn)
+    assert eq2(dot2(M, Mi), I)
+    assert eq2(dot2(Mi, M), I)
+
+    gens = []
+    for f in perms:
+        A = space.get_perm(f)
+        dode = QCode.from_symplectic(dot2(A, M), code.m)
+        assert dode.equiv(code)
+
+        MiAM = dot2(Mi, A, M)
+        L = MiAM[-kk:, -kk:]
+        assert K.is_symplectic(L)
+        gens.append(L)
+
+    from sage.all_cmdline import GF, matrix, MatrixGroup
+    field = GF(2)
+    gens = [matrix(field, kk, A.copy()) for A in gens]
+    G = MatrixGroup(gens)
+    print(G.structure_description())
 
 
-def find_zx_duality(Ax, Az):
-    # find a zx duality
-    ax, n = Ax.shape
-    az, _ = Az.shape
-    U = Tanner.build2(Ax, Az)
-    V = Tanner.build2(Az, Ax)
-    for duality in search(U, V):
-        break
-    else:
-        return None
+def fixed(f):
+    return [i for i in range(len(f)) if f[i]==i]
 
-    dual_x = [duality[i] for i in range(ax)]
-    dual_z = [duality[i]-ax for i in range(ax,ax+az)]
-    dual_n = [duality[i]-ax-az for i in range(ax+az,ax+az+n)]
+def is_identity(f):
+    for i in range(len(f)):
+        if f[i] != i:
+            return False
+    return True
 
-    Ax1 = Ax[dual_z, :][:, dual_n]
-    Az1 = Az[dual_x, :][:, dual_n]
+def mul(f, g):
+    return [f[g[i]] for i in range(len(g))]
+        
 
-    assert eq2(Ax1, Az)
-    assert eq2(Az1, Ax)
-    return dual_n
+def find_logicals(Ax, Az):
+
+    Hx = linear_independent(Ax)
+    Hz = linear_independent(Az)
+    code = QCode.build_css(Hx, Hz)
+    space = code.space
+
+    perms = css.find_autos(Ax, Az)
+    print("perms:", len(perms))
+
+    duality = css.find_zx_duality(Ax, Az)
+
+    dode = code.apply_perm(duality)
+    dode = dode.apply_H()
+    assert code.equiv(dode)
+
+    n = code.n
+    kk = 2*code.k
+    K = SymplecticSpace(code.k)
+    M = code.get_symplectic()
+    Mi = dot2(space.F, M.transpose(), space.F)
+    I = identity2(code.nn)
+    assert eq2(dot2(M, Mi), I)
+    assert eq2(dot2(Mi, M), I)
+
+    gens = []
+    A = dot2(space.get_H(), space.get_perm(duality))
+    gens.append(A)
+
+    for f in perms:
+        A = space.get_perm(f)
+        gens.append(A)
+
+    for f in perms:
+        # zx duality
+        zx = mul(duality, f)
+        if not is_identity(mul(zx, zx)) or len(fixed(zx))%2 != 0:
+            continue
+        # XXX there's more conditions to check
+
+        A = I
+        remain = set(range(n))
+        for i in fixed(zx):
+            A = dot2(space.get_S(i), A)
+            remain.remove(i)
+        for i in range(n):
+            if i not in remain:
+                continue
+            j = zx[i]
+            assert zx[j] == i
+            remain.remove(i)
+            remain.remove(j)
+            A = dot2(space.get_CZ(i, j), A)
+        gens.append(A)
+        break # we only need one of these
+
+    print("gens:", len(gens))
+
+    logicals = []
+    for A in gens:
+        dode = QCode.from_symplectic(dot2(A, M), code.m)
+        assert dode.equiv(code)
+        MiAM = dot2(Mi, A, M)
+        L = MiAM[-kk:, -kk:]
+        assert K.is_symplectic(L)
+        logicals.append(L)
+    print("logicals:", len(logicals))
+
+    from sage.all_cmdline import GF, matrix, MatrixGroup
+    field = GF(2)
+    logicals = [matrix(field, kk, A.copy()) for A in logicals]
+    G = MatrixGroup(logicals)
+    print(G.structure_description())
+    print("|G| =", len(G))
 
 
 def test_bring():
@@ -85,7 +163,7 @@ def test_bring():
     ...1.........1.1.........1.1..
     1.11................1.1.......
     """)
-    find(Ax, Az)
+    find_logicals(Ax, Az)
 
 
 def test_5_1_3():
@@ -105,19 +183,18 @@ def test_5_1_3():
 def test_autos():
     codes = QCode.load_codetables()
     for code in codes:
+        if code.n > 10:
+            break
         print("[[%s, %s, %s]]"%(code.n, code.k, code.d), end=" ", flush=True)
         N, perms = code.get_autos()
         print("perms:", N)
-        if code.n > 10:
-            break
 
 
 def test_iso():
     code = QCode.fromstr("X. .Z")
-    dode = code.permute([1,0])
-
+    dode = code.apply_perm([1,0])
     iso = code.get_iso(dode)
-    print(iso)
+    assert iso == [1, 0]
 
 
 def test_10_2_3():
@@ -147,7 +224,7 @@ def test_10_2_3():
     N, perms = code.get_autos()
     assert N==20
 
-    dode = code.permute(perms[0])
+    dode = code.apply_perm(perms[0])
     assert code.equiv(dode)
 
     dode = code.apply_H()
@@ -157,7 +234,7 @@ def test_10_2_3():
 
     iso = code.get_iso(dode)
     print(iso)
-    eode = code.permute(iso)
+    eode = code.apply_perm(iso)
     assert eode.equiv(dode)
 
     print("eode:")
@@ -195,8 +272,8 @@ def test_10_2_3():
         if ck.equiv(code):
             print("FOUND!")
             return
-
     #find(Ax, Az)
+
 
 def get_m24():
     # Golay code:
@@ -217,41 +294,62 @@ def get_m24():
     return QCode.build_css(H, H)
 
 
-def test_code(code):
-    M = code.get_symplectic()
-    dode = QCode.from_symplectic(M, code.m)
-    assert code == dode
+def test_symplectic():
 
-    N, perms = code.get_autos()
-    print(N)
+    for s in [
+        "XI IX",
+        "XI IZ",
+        "ZI IZ",
+        "ZI IX",
+        "XX ZZ",
+        "ZZXX XYZZ",
+    ]:
+        code = QCode.fromstr(s)
+    
+        space = code.space
+        F = space.F
+        M = code.get_symplectic()
+        assert space.is_symplectic(M)
+        assert QCode.from_symplectic(M, code.m) == code
+    
+        A = space.get_S()
+        assert space.is_symplectic(A)
+        AM = dot2(A, M)
+        assert space.is_symplectic(AM)
+        dode = QCode.from_symplectic(AM, code.m)
+        eode = code.apply_S()
+        assert eode == dode
+    
+        A = space.get_CNOT(0, 1)
+        assert space.is_symplectic(A)
+        AM = dot2(A, M)
+        assert space.is_symplectic(AM)
+        dode = QCode.from_symplectic(AM, code.m)
+        eode = code.apply_CNOT(0, 1)
+        assert eode == dode
 
-    E = code.get_encoder()
-    #print(shortstr(E))
-    #print(E.shape)
-    D = code.get_decoder()
-
-    E = code.get_symplectic()
-    space = code.space
-    F = space.F
-    assert space.is_symplectic(E)
-
-    #E = code.H.transpose()
-    #D = dot2(E.transpose(), F)
-
-    E = code.get_encoder()
-    D = code.get_decoder()
-
-    for f in perms:
+        f = list(range(code.n))
+        shuffle(f)
         A = space.get_perm(f)
-        #print(f)
-        #print(shortstr(A))
-        #print()
-        A1 = dot2(D, A, E)
-        print(shortstr(A1))
-        print()
+        assert space.is_symplectic(A)
+        AM = dot2(A, M)
+        assert space.is_symplectic(AM)
+        dode = QCode.from_symplectic(AM, code.m)
+        eode = code.apply_perm(f)
+        assert eode == dode
+    
+    toric = QCode.fromstr("""
+    X..X..XX..
+    .X..X..XX.
+    X.X.....XX
+    .X.X.X...X
+    ..ZZ..Z..Z
+    ...ZZZ.Z..
+    Z...Z.Z.Z.
+    ZZ.....Z.Z
+    """)
 
 
-def test():
     # RM [[16,6,4]]
     H = parse("""
     11111111........
@@ -261,10 +359,8 @@ def test():
     .11..11..11..11.
     """)
 
-    code = QCode.build_css(H, H)
-    #print(code)
-
-    assert code.is_css()
+    rm = QCode.build_css(H, H)
+    assert rm.is_css()
 
     #for code in QCode.load_codetables():
     #    print(code, code.is_css())
@@ -281,127 +377,13 @@ def test():
     assert code.is_css()
 
 
-    return
-
-    code = QCode.fromstr("ZI IZ")
-    print(code.longstr())
-
-    space = code.space
-    F = space.F
-    M = code.get_symplectic()
-    M = dot2(F, M)
-    print(M)
-    assert space.is_symplectic(M)
-
-    #test_code(code)
-
-    return
-
-    code = get_m24()
-    print(code)
-    H = code.H
-    T = code.T
-    n = code.n
-    F = code.space.F
-    I = identity2(n)
-
-#    A = dot2(code.T, F)
-#    print(A.shape, rank(A))
-#    print(kernel(A))
-#
-#    return
-#
-#    print(H.shape, T.shape)
-#    while 1:
-#        U = rand2(n, n)
-#        if rank(U) == n:
-#            break
-#    H1 = dot2(U, H)
-#    dode = QCode(H1)
-#    assert eq2( dot2(dode.T, F, dode.H.transpose()), I )
-#    T1 = dode.T
-#    Ui = pseudo_inverse(U)
-#    assert eq2(dot2(Ui, U), I)
-#    UiH1 = dot2(Ui, H1)
-#    assert eq2(UiH1, H)
-#
-#    Ut = U.transpose()
-#    Uti = pseudo_inverse(Ut)
-#
-#    print(shortstr(T))
-#    print()
-#    assert eq2( dot2(Uti, T, F, H.transpose(), Ut), I )
-#    print(eq2(H1.transpose(), dot2(H.transpose(), Ut)))
-#    print(eq2(dot2(Uti, T), dode.T))
-#    print(shortstr(dode.T))
-#    
-#    #print(shortstr(dot2(T, F, H.transpose())))
-
-def find(Ax, Az):
-
-    print(Ax.shape)
-
-    autos = find_autos_css(Ax, Az)
-    print("autos:", len(autos))
-
-    duality = find_zx_duality(Ax, Az)
-    print("duality:", duality)
-
-    Hx = linear_independent(Ax)
-    Hz = linear_independent(Az)
-    code = QCode.build_css(Hx, Hz)
-
-    print(code)
-    print()
-
-    M = code.get_symplectic()
-    #print(shortstr(M))
-
-    F = symplectic_form(code.n)
-    assert eq2(F, dot2(M, F, M.transpose()))
-
-    I = identity2(2*code.n)
-    assert eq2(dot2(F, F), I) # self inverse
-
-    Mi = dot2(F, M.transpose(), F)
-    assert eq2(dot2(M, Mi), I)
-
-    Hx = code.H
-    Tz = code.T
-    Lx = code.L[0::2, :]
-    Lz = code.L[1::2, :]
-
-    # encoder
-    E = numpy.concatenate((Tz, Lz)).transpose()
-
-    # decoder
-    D = numpy.concatenate((Hx, Lx))
-    D = dot2(D, F)
-
-    DE = dot2(D, E)
-    assert eq2(DE, identity2(code.n))
-    
-    return
-
-    F = code.overlap(code)
-    print(shortstr(F))
-
-    for g in autos:
-        tgt = code.permute(g)
-        F = code.overlap(tgt)
-        #print(shortstr(F))
-
-
-def test_2():
-    c = QCode.fromstr("XI IZ")
-    c.build()
-    print(c)
-    print()
-
-    c1 = c.apply_CNOT(0, 1)
-    print(c1)
-
-
+def test():
+    test_5_1_3()
+    test_autos()
+    test_iso()
+    test_10_2_3()
+    test_symplectic()
+    test_bring()
 
 
 
@@ -430,8 +412,7 @@ if __name__ == "__main__":
 
 
     t = time() - start_time
-    print("finished in %.3f seconds"%t)
-    print("OK!\n")
+    print("OK! finished in %.3f seconds\n"%t)
 
 
 
