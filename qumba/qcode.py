@@ -656,7 +656,7 @@ class QCode(object):
             d = min(w, d)
         return d
 
-    def get_symplectic(self):
+    def get_encoder(self):
         self.build()
         H, T, L = self.H, self.T, self.L
         HT = array2(list(zip(H, T)))
@@ -666,7 +666,7 @@ class QCode(object):
         return M.transpose()
 
     @classmethod
-    def from_symplectic(cls, M, m=None, **kw):
+    def from_encoder(cls, M, m=None, **kw):
         nn = len(M)
         assert M.shape == (nn, nn)
         assert nn%2 == 0

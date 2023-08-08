@@ -20,7 +20,7 @@ def find_logical_autos(code):
 
     space = code.space
     N, perms = code.get_autos()
-    M = code.get_symplectic()
+    M = code.get_encoder()
     Mi = dot2(space.F, M.transpose(), space.F)
     I = identity2(code.nn)
     assert eq2(dot2(M, Mi), I)
@@ -29,7 +29,7 @@ def find_logical_autos(code):
     gens = []
     for f in perms:
         A = space.get_perm(f)
-        dode = QCode.from_symplectic(dot2(A, M), code.m)
+        dode = QCode.from_encoder(dot2(A, M), code.m)
         assert dode.equiv(code)
 
         MiAM = dot2(Mi, A, M)
@@ -76,7 +76,7 @@ def find_logicals(Ax, Az):
     n = code.n
     kk = 2*code.k
     K = SymplecticSpace(code.k)
-    M = code.get_symplectic()
+    M = code.get_encoder()
     Mi = dot2(space.F, M.transpose(), space.F)
     I = identity2(code.nn)
     assert eq2(dot2(M, Mi), I)
@@ -117,7 +117,7 @@ def find_logicals(Ax, Az):
 
     logicals = []
     for A in gens:
-        dode = QCode.from_symplectic(dot2(A, M), code.m)
+        dode = QCode.from_encoder(dot2(A, M), code.m)
         assert dode.equiv(code)
         MiAM = dot2(Mi, A, M)
         L = MiAM[-kk:, -kk:]
@@ -308,15 +308,15 @@ def test_symplectic():
     
         space = code.space
         F = space.F
-        M = code.get_symplectic()
+        M = code.get_encoder()
         assert space.is_symplectic(M)
-        assert QCode.from_symplectic(M, code.m) == code
+        assert QCode.from_encoder(M, code.m) == code
     
         A = space.get_S()
         assert space.is_symplectic(A)
         AM = dot2(A, M)
         assert space.is_symplectic(AM)
-        dode = QCode.from_symplectic(AM, code.m)
+        dode = QCode.from_encoder(AM, code.m)
         eode = code.apply_S()
         assert eode == dode
     
@@ -324,7 +324,7 @@ def test_symplectic():
         assert space.is_symplectic(A)
         AM = dot2(A, M)
         assert space.is_symplectic(AM)
-        dode = QCode.from_symplectic(AM, code.m)
+        dode = QCode.from_encoder(AM, code.m)
         eode = code.apply_CNOT(0, 1)
         assert eode == dode
 
@@ -334,7 +334,7 @@ def test_symplectic():
         assert space.is_symplectic(A)
         AM = dot2(A, M)
         assert space.is_symplectic(AM)
-        dode = QCode.from_symplectic(AM, code.m)
+        dode = QCode.from_encoder(AM, code.m)
         eode = code.apply_perm(f)
         assert eode == dode
     
