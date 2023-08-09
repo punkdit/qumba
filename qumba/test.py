@@ -458,26 +458,17 @@ def test_concatenate():
 def test_concatenate_steane():
     surface = QCode.fromstr("ZZZII IIZZZ XIXXI IXXIX")
     assert surface.get_params() == (5, 1, 2)
-    print(surface)
-    print(surface.longstr())
-    print()
 
-    #for i in [1, 2, 3]:
-    #    surface = surface.apply_S(i)
     surface = surface.apply_perm([1, 2, 3, 0, 4])
-
-    #inner = QCode.fromstr("XXXX ZZZZ", None, "ZIZI XXII ZZII XIXI")
     inner = get_422()
-    print(inner.longstr())
 
     right = QCode.trivial(2) + surface
-    left = QCode.fromstr("XXXX ZZZZ") + QCode.trivial(3)
+    left = inner + QCode.trivial(3)
 
     code = left << right
     assert code.get_params() == (7, 1, 3)
-    print(code.longstr())
-    print(code.is_selfdual())
-    print(code.is_css())
+    assert code.is_selfdual()
+    assert code.is_css()
 
 
 def test_concatenate_toric():
@@ -485,15 +476,10 @@ def test_concatenate_toric():
     dual = toric.get_dual()
     iso = toric.get_iso(dual)
     print(iso)
-#    E1 = toric.get_encoder()
-#    E2 = toric.get_encoder()
-#    E = direct_sum(E1, E2)
     
     outer = toric + dual
-    E = outer.get_encoder()
 
     print("outer:", outer)
-    print(shortstr(E))
 
     f = []
     for (i,j) in enumerate(iso):
@@ -502,26 +488,25 @@ def test_concatenate_toric():
     print("f:", f)
     #P = outer.space.get_perm(f)
     outer = outer.apply_perm(f)
+    print(outer.longstr())
 
-    inner = QCode.fromstr("XXXX ZZZZ")
+    inner = get_422()
     print(inner)
 
-    inns = (outer.n // inner.k) * inner
-    E1 = inns.get_encoder()
+    left = (outer.n // inner.k) * inner
 
-    print("inns:", inns)
-    #print(shortstr(E1))
+    print("left:", left)
 
-    trivial = QCode.from_encoder(identity2(2*inns.m))
-    print(trivial)
-    #print(shortstr(trivial.get_encoder()))
-    rhs = trivial + outer
-    EE = dot2(E1, rhs.get_encoder())
+    trivial = QCode.trivial(left.m)
+    right = trivial + outer
+    print(right)
 
-    result = QCode.from_encoder(EE, k=toric.k)
+    result = left << right
     print(result)
     print(result.longstr())
     print(result.is_selfdual())
+
+    # hmm...
 
 
 def test():
