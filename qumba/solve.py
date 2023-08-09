@@ -657,6 +657,14 @@ def span(vs):
     return image(H.transpose())
 
 
+def direct_sum(A, B):
+    assert A is not None
+    assert B is not None
+    AB = zeros2(A.shape[0] + B.shape[0], A.shape[1] + B.shape[1])
+    AB[:A.shape[0], :A.shape[1]] = A
+    AB[A.shape[0]:, A.shape[1]:] = B
+    return AB
+
 
 class RowReduction(object):
     "deprecated: use get_reductor"

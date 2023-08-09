@@ -8,7 +8,7 @@ from random import randint, choice, random
 from time import sleep, time
 from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
-from operator import matmul
+from operator import add
 import json
 
 import numpy
@@ -17,7 +17,7 @@ from numpy import alltrue, zeros, dot
 from qumba import solve 
 from qumba.solve import (
     array2, zeros2, shortstr, dot2, solve2, linear_independent, row_reduce, kernel,
-    span, intersect, rank, enum2, shortstrx, identity2, eq2, pseudo_inverse)
+    span, intersect, rank, enum2, shortstrx, identity2, eq2, pseudo_inverse, direct_sum)
 from qumba.argv import argv
 from qumba.smap import SMap
 
@@ -29,6 +29,19 @@ def parse(s):
     for c in " [],":
         s = s.replace(c, '')
     return solve.parse(s)
+
+
+def fromstr(Hs):
+    stabs = Hs.split()
+    H = []
+    I, X, Z, Y = [0,0], [1,0], [0,1], [1,1]
+    lookup = {'X':X, 'Z':Z, 'Y':Y, 'I':I, '.':I}
+    for stab in stabs:
+        row = [lookup[c] for c in stab]
+        H.append(row)
+    H = array2(H)
+    return H
+
 
 def css_to_symplectic(Lx, Lz):
     assert Lz.shape == Lx.shape
@@ -48,21 +61,13 @@ def css_to_isotropic(Hx, Hz):
     H[mx:, :, 1] = Hz
     return H
 
+
 def flatten(H):
     if H is not None and len(H.shape)==3:
         H = H.view()
         m, n, _ = H.shape
         H.shape = m, 2*n
     return H
-
-
-def direct_sum(A, B):
-    assert A is not None
-    assert B is not None
-    AB = zeros2(A.shape[0] + B.shape[0], A.shape[1] + B.shape[1])
-    AB[:A.shape[0], :A.shape[1]] = A
-    AB[A.shape[0]:, A.shape[1]:] = B
-    return AB
 
 
 def complement(H):
@@ -273,6 +278,12 @@ class QCode(object):
         L = direct_sum(self.L, other.L)
         return QCode(H, T, L)
 
+    def __rmul__(self, count):
+        assert type(count) is int
+        assert count>=0
+        code = reduce(add, [self]*count)
+        return code
+
     @classmethod
     def build_css(cls, Hx, Hz, Lx=None, Lz=None, Jx=None, Jz=None, **kw):
         H = css_to_isotropic(Hx, Hz)
@@ -306,16 +317,12 @@ class QCode(object):
         return code
 
     @classmethod
-    def fromstr(cls, Hs, Ls=None, check=True, **kw):
-        stabs = Hs.split()
-        H = []
-        I, X, Z, Y = [0,0], [1,0], [0,1], [1,1]
-        lookup = {'X':X, 'Z':Z, 'Y':Y, 'I':I, '.':I}
-        for stab in stabs:
-            row = [lookup[c] for c in stab]
-            H.append(row)
-        H = array2(H)
-        return QCode(H, check=check, **kw)
+    def fromstr(cls, Hs, Ts=None, Ls=None, Js=None, check=True, **kw):
+        H = fromstr(Hs)
+        T = fromstr(Ts) if Ts is not None else None
+        L = fromstr(Ls) if Ls is not None else None
+        J = fromstr(Js) if Js is not None else None
+        return QCode(H, T, L, J, check=check, **kw)
 
     def __str__(self):
         d = self.d if self.d is not None else '?'
@@ -510,6 +517,7 @@ class QCode(object):
         # swap X<-->Z on bit idx
         H = array2([[0,1],[1,0]])
         return self.apply(idx, H)
+    get_dual = apply_H
 
     def apply_S(self, idx=None):
         # swap X<-->Y
@@ -656,20 +664,29 @@ class QCode(object):
             d = min(w, d)
         return d
 
-    def get_encoder(self):
+    #@cache # needs __hash__
+    def get_encoder(self, inverse=False):
         self.build()
         H, T, L = self.H, self.T, self.L
         HT = array2(list(zip(H, T)))
         m, n = self.shape
         HT.shape = 2*m, 2*n
         M = numpy.concatenate((HT, L))
-        return M.transpose()
+        Mt = M.transpose()
+        if inverse:
+            F = self.space.F
+            return dot2(F, M, F)
+        else:
+            return Mt
+    get_symplectic = get_encoder
 
     @classmethod
-    def from_encoder(cls, M, m=None, **kw):
+    def from_encoder(cls, M, m=None, k=None, **kw):
         nn = len(M)
         assert M.shape == (nn, nn)
         assert nn%2 == 0
+        if k is not None:
+            m = nn//2 - k
         if m is None:
             m = nn//2
         assert 0<=2*m<=nn
@@ -680,31 +697,27 @@ class QCode(object):
         T = HT[1::2, :]
         code = QCode(H, T, L, **kw)
         return code
+    from_symplectic = from_encoder
 
-#    def get_encoder(self):
-#        Hx = self.H
-#        Tz = self.T
-#        Lz = self.L[1::2, :]
-#        E = numpy.concatenate((Tz, Lz)).transpose()
-#        return E
-#
-#    def get_decoder(self):
-#        Hx = self.H
-#        Lx = self.L[0::2, :]
-#        D = numpy.concatenate((Hx, Lx))
-#        F = symplectic_form(self.n)
-#        D = dot2(D, F)
-#        return D
+    @classmethod
+    def trivial(cls, n):
+        return cls.from_symplectic(identity2(2*n))
+
+    def __lshift__(left, right):
+        assert left.n == right.n
+        L = left.get_symplectic() 
+        R = right.get_symplectic()
+        E = dot2(L, R)
+        code = QCode.from_symplectic(E, k=right.k)
+        return code
 
     @classmethod
     def load_codetables(cls):
         f = open("codetables.txt")
-        #data = {}
         for line in f:
             record = json.loads(line)
             n = record['n']
             k = record['k']
-            #data[n,k] = record
             stabs = record["stabs"]
             code = QCode.fromstr(stabs, d=record["d"])
             yield code
@@ -717,5 +730,10 @@ class QCode(object):
         for i in range(n):
             tgt = tgt.apply_CNOT(i, n+i)
         return src.equiv(tgt)
+
+    def is_selfdual(self):
+        tgt = self.apply_H()
+        return self.equiv(tgt)
+
 
 

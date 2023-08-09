@@ -7,11 +7,72 @@ from random import shuffle
 import numpy
 
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
-    rank, rand2, pseudo_inverse, kernel)
+    rank, rand2, pseudo_inverse, kernel, direct_sum)
 from qumba.qcode import QCode, SymplecticSpace
 from qumba import css
 from qumba.argv import argv
 
+
+def get_422():
+    return QCode.fromstr("XXXX ZZZZ", None, "XXII ZIZI XIXI ZZII")
+
+
+def get_513():
+    H = """
+    XZZX.
+    .XZZX
+    X.XZZ
+    ZX.XZ
+    """
+    code = QCode.fromstr(H)
+    return code
+
+
+def get_m24():
+    # Golay code:
+    H = parse("""
+    1...........11...111.1.1
+    .1...........11...111.11
+    ..1.........1111.11.1...
+    ...1.........1111.11.1..
+    ....1.........1111.11.1.
+    .....1......11.11..11..1
+    ......1......11.11..11.1
+    .......1......11.11..111
+    ........1...11.111...11.
+    .........1..1.1.1..1.111
+    ..........1.1..1..11111.
+    ...........11...111.1.11
+    """)
+    return QCode.build_css(H, H)
+
+
+def get_10_2_3():
+    toric = QCode.fromstr("""
+    X..X..XX..
+    .X..X..XX.
+    X.X.....XX
+    .X.X.X...X
+    ..ZZ..Z..Z
+    ...ZZZ.Z..
+    Z...Z.Z.Z.
+    ZZ.....Z.Z
+    """)
+    return toric
+
+
+def get_rm():
+    # RM [[16,6,4]]
+    H = parse("""
+    11111111........
+    ....11111111....
+    ........11111111
+    11..11..11..11..
+    .11..11..11..11.
+    """)
+
+    rm = QCode.build_css(H, H)
+    return rm
 
 
 def find_logical_autos(code):
@@ -166,28 +227,17 @@ def test_bring():
     find_logicals(Ax, Az)
 
 
-def test_5_1_3():
-    H = """
-    XZZX.
-    .XZZX
-    X.XZZ
-    ZX.XZ
-    """
-    #H = "XX ZZ"
-    code = QCode.fromstr(H)
-    print(code)
-
-    N, perms = code.get_autos()
-    assert N==10 # dihedral group
-
-def test_autos():
-    codes = QCode.load_codetables()
-    for code in codes:
+def test_codetables():
+    for code in QCode.load_codetables():
         if code.n > 10:
             break
         print("[[%s, %s, %s]]"%(code.n, code.k, code.d), end=" ", flush=True)
         N, perms = code.get_autos()
-        print("perms:", N)
+        if code.is_css():
+            print("css, ", end="")
+        if code.is_selfdual():
+            print("selfdual, ", end="")
+        print("autos:", N)
 
 
 def test_iso():
@@ -218,8 +268,8 @@ def test_10_2_3():
     Hz = linear_independent(Az)
     code = QCode.build_css(Hx, Hz)
 
-    print(code)
-    print()
+    #print(code)
+    #print()
 
     N, perms = code.get_autos()
     assert N==20
@@ -228,19 +278,22 @@ def test_10_2_3():
     assert code.equiv(dode)
 
     dode = code.apply_H()
-    print("dode:")
-    print(dode)
+    #print("dode:")
+    #print(dode)
     assert not code.equiv(dode)
 
     iso = code.get_iso(dode)
-    print(iso)
+    #print(iso)
     eode = code.apply_perm(iso)
     assert eode.equiv(dode)
 
-    print("eode:")
-    print(eode)
+    #print("eode:")
+    #print(eode)
 
     return
+
+
+def test_toric_cnot():
 
     """
     0123456789
@@ -255,6 +308,7 @@ def test_10_2_3():
     ZZ.....Z.Z
     """
 
+    code = get_10_2_3()
     idxs = list(range(code.n))
     pairs = [(i,j) for i in idxs for j in idxs if i!=j]
     print(len(pairs))
@@ -272,26 +326,7 @@ def test_10_2_3():
         if ck.equiv(code):
             print("FOUND!")
             return
-    #find(Ax, Az)
-
-
-def get_m24():
-    # Golay code:
-    H = parse("""
-    1...........11...111.1.1
-    .1...........11...111.11
-    ..1.........1111.11.1...
-    ...1.........1111.11.1..
-    ....1.........1111.11.1.
-    .....1......11.11..11..1
-    ......1......11.11..11.1
-    .......1......11.11..111
-    ........1...11.111...11.
-    .........1..1.1.1..1.111
-    ..........1.1..1..11111.
-    ...........11...111.1.11
-    """)
-    return QCode.build_css(H, H)
+    print("NOT FOUND")
 
 
 def test_symplectic():
@@ -338,28 +373,12 @@ def test_symplectic():
         eode = code.apply_perm(f)
         assert eode == dode
     
-    toric = QCode.fromstr("""
-    X..X..XX..
-    .X..X..XX.
-    X.X.....XX
-    .X.X.X...X
-    ..ZZ..Z..Z
-    ...ZZZ.Z..
-    Z...Z.Z.Z.
-    ZZ.....Z.Z
-    """)
 
+    code = get_513()
+    N, perms = code.get_autos()
+    assert N==10 # dihedral group
 
-    # RM [[16,6,4]]
-    H = parse("""
-    11111111........
-    ....11111111....
-    ........11111111
-    11..11..11..11..
-    .11..11..11..11.
-    """)
-
-    rm = QCode.build_css(H, H)
+    rm = get_rm()
     assert rm.is_css()
 
     #for code in QCode.load_codetables():
@@ -377,13 +396,141 @@ def test_symplectic():
     assert code.is_css()
 
 
+def test_concatenate_show():
+    bflip = QCode.fromstr("ZZI IZZ")
+    print(bflip.longstr())
+    print()
+    pflip = bflip.get_dual()
+    print(pflip.longstr())
+
+    outer = bflip
+    print(shortstr(outer.get_encoder()))
+    print()
+    inner = 3*pflip
+    E1 = inner.get_encoder()
+    print(inner)
+    print(shortstr(E1))
+    print()
+
+    trivial = QCode.from_symplectic(identity2(12))
+    rhs = trivial + outer
+    E0 = rhs.get_encoder()
+    print(shortstr(E0))
+    print()
+
+    F = dot2(E1, E0)
+    result = QCode.from_symplectic(F, k=1)
+    print(result)
+    print(result.get_params())
+    print(shortstr(F))
+    print(result.longstr())
+    assert result.get_params() == (9, 1, 3)
+    
+
+
+
+#def test_concatenate_422():
+def test_concatenate():
+    inner = get_422()
+
+    right = QCode.trivial(2) + QCode.fromstr("XX ZZ")
+    result = inner << right
+    assert result.equiv( QCode.fromstr("XXXX ZZZZ IZZI IXXI") )
+
+    # --------------------
+
+    code = QCode.fromstr("XXXX ZZZZ", None, "XXII ZIZI XIXI ZZII")
+
+    right = QCode.trivial(4) + code
+    #right = right.apply_perm([0, 1, 4, 5, 2, 3, 6, 7])
+    #print(shortstr(right.get_encoder()))
+    #print()
+
+    left = code + code
+    #print(shortstr(left.get_encoder()))
+
+    result = left << right
+    print(result.get_params())
+    print(result.longstr())
+    assert result.get_params() == (8, 2, 2)
+
+
+def test_concatenate_steane():
+    surface = QCode.fromstr("ZZZII IIZZZ XIXXI IXXIX")
+    assert surface.get_params() == (5, 1, 2)
+    print(surface)
+    print(surface.longstr())
+    print()
+
+    #for i in [1, 2, 3]:
+    #    surface = surface.apply_S(i)
+    surface = surface.apply_perm([1, 2, 3, 0, 4])
+
+    #inner = QCode.fromstr("XXXX ZZZZ", None, "ZIZI XXII ZZII XIXI")
+    inner = get_422()
+    print(inner.longstr())
+
+    right = QCode.trivial(2) + surface
+    left = QCode.fromstr("XXXX ZZZZ") + QCode.trivial(3)
+
+    code = left << right
+    assert code.get_params() == (7, 1, 3)
+    print(code.longstr())
+    print(code.is_selfdual())
+    print(code.is_css())
+
+
+def test_concatenate_toric():
+    toric = get_10_2_3()
+    dual = toric.get_dual()
+    iso = toric.get_iso(dual)
+    print(iso)
+#    E1 = toric.get_encoder()
+#    E2 = toric.get_encoder()
+#    E = direct_sum(E1, E2)
+    
+    outer = toric + dual
+    E = outer.get_encoder()
+
+    print("outer:", outer)
+    print(shortstr(E))
+
+    f = []
+    for (i,j) in enumerate(iso):
+        f.append(i)
+        f.append(toric.n + j)
+    print("f:", f)
+    #P = outer.space.get_perm(f)
+    outer = outer.apply_perm(f)
+
+    inner = QCode.fromstr("XXXX ZZZZ")
+    print(inner)
+
+    inns = (outer.n // inner.k) * inner
+    E1 = inns.get_encoder()
+
+    print("inns:", inns)
+    #print(shortstr(E1))
+
+    trivial = QCode.from_encoder(identity2(2*inns.m))
+    print(trivial)
+    #print(shortstr(trivial.get_encoder()))
+    rhs = trivial + outer
+    EE = dot2(E1, rhs.get_encoder())
+
+    result = QCode.from_encoder(EE, k=toric.k)
+    print(result)
+    print(result.longstr())
+    print(result.is_selfdual())
+
+
 def test():
-    test_5_1_3()
-    test_autos()
+    test_codetables()
     test_iso()
     test_10_2_3()
     test_symplectic()
-    test_bring()
+    test_concatenate()
+    #test_bring() # slow..
 
 
 
