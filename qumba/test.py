@@ -471,6 +471,58 @@ def test_concatenate_steane():
     assert code.is_css()
 
 
+
+def test_concatenate_zx():
+    Ax = parse("""
+    X..X..XX..
+    .X..X..XX.
+    X.X.....XX
+    .X.X.X...X
+    ..X.XXX...
+    """)
+
+    Az = parse("""
+    .ZZ..Z..Z.
+    ..ZZ..Z..Z
+    ...ZZZ.Z..
+    Z...Z.Z.Z.
+    ZZ.....Z.Z
+    """)
+
+    duality = css.find_zx_duality(Ax, Az)
+    #print(duality)
+    pairs = []
+    perm = []
+    for (i, j) in enumerate(duality):
+        assert i!=j
+        if i < j:
+            pairs.append((i, j))
+            perm.append(i)
+            perm.append(j)
+    assert len(pairs)*2 == len(duality)
+    #print(pairs)
+
+    Hx = linear_independent(Ax)
+    Hz = linear_independent(Az)
+    right = QCode.build_css(Hx, Hz)
+    #print("perm:", perm)
+    right = right.apply_perm(perm)
+
+    inner = get_422()
+    left = len(pairs) * inner
+
+    #print(left)
+    #print(right)
+    right = QCode.trivial(left.n - right.n) + right
+
+    code = left << right
+    #print(code)
+    #print(code.longstr())
+    assert code.is_selfdual()
+    #print(code.get_params())
+
+
+
 def test_concatenate_toric():
     toric = get_10_2_3()
     dual = toric.get_dual()
