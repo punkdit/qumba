@@ -649,6 +649,8 @@ class QCode(object):
             count = get_weight(v) # destructive
             if count:
                 d = min(count, d)
+        if kk:
+            self.d = d
         return self.n, kk//2, d
 
     def bound_distance(self):
