@@ -28,6 +28,12 @@ def get_513():
     return code
 
 
+def get_713():
+    H = "X..X.XX .X.XXX. ..X.XXX Z..Z.ZZ .Z.ZZZ. ..Z.ZZZ"
+    code = QCode.fromstr(H)
+    return code
+
+
 def get_m24():
     # Golay code:
     H = parse("""

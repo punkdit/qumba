@@ -11,7 +11,25 @@ import numpy
 import numpy.random as ra
 from numpy import dot, concatenate
 
+from qumba.argv import argv
+
+numba = None
+njit = lambda f : f
+
+if argv.numba:
+    try:
+        import numba
+        from numba import njit, types
+        from numba.extending import overload
+        from numba.core.errors import TypingError
+    
+    except ImportError:
+    
+        print("numba not found")
+
+
 int_scalar = numpy.int64
+#int_scalar = numpy.int8
 
 
 def array2(items):
@@ -24,11 +42,6 @@ def zeros2(*shape):
     if len(shape)==1 and type(shape[0]) is tuple:
         shape = shape[0]
     return numpy.zeros(shape, dtype=int_scalar)
-
-
-def identity2(n):
-    return numpy.identity(n, dtype=int_scalar)
-
 
 def dot2(*items):
     idx = 0
@@ -50,6 +63,63 @@ def compose2(*items):
 def eq2(A, B):
     A = (A-B)%2
     return numpy.abs(A).sum() == 0
+
+def identity2(n):
+    return numpy.identity(n, dtype=int_scalar)
+
+
+
+if numba:
+
+    @njit
+    def _zeros2(m, n):
+        return numpy.zeros((m, n), dtype=int_scalar)
+
+    @njit
+    def identity2(n):
+        return numpy.identity(n, dtype=int_scalar) # XXX numba fail
+
+    def dot_22(A, B):
+        assert A.shape[1] == B.shape[0]
+        m, p = A.shape
+        p, n = B.shape
+        C = numpy.empty((m, n), dtype=int_scalar)
+        for i in range(m):
+          for j in range(n):
+            x = 0
+            for k in range(p):
+                x += A[i, k] * B[k, j]
+            C[i, j] = x
+        return C
+
+    def dot_11(A, B):
+        assert A.shape[0] == B.shape[0]
+        p = A.shape[0]
+        x = 0
+        for k in range(p):
+            x += A[k] * B[k]
+        return x
+
+    @overload(numpy.dot)
+    def impl_dot(A, B):
+        if not isinstance(A, types.Array):
+            raise TypingError("A must be array")
+        if not isinstance(B, types.Array):
+            raise TypingError("B must be array")
+        if A.ndim == 2 and B.ndim == 2:
+            return dot_22
+        if A.ndim == 1 and B.ndim == 1:
+            return dot_11
+        raise TypingError("fail")
+
+    @njit
+    def _dot2(A, B):
+        AB = dot(A, B) % 2
+        return AB
+
+else:
+    _zeros2 = zeros2
+    _dot2 = dot2
 
 
 def pop2(A, i):
@@ -199,11 +269,13 @@ def enum2(n):
 #        i += 1
 
 
+@njit
 def swap_row(A, j, k):
     row = A[j, :].copy()
     A[j, :] = A[k, :]
     A[k, :] = row
 
+@njit
 def swap_col(A, j, k):
     col = A[:, j].copy()
     A[:, j] = A[:, k]
@@ -280,6 +352,7 @@ def lu_decompose(A, verbose=False):
     return L, U
         
 
+@njit
 def row_reduce(H, truncate=True, inplace=False, check=False, debug=False):
     """Remove zero rows if truncate=True
     """
@@ -293,15 +366,15 @@ def row_reduce(H, truncate=True, inplace=False, check=False, debug=False):
     if m*n==0:
         return H
 
-    if debug:
-        print("solve:")
-        print("%d rows, %d cols" % (m, n))
+#    if debug:
+#        print("solve:")
+#        print("%d rows, %d cols" % (m, n))
 
     i = 0
     j = 0
     while i < m and j < n:
-        if debug:
-            print("i, j = %d, %d" % (i, j))
+#        if debug:
+#            print("i, j = %d, %d" % (i, j))
 
         assert i<=j
         if i and check:
@@ -316,15 +389,15 @@ def row_reduce(H, truncate=True, inplace=False, check=False, debug=False):
             continue # <----------- continue ------------
 
         if i != i1:
-            if debug:
-                print("swap", i, i1)
+#            if debug:
+#                print("swap", i, i1)
             swap_row(H, i, i1)
 
         assert H[i, j]
         for i1 in range(i+1, m):
             if H[i1, j]:
-                if debug: 
-                    print("add %s to %s" % (i, i1))
+#                if debug: 
+#                    print("add %s to %s" % (i, i1))
                 H[i1, :] += H[i, :]
                 H[i1, :] %= 2
 
@@ -343,6 +416,31 @@ def row_reduce(H, truncate=True, inplace=False, check=False, debug=False):
     return H
 
 
+@njit
+def normal_form(A, truncate=True):
+    "reduced row-echelon form"
+    A = row_reduce(A, truncate)
+    #print(A)
+    m, n = A.shape
+    j = 0
+    for i in range(m):
+        while j < n and A[i, j] == 0:
+            j += 1
+        if j==n:
+            break
+        i0 = i-1
+        while i0>=0:
+            r = A[i0, j]
+            if r!=0:
+                A[i0, :] += A[i, :]
+                A %= 2
+            i0 -= 1
+        j += 1
+    #print(A)
+    return A
+
+
+@njit
 def u_inverse(U, check=False, verbose=False):
     """invert a row reduced U
     """
@@ -358,7 +456,7 @@ def u_inverse(U, check=False, verbose=False):
         col = cols[0]
         leading.append(col)
 
-    U1 = zeros2(n, m)
+    U1 = _zeros2(n, m)
 
     #print shortstrx(U, U1)
 
@@ -377,18 +475,19 @@ def u_inverse(U, check=False, verbose=False):
             #print "dot2"
             #print shortstr(U[k,:])
             #print shortstr(U1[:,i])
-            if dot2(U[k, :], U1[:, i]):
+            if _dot2(U[k, :], U1[:, i]):
                 j = leading[k]
                 #print "set", j, i
                 U1[j, i] = 1
             #print shortstr(U1[:,i])
-            assert dot2(U[k, :], U1[:, i]) == 0
+            assert _dot2(U[k, :], U1[:, i]) == 0
             k -= 1
         i -= 1
 
     return U1
 
 
+@njit
 def l_inverse(L, check=False, verbose=False):
     """invert L (lower triangular, 1 on diagonal)
     """
@@ -401,15 +500,16 @@ def l_inverse(L, check=False, verbose=False):
     for i in range(m):
         #u = L1[:, i]
         for j in range(i+1, m):
-            r = dot2(L[j, :], L1[:, i])
+            r = _dot2(L[j, :], L1[:, i])
             if r:
                 L1[j, i] = 1
-            assert dot2(L[j, :], L1[:, i]) == 0
+            assert _dot2(L[j, :], L1[:, i]) == 0
 
-    assert eq2(dot2(L, L1), identity2(m))
+    #assert eq2(_dot2(L, L1), identity2(m))
     return L1
 
 
+@njit
 def plu_reduce(A, truncate=False, check=False, verbose=False):
     """
     Solve PLU = A, st. P is permutation, L is lower tri, U is upper tri.
@@ -421,19 +521,19 @@ def plu_reduce(A, truncate=False, check=False, verbose=False):
     L = identity2(m)
     U = A.copy()
 
-    assert m*n, (m, n)
+    assert m>0 and n>0
 
-    if verbose:
-        print("plu_reduce:")
-        print("%d rows, %d cols" % (m, n))
+#    if verbose:
+#        print("plu_reduce:")
+#        print("%d rows, %d cols" % (m, n))
 
     i = 0
     j = 0
     while i < m and j < n:
-        if verbose:
-            print("i, j = %d, %d" % (i, j))
-            print("P, L, U:")
-            print(shortstrx(P, L, U))
+#        if verbose:
+#            print("i, j = %d, %d" % (i, j))
+#            print("P, L, U:")
+#            print(shortstrx(P, L, U))
 
         assert i<=j
         if i and check:
@@ -448,29 +548,29 @@ def plu_reduce(A, truncate=False, check=False, verbose=False):
             continue # <----------- continue ------------
 
         if i != i1:
-            if verbose:
-                print("swap", i, i1)
+#            if verbose:
+#                print("swap", i, i1)
             swap_row(U, i, i1)
             swap_col(P, i, i1)
             swap_col(L, i, i1)
             swap_row(L, i, i1)
 
-        if check:
-            A1 = dot2(P, dot2(L, U))
-            assert eq2(A1, A)
+        #if check:
+        #    A1 = _dot2(P, _dot2(L, U))
+        #    assert eq2(A1, A)
 
         assert U[i, j]
         for i1 in range(i+1, m):
             if U[i1, j]:
-                if verbose: 
-                    print("add %s to %s" % (i, i1))
+#                if verbose: 
+#                    print("add %s to %s" % (i, i1))
                 L[i1, i] = 1
                 U[i1, :] += U[i, :]
                 U[i1, :] %= 2
 
-        if check:
-            A1 = dot2(P, dot2(L, U))
-            assert eq2(A1, A)
+        #if check:
+        #    A1 = _dot2(P, _dot2(L, U))
+        #    assert eq2(A1, A)
 
         i += 1
         j += 1
@@ -824,9 +924,6 @@ def find_errors(Hx, Lx, Rx=None):
     return Tz
 
 
-
-
-
 def check_conjugate(A, B):
     if A is None or B is None:
         return
@@ -840,36 +937,6 @@ def check_commute(A, B):
         return
     C = dot2(A, B.transpose())
     assert C.sum() == 0, "\n%s"%shortstr(C)
-
-
-
-
-
-"""
-def orthogonal(A):
-    A = row_reduce(A, truncate=True)
-    m, n = A.shape
-    B = zeros2(n-m, n)
-    i, j = 0, 0
-    for row in A:
-        while row[i] == 0:
-            B[j, i] = 1
-            i += 1
-            j += 1
-        else:
-            i += 1
-    while j<n-m:
-        B[j, i] = 1
-        i += 1
-        j += 1
-#    print "orthogonal"
-#    print shortstrx(A)
-#    print
-#    print shortstrx(B)
-    AB = numpy.concatenate((A, B))
-    assert len(row_reduce(AB, truncate=True))==n
-    return B
-"""
 
 
 def pseudo_inverse(A, check=False):
@@ -889,7 +956,7 @@ def solve2(H, u, force=False, debug=False):
     assert H.shape[0] == u.shape[0], (H.shape, u.shape)
     A = pseudo_inverse(H)
     v = dot2(A, u)
-    if eq2(dot2(H, v), u) or force:
+    if force or eq2(dot2(H, v), u):
         return v
 solve = solve2
 
