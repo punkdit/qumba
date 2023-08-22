@@ -350,6 +350,7 @@ class QCode(object):
         H1 = dot2(H, symplectic_form(n))
         R = dot2(H, H1.transpose())
         if R.sum() != 0:
+            print(shortstr(R))
             assert 0, "not isotropic"
         L = self.get_logops()
         R = dot2(L, H1.transpose())

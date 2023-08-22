@@ -8,11 +8,14 @@ import numpy
 class Scalar(object):
     dtype = numpy.complex128
     @classmethod
-    def zeros(cls, m, n):
+    def zeros(cls, arg):
         return numpy.zeros(arg, dtype=cls.dtype)
     @classmethod
     def array(cls, A):
         return numpy.array(A, dtype=cls.dtype)
+
+class RealScalar(Scalar):
+    dtype = numpy.float64
     
 
 EPSILON = 1e-8
@@ -43,6 +46,10 @@ class Space(object):
         A = numpy.zeros((self.n, self.n), dtype=self.dtype)
         return Lin(self, self, A)
 
+    def perm(self, f):
+        A = numpy.identity(self.n, dtype=self.dtype)
+        A = A[:, f]
+        return Lin(self, self, A)
 
 
 def fstr(x):
@@ -50,7 +57,14 @@ def fstr(x):
     im = x.imag
     if abs(im) < EPSILON:
         x = re
-        s = "%.6f"%x
+        if abs(x) < EPSILON:
+            s = " 0."
+        elif abs(x-1) < EPSILON:
+            s = " 1."
+        elif abs(x+1) < EPSILON:
+            s = "-1."
+        else:
+            s = "%.6f"%x
     else:
         s = str(x)
     return s
@@ -132,6 +146,10 @@ class Lin(object):
         lin = reduce(mul, [self]*n)
         return lin
 
+    def transpose(self):
+        A = self.A.transpose()
+        return Lin(self.src, self.tgt, A)
+
 
 def test_pauli(n):
 
@@ -189,9 +207,60 @@ def test_pauli(n):
     assert (rhs == Zi)
 
 
+def all_perms(items):
+    items = tuple(items)
+    if len(items)<=1:
+        yield items
+        return
+    n = len(items)
+    for i in range(n):
+        for rest in all_perms(items[:i] + items[i+1:]):
+            yield (items[i],) + rest
+
+
+def all_signed_perms(V):
+    n = V.n
+    items = list(range(n))
+    signs = [2*numpy.array(v)-1 for v in numpy.ndindex((2,)*n)]
+    for f in all_perms(items):
+        P = V.perm(f)
+        for sign in signs:
+            A = P.A * sign
+            SP = Lin(V, V, A)
+            yield SP
+
+    
+def test_symplectic():
+    n = 4
+    nn = 2*n
+    scalar = RealScalar
+    V = Space(nn, "V", scalar)
+    I = V.identity()
+
+    F = scalar.zeros((nn, nn))
+    for i in range(n):
+        F[i, n+i] = 1.
+        F[n+i, i] = -1.
+    F = Lin(V, V, F)
+    print(F)
+
+    count = 0
+    total = 0
+    for P in all_signed_perms(V):
+        total += 1
+        #print(P)
+        #print()
+        Pi = P.transpose()
+        #assert P*Pi == I
+        if P*F*Pi == F:
+            count += 1
+    print(count, "of", total)
+
+
 def test():
     for n in [2, 3]:
         test_pauli(n)
+    test_symplectic()
 
 
 if __name__ == "__main__":

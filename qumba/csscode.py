@@ -436,7 +436,7 @@ class CSSCode(object):
     def to_qcode(self):
         return qcode.QCode.build_css(self.Hx, self.Hz, self.Lx, self.Lz)
 
-    def __str__(self):
+    def __repr__(self):
         Lx = len(self.Lx) if self.Lx is not None else None
         Lz = len(self.Lz) if self.Lz is not None else None
         Hx = len(self.Hx) if self.Hx is not None else None
@@ -452,6 +452,9 @@ class CSSCode(object):
         #    Lz = "(%d)"%(n - Hx - Hz)
         return "CSSCode(n=%s, Lx:%s, Lz:%s, Hx:%s, Tz:%s, Hz:%s, Tx:%s, Gx:%s, Gz:%s)" % (
             n, Lx, Lz, Hx, Tz, Hz, Tx, Gx, Gz)
+
+    def __str__(self):
+        return "[[%d, %d]]"%(self.n, self.k)
 
     def save(self, name=None, stem=None):
         assert name or stem
