@@ -13,7 +13,6 @@ import numpy
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum, zeros2, solve2, normal_form)
 from qumba.qcode import QCode, SymplecticSpace
-from qumba import css
 from qumba import construct
 from qumba.argv import argv
 
@@ -72,13 +71,16 @@ def get_autos_slow(code):
     print(len(gen))
 
 
-def get_autos(code):
-    n, m = code.n, code.m
+def get_isos(src, tgt):
+    if src.n != tgt.n or src.m != tgt.m:
+        return 
 
-    H = code.H
+    n, m = src.n, src.m
+
+    H = src.H
     m, nn = H.shape
 
-    rhs = normal_form(H)
+    rhs = normal_form(tgt.H)
     #print(shortstr(rhs))
 
     forms = [None]
@@ -127,19 +129,21 @@ def get_autos(code):
       if not stack:
           break
       #print(stack)
-      gen.append(stack)
+      #gen.append(stack)
+      yield stack
       #if len(gen) > 4000:
       #  return
-      dode = code.apply_perm(stack)
-      assert dode.equiv(code)
+      dode = src.apply_perm(stack)
+      assert dode.equiv(tgt)
       #print("equiv!")
 
       idx = stack.pop()+1
       while idx >= n and len(stack):
           idx = stack.pop()+1
 
-    return gen
 
+def get_autos(code):
+    return list(get_isos(code, code))
 
 
 def test():

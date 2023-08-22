@@ -19,6 +19,7 @@ from qumba.solve import (
     array2, zeros2, shortstr, dot2, solve2, linear_independent, row_reduce, kernel,
     span, intersect, rank, enum2, shortstrx, identity2, eq2, pseudo_inverse, direct_sum)
 from qumba.argv import argv
+from qumba.csscode import CSSCode
 from qumba.smap import SMap
 
 
@@ -254,7 +255,7 @@ class QCode(object):
         self.m = m
         self.n = n
         self.nn = nn
-        self.k = n - m # logicals
+        self.k = n - m # number of logicals
         self.d = d
         self.shape = m, n
         self.space = SymplecticSpace(n)
@@ -406,6 +407,23 @@ class QCode(object):
         if U is None:
             return False
         return True
+
+    def to_css(self):
+        H = self.H
+        #print(shortstr(H))
+        #print(self.space.F)
+        m, nn = H.shape
+        Hx = H[:, 0:nn:2]
+        Hz = H[:, 1:nn:2]
+        idxs = numpy.where(Hx.sum(1))[0]
+        jdxs = numpy.where(Hz.sum(1))[0]
+        #print(idxs, jdxs)
+        assert Hx[jdxs, :].sum() == 0, "not in css form"
+        assert Hz[idxs, :].sum() == 0, "not in css form"
+        Hx = Hx[idxs, :]
+        Hz = Hz[jdxs, :]
+        code = CSSCode(Hx=Hx, Hz=Hz)
+        return code
 
     def get_graph(self):
         "encode into a pynauty Graph"

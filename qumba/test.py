@@ -472,6 +472,13 @@ def test_concatenate_steane():
     assert code.is_css()
 
 
+def test_css():
+    code = get_10_2_3()
+    print(code)
+
+    c1 = code.to_css()
+    print(c1)
+
 
 def test_concatenate_zx():
     Ax = parse("""
