@@ -69,6 +69,35 @@ def get_10_2_3():
     return toric
 
 
+def get_toric(rows, cols, delta_row=0, delta_col=0):
+    n = 2*rows*cols
+
+    def getidx(r, c, k):
+        assert k in [0, 1]
+        r, c = r+(c//cols)*delta_row, c+(r//rows)*delta_col
+        idx = 2*((r%rows)*cols + (c%cols)) + k
+        return idx
+
+    Hx, Hz = [], []
+    for r in range(rows):
+      for c in range(cols):
+        X = [0]*n
+        for key in [(r, c, 0), (r, c, 1), (r, c+1, 1), (r+1, c, 0)]:
+            X[getidx(*key)] = 1
+        Hx.append(X)
+
+        Z = [0]*n
+        for key in [(r, c, 0), (r, c, 1), (r, c-1, 0), (r-1, c, 1)]:
+            Z[getidx(*key)] = 1
+        Hz.append(Z)
+
+    Hx = numpy.array(Hx)
+    Hz = numpy.array(Hz)
+
+    code = CSSCode(Hx=Hx, Hz=Hz)
+    return code
+
+
 def get_rm():
     # RM [[16,6,4]]
     H = parse("""
