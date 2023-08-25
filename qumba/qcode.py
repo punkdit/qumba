@@ -474,31 +474,20 @@ class QCode(object):
             perms.append(perm)
         return N, perms
 
-    def get_iso(self, other):
+    def get_isomorphism(self, other):
         import pynauty
         lhs = self.get_graph()
         #print(lhs)
         rhs = other.get_graph()
         #print(rhs)
         if not pynauty.isomorphic(lhs, rhs):
-            assert 0
-        #    return # assert 0 ?
+            return None
         # See https://github.com/pdobsan/pynauty/issues/31
         f = pynauty.canon_label(lhs) # lhs--f-->C
         g = pynauty.canon_label(rhs) # rhs--g-->C
-        #gi = [None]*len(g)
-        #for (idx, i) in enumerate(g):
-        #    gi[i] = idx
-        #assert [gi[g[i]] for i in range(len(g))] == list(range(len(g)))
-        #print("f:", f)
-        #print("g:", g)
-        #print("gi:", gi)
-        #iso = [gi[f[i]] for i in range(len(f))]
         iso = [None]*len(f)
         for i in range(len(f)):
             iso[f[i]] = g[i]
-        #print("iso:", iso)
-
         n = self.n
         for bit in range(n):
             assert iso[2*bit]%2 == 0
@@ -506,6 +495,9 @@ class QCode(object):
             assert iso[2*bit]+1 == iso[2*bit+1]
         iso = [iso[2*bit]//2 for bit in range(n)]
         return iso
+
+    def is_isomorphic(self, other):
+        return self.get_isomorphism(other) is not None
 
     def apply_perm(self, f):
         n = self.n
