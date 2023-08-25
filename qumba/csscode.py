@@ -16,7 +16,7 @@ from qumba import qcode
 from qumba.isomorph import Tanner, search
 from qumba.solve import (
     shortstr, shortstrx, eq2, dot2, compose2, rand2,
-    pop2, insert2, append2, array2, zeros2, identity2, rank)
+    pop2, insert2, append2, array2, zeros2, identity2, rank, linear_independent)
 
 
     
@@ -105,12 +105,21 @@ class CSSCode(object):
             Hx=None, Tz=None, 
             Hz=None, Tx=None,
             Gx=None, Gz=None, 
-            build=True,
-            check=True, verbose=False, logops_only=False):
+            Ax=None, Az=None,
+            build=True, check=True, verbose=False, logops_only=False):
 
         if Hx is None and Hz is not None:
             # This is a classical code
             Hx = zeros2(0, Hz.shape[1])
+
+        Ax = Hx if Ax is None else Ax
+        Az = Hz if Az is None else Az
+        if Hx is None:
+            assert Ax is not None
+            Hx = linear_independent(Ax)
+        if Hz is None:
+            assert Az is not None
+            Hz = linear_independent(Az)
 
         self.Lx = Lx
         self.Lz = Lz
@@ -120,6 +129,8 @@ class CSSCode(object):
         self.Tx = Tx
         self.Gx = Gx
         self.Gz = Gz
+        self.Ax = Ax
+        self.Az = Az
 
         if Hx is not None and len(Hx.shape)<2:
             Hx.shape = (0, Hz.shape[1])
@@ -434,7 +445,7 @@ class CSSCode(object):
         return code
 
     def to_qcode(self):
-        return qcode.QCode.build_css(self.Hx, self.Hz, self.Lx, self.Lz)
+        return qcode.QCode.build_css(self.Hx, self.Hz, self.Tx, self.Tz, self.Lx, self.Lz)
 
     def __repr__(self):
         Lx = len(self.Lx) if self.Lx is not None else None

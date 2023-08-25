@@ -11,7 +11,7 @@ import numpy
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     zeros2, rank, rand2, pseudo_inverse, kernel, direct_sum)
 from qumba.qcode import QCode, SymplecticSpace
-from qumba.csscode import CSSCode
+from qumba.csscode import CSSCode, find_zx_duality
 from qumba.argv import argv
 
 
@@ -106,18 +106,16 @@ def biplanar(w=24, h=12):
     lookup = dict((key,idx) for idx,key in enumerate(keys))
     n = len(keys)
 
-    Hx = zeros2((len(xstabs), n))
+    Ax = zeros2((len(xstabs), n))
     for i,op in enumerate(xstabs):
         for key in op:
-            Hx[i, lookup[key]] = 1
+            Ax[i, lookup[key]] = 1
 
-    Hz = zeros2((len(zstabs), n))
+    Az = zeros2((len(zstabs), n))
     for i,op in enumerate(zstabs):
         for key in op:
-            Hz[i, lookup[key]] = 1
+            Az[i, lookup[key]] = 1
 
-    Hx = linear_independent(Hx)
-    Hz = linear_independent(Hz)
-    code = CSSCode(Hx=Hx, Hz=Hz)
+    code = CSSCode(Ax=Ax, Az=Az)
     return code
 

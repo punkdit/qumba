@@ -573,9 +573,9 @@ def test_biplanar():
     code = construct.biplanar()
     print(code)
     Hx, Hz = code.Hx, code.Hz
-    print(shortstr(code.Hx))
-    print(Hx.sum(0), Hx.sum(1))
-    print(shortstr(code.Lx))
+    #print(shortstr(code.Hx))
+    #print(Hx.sum(0), Hx.sum(1))
+    #print(shortstr(code.Lx))
 
 
 def test():

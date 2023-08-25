@@ -286,11 +286,12 @@ class QCode(object):
         return code
 
     @classmethod
-    def build_css(cls, Hx, Hz, Lx=None, Lz=None, Jx=None, Jz=None, **kw):
+    def build_css(cls, Hx, Hz, Tx=None, Tz=None, Lx=None, Lz=None, Jx=None, Jz=None, **kw):
         H = css_to_isotropic(Hx, Hz)
+        #T = css_to_isotropic(Tx, Tz) if Tx is not None else None # FAIL
+        T = None
         L = css_to_symplectic(Lx, Lz) if Lx is not None else None
         J = css_to_symplectic(Jx, Jz) if Jx is not None else None
-        T = None
         return QCode(H, T, L, J, **kw)
 
     @classmethod
@@ -425,6 +426,9 @@ class QCode(object):
         Hz = Hz[jdxs, :]
         code = CSSCode(Hx=Hx, Hz=Hz)
         return code
+
+    def to_qcode(self):
+        return self
 
     def get_graph(self):
         "encode into a pynauty Graph"
