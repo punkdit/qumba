@@ -9,7 +9,7 @@ import numpy
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum)
 from qumba.qcode import QCode, SymplecticSpace
-from qumba import css
+from qumba import csscode, construct
 from qumba.construct import get_422, get_513, get_m24, get_10_2_3, get_rm
 from qumba.argv import argv
 
@@ -126,10 +126,10 @@ def find_logicals(Ax, Az):
     code = QCode.build_css(Hx, Hz)
     space = code.space
 
-    perms = css.find_autos(Ax, Az)
+    perms = csscode.find_autos(Ax, Az)
     print("perms:", len(perms))
 
-    duality = css.find_zx_duality(Ax, Az)
+    duality = csscode.find_zx_duality(Ax, Az)
 
     dode = code.apply_perm(duality)
     dode = dode.apply_H()
@@ -497,7 +497,7 @@ def test_concatenate_zx():
     ZZ.....Z.Z
     """)
 
-    duality = css.find_zx_duality(Ax, Az)
+    duality = csscode.find_zx_duality(Ax, Az)
     #print(duality)
     pairs = []
     perm = []
@@ -567,6 +567,15 @@ def test_concatenate_toric():
     print(result.is_selfdual())
 
     # hmm...
+
+
+def test_biplanar():
+    code = construct.biplanar()
+    print(code)
+    Hx, Hz = code.Hx, code.Hz
+    print(shortstr(code.Hx))
+    print(Hx.sum(0), Hx.sum(1))
+    print(shortstr(code.Lx))
 
 
 def test():
