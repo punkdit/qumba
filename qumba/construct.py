@@ -36,7 +36,7 @@ def get_713():
     return code
 
 
-def get_m24():
+def golay():
     # Golay code:
     H = parse("""
     1...........11...111.1.1
@@ -65,11 +65,11 @@ def get_10_2_3():
     ...ZZZ.Z..
     Z...Z.Z.Z.
     ZZ.....Z.Z
-    """)
+    """, d=3)
     return toric
 
 
-def get_toric(rows, cols, delta_row=0, delta_col=0):
+def toric(rows, cols, delta_row=0, delta_col=0):
     n = 2*rows*cols
 
     def getidx(r, c, k):
@@ -98,7 +98,7 @@ def get_toric(rows, cols, delta_row=0, delta_col=0):
     return code
 
 
-def get_rm():
+def reed_muller():
     # RM [[16,6,4]]
     H = parse("""
     11111111........

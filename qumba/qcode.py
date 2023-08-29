@@ -697,6 +697,9 @@ class QCode(object):
             return Mt
     get_symplectic = get_encoder
 
+    def get_decoder(self):
+        return self.get_encoder(True)
+
     @classmethod
     def from_encoder(cls, M, m=None, k=None, **kw):
         nn = len(M)
