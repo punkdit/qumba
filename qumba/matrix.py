@@ -6,6 +6,7 @@ Algebraic groups: matrix groups over Z/pZ.
 """
 
 
+from random import shuffle
 from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
 from operator import add, mul
@@ -129,6 +130,10 @@ class Matrix(object):
         A = self.A
         return Matrix(A.transpose(), self.p)
 
+    def sum(self):
+        A = self.A
+        return A.astype(numpy.int64).sum()
+
 
 
 
@@ -139,7 +144,40 @@ def test():
     from qumba import construct
     code = construct.get_10_2_3()
     code = code.to_qcode()
+    n = code.n
     print(code)
+    src = code
+    found = set([code])
+
+    pairs = []
+    for idx in range(n):
+      for jdx in range(n):
+        if idx==jdx:
+            continue
+        pairs.append((idx, jdx))
+
+    bdy = list(found)
+    while bdy:
+      print("\nbdy:", len(bdy))
+      _bdy = []
+      for (idx, jdx) in pairs:
+       for code in bdy:
+        dode = code.CNOT(idx, jdx)
+        if dode.get_distance() < code.d:
+            continue
+        if dode in found:
+            continue
+        #print((idx, jdx), dode)
+        if dode.equiv(src):
+            print("/", end="", flush=True)
+        else:
+            print("*", end="", flush=True)
+        found.add(dode)
+        _bdy.append(dode)
+      bdy = _bdy
+    print()
+
+    return
 
     E = code.get_encoder()
     Ei = code.get_decoder()
@@ -147,7 +185,7 @@ def test():
     M = QCode.trivial(code.m)
 
     L = QCode.trivial(code.k)
-    L = L.apply_CNOT(0, 1) # logical gate
+    L = L.CNOT(0, 1) # logical gate
 
     logop = (M+L).get_encoder()
 
@@ -156,7 +194,7 @@ def test():
     nn = 2*n
     A = A[:nn,:nn]
 
-    tgt = Matrix(A)
+    tgt = Matrix(A, name=[])
 
     gen = []
     for idx in range(n):
@@ -166,28 +204,101 @@ def test():
         A = identity2(nn)
         A[2*jdx+1, 2*idx+1] = 1
         A[2*idx, 2*jdx] = 1
-        g = Matrix(A)
-        #print(shortstr(g.A), idx, jdx)
-        #print()
+        name="C(%d,%d)"%(idx, jdx)
+        name = [(idx, jdx)]
+        g = Matrix(A, name=name)
         gen.append(g)
 
-    found = set(gen)
-    bdy = list(found)
+    for src in find(tgt, gen):
+        P = src.A
+        P = P[::2, ::2]
+        print(shortstr(P))
+        perm = list(numpy.where(P)[1]) + list(range(len(P), code.nn))
+        name = src.name
+        print(name, len(name))
+
+        dode = code
+        for (idx, jdx) in reversed(name):
+            dode = dode.CNOT(jdx, idx)
+            print(dode.get_params())
+        print(perm)
+        dode = dode.permute(perm)
+        assert dode.equiv(code)
+
+
+def find(tgt, gen):
+    gen = list(gen)
+    nn = tgt.shape[0]
+    I = Matrix.identity(nn)
+    best = None
+
+    #while 1:
+    for trial in range(10000):
+#      print()
+      src = tgt
+      while src != I:
+        shuffle(gen)
+        weight = src.sum()
+#        print(weight-nn, end=" ")
+        if weight == nn:
+            if best is None or len(src.name) < len(best.name):
+                print()
+                print(shortstr(src.A))
+                yield src
+                best = src
+            break
+
+        for g in gen:
+            gh = g*src
+            if gh.sum() >= weight:
+                continue
+            src = gh
+            break
+        else:
+            break
+      else:
+        #print(src.name)
+        assert src == I
+
+
+def search_1(tgt, gen):
+    bdy = [tgt]
     while bdy:
+        weight = bdy[0].sum()
+        print(weight, len(bdy))
         _bdy = []
         for g in gen:
           for h in bdy:
             gh = g*h
+            if gh.sum() >= weight:
+                continue
+            _bdy.append(gh)
+        bdy = _bdy
+
+
+def search(tgt, gen):
+    weight = tgt.sum()
+    count = 1
+    found = set(gen)
+    bdy = list(found)
+    while bdy and count < 5:
+        _bdy = []
+        for g in gen:
+          for h in bdy:
+            gh = g*h
+            if gh.sum() > weight:
+                continue
             if gh in found:
                 continue
             if gh == tgt:
-                print("found")
-                return
+                print("found", gh.name)
+                return gh
             _bdy.append(gh)
             found.add(gh)
 
         bdy = _bdy
         print(len(found), len(bdy))
+        count += 1
 
 
 

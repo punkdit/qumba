@@ -273,6 +273,11 @@ class QCode(object):
             eq(self.H, other.H) and eq(self.T, other.T) and
             eq(self.L, other.L) and eq(self.J, other.J))
 
+    def __hash__(self):
+        A = self.get_symplectic()
+        key = A.tobytes(), self.m
+        return hash(key)
+
     def __add__(self, other):
         H = direct_sum(self.H, other.H)
         T = direct_sum(self.T, other.T)
@@ -509,6 +514,7 @@ class QCode(object):
         if T is not None:
             T = T[:, [f[i] for i in range(n)], :].copy()
         return QCode(H, T, L)
+    permute = apply_perm
 
     def apply(self, idx, gate):
         if idx is None:
@@ -533,16 +539,19 @@ class QCode(object):
         H = array2([[0,1],[1,0]])
         return self.apply(idx, H)
     get_dual = apply_H
+    H = apply_H
 
     def apply_S(self, idx=None):
         # swap X<-->Y
         S = array2([[1,1],[0,1]])
         return self.apply(idx, S)
+    S = apply_S
 
     def apply_SH(self, idx=None):
         # X-->Z-->Y-->X 
         SH = array2([[0,1],[1,1]])
         return self.apply(idx, SH)
+    SH = apply_SH
 
     def apply_CZ(self, idx, jdx):
         assert idx != jdx
@@ -554,6 +563,7 @@ class QCode(object):
         T = dot2(self.T, A)
         L = dot2(self.L, A)
         return QCode(H, T, L)
+    CZ = apply_CZ
 
     def apply_CNOT(self, idx, jdx):
         assert idx != jdx
@@ -567,6 +577,7 @@ class QCode(object):
         T = dot2(self.T, A)
         L = dot2(self.L, A)
         return QCode(H, T, L)
+    CNOT = apply_CNOT
 
     def row_reduce(self):
         H = self.H.copy()
@@ -646,7 +657,7 @@ class QCode(object):
         HL = numpy.concatenate((H, L))
         return HL
 
-    def get_params(self, max_mk=22):
+    def get_distance(self, max_mk=22):
         L = self.get_logops()
         kk = len(L)
         H = self.H
@@ -654,7 +665,7 @@ class QCode(object):
         HL = numpy.concatenate((H, L))
         mk = len(HL)
         if mk > max_mk:
-            return self.n, kk//2, None
+            return None
         d = self.n
         for w in numpy.ndindex((2,)*mk):
             u, v = w[:m], w[m:]
@@ -666,6 +677,10 @@ class QCode(object):
                 d = min(count, d)
         if kk:
             self.d = d
+        return d
+
+    def get_params(self, max_mk=22):
+        d = self.get_distance(max_mk)
         return self.n, kk//2, d
 
     def bound_distance(self):
