@@ -15,7 +15,7 @@ from math import prod
 import numpy
 
 from qumba.qcode import QCode
-from qumba.solve import shortstr, dot2, identity2
+from qumba.solve import shortstr, dot2, identity2, eq2
 
 
 #scalar = numpy.int64
@@ -135,19 +135,17 @@ class Matrix(object):
         return A.astype(numpy.int64).sum()
 
 
-
-
-
-
-def test():
-
-    from qumba import construct
-    code = construct.get_10_2_3()
+def find_cnots(code):
     code = code.to_qcode()
     n = code.n
-    print(code)
+    code.get_distance()
+    print("find_cnots:", code)
     src = code
+    src.name = []
     found = set([code])
+
+    dode = src.CNOT(0, 1)
+    eq2(dode.L, src.L)
 
     pairs = []
     for idx in range(n):
@@ -158,24 +156,71 @@ def test():
 
     bdy = list(found)
     while bdy:
-      print("\nbdy:", len(bdy))
+      print("\nbdy:", len(bdy), len(found))
+
+# not much help
+#      N = len(bdy)
+#      i = 0
+#      while i < len(bdy):
+#        j = i+1
+#        while j < len(bdy):
+#            if bdy[i].equiv(bdy[j]): # XXX and trivial logop
+#                #print("equiv", i, j)
+#                print("p", end="", flush=True)
+#                bdy.pop(j)
+#            #elif bdy[i].is_isomorphic(bdy[j]): # too coarse
+#            #    #print("is_isomorphic", i, j)
+#            #    print("i", end="", flush=True)
+#            #    bdy.pop(j)
+#            else:
+#                j += 1
+#        i += 1
+#      print()
+#      print("bdy:", len(bdy), len(found))
+
       _bdy = []
       for (idx, jdx) in pairs:
        for code in bdy:
         dode = code.CNOT(idx, jdx)
+        assert dode is not None
+        assert code is not None
         if dode.get_distance() < code.d:
             continue
         if dode in found:
             continue
+        dode.name = [(idx,jdx)] + code.name
         #print((idx, jdx), dode)
         if dode.equiv(src):
-            print("/", end="", flush=True)
-        else:
-            print("*", end="", flush=True)
+            if eq2(dode.L, src.L):
+                print("/\n", end="", flush=True)
+            else:
+                print()
+                yield dode
+        elif code.n > 8:
+            #print("%d%d."%(idx,jdx), end="", flush=True)
+            print(".", end="", flush=True)
         found.add(dode)
         _bdy.append(dode)
       bdy = _bdy
     print()
+
+
+
+def test():
+
+    from qumba import construct
+    code = construct.get_713()
+    code = construct.get_513()
+    code = construct.toric(2,2)
+    code = construct.get_10_2_3()
+    code = code.to_qcode()
+
+    for dode in find_cnots(code):
+        print(dode.longstr())
+        L = dot2(code.get_decoder(), dode.get_encoder())
+        print(L[-2*code.k:, -2*code.k:])
+        print(dode.name)
+        print()
 
     return
 
