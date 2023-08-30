@@ -14,8 +14,8 @@ from math import prod
 
 import numpy
 
-from qumba.qcode import QCode
-from qumba.solve import shortstr, dot2, identity2, eq2
+from qumba.qcode import QCode, get_weight
+from qumba.solve import shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2
 
 
 #scalar = numpy.int64
@@ -119,6 +119,11 @@ class Matrix(object):
         A = r*self.A
         return Matrix(A, self.p)
 
+    def __lshift__(self, other):
+        "direct_sum"
+        A = direct_sum(self.A, other.A)
+        return Matrix(A, self.p)
+
     def __getitem__(self, idx):
         A = self.A[idx]
         #print("__getitem__", idx, type(A))
@@ -133,6 +138,86 @@ class Matrix(object):
     def sum(self):
         A = self.A
         return A.astype(numpy.int64).sum()
+
+
+@cache
+def symplectic_form(n, p=DEFAULT_P):
+    F = zeros2(2*n, 2*n)
+    for i in range(n):
+        F[2*i:2*i+2, 2*i:2*i+2] = [[0,1],[p-1,0]]
+    F = Matrix(F, p)
+    return F
+
+
+class SymplecticSpace(object):
+    def __init__(self, n, p=DEFAULT_P):
+        assert 0<=n
+        self.n = n
+        self.p = p
+        self.F = symplectic_form(n, p)
+
+    def is_symplectic(self, M):
+        assert isinstance(M, Matrix)
+        nn = 2*self.n
+        F = self.F
+        assert M.shape == (nn, nn)
+        return F == M*F*M.transpose()
+
+    def get_perm(self, f):
+        n, nn = self.n, 2*self.n
+        assert len(f) == n
+        assert set([f[i] for i in range(n)]) == set(range(n))
+        A = zeros2(nn, nn)
+        for i in range(n):
+            A[2*i, 2*f[i]] = 1
+            A[2*i+1, 2*f[i]+1] = 1
+        M = Matrix(A, self.p)
+        assert self.is_symplectic(M)
+        return M
+
+    def get(self, M, idx=None):
+        assert M.shape == (2,2)
+        assert isinstance(M, Matrix)
+        n = self.n
+        A = identity2(2*n)
+        idxs = list(range(n)) if idx is None else [idx]
+        for i in idxs:
+            A[2*i:2*i+2, 2*i:2*i+2] = M.A
+        A = A.transpose()
+        return Matrix(A, self.p)
+
+    def get_H(self, idx=None):
+        # swap X<-->Z on bit idx
+        H = ([[0,1],[1,0]])
+        return self.get(H, idx)
+
+    def get_S(self, idx=None):
+        # swap X<-->Y
+        S = ([[1,1],[0,1]])
+        return self.get(S, idx)
+
+    def get_SH(self, idx=None):
+        # X-->Z-->Y-->X 
+        SH = ([[0,1],[1,1]])
+        return self.get(SH, idx)
+
+    def get_CZ(self, idx, jdx):
+        assert idx != jdx
+        n = self.n
+        A = identity2(2*n)
+        A[2*idx, 2*jdx+1] = 1
+        A[2*jdx, 2*idx+1] = 1
+        A = A.transpose()
+        return Matrix(A, self.p)
+
+    def get_CNOT(self, idx, jdx):
+        assert idx != jdx
+        n = self.n
+        A = identity2(2*n)
+        A[2*jdx+1, 2*idx+1] = 1
+        A[2*idx, 2*jdx] = 1
+        A = A.transpose()
+        return Matrix(A, self.p)
 
 
 def find_cnots(code):
@@ -198,7 +283,9 @@ def find_cnots(code):
                 yield dode
         elif code.n > 8:
             #print("%d%d."%(idx,jdx), end="", flush=True)
-            print(".", end="", flush=True)
+            #print(".", end="", flush=True)
+            J = intersect(src.H, dode.H)
+            print("%d"%(len(J),), end="", flush=True)
         found.add(dode)
         _bdy.append(dode)
       bdy = _bdy
@@ -206,21 +293,104 @@ def find_cnots(code):
 
 
 
+
+def cnots_priority(src, tgt):
+    src = src.to_qcode()
+    tgt = tgt.to_qcode()
+    print("find_cnots:", src, "-->", tgt)
+
+    n = src.n
+
+    pairs = []
+    for idx in range(n):
+      for jdx in range(n):
+        if idx==jdx:
+            continue
+        pairs.append((idx, jdx))
+
+    src.get_distance()
+    src.name = []
+    src.weight = src.get_overlap(tgt)
+    found = set([src])
+    bdy = list(found)
+    count = 0
+    while bdy: # and count < 3:
+      count += 1
+
+      code = bdy.pop()
+      print(". \tbdy:", len(bdy), len(found), code.weight)
+      shuffle(pairs)
+      for (idx, jdx) in pairs:
+        dode = code.CNOT(idx, jdx)
+        if dode.get_distance() < code.d:
+            continue
+        if dode in found:
+            continue
+        dode.name = [(idx,jdx)] + code.name
+        #print((idx, jdx), dode)
+        dode.weight = dode.get_overlap(tgt)
+        if dode.weight == tuple(range(tgt.m, tgt.m+tgt.k+1)):
+            print()
+            yield dode
+        #elif code.n > 8:
+            #print("%d%d."%(idx,jdx), end="", flush=True)
+            #print(".", end="", flush=True)
+        print("%s%s%s."%dode.weight, end="", flush=True)
+        found.add(dode)
+        bdy.append(dode)
+      #shuffle(bdy)
+      bdy.sort(key = lambda code : (code.weight, -len(code.name)))
+      #bdy.sort(key = lambda code : code.weight)
+      #print([(c.weight, len(c.name)) for c in bdy], tgt.m)
+    print()
+
+
 def test():
 
     from qumba import construct
     code = construct.get_713()
     code = construct.get_513()
-    code = construct.toric(2,2)
+    #code = construct.toric(2,2)
     code = construct.get_10_2_3()
+
     code = code.to_qcode()
 
-    for dode in find_cnots(code):
-        print(dode.longstr())
-        L = dot2(code.get_decoder(), dode.get_encoder())
-        print(L[-2*code.k:, -2*code.k:])
-        print(dode.name)
-        print()
+    print("src:")
+    print(code.longstr())
+
+    D = Matrix(code.get_decoder())
+    L = Matrix.identity(2*code.m) << SymplecticSpace(code.k).get_CNOT(0,1)
+    E = Matrix(code.get_encoder())
+
+    ELD = E*L*D
+    assert SymplecticSpace(code.n).is_symplectic(ELD)
+    #print( (E*L*D).shortstr() )
+
+    dode = QCode.from_symplectic((E*L).A, code.m)
+    #print(dode.get_params())
+    #print(dode.longstr())
+    assert code.equiv(dode)
+    #print(code.get_logop(dode))
+
+    print("tgt:")
+    print(dode.longstr())
+
+
+    src, tgt = code, dode
+    #print(src.get_overlap(tgt))
+    #print(tgt.get_overlap(tgt))
+    #return
+
+    I = zeros2(code.kk)
+    for code in cnots_priority(src, tgt):
+        print(code.longstr())
+        print(code.name)
+        L = src.get_logop(code)
+        if not eq2(L, I):
+            break
+        
+    print(L)
+    assert code.equiv(tgt)
 
     return
 
@@ -377,7 +547,5 @@ if __name__ == "__main__":
 
     t = time() - start_time
     print("OK! finished in %.3f seconds\n"%t)
-
-
 
 

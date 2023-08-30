@@ -12,7 +12,7 @@ from operator import add
 import json
 
 import numpy
-from numpy import alltrue, zeros, dot
+from numpy import alltrue, zeros, dot, concatenate
 
 from qumba import solve 
 from qumba.solve import (
@@ -256,6 +256,7 @@ class QCode(object):
         self.n = n
         self.nn = nn
         self.k = n - m # number of logicals
+        self.kk = 2*self.k
         self.d = d
         self.shape = m, n
         self.space = SymplecticSpace(n)
@@ -681,7 +682,7 @@ class QCode(object):
 
     def get_params(self, max_mk=22):
         d = self.get_distance(max_mk)
-        return self.n, kk//2, d
+        return self.n, self.kk//2, d
 
     def bound_distance(self):
         L = self.get_logops()
@@ -769,6 +770,22 @@ class QCode(object):
     def is_selfdual(self):
         tgt = self.apply_H()
         return self.equiv(tgt)
+
+    def get_logop(self, other):
+        L = dot2(self.get_decoder(), other.get_encoder())
+        L = L[-self.kk:, -self.kk:]
+        return L
+
+    def get_overlap(self, other):
+        items = []
+        for i in range(self.k+1):
+            lhs = concatenate((self.H, self.L[:2*i:2]))
+            rhs = concatenate((other.H, other.L[:2*i:2]))
+            J = intersect(lhs, rhs)
+            items.append(len(J))
+        return tuple(items)
+
+
 
 
 

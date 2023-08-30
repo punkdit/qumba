@@ -14,7 +14,6 @@ from numpy import dot, concatenate
 from qumba.argv import argv
 
 numba = None
-njit = lambda f : f
 
 if argv.numba:
     try:
@@ -26,6 +25,9 @@ if argv.numba:
     except ImportError:
     
         print("numba not found")
+
+else:
+    njit = lambda f : f
 
 
 int_scalar = numpy.int64
@@ -75,9 +77,16 @@ if numba:
     def _zeros2(m, n):
         return numpy.zeros((m, n), dtype=int_scalar)
 
+#    @njit
+#    def identity2(n):
+#        return numpy.identity(n, dtype=int_scalar) # XXX numba fail
+
     @njit
     def identity2(n):
-        return numpy.identity(n, dtype=int_scalar) # XXX numba fail
+        I = _zeros2(n, n)
+        for i in range(n):
+            I[i, i] = 1
+        return I
 
     def dot_22(A, B):
         assert A.shape[1] == B.shape[0]
