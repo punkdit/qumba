@@ -10,70 +10,8 @@ from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identit
     rank, rand2, pseudo_inverse, kernel, direct_sum)
 from qumba.qcode import QCode, SymplecticSpace
 from qumba import csscode, construct
-from qumba.construct import get_422, get_513, get_m24, get_10_2_3, get_rm
+from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
 from qumba.argv import argv
-
-
-#def get_422():
-#    return QCode.fromstr("XXXX ZZZZ", None, "XXII ZIZI XIXI ZZII")
-#
-#
-#def get_513():
-#    H = """
-#    XZZX.
-#    .XZZX
-#    X.XZZ
-#    ZX.XZ
-#    """
-#    code = QCode.fromstr(H)
-#    return code
-#
-#
-#def get_m24():
-#    # Golay code:
-#    H = parse("""
-#    1...........11...111.1.1
-#    .1...........11...111.11
-#    ..1.........1111.11.1...
-#    ...1.........1111.11.1..
-#    ....1.........1111.11.1.
-#    .....1......11.11..11..1
-#    ......1......11.11..11.1
-#    .......1......11.11..111
-#    ........1...11.111...11.
-#    .........1..1.1.1..1.111
-#    ..........1.1..1..11111.
-#    ...........11...111.1.11
-#    """)
-#    return QCode.build_css(H, H)
-#
-#
-#def get_10_2_3():
-#    toric = QCode.fromstr("""
-#    X..X..XX..
-#    .X..X..XX.
-#    X.X.....XX
-#    .X.X.X...X
-#    ..ZZ..Z..Z
-#    ...ZZZ.Z..
-#    Z...Z.Z.Z.
-#    ZZ.....Z.Z
-#    """)
-#    return toric
-#
-#
-#def get_rm():
-#    # RM [[16,6,4]]
-#    H = parse("""
-#    11111111........
-#    ....11111111....
-#    ........11111111
-#    11..11..11..11..
-#    .11..11..11..11.
-#    """)
-#
-#    rm = QCode.build_css(H, H)
-#    return rm
 
 
 def find_logical_autos(code):
@@ -241,10 +179,10 @@ def test_codetables():
         print("autos:", N)
 
 
-def test_iso():
+def test_isomorphism():
     code = QCode.fromstr("X. .Z")
     dode = code.apply_perm([1,0])
-    iso = code.get_iso(dode)
+    iso = code.get_isomorphism(dode)
     assert iso == [1, 0]
 
 
@@ -283,7 +221,7 @@ def test_10_2_3():
     #print(dode)
     assert not code.equiv(dode)
 
-    iso = code.get_iso(dode)
+    iso = code.get_isomorphism(dode)
     #print(iso)
     eode = code.apply_perm(iso)
     assert eode.equiv(dode)
@@ -379,7 +317,7 @@ def test_symplectic():
     N, perms = code.get_autos()
     assert N==10 # dihedral group
 
-    rm = get_rm()
+    rm = reed_muller()
     assert rm.is_css()
 
     #for code in QCode.load_codetables():
@@ -534,7 +472,7 @@ def test_concatenate_zx():
 def test_concatenate_toric():
     toric = get_10_2_3()
     dual = toric.get_dual()
-    iso = toric.get_iso(dual)
+    iso = toric.get_isomorphism(dual)
     print(iso)
     
     outer = toric + dual
@@ -580,7 +518,7 @@ def test_biplanar():
 
 def test():
     test_codetables()
-    test_iso()
+    test_isomorphism()
     test_10_2_3()
     test_symplectic()
     test_concatenate()
