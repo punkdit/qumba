@@ -771,7 +771,7 @@ class QCode(object):
         tgt = self.apply_H()
         return self.equiv(tgt)
 
-    def get_logop(self, other):
+    def get_logical(self, other):
         L = dot2(self.get_decoder(), other.get_encoder())
         L = L[-self.kk:, -self.kk:]
         return L

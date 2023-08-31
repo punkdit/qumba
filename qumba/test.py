@@ -229,7 +229,46 @@ def test_10_2_3():
     #print("eode:")
     #print(eode)
 
-    return
+    duality = csscode.find_zx_duality(Ax, Az)
+    print(duality)
+
+    n = code.n
+    pairs = []
+    remain = set(range(n))
+    for i, j in enumerate(duality):
+        assert duality[j] == i
+        assert i != j
+        if i<j:
+            pairs.append((i, j))
+
+    dode = code
+    print(dode.longstr())
+    print(dode.get_params())
+    print()
+    for (i,j) in pairs:
+        dode = dode.apply_CNOT(i, j)
+    #print(dode.longstr())
+    #print(dode.get_params())
+    #print()
+    for (i,j) in pairs:
+        dode = dode.apply_CNOT(j, i)
+    #print(dode.longstr())
+    #print(dode.get_params())
+    #print()
+    for (i,j) in pairs:
+        dode = dode.apply_CNOT(i, j)
+    #print(dode.longstr())
+    #print(dode.get_params())
+    #print()
+    f = dode.get_isomorphism(code)
+    dode = dode.permute(f)
+    print(code.equiv(dode))
+    print(dode.longstr())
+    print(dode.get_params())
+    print()
+
+    print(code.get_logical(dode))
+        
 
 
 def test_toric_cnot():
