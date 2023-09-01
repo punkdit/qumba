@@ -25,7 +25,7 @@ DEFAULT_P = 2 # qubits
 
 
 class Matrix(object):
-    def __init__(self, A, p=DEFAULT_P, shape=None, name="?"):
+    def __init__(self, A, p=DEFAULT_P, shape=None, name=""):
         if type(A) == list or type(A) == tuple:
             A = numpy.array(A, dtype=scalar)
         else:
@@ -47,7 +47,13 @@ class Matrix(object):
         self.name = name
 
     @classmethod
-    def perm(cls, items, p=DEFAULT_P, name="?"):
+    def promote(cls, item, p=DEFAULT_P, name=""):
+        if isinstance(item, Matrix):
+            return item
+        return Matrix(item, p, name=name)
+
+    @classmethod
+    def perm(cls, items, p=DEFAULT_P, name=""):
         n = len(items)
         A = numpy.zeros((n, n), dtype=scalar)
         for i, ii in enumerate(items):
@@ -153,6 +159,7 @@ class SymplecticSpace(object):
     def __init__(self, n, p=DEFAULT_P):
         assert 0<=n
         self.n = n
+        self.nn = 2*n
         self.p = p
         self.F = symplectic_form(n, p)
 
@@ -162,6 +169,11 @@ class SymplecticSpace(object):
         F = self.F
         assert M.shape == (nn, nn)
         return F == M*F*M.transpose()
+
+    def identity(self):
+        A = identity2(self.nn)
+        M = Matrix(A, self.p)
+        return M
 
     def get_perm(self, f):
         n, nn = self.n, 2*self.n
@@ -229,9 +241,6 @@ def find_cnots(code):
     src.name = []
     found = set([code])
 
-    dode = src.CNOT(0, 1)
-    eq2(dode.L, src.L)
-
     pairs = []
     for idx in range(n):
       for jdx in range(n):
@@ -297,7 +306,7 @@ def find_cnots(code):
 def cnots_priority(src, tgt):
     src = src.to_qcode()
     tgt = tgt.to_qcode()
-    print("find_cnots:", src, "-->", tgt)
+    print("cnots_priority:", src, "-->", tgt)
 
     n = src.n
 
@@ -307,6 +316,17 @@ def cnots_priority(src, tgt):
         if idx==jdx:
             continue
         pairs.append((idx, jdx))
+
+    space = SymplecticSpace(src.n)
+    gates = []
+    for (i0,i1) in pairs:
+      M = space.get_CNOT(i0, i1)
+      for (j0,j1) in pairs:
+        if i0==j0 or i0==j1 or i1==j0 or i1==j1:
+            continue
+        MN = M*space.get_CNOT(j0,j1)
+        gates.append(MN)
+    print(len(gates))
 
     src.get_distance()
     src.name = []
@@ -319,9 +339,11 @@ def cnots_priority(src, tgt):
 
       code = bdy.pop()
       print(". \tbdy:", len(bdy), len(found), code.weight)
-      shuffle(pairs)
-      for (idx, jdx) in pairs:
-        dode = code.CNOT(idx, jdx)
+      E = code.get_symplectic()
+      E = Matrix.promote(E)
+      for M in gates:
+        ME = M*E
+        dode = QCode.from_symplectic(ME.A, code.m)
         if dode.get_distance() < code.d:
             continue
         if dode in found:
@@ -363,8 +385,61 @@ def test():
     E = Matrix(code.get_encoder())
 
     ELD = E*L*D
-    assert SymplecticSpace(code.n).is_symplectic(ELD)
-    #print( (E*L*D).shortstr() )
+    n = code.n
+    space = SymplecticSpace(n)
+    assert space.is_symplectic(ELD)
+
+    def metric(A, B):
+        AB = (A.A + B.A)%2
+        d = AB.astype(numpy.int64).sum()
+        #print(shortstr(AB), d)
+        #print()
+        return d
+
+    pairs = []
+    for idx in range(n):
+      for jdx in range(n):
+        if idx==jdx:
+            continue
+        pairs.append((idx, jdx))
+
+    print( (ELD).shortstr() )
+
+    best = None
+    while 1:
+      found = set()
+      M0 = space.identity()
+      d0 = metric(M0, ELD)
+      while d0:
+        done = True
+        shuffle(pairs)
+        for (i,j) in pairs:
+            #if i in found or j in found:
+            #    continue
+            M = space.get_CNOT(i,j)
+            M1 = M*M0
+            #print(M.shortstr())
+            d1 = metric(M1, ELD)
+            if d1 < d0:
+                d0 = d1
+                M0 = M1
+                found.add(i)
+                found.add(j)
+                #print(M0.shortstr())
+                print(found, d0, (i, j))
+                done = False
+        if done:
+            break
+      if best is None or d0 < best:
+        print()
+        print(M0 == ELD)
+        D = (M0.A + ELD.A)%2
+        print(shortstr(D))
+        best = d0
+      if best==0:
+        break
+
+    return
 
     dode = QCode.from_symplectic((E*L).A, code.m)
     #print(dode.get_params())
@@ -375,6 +450,7 @@ def test():
     print("tgt:")
     print(dode.longstr())
 
+    
 
     src, tgt = code, dode
     #print(src.get_overlap(tgt))
