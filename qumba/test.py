@@ -242,6 +242,15 @@ def test_10_2_3():
             pairs.append((i, j))
 
     dode = code
+    for (i,j) in pairs:
+        dode = dode.apply_CZ(i, j)
+        print(dode.get_params())
+        print(dode.equiv(code))
+    print(code.get_logical(dode))
+
+    return
+
+    dode = code
     print(dode.longstr())
     print(dode.get_params())
     print()
