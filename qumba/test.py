@@ -93,6 +93,11 @@ def find_logicals(Ax, Az):
     for f in perms:
         # zx duality
         zx = mul(duality, f)
+        print("fixed:", len(fixed(zx)), "involution" if is_identity(mul(zx,zx)) else "")
+
+    for f in perms:
+        # zx duality
+        zx = mul(duality, f)
         if not is_identity(mul(zx, zx)) or len(fixed(zx))%2 != 0:
             continue
         # XXX there's more conditions to check
@@ -129,7 +134,7 @@ def find_logicals(Ax, Az):
     field = GF(2)
     logicals = [matrix(field, kk, A.copy()) for A in logicals]
     G = MatrixGroup(logicals)
-    print(G.structure_description())
+    print("G =", G.structure_description())
     print("|G| =", len(G))
 
 
@@ -248,35 +253,7 @@ def test_10_2_3():
         print(dode.equiv(code))
     print(code.get_logical(dode))
 
-    return
-
-    dode = code
-    print(dode.longstr())
-    print(dode.get_params())
-    print()
-    for (i,j) in pairs:
-        dode = dode.apply_CNOT(i, j)
-    #print(dode.longstr())
-    #print(dode.get_params())
-    #print()
-    for (i,j) in pairs:
-        dode = dode.apply_CNOT(j, i)
-    #print(dode.longstr())
-    #print(dode.get_params())
-    #print()
-    for (i,j) in pairs:
-        dode = dode.apply_CNOT(i, j)
-    #print(dode.longstr())
-    #print(dode.get_params())
-    #print()
-    f = dode.get_isomorphism(code)
-    dode = dode.permute(f)
-    print(code.equiv(dode))
-    print(dode.longstr())
-    print(dode.get_params())
-    print()
-
-    print(code.get_logical(dode))
+    find_logicals(Ax, Az)
         
 
 
