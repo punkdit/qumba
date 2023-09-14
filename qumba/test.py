@@ -62,6 +62,7 @@ def find_logicals(Ax, Az):
     Hx = linear_independent(Ax)
     Hz = linear_independent(Az)
     code = QCode.build_css(Hx, Hz)
+    print(code)
     space = code.space
 
     perms = csscode.find_autos(Ax, Az)
@@ -93,7 +94,7 @@ def find_logicals(Ax, Az):
     for f in perms:
         # zx duality
         zx = mul(duality, f)
-        print("fixed:", len(fixed(zx)), "involution" if is_identity(mul(zx,zx)) else "")
+        #print("fixed:", len(fixed(zx)), "involution" if is_identity(mul(zx,zx)) else "")
 
     for f in perms:
         # zx duality
@@ -116,26 +117,30 @@ def find_logicals(Ax, Az):
             remain.remove(j)
             A = dot2(space.get_CZ(i, j), A)
         gens.append(A)
-        break # we only need one of these
+        #break # sometimes we only need one of these ...
 
     print("gens:", len(gens))
 
     logicals = []
+    found = set()
     for A in gens:
         dode = QCode.from_encoder(dot2(A, M), code.m)
         assert dode.equiv(code)
         MiAM = dot2(Mi, A, M)
         L = MiAM[-kk:, -kk:]
         assert K.is_symplectic(L)
-        logicals.append(L)
+        s = shortstr(L)
+        if s not in found:
+            logicals.append(L)
+            found.add(s)
     print("logicals:", len(logicals))
 
     from sage.all_cmdline import GF, matrix, MatrixGroup
     field = GF(2)
     logicals = [matrix(field, kk, A.copy()) for A in logicals]
     G = MatrixGroup(logicals)
+    print("|G| =", G.order())
     print("G =", G.structure_description())
-    print("|G| =", len(G))
 
 
 def test_bring():
@@ -255,6 +260,66 @@ def test_10_2_3():
 
     find_logicals(Ax, Az)
         
+
+def find_cliffords(Ax, Az):
+    Hx = linear_independent(Ax)
+    Hz = linear_independent(Az)
+    code = QCode.build_css(Hx, Hz)
+
+    #print(code)
+    #print()
+
+    perms = csscode.find_autos(Ax, Az)
+    print("perms:", len(perms))
+    #N, perms = code.get_autos()
+    #print("autos:", N)
+
+    dode = code.apply_perm(perms[0])
+    assert code.equiv(dode)
+
+    duality = csscode.find_zx_duality(Ax, Az)
+    print(duality)
+
+    for f in perms:
+        # zx duality
+        zx = mul(duality, f)
+        #if not is_identity(mul(zx, zx)) or len(fixed(zx))%2 != 0:
+        if not is_identity(mul(zx, zx)) or len(fixed(zx)) != 0:
+            continue
+
+        break
+    else:
+        assert 0, "fail"
+
+    duality = zx
+
+    n = code.n
+    pairs = []
+    remain = set(range(n))
+    for i, j in enumerate(duality):
+        assert duality[j] == i
+        assert i != j
+        if i<j:
+            pairs.append((i, j))
+
+    dode = code
+    for (i,j) in pairs:
+        dode = dode.apply_CZ(i, j)
+        #print(dode.get_params())
+        #print(dode.equiv(code))
+    print(code.get_logical(dode))
+    assert dode.equiv(code)
+
+    find_logicals(Ax, Az)
+        
+
+def test_8_2_2():
+    css = construct.toric(2, 2)
+    Ax, Az = css.Ax, css.Az
+    Ax = direct_sum(Ax, Ax)
+    Az = direct_sum(Az, Az)
+    find_cliffords(Ax, Az)
+    code = css.to_qcode()
 
 
 def test_toric_cnot():
