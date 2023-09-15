@@ -2,7 +2,9 @@
 
 from time import time
 start_time = time()
-from random import shuffle
+from random import shuffle, randint
+from operator import add
+from functools import reduce
 
 import numpy
 
@@ -134,6 +136,7 @@ def find_logicals(Ax, Az):
             logicals.append(L)
             found.add(s)
     print("logicals:", len(logicals))
+    gens = logicals
 
     from sage.all_cmdline import GF, matrix, MatrixGroup
     field = GF(2)
@@ -141,6 +144,8 @@ def find_logicals(Ax, Az):
     G = MatrixGroup(logicals)
     print("|G| =", G.order())
     print("G =", G.structure_description())
+
+    return gens
 
 
 def test_bring():
@@ -267,6 +272,8 @@ def test_toric_logicals():
     css = construct.toric(3, 3)
     Ax, Az = css.Ax, css.Az
     find_logicals(Ax, Az)
+
+
 
 
 def test_symplectic():
