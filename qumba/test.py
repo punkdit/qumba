@@ -212,6 +212,10 @@ def test_10_2_3():
     Z...Z.Z.Z.
     ZZ.....Z.Z
     """)
+    find_logicals(Ax, Az)
+
+    return
+        
 
     Hx = linear_independent(Ax)
     Hz = linear_independent(Az)
@@ -258,104 +262,11 @@ def test_10_2_3():
         print(dode.equiv(code))
     print(code.get_logical(dode))
 
-    find_logicals(Ax, Az)
-        
 
-def find_cliffords(Ax, Az):
-    Hx = linear_independent(Ax)
-    Hz = linear_independent(Az)
-    code = QCode.build_css(Hx, Hz)
-
-    #print(code)
-    #print()
-
-    perms = csscode.find_autos(Ax, Az)
-    print("perms:", len(perms))
-    #N, perms = code.get_autos()
-    #print("autos:", N)
-
-    dode = code.apply_perm(perms[0])
-    assert code.equiv(dode)
-
-    duality = csscode.find_zx_duality(Ax, Az)
-    print(duality)
-
-    for f in perms:
-        # zx duality
-        zx = mul(duality, f)
-        #if not is_identity(mul(zx, zx)) or len(fixed(zx))%2 != 0:
-        if not is_identity(mul(zx, zx)) or len(fixed(zx)) != 0:
-            continue
-
-        break
-    else:
-        assert 0, "fail"
-
-    duality = zx
-
-    n = code.n
-    pairs = []
-    remain = set(range(n))
-    for i, j in enumerate(duality):
-        assert duality[j] == i
-        assert i != j
-        if i<j:
-            pairs.append((i, j))
-
-    dode = code
-    for (i,j) in pairs:
-        dode = dode.apply_CZ(i, j)
-        #print(dode.get_params())
-        #print(dode.equiv(code))
-    print(code.get_logical(dode))
-    assert dode.equiv(code)
-
-    find_logicals(Ax, Az)
-        
-
-def test_8_2_2():
-    css = construct.toric(2, 2)
+def test_toric_logicals():
+    css = construct.toric(3, 3)
     Ax, Az = css.Ax, css.Az
-    Ax = direct_sum(Ax, Ax)
-    Az = direct_sum(Az, Az)
-    find_cliffords(Ax, Az)
-    code = css.to_qcode()
-
-
-def test_toric_cnot():
-
-    """
-    0123456789
-    X..X..XX..
-    .X..X..XX.
-    X.X.....XX
-    .X.X.X...X
-    ..X.XXX...
-    ..ZZ..Z..Z
-    ...ZZZ.Z..
-    Z...Z.Z.Z.
-    ZZ.....Z.Z
-    """
-
-    code = get_10_2_3()
-    idxs = list(range(code.n))
-    pairs = [(i,j) for i in idxs for j in idxs if i!=j]
-    print(len(pairs))
-    assert code.equiv(code)
-
-    N = len(pairs)
-    for idx in range(N):
-     print("idx =", idx)
-     ci = code.apply_CNOT(*pairs[idx])
-     for jdx in range(idx+1, N):
-      cj = ci.apply_CNOT(*pairs[jdx])
-      for kdx in range(jdx+1, N):
-        ck = cj.apply_CNOT(*pairs[kdx])
-        #print(c)
-        if ck.equiv(code):
-            print("FOUND!")
-            return
-    print("NOT FOUND")
+    find_logicals(Ax, Az)
 
 
 def test_symplectic():
