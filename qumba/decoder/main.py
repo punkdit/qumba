@@ -11,7 +11,7 @@ from qumba.argv import argv
 from qumba import construct
 #from qumba.decoder.bpdecode import RadfordBPDecoder
 #from qumba.decoder.cluster import ClusterCSSDecoder
-from qumba.decoder import SimpleDecoder, ExactDecoder, OEDecoder, ClusterCSSDecoder
+from qumba import decoder
 
 write = lambda s : print(s, end='', flush=True)
 
@@ -22,13 +22,14 @@ def main():
     code = construct.toric(l, l)
     print(code)
 
-    decoder = SimpleDecoder(code)
-    decoder = ExactDecoder(code)
-    decoder = OEDecoder(code)
-    decoder = ClusterCSSDecoder(code)
-    #decoder = ClusterCSSDecoder(code, minimize=True)
+    decode = decoder.SimpleDecoder(code)
+    decode = decoder.ExactDecoder(code)
+    decode = decoder.OEDecoder(code)
+    decode = decoder.ClusterCSSDecoder(code)
+    decode = decoder.ClusterCSSDecoder(code, minimize=True)
+    decode = decoder.RadfordNealBPDecoder(code)
 
-    print(decoder)
+    print(decode)
 
     N = argv.get('N', 10)
     p = argv.get('p', 0.04)
@@ -60,7 +61,7 @@ def main():
 
         _err_op = scramble(err_op, code.Hx)
         _err_op = scramble(_err_op, code.Lx)
-        op = decoder.decode(p, _err_op, verbose=False, argv=argv)
+        op = decode.decode(p, _err_op, verbose=False, argv=argv)
 
         c = 'F'
         success = False
