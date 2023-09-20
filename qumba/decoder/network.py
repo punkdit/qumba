@@ -12,23 +12,10 @@ from numpy import dot
 is_close = numpy.allclose
 import numpy.linalg
 
-#from qumba.abstract import genidx
-#from qumba.dense import is_close
-#from qumba.ldpc.tool import write
-#from qumba.ldpc.solve import dot2, zeros2, shortstr, shortstrx, span, array2
-##from qumba.ldpc.ensemble import Ensemble, loglikely
-#from qumba.argv import argv
-#
-#epsilon = 1e-10
-#r2 = math.sqrt(2)
-
+from qumba.tool import write
 
 def genidx(shape):
     return numpy.ndindex(*shape)
-
-
-write = lambda s : print(s, end='', flush=True)
-
 
 
 scalar = numpy.float64

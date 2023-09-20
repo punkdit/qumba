@@ -11,8 +11,7 @@ from random import *
 import numpy
 import numpy.random as ra
 
-from qumba import solve
-from qumba.solve import shortstr, dot2
+from qumba.solve import shortstr, dot2, solve, array2, linear_independent, rank
 from qumba.argv import argv
 
 
@@ -54,8 +53,9 @@ def save_alist(name, H, j=None, k=None):
 
 class RadfordNealBPDecoder(object):
 
-    def __init__(self, code):
-        H = code.Hz
+    def __init__(self, code=None, H=None):
+        if H is None:
+            H = code.Hz
         self.H = H
         m, n = H.shape
         self.m = m # rows
@@ -64,8 +64,13 @@ class RadfordNealBPDecoder(object):
         stem = 'tempcode_%.6d'%randint(0, 99999999)
         self.stem = stem
         save_alist(stem+'.alist', H)
-        r = os.system('./LDPC-codes/alist-to-pchk -t %s.alist %s.pchk' % (stem, stem))
+        path = __file__
+        assert path.endswith("/bp.py")
+        path = path[:-len("bp.py")]
+        path = path + "/LDPC-codes"
+        r = os.system('%s/alist-to-pchk -t %s.alist %s.pchk' % (path, stem, stem))
         assert r==0
+        self.path = path
 
     def __del__(self):
         stem = self.stem
@@ -86,7 +91,8 @@ class RadfordNealBPDecoder(object):
         except:
             pass
 
-        cmd = './LDPC-codes/decode %s.pchk - %s.out bsc %.4f prprp %d' % (stem, stem, p, max_iter)
+        cmd = '%s/decode %s.pchk - %s.out bsc %.4f prprp %d' % (
+            self.path, stem, stem, p, max_iter)
         p = subprocess.Popen(cmd, shell=True,
             stdin=PIPE, stdout=DEVNULL,
             stderr=DEVNULL, close_fds=True)
@@ -105,5 +111,53 @@ class RadfordNealBPDecoder(object):
 
         if syndrome.sum() == 0:
             return (err + op) % 2
+
+
+def make_bigger(H, weight): 
+    m, n = H.shape
+    rows = []
+    for i in range(m):
+      for j in range(i+1, m):
+        u = (H[i]+H[j])%2
+        if u.sum() == weight:
+            rows.append(u)
+    #print("rows:", len(rows))
+    #R = array2(rows)
+    #print(rank(R), m)
+    while 1:
+        shuffle(rows)
+        H1 = array2(rows)
+        H1 = linear_independent(H1)
+        while len(H1)<m:
+            u = H[randint(0, m-1)]
+            v = solve(H1.transpose(), u)
+            if v is None:
+                u.shape = (1, n)
+                H1 = numpy.concatenate((H1, u))
+                #print(len(H1), m)
+        H1 = array2(H1)
+        assert rank(H1) == m
+        #print(H1.sum(1))
+        print("/", end="", flush=True)
+        yield H1
+
+
+class RetryBPDecoder(object):
+    def __init__(self, code):
+        H = code.Hz
+        Hs = make_bigger(H, 12)
+        Hs = [Hs.__next__() for i in range(100)]
+        print()
+        self.Hs = Hs
+
+    def decode(self, p, err, max_iter=None, verbose=False, **kw):
+        for H in self.Hs:
+            decoder = RadfordNealBPDecoder(H=H)
+            op = decoder.decode(p, err)
+            if op is not None:
+                return op
+
+
+
 
 

@@ -12,30 +12,49 @@ from qumba import construct
 #from qumba.decoder.bpdecode import RadfordBPDecoder
 #from qumba.decoder.cluster import ClusterCSSDecoder
 from qumba import decoder
+from qumba.tool import write
 
-write = lambda s : print(s, end='', flush=True)
 
 
 def main():
+    from qumba.csscode import CSSCode
 
-    l = argv.get('l', 4)
-    code = construct.toric(l, l)
+    name = argv.get("code", "toric")
+
+    if name == "toric":
+        l = argv.get('l', 4)
+        code = construct.toric(l, l)
+    for name in argv:
+        if name.endswith(".txt"):
+            s = open(name).read()
+            H = parse(s)
+            code = CSSCode(Hx=H, Hz=H)
+
     print(code)
 
-    decode = decoder.SimpleDecoder(code)
-    decode = decoder.ExactDecoder(code)
-    decode = decoder.OEDecoder(code)
-    decode = decoder.ClusterCSSDecoder(code)
-    decode = decoder.ClusterCSSDecoder(code, minimize=True)
-    decode = decoder.RadfordNealBPDecoder(code)
+    name = argv.get("decode", "")
 
-    print(decode)
+#    decode = decoder.SimpleDecoder(code)
+#    decode = decoder.ExactDecoder(code)
+#    decode = decoder.OEDecoder(code)
+#    decode = decoder.ClusterCSSDecoder(code)
+#    decode = decoder.ClusterCSSDecoder(code, minimize=True)
+#    decode = decoder.RadfordNealBPDecoder(code)
+
+    Decoder = {
+        "oe" : decoder.OEDecoder,
+        "cluster" : decoder.ClusterCSSDecoder,
+        "bp" : decoder.RadfordNealBPDecoder,
+        "retrybp" : decoder.RetryBPDecoder,
+        "match" : decoder.MatchingDecoder, # XX only works on surface codes
+        }.get(name)
+    if Decoder is None:
+        Decoder = getattr(decoder, name, None)
+    decode = Decoder(code)
+    print(decode.__class__.__name__)
 
     N = argv.get('N', 10)
     p = argv.get('p', 0.04)
-    if argv.silent:
-        global write
-        write = lambda s:None
 
     #if argv.noerr:
     #    print("redirecting stderr to stderr.out")

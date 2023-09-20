@@ -11,9 +11,7 @@ import numpy.random as ra
 from qumba import solve
 from qumba.solve import shortstrx, shortstr, array2
 from qumba.decoder import dynamic
-
-def write(s):
-    print(s, end="", flush=True)
+from qumba.tool import write
 
 dot = numpy.dot
 
@@ -175,7 +173,7 @@ class CSSDecoder(object):
 
 class ClusterCSSDecoder(CSSDecoder):
 
-    minimize = False
+    minimize = True
     def decode(self, p, err, verbose=False, str=shortstr, **kw):
         s = self.check(err)
         if verbose:

@@ -5,16 +5,15 @@ from random import *
 import numpy
 import numpy.random as ra
 
-write = lambda s : print(s, end='', flush=True)
 
 
-from qupy.ldpc import solve
-from qupy.ldpc.solve import (
+from qumba import solve
+from qumba.solve import (
     pop2, zeros2, dot2, array2, eq2, rand2, binomial2,
     randexpo, shortstr, shortstrx)
-from qupy.ldpc.dynamic import Tanner
+from qumba.decoder.dynamic import Tanner
 
-from qupy.argv import argv
+from qumba.argv import argv
 
 strop = solve.shortstr
 
