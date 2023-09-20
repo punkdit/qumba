@@ -11,7 +11,7 @@ from qumba.argv import argv
 from qumba import construct
 #from qumba.decoder.bpdecode import RadfordBPDecoder
 #from qumba.decoder.cluster import ClusterCSSDecoder
-from qumba.decoder import SimpleDecoder, ExactDecoder, OEDecoder
+from qumba.decoder import SimpleDecoder, ExactDecoder, OEDecoder, ClusterCSSDecoder
 
 write = lambda s : print(s, end='', flush=True)
 
@@ -25,6 +25,8 @@ def main():
     decoder = SimpleDecoder(code)
     decoder = ExactDecoder(code)
     decoder = OEDecoder(code)
+    decoder = ClusterCSSDecoder(code)
+    #decoder = ClusterCSSDecoder(code, minimize=True)
 
     print(decoder)
 
