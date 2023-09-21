@@ -11,7 +11,7 @@ from qumba import solve
 from qumba.solve import (
     pop2, zeros2, dot2, array2, eq2, rand2, binomial2,
     randexpo, shortstr, shortstrx)
-from qumba.decoder.dynamic import Tanner
+from qumba.decode.dynamic import Tanner
 
 from qumba.argv import argv
 

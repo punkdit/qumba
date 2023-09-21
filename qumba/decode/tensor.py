@@ -12,8 +12,8 @@ from numpy import dot
 import numpy.linalg
 
 from qumba.solve import dot2, zeros2, shortstr, shortstrx, span, array2
-from qumba.decoder.simple import Decoder
-from qumba.decoder.network import TensorNetwork
+from qumba.decode.simple import Decoder
+from qumba.decode.network import TensorNetwork
 from qumba.argv import argv
 
 

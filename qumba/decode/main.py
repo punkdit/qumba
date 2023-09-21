@@ -9,9 +9,9 @@ from qumba.solve import shortstr, zeros2, array2, dot2, parse, linear_independen
 from qumba.argv import argv
 
 from qumba import construct
-#from qumba.decoder.bpdecode import RadfordBPDecoder
-#from qumba.decoder.cluster import ClusterCSSDecoder
-from qumba import decoder
+#from qumba.decode.bpdecode import RadfordBPDecoder
+#from qumba.decode.cluster import ClusterCSSDecoder
+from qumba import decode
 from qumba.tool import write
 
 
@@ -34,24 +34,24 @@ def main():
 
     name = argv.get("decode", "")
 
-#    decode = decoder.SimpleDecoder(code)
-#    decode = decoder.ExactDecoder(code)
-#    decode = decoder.OEDecoder(code)
-#    decode = decoder.ClusterCSSDecoder(code)
-#    decode = decoder.ClusterCSSDecoder(code, minimize=True)
-#    decode = decoder.RadfordNealBPDecoder(code)
+#    decode = decode.SimpleDecoder(code)
+#    decode = decode.ExactDecoder(code)
+#    decode = decode.OEDecoder(code)
+#    decode = decode.ClusterCSSDecoder(code)
+#    decode = decode.ClusterCSSDecoder(code, minimize=True)
+#    decode = decode.RadfordNealBPDecoder(code)
 
     Decoder = {
-        "oe" : decoder.OEDecoder,
-        "cluster" : decoder.ClusterCSSDecoder,
-        "bp" : decoder.RadfordNealBPDecoder,
-        "retrybp" : decoder.RetryBPDecoder,
-        "match" : decoder.MatchingDecoder, # XX only works on surface codes
+        "oe"      : decode.OEDecoder,
+        "cluster" : decode.ClusterCSSDecoder,
+        "bp"      : decode.RadfordNealBPDecoder,
+        "retrybp" : decode.RetryBPDecoder,
+        "match"   : decode.MatchingDecoder, # XX only works on surface codes
         }.get(name)
     if Decoder is None:
-        Decoder = getattr(decoder, name, None)
-    decode = Decoder(code)
-    print(decode.__class__.__name__)
+        Decoder = getattr(decode, name, None)
+    decoder = Decoder(code)
+    print(decoder.__class__.__name__)
 
     N = argv.get('N', 10)
     p = argv.get('p', 0.04)
@@ -80,7 +80,7 @@ def main():
 
         _err_op = scramble(err_op, code.Hx)
         _err_op = scramble(_err_op, code.Lx)
-        op = decode.decode(p, _err_op, verbose=False, argv=argv)
+        op = decoder.decode(p, _err_op, verbose=False, argv=argv)
 
         c = 'F'
         success = False

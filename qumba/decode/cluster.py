@@ -10,7 +10,7 @@ import numpy.random as ra
 
 from qumba import solve
 from qumba.solve import shortstrx, shortstr, array2
-from qumba.decoder import dynamic
+from qumba.decode import dynamic
 from qumba.tool import write
 
 dot = numpy.dot
