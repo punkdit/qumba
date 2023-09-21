@@ -9,8 +9,8 @@ from operator import add
 import numpy
 
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
-    zeros2, rank, rand2, pseudo_inverse, kernel, direct_sum)
-from qumba.qcode import QCode, SymplecticSpace
+    zeros2, rank, rand2, pseudo_inverse, kernel, direct_sum, span)
+from qumba.qcode import QCode, SymplecticSpace, get_weight, fromstr
 from qumba.csscode import CSSCode, find_zx_duality
 from qumba.argv import argv
 
@@ -147,4 +147,137 @@ def biplanar(w=24, h=12):
 
     code = CSSCode(Ax=Ax, Az=Az)
     return code
+
+
+
+def test():
+
+    from qumba.lattices.db import items
+
+    lattice = {}
+    
+    # face--edge, edge--vert
+    A, B = items[0]
+    print("face--edge")
+    print(shortstr(A), A.shape)
+    print("edge-vert")
+    print(shortstr(B), B.shape)
+
+    assert A.shape[1] == B.shape[0]
+    nface, nedge = A.shape
+    nedge, nvert = B.shape
+
+    #rows = []
+    #for i in range(nface):
+        #for j in range(nvert):
+
+    AB = numpy.dot(A, B) // 2
+
+    print("face-vert")
+    AB = AB.astype(object)
+    print(shortstr(AB), AB.shape)
+
+    for i in range(nvert):
+        XYZ = list('XYZ')
+        shuffle(XYZ)
+        for j in range(nface):
+            if AB[j, i] == 0:
+                AB[j, i] = "I"
+            else:
+                AB[j, i] = XYZ.pop()
+    print(AB, AB.shape)
+
+    stabs = [''.join(row) for row in AB]
+    print(stabs)
+
+    H = fromstr(stabs)
+    print(shortstr(H), H.shape, rank(H))
+
+    estabs = []
+    for i in range(nedge):
+        b = B[i]
+        j0, j1 = numpy.where(b)[0]
+        op = ['I']*nvert
+        for stab in stabs:
+            s0, s1 = stab[j0], stab[j1]
+            if s0 == 'I' and s1 != 'I':
+                op[j1] = stab[j1]
+            elif s1 == 'I' and s0 != 'I':
+                op[j0] = stab[j0]
+        op = ''.join(op)
+        estabs.append(op)
+    H = fromstr(stabs + estabs)
+    print(shortstr(H), H.shape, rank(H))
+    
+
+    return
+
+    stabs.pop()
+    code = QCode.fromstr(stabs)
+    print(code)
+    print(code.longstr())
+
+#    HL = numpy.concatenate((code.H, code.L[::2]))
+#    H1 = []
+#    for v in span(HL):
+#        if v.sum() == 0:
+#            continue
+#        if get_weight(v) == 2:
+#            #print(v)
+#            H1.append(v)
+#    H = numpy.concatenate((code.H, H1))
+#    H = linear_independent(H)
+#    code = QCode(H)
+#    print(code.get_params())
+#    print(code.longstr())
+#
+#    HL = numpy.concatenate((code.H, code.L[1::2]))
+#    H1 = []
+#    for v in span(HL):
+#        if v.sum() == 0:
+#            continue
+#        if get_weight(v) == 2:
+#            #print(v)
+#            H1.append(v)
+#    H = numpy.concatenate((code.H, H1))
+#    H = linear_independent(H)
+#    code = QCode(H)
+#    print(code.get_params())
+#    print(code.longstr())
+
+
+
+if __name__ == "__main__":
+
+    from time import time
+
+    start_time = time()
+
+    profile = argv.profile
+    name = argv.next()
+    _seed = argv.get("seed")
+    if _seed is not None:
+        print("seed(%s)"%(_seed))
+        seed(_seed)
+
+    if profile:
+        import cProfile as profile
+        profile.run("%s()"%name)
+
+    elif name is not None:
+        fn = eval(name)
+        fn()
+
+    else:
+        test()
+
+
+    t = time() - start_time
+    print("finished in %.3f seconds"%t)
+    print("OK!\n")
+
+
+
+
+
 

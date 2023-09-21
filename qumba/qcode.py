@@ -33,7 +33,10 @@ def parse(s):
 
 
 def fromstr(Hs):
-    stabs = Hs.split()
+    if type(Hs) is str:
+        stabs = Hs.split()
+    else:
+        stabs = list(Hs)
     H = []
     I, X, Z, Y = [0,0], [1,0], [0,1], [1,1]
     lookup = {'X':X, 'Z':Z, 'Y':Y, 'I':I, '.':I}
@@ -41,6 +44,7 @@ def fromstr(Hs):
         row = [lookup[c] for c in stab]
         H.append(row)
     H = array2(H)
+    H = flatten(H)
     return H
 
 
@@ -326,11 +330,15 @@ class QCode(object):
 
     @classmethod
     def fromstr(cls, Hs, Ts=None, Ls=None, Js=None, check=True, **kw):
-        H = fromstr(Hs)
+        H = fromstr(Hs) if Hs is not None else None
         T = fromstr(Ts) if Ts is not None else None
         L = fromstr(Ls) if Ls is not None else None
         J = fromstr(Js) if Js is not None else None
-        return QCode(H, T, L, J, check=check, **kw)
+        if H is None and J is not None:
+            code = QCode.build_gauge(J, T=T, L=L)
+        else:
+            code = QCode(H, T, L, J, check=check, **kw)
+        return code
 
     def __str__(self):
         d = self.d if self.d is not None else '?'
