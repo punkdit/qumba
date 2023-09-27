@@ -11,6 +11,7 @@ import numpy
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum)
 from qumba.qcode import QCode, SymplecticSpace
+from qumba.csscode import CSSCode
 from qumba import csscode, construct
 from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
 from qumba.argv import argv
@@ -513,6 +514,23 @@ def test_concatenate_toric():
     print(result.is_selfdual())
 
     # hmm...
+
+
+def test_hgp():
+    n, m = 6, 4
+    for H in construct.classical_codes(n, m, 3):
+        print("H=")
+        print(shortstr(H))
+        Hx, Hz = construct.hypergraph_product(H, H.transpose())
+        code = CSSCode(Hx=Hx, Hz=Hz)
+        print(code)
+        #print(code.distance())
+        #print("Hz =")
+        #print(shortstr(Hz))
+        #print("Hx =")
+        #print(shortstr(Hx))
+        #print()
+
 
 
 def test_biplanar():
