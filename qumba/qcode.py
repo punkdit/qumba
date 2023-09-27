@@ -244,7 +244,7 @@ class SymplecticSpace(object):
 
 class QCode(object):
     def __init__(self, H, T=None, L=None, J=None, d=None, check=True):
-        assert H.max() <= 1
+        assert len(H)==0 or H.max() <= 1
         H = flatten(H) # stabilizers
         m, nn = H.shape
         assert nn%2 == 0

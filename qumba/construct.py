@@ -16,6 +16,30 @@ from qumba.argv import argv
 def get_422():
     return QCode.fromstr("XXXX ZZZZ", None, "XXII ZIZI XIXI ZZII")
 
+def get_832():
+    """ Build the [[8,3,2]] code.
+
+    We _number the qubits like this:
+    0 ----------- 1
+    |\           /|
+    | \         / |
+    |  2-------3  |
+    |  |       |  |
+    |  |       |  |
+    |  6-------7  |
+    | /         \ |
+    |/           \|
+    4 ----------- 5
+
+    See:
+    https://earltcampbell.com/2016/09/26/the-smallest-interesting-colour-code/
+    """
+    return QCode.fromstr(
+        "XXXXXXXX ZZZZIIII ZZIIZZII ZIZIZIZI ZZZZZZZZ",
+        None,
+        "XXIIXXII IZIZIIII IXIXIXIX ZZIIIIII XXXXIIII IZIIIZII"
+    )
+
 
 def get_513():
     H = """
