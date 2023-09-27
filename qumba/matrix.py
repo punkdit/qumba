@@ -67,7 +67,7 @@ class Matrix(object):
         return Matrix(A, p, name="I")
 
     def __str__(self):
-        return str(self.A)
+        return shortstr(self.A)
 
     def __repr__(self):
         return "Matrix(%s)"%str(self.A)
