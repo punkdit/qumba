@@ -518,7 +518,7 @@ class QCode(object):
         kk = len(L)
         H = self.H
         m = len(H)
-        HL = numpy.concatenate((H, L))
+        HL = numpy.concatenate((H.A, L.A))
         mk = len(HL)
         if mk > max_mk:
             return None
@@ -597,7 +597,7 @@ class QCode(object):
         assert left.n == right.n
         L = left.get_symplectic() 
         R = right.get_symplectic()
-        E = dot2(L, R)
+        E = L*R
         code = QCode.from_symplectic(E, k=right.k)
         return code
 
@@ -626,11 +626,12 @@ class QCode(object):
         return self.equiv(tgt)
 
     def get_logical(self, other):
-        L = dot2(self.get_decoder(), other.get_encoder())
+        L = self.get_decoder() * other.get_encoder()
         L = L[-self.kk:, -self.kk:]
         return L
 
     def get_overlap(self, other):
+        assert 0, "fix me"
         items = []
         for i in range(self.k+1):
             lhs = concatenate((self.H, self.L[:2*i:2]))
