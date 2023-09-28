@@ -31,7 +31,7 @@ else:
 
 
 int_scalar = numpy.int64
-#int_scalar = numpy.int8
+#int_scalar = numpy.int8 # careful with .sum() !
 
 
 def array2(items):

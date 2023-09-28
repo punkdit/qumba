@@ -17,35 +17,6 @@ from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
 from qumba.argv import argv
 
 
-def find_logical_autos(code):
-    K = SymplecticSpace(code.k)
-    kk = 2*code.k
-
-    space = code.space
-    N, perms = code.get_autos()
-    M = code.get_encoder()
-    Mi = dot2(space.F, M.transpose(), space.F)
-    I = identity2(code.nn)
-    assert eq2(dot2(M, Mi), I)
-    assert eq2(dot2(Mi, M), I)
-
-    gens = []
-    for f in perms:
-        A = space.get_perm(f)
-        dode = QCode.from_encoder(dot2(A, M), code.m)
-        assert dode.equiv(code)
-
-        MiAM = dot2(Mi, A, M)
-        L = MiAM[-kk:, -kk:]
-        assert K.is_symplectic(L)
-        gens.append(L)
-
-    from sage.all_cmdline import GF, matrix, MatrixGroup
-    field = GF(2)
-    gens = [matrix(field, kk, A.copy()) for A in gens]
-    G = MatrixGroup(gens)
-    print(G.structure_description())
-
 
 def fixed(f):
     return [i for i in range(len(f)) if f[i]==i]
@@ -81,13 +52,18 @@ def find_logicals(Ax, Az):
     kk = 2*code.k
     K = SymplecticSpace(code.k)
     M = code.get_encoder()
-    Mi = dot2(space.F, M.transpose(), space.F)
-    I = identity2(code.nn)
-    assert eq2(dot2(M, Mi), I)
-    assert eq2(dot2(Mi, M), I)
+    Mi = space.F * M.t * space.F
+    #Mi = dot2(space.F, M.transpose(), space.F)
+    #I = identity2(code.nn)
+    I = space.identity()
+    #assert eq2(dot2(M, Mi), I)
+    #assert eq2(dot2(Mi, M), I)
+    assert M*Mi == I
+    assert Mi*M == I
 
     gens = []
-    A = dot2(space.get_H(), space.get_perm(duality))
+    #A = dot2(space.get_H(), space.get_perm(duality))
+    A = space.get_H() * space.get_perm(duality)
     gens.append(A)
 
     for f in perms:
@@ -109,7 +85,8 @@ def find_logicals(Ax, Az):
         A = I
         remain = set(range(n))
         for i in fixed(zx):
-            A = dot2(space.get_S(i), A)
+            #A = dot2(space.get_S(i), A)
+            A = space.get_S(i) * A
             remain.remove(i)
         for i in range(n):
             if i not in remain:
@@ -118,7 +95,8 @@ def find_logicals(Ax, Az):
             assert zx[j] == i
             remain.remove(i)
             remain.remove(j)
-            A = dot2(space.get_CZ(i, j), A)
+            #A = dot2(space.get_CZ(i, j), A)
+            A = space.get_CZ(i, j) * A
         gens.append(A)
         #break # sometimes we only need one of these ...
 
@@ -129,10 +107,11 @@ def find_logicals(Ax, Az):
     for A in gens:
         dode = QCode.from_encoder(dot2(A, M), code.m)
         assert dode.equiv(code)
-        MiAM = dot2(Mi, A, M)
+        #MiAM = dot2(Mi, A, M)
+        MiAM = Mi*A*M
         L = MiAM[-kk:, -kk:]
         assert K.is_symplectic(L)
-        s = shortstr(L)
+        s = L.shortstr()
         if s not in found:
             logicals.append(L)
             found.add(s)
@@ -141,7 +120,7 @@ def find_logicals(Ax, Az):
 
     from sage.all_cmdline import GF, matrix, MatrixGroup
     field = GF(2)
-    logicals = [matrix(field, kk, A.copy()) for A in logicals]
+    logicals = [matrix(field, kk, A.A.copy()) for A in logicals]
     G = MatrixGroup(logicals)
     print("|G| =", G.order())
     print("G =", G.structure_description())
@@ -297,7 +276,8 @@ def test_symplectic():
     
         A = space.get_S()
         assert space.is_symplectic(A)
-        AM = dot2(A, M)
+        #AM = dot2(A, M)
+        AM = A*M
         assert space.is_symplectic(AM)
         dode = QCode.from_encoder(AM, code.m)
         eode = code.apply_S()
@@ -305,7 +285,8 @@ def test_symplectic():
     
         A = space.get_CNOT(0, 1)
         assert space.is_symplectic(A)
-        AM = dot2(A, M)
+        #AM = dot2(A, M)
+        AM = A*M
         assert space.is_symplectic(AM)
         dode = QCode.from_encoder(AM, code.m)
         eode = code.apply_CNOT(0, 1)
@@ -315,7 +296,8 @@ def test_symplectic():
         shuffle(f)
         A = space.get_perm(f)
         assert space.is_symplectic(A)
-        AM = dot2(A, M)
+        #AM = dot2(A, M)
+        AM = A*M
         assert space.is_symplectic(AM)
         dode = QCode.from_encoder(AM, code.m)
         eode = code.apply_perm(f)
@@ -366,11 +348,12 @@ def test_concatenate_show():
     print(shortstr(E0))
     print()
 
-    F = dot2(E1, E0)
+    #F = dot2(E1, E0)
+    F = E1*E0
     result = QCode.from_symplectic(F, k=1)
     print(result)
     print(result.get_params())
-    print(shortstr(F))
+    print(F)
     print(result.longstr())
     assert result.get_params() == (9, 1, 3)
     
@@ -543,11 +526,13 @@ def test_biplanar():
 
 
 def test():
-    test_codetables()
+    print("\ntest()")
+    get_422()
     test_isomorphism()
-    test_10_2_3()
     test_symplectic()
     test_concatenate()
+    test_10_2_3()
+    test_codetables()
     #test_bring() # slow..
 
 

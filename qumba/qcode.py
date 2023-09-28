@@ -17,17 +17,19 @@ from numpy import alltrue, zeros, dot, concatenate
 from qumba import solve 
 from qumba.solve import (
     array2, zeros2, shortstr, dot2, solve2, linear_independent, row_reduce, kernel,
-    span, intersect, rank, enum2, shortstrx, identity2, eq2, pseudo_inverse, direct_sum)
-from qumba.argv import argv
+    span, intersect, rank, enum2, shortstrx, identity2, eq2, pseudo_inverse)
+from qumba.matrix import SymplecticSpace, Matrix, flatten, symplectic_form
 from qumba.csscode import CSSCode
+from qumba.argv import argv
 from qumba.smap import SMap
+
 
 
 def parse(s):
     for c in "XZY":
         s = s.replace(c, '1')
     s = s.replace("I", "0")
-    for c in " [],":
+    for c in "[],":
         s = s.replace(c, '')
     return solve.parse(s)
 
@@ -66,37 +68,6 @@ def css_to_isotropic(Hx, Hz):
     H[mx:, :, 1] = Hz
     return H
 
-
-def flatten(H):
-    if H is not None and len(H.shape)==3:
-        H = H.view()
-        m, n, _ = H.shape
-        H.shape = m, 2*n
-    return H
-
-
-def complement(H):
-    H = flatten(H)
-    H = row_reduce(H)
-    m, nn = H.shape
-    #print(shortstr(H))
-    pivots = []
-    row = col = 0
-    while row < m:
-        while col < nn and H[row, col] == 0:
-            #print(row, col, H[row, col])
-            pivots.append(col)
-            col += 1
-        row += 1
-        col += 1
-    while col < nn:
-        pivots.append(col)
-        col += 1
-    W = zeros2(len(pivots), nn)
-    for i, ii in enumerate(pivots):
-        W[i, ii] = 1
-    #print()
-    return W
 
 def get_weight_slow(v):
     count = 0
@@ -169,78 +140,6 @@ def strop(H):
         smap[i,j] = c
     return str(smap)
 
-@cache
-def symplectic_form(n):
-    F = zeros2(2*n, 2*n)
-    for i in range(n):
-        F[2*i:2*i+2, 2*i:2*i+2] = [[0,1],[1,0]]
-    return F
-
-
-class SymplecticSpace(object):
-    def __init__(self, n):
-        assert 0<=n
-        self.n = n
-        self.F = symplectic_form(n)
-
-    def is_symplectic(self, M):
-        nn = 2*self.n
-        F = self.F
-        assert M.shape == (nn, nn)
-        return eq2(F, dot2(M, F, M.transpose()))
-
-    def get_perm(self, f):
-        n, nn = self.n, 2*self.n
-        assert len(f) == n
-        assert set([f[i] for i in range(n)]) == set(range(n))
-        A = zeros2(nn, nn)
-        for i in range(n):
-            A[2*i, 2*f[i]] = 1
-            A[2*i+1, 2*f[i]+1] = 1
-        assert self.is_symplectic(A)
-        return A
-
-    def get(self, M, idx=None):
-        M = array2(M)
-        assert M.shape == (2,2)
-        n = self.n
-        A = identity2(2*n)
-        idxs = list(range(n)) if idx is None else [idx]
-        for i in idxs:
-            A[2*i:2*i+2, 2*i:2*i+2] = M
-        return A.transpose()
-
-    def get_H(self, idx=None):
-        # swap X<-->Z on bit idx
-        H = array2([[0,1],[1,0]])
-        return self.get(H, idx)
-
-    def get_S(self, idx=None):
-        # swap X<-->Y
-        S = array2([[1,1],[0,1]])
-        return self.get(S, idx)
-
-    def get_SH(self, idx=None):
-        # X-->Z-->Y-->X 
-        SH = array2([[0,1],[1,1]])
-        return self.get(SH, idx)
-
-    def get_CZ(self, idx, jdx):
-        assert idx != jdx
-        n = self.n
-        A = identity2(2*n)
-        A[2*idx, 2*jdx+1] = 1
-        A[2*jdx, 2*idx+1] = 1
-        return A.transpose()
-
-    def get_CNOT(self, idx, jdx):
-        assert idx != jdx
-        n = self.n
-        A = identity2(2*n)
-        A[2*jdx+1, 2*idx+1] = 1
-        A[2*idx, 2*jdx] = 1
-        return A.transpose()
-
 
 class QCode(object):
     def __init__(self, H, T=None, L=None, J=None, d=None, check=True):
@@ -249,9 +148,10 @@ class QCode(object):
         m, nn = H.shape
         assert nn%2 == 0
         n = nn//2
-        T = flatten(T)
-        L = flatten(L)
-        J = flatten(J)
+        H = Matrix.promote(H)
+        T = Matrix.promote(T)
+        L = Matrix.promote(L)
+        J = Matrix.promote(J)
         self.H = H # stabilizers
         self.T = T # destabilizers
         self.L = L # logicals
@@ -273,20 +173,24 @@ class QCode(object):
 
     def __eq__(self, other):
         assert isinstance(other, QCode)
-        eq = lambda A, B : (A is None and B is None) or A is not None and B is not None and eq2(A, B)
+        # XXX assert None's agree before we check, because of __hash__ below
+        eq = lambda A, B : (A is None and B is None) or A is not None and B is not None and A==B
         return (
             eq(self.H, other.H) and eq(self.T, other.T) and
             eq(self.L, other.L) and eq(self.J, other.J))
 
     def __hash__(self):
-        A = self.get_symplectic()
-        key = A.tobytes(), self.m
+        self.build()
+        key = self.longstr()
         return hash(key)
 
     def __add__(self, other):
-        H = direct_sum(self.H, other.H)
-        T = direct_sum(self.T, other.T)
-        L = direct_sum(self.L, other.L)
+        #H = direct_sum(self.H, other.H)
+        #T = direct_sum(self.T, other.T)
+        #L = direct_sum(self.L, other.L)
+        H = self.H.direct_sum(other.H)
+        T = self.T.direct_sum(other.T)
+        L = self.L.direct_sum(other.L)
         return QCode(H, T, L)
 
     def __rmul__(self, count):
@@ -362,26 +266,35 @@ class QCode(object):
     def check(self):
         H = self.H
         m, n = self.shape
-        H1 = dot2(H, symplectic_form(n))
-        R = dot2(H, H1.transpose())
+        F = self.space.F # the symplectic form
+        #H1 = dot2(H, symplectic_form(n))
+        #R = dot2(H, H1.transpose())
+        #print(type(F), type(F), type(H.t))
+        R = H * F * H.t
         if R.sum() != 0:
             print(shortstr(R))
             assert 0, "not isotropic"
         L = self.get_logops()
-        R = dot2(L, H1.transpose())
+        #R = dot2(L, H1.transpose())
+        R = L*F*H.t
         if R.sum() != 0:
             print("R:")
             print(shortstr(R))
             assert 0
-        R = dot2(L, symplectic_form(n), L.transpose())
-        if not eq2(R, symplectic_form(self.k)):
+        #R = dot2(L, symplectic_form(n), L.transpose())
+        R = L*F*L.t
+        #if not eq2(R, symplectic_form(self.k)):
+        if R != symplectic_form(self.k):
             assert 0
         T = self.get_destabilizers()
-        HT = array2(list(zip(H, T)))
+        HT = array2(list(zip(H.A, T.A)))
         HT.shape = 2*m, 2*n
-        A = numpy.concatenate((HT, L))
-        F = dot2(A, symplectic_form(n), A.transpose())
-        assert eq2(F, symplectic_form(n))
+        HT = Matrix(HT)
+        A = HT.concatenate(L)
+        assert A*F*A.t == F
+        #A = numpy.concatenate((HT, L))
+        #F = dot2(A, symplectic_form(n), A.transpose())
+        #assert eq2(F, symplectic_form(n))
 
     @property
     def deepH(self):
@@ -415,11 +328,11 @@ class QCode(object):
 #        return A
 
     def equiv(self, other):
-        H1, H2 = self.H.transpose(), other.H.transpose()
-        U = solve2(H1, H2)
+        H1, H2 = self.H.t, other.H.t
+        U = solve2(H1.A, H2.A)
         if U is None:
             return False
-        U = solve2(H2, H1)
+        U = solve2(H2.A, H1.A)
         if U is None:
             return False
         return True
@@ -513,80 +426,125 @@ class QCode(object):
     def is_isomorphic(self, other):
         return self.get_isomorphism(other) is not None
 
-    def apply_perm(self, f):
-        n = self.n
-        H = self.deepH[:, [f[i] for i in range(n)], :].copy()
-        L = self.deepL
-        if L is not None:
-            L = L[:, [f[i] for i in range(n)], :].copy()
-        T = self.deepT
-        if T is not None:
-            T = T[:, [f[i] for i in range(n)], :].copy()
-        return QCode(H, T, L)
-    permute = apply_perm
+#    def apply_perm(self, f):
+#        n = self.n
+#        H = self.deepH[:, [f[i] for i in range(n)], :].copy()
+#        L = self.deepL
+#        if L is not None:
+#            L = L[:, [f[i] for i in range(n)], :].copy()
+#        T = self.deepT
+#        if T is not None:
+#            T = T[:, [f[i] for i in range(n)], :].copy()
+#        return QCode(H, T, L)
+#    permute = apply_perm
+#
+#    def apply(self, idx, gate):
+#        if idx is None:
+#            code = self
+#            for idx in range(self.n):
+#                code = code.apply(idx, gate) # <--- recurse
+#            return code
+#        H = self.deepH.copy()
+#        H[:, idx] = dot(H[:, idx], gate) % 2
+#        T = self.T
+#        if T is not None:
+#            T = self.deepT.copy()
+#            T[:, idx] = dot(T[:, idx], gate) % 2
+#        L = self.L
+#        if L is not None:
+#            L = self.deepL.copy()
+#            L[:, idx] = dot(L[:, idx], gate) % 2
+#        return QCode(H, T, L)
+#
+#    def apply_H(self, idx=None):
+#        # swap X<-->Z on bit idx
+#        H = array2([[0,1],[1,0]])
+#        return self.apply(idx, H)
+#    get_dual = apply_H
+#    H = apply_H
+#
+#    def apply_S(self, idx=None):
+#        # swap X<-->Y
+#        S = array2([[1,1],[0,1]])
+#        return self.apply(idx, S)
+#    S = apply_S
+#
+#    def apply_SH(self, idx=None):
+#        # X-->Z-->Y-->X 
+#        SH = array2([[0,1],[1,1]])
+#        return self.apply(idx, SH)
+#    SH = apply_SH
+#
+#    def apply_CZ(self, idx, jdx):
+#        assert idx != jdx
+#        n = self.n
+#        A = identity2(2*n)
+#        A[2*idx, 2*jdx+1] = 1
+#        A[2*jdx, 2*idx+1] = 1
+#        H = dot2(self.H, A)
+#        T = dot2(self.T, A)
+#        L = dot2(self.L, A)
+#        return QCode(H, T, L)
+#    CZ = apply_CZ
+#
+#    def apply_CNOT(self, idx, jdx):
+#        assert idx != jdx
+#        n = self.n
+#        A = identity2(2*n)
+#        A[2*jdx+1, 2*idx+1] = 1
+#        A[2*idx, 2*jdx] = 1
+#        #print("apply_CNOT")
+#        #print(A)
+#        H = dot2(self.H, A)
+#        T = dot2(self.T, A)
+#        L = dot2(self.L, A)
+#        return QCode(H, T, L)
+#    CNOT = apply_CNOT
 
-    def apply(self, idx, gate):
-        if idx is None:
-            code = self
-            for idx in range(self.n):
-                code = code.apply(idx, gate) # <--- recurse
-            return code
-        H = self.deepH.copy()
-        H[:, idx] = dot(H[:, idx], gate) % 2
-        T = self.T
-        if T is not None:
-            T = self.deepT.copy()
-            T[:, idx] = dot(T[:, idx], gate) % 2
-        L = self.L
-        if L is not None:
-            L = self.deepL.copy()
-            L[:, idx] = dot(L[:, idx], gate) % 2
+    def apply(self, M):
+        assert isinstance(M, Matrix)
+        Mt = M.t
+        H = self.H * Mt
+        T = self.T * Mt
+        L = self.L * Mt
         return QCode(H, T, L)
+
+    def apply_perm(self, f):
+        M = self.space.get_perm(f)
+        return self.apply(M)
+    permute = apply_perm
 
     def apply_H(self, idx=None):
         # swap X<-->Z on bit idx
-        H = array2([[0,1],[1,0]])
-        return self.apply(idx, H)
+        M = self.space.get_H(idx)
+        return self.apply(M)
     get_dual = apply_H
     H = apply_H
 
     def apply_S(self, idx=None):
         # swap X<-->Y
-        S = array2([[1,1],[0,1]])
-        return self.apply(idx, S)
+        M = self.space.get_S(idx)
+        return self.apply(M)
     S = apply_S
 
     def apply_SH(self, idx=None):
         # X-->Z-->Y-->X 
-        SH = array2([[0,1],[1,1]])
-        return self.apply(idx, SH)
+        M = self.space.get_SH(idx)
+        return self.apply(M)
     SH = apply_SH
 
     def apply_CZ(self, idx, jdx):
         assert idx != jdx
-        n = self.n
-        A = identity2(2*n)
-        A[2*idx, 2*jdx+1] = 1
-        A[2*jdx, 2*idx+1] = 1
-        H = dot2(self.H, A)
-        T = dot2(self.T, A)
-        L = dot2(self.L, A)
-        return QCode(H, T, L)
+        M = self.space.get_CZ(idx, jdx)
+        return self.apply(M)
     CZ = apply_CZ
 
     def apply_CNOT(self, idx, jdx):
         assert idx != jdx
-        n = self.n
-        A = identity2(2*n)
-        A[2*jdx+1, 2*idx+1] = 1
-        A[2*idx, 2*jdx] = 1
-        #print("apply_CNOT")
-        #print(A)
-        H = dot2(self.H, A)
-        T = dot2(self.T, A)
-        L = dot2(self.L, A)
-        return QCode(H, T, L)
+        M = self.space.get_CNOT(idx, jdx)
+        return self.apply(M)
     CNOT = apply_CNOT
+
 
     def row_reduce(self):
         H = self.H.copy()
@@ -600,26 +558,34 @@ class QCode(object):
         if self.L is not None:
             return self.L
         m, n = self.shape
+        F = self.space.F
         k = self.k
         H = self.H
         L = []
         for i in range(k):
-            M = dot2(H, symplectic_form(n))
-            K = kernel(M) # XXX do this incrementally for more speed XXX
-            J = dot2(K, symplectic_form(n), K.transpose())
-            for (row, col) in zip(*numpy.where(J)):
+            #M = dot2(H, symplectic_form(n))
+            M = H*F
+            #K = kernel(M) # XXX do this incrementally for more speed XXX
+            K = M.kernel()
+            #J = dot2(K, symplectic_form(n), K.transpose())
+            J = K*F*K.t
+            for (row, col) in J.where():
                 break
             lx = K[row:row+1]
             lz = K[col:col+1]
-            L.append(lx)
-            L.append(lz)
-            H = numpy.concatenate((H, lx, lz))
+            L.append(lx.A)
+            L.append(lz.A)
+            #H = numpy.concatenate((H, lx, lz))
+            H = H.concatenate(lx, lz)
     
         L = array2(L)
         L.shape = (2*k, 2*n)
+        L = Matrix(L)
     
-        M = dot2(L, symplectic_form(n), L.transpose())
-        assert eq2(M, symplectic_form(k))
+        #M = dot2(L, symplectic_form(n), L.transpose())
+        M = L*F*L.t
+        #assert eq2(M, symplectic_form(k))
+        assert M==symplectic_form(k)
         self.L = L
         return L
 
@@ -629,28 +595,33 @@ class QCode(object):
         m, n = self.shape
         H = self.H
         L = self.get_logops()
-        HL = numpy.concatenate((H, L))
+        #HL = numpy.concatenate((H, L))
+        HL = H.concatenate(L)
+        F = self.space.F
         T = []
         for i in range(m):
-            A = dot2(HL, symplectic_form(n))
-            #B = numpy.concatenate((identity2(m), zeros2(2*self.k+i, m)))
+            #A = dot2(HL, symplectic_form(n))
+            A = HL*F
             B = zeros2(len(A), 1)
             B[i] = 1
             #print("A =")
             #print(A)
-            tt = solve2(A, B) # XXX do this incrementally for more speed XXX
+            tt = solve2(A.A, B) # XXX do this incrementally for more speed XXX
             assert tt is not None
             t = tt.transpose()
             t.shape = (1, 2*n)
             T.append(t)
-            HL = numpy.concatenate((HL, t))
+            #HL = numpy.concatenate((HL, t))
+            HL = HL.concatenate(Matrix(t))
         T = array2(T)
         T.shape = (m, 2*n)
+        T = Matrix(T)
         self.T = T
 
-        HT = array2(list(zip(H, T)))
+        # one last check...
+        HT = array2(list(zip(H.A, T.A)))
         HT.shape = 2*m, 2*n
-        A = numpy.concatenate((HT, L))
+        A = numpy.concatenate((HT, L.A))
         M = dot2(A, symplectic_form(n), A.transpose())
         assert eq2(M, symplectic_form(n))
 
@@ -709,16 +680,16 @@ class QCode(object):
     def get_encoder(self, inverse=False):
         self.build()
         H, T, L = self.H, self.T, self.L
-        HT = array2(list(zip(H, T)))
+        HT = array2(list(zip(H.A, T.A)))
         m, n = self.shape
         HT.shape = 2*m, 2*n
-        M = numpy.concatenate((HT, L))
-        Mt = M.transpose()
+        M = numpy.concatenate((HT, L.A))
+        M = Matrix(M)
         if inverse:
             F = self.space.F
-            return dot2(F, M, F)
+            return F*M*F
         else:
-            return Mt
+            return M.t
     get_symplectic = get_encoder
 
     def get_decoder(self):
