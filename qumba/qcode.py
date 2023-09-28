@@ -190,10 +190,16 @@ class QCode(object):
         L = self.L.direct_sum(other.L)
         return QCode(H, T, L)
 
-    def __rmul__(self, count):
-        assert type(count) is int
-        assert count>=0
-        code = reduce(add, [self]*count)
+    def __rmul__(self, r):
+        if type(r) is int:
+            assert r>=0
+            code = reduce(add, [self]*r)
+        elif type(r) is Matrix:
+            E = self.get_encoder()
+            E = r*E
+            code = QCode.from_encoder(E, self.m)
+        else:
+            raise TypeError
         return code
 
     @classmethod
@@ -569,6 +575,14 @@ class QCode(object):
 
     def get_decoder(self):
         return self.get_encoder(True)
+
+    def get_isometry(self, inverse=False):
+        E = self.get_encoder(inverse)
+        if inverse:
+            E = E[-self.kk:, :]
+        else:
+            E = E[:, -self.kk:]
+        return E
 
     @classmethod
     def from_encoder(cls, M, m=None, k=None, **kw):

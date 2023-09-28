@@ -284,7 +284,7 @@ class SymplecticSpace(object):
         SH = Matrix([[0,1],[1,1]])
         return self.get(SH, idx)
 
-    def get_CZ(self, idx, jdx):
+    def get_CZ(self, idx=0, jdx=1):
         assert idx != jdx
         n = self.n
         A = identity2(2*n)
@@ -293,7 +293,7 @@ class SymplecticSpace(object):
         A = A.transpose()
         return Matrix(A, self.p)
 
-    def get_CNOT(self, idx, jdx):
+    def get_CNOT(self, idx=0, jdx=1):
         assert idx != jdx
         n = self.n
         A = identity2(2*n)
