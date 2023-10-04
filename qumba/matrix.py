@@ -15,7 +15,7 @@ from math import prod
 import numpy
 
 from qumba.solve import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
-    kernel)
+    kernel, span)
 from qumba.solve import int_scalar as scalar
 from qumba.action import mulclose
 
@@ -195,7 +195,7 @@ class Matrix(object):
         return K
 
     def where(self):
-        return zip(*numpy.where(self.A)) # list ?
+        return list(zip(*numpy.where(self.A))) # list ?
 
     def concatenate(self, *others):
         A = numpy.concatenate((self.A,)+tuple(other.A for other in others))
@@ -209,6 +209,13 @@ class Matrix(object):
 
     def copy(self):
         return Matrix(self.A, self.p)
+
+    def rowspan(self):
+        m, n = self.A.shape
+        for u in span(self.A):
+            u.shape = 1, n
+            u = Matrix(u)
+            yield u
 
 
 @cache
@@ -268,6 +275,10 @@ class SymplecticSpace(object):
             A[2*i:2*i+2, 2*i:2*i+2] = M.A
         A = A.transpose()
         return Matrix(A, self.p)
+
+    def invert(self, M):
+        F = self.F
+        return F * M.t * F
 
     def get_H(self, idx=None):
         # swap X<-->Z on bit idx

@@ -287,20 +287,20 @@ class QCode(object):
 
     @property
     def deepH(self):
-        H = self.H.view()
+        H = self.H.A.view()
         m, n = self.shape
         H.shape = m, n, 2
         return H
 
     @property
     def deepL(self):
-        L = self.L.view()
+        L = self.L.A.view()
         L.shape = 2*self.k, self.n, 2
         return L
 
     @property
     def deepT(self):
-        T = self.T.view()
+        T = self.T.A.view()
         T.shape = self.m, self.n, 2
         return T
 
