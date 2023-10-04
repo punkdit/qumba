@@ -46,7 +46,7 @@ def find_logicals(Ax, Az):
 
     dode = code.apply_perm(duality)
     dode = dode.apply_H()
-    assert code.equiv(dode)
+    assert code.is_equiv(dode)
 
     n = code.n
     kk = 2*code.k
@@ -106,7 +106,7 @@ def find_logicals(Ax, Az):
     found = set()
     for A in gens:
         dode = QCode.from_encoder(dot2(A, M), code.m)
-        assert dode.equiv(code)
+        assert dode.is_equiv(code)
         #MiAM = dot2(Mi, A, M)
         MiAM = Mi*A*M
         L = MiAM[-kk:, -kk:]
@@ -213,17 +213,17 @@ def test_10_2_3():
     assert N==20
 
     dode = code.apply_perm(perms[0])
-    assert code.equiv(dode)
+    assert code.is_equiv(dode)
 
     dode = code.apply_H()
     #print("dode:")
     #print(dode)
-    assert not code.equiv(dode)
+    assert not code.is_equiv(dode)
 
     iso = code.get_isomorphism(dode)
     #print(iso)
     eode = code.apply_perm(iso)
-    assert eode.equiv(dode)
+    assert eode.is_equiv(dode)
 
     #print("eode:")
     #print(eode)
@@ -244,7 +244,7 @@ def test_10_2_3():
     for (i,j) in pairs:
         dode = dode.apply_CZ(i, j)
         print(dode.get_params())
-        print(dode.equiv(code))
+        print(dode.is_equiv(code))
     print(code.get_logical(dode))
 
 
@@ -366,7 +366,7 @@ def test_concatenate():
 
     right = QCode.trivial(2) + QCode.fromstr("XX ZZ")
     result = inner << right
-    assert result.equiv( QCode.fromstr("XXXX ZZZZ IZZI IXXI") )
+    assert result.is_equiv( QCode.fromstr("XXXX ZZZZ IZZI IXXI") )
 
     # --------------------
 

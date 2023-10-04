@@ -104,12 +104,12 @@ def toric(rows, cols, delta_row=0, delta_col=0):
     for r in range(rows):
       for c in range(cols):
         X = [0]*n
-        for key in [(r, c, 0), (r, c, 1), (r, c+1, 1), (r+1, c, 0)]:
+        for key in [(r, c, 0), (r, c, 1), (r, c-1, 0), (r-1, c, 1)]:
             X[getidx(*key)] = 1
         Hx.append(X)
 
         Z = [0]*n
-        for key in [(r, c, 0), (r, c, 1), (r, c-1, 0), (r-1, c, 1)]:
+        for key in [(r, c, 0), (r, c, 1), (r, c+1, 1), (r+1, c, 0)]:
             Z[getidx(*key)] = 1
         Hz.append(Z)
 

@@ -304,7 +304,7 @@ class QCode(object):
         T.shape = self.m, self.n, 2
         return T
 
-    def equiv(self, other):
+    def is_equiv(self, other):
         H1, H2 = self.H.t, other.H.t
         U = solve2(H1.A, H2.A)
         if U is None:
@@ -633,11 +633,11 @@ class QCode(object):
         tgt = src
         for i in range(n):
             tgt = tgt.apply_CNOT(i, n+i)
-        return src.equiv(tgt)
+        return src.is_equiv(tgt)
 
     def is_selfdual(self):
         tgt = self.apply_H()
-        return self.equiv(tgt)
+        return self.is_equiv(tgt)
 
     def get_logical(self, other):
         L = self.get_decoder() * other.get_encoder()

@@ -62,7 +62,7 @@ def get_autos_slow(code):
       if len(gen) > 200:
         return
       dode = code.apply_perm(stack)
-      assert dode.equiv(code)
+      assert dode.is_equiv(code)
 
       idx = stack.pop()+1
       while idx >= n and len(stack):
@@ -134,8 +134,8 @@ def get_isos(src, tgt):
       #if len(gen) > 4000:
       #  return
       dode = src.apply_perm(stack)
-      assert dode.equiv(tgt)
-      #print("equiv!")
+      assert dode.is_equiv(tgt)
+      #print("is_equiv!")
 
       idx = stack.pop()+1
       while idx >= n and len(stack):
