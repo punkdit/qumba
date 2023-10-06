@@ -103,7 +103,12 @@ class Matrix(object):
         return Matrix(A, p, name="I")
 
     def shortstr(self):
-        return shortstr(self.A)
+        s = shortstr(self.A)
+        lines = s.split()
+        lines = [" ["+line+"]" for line in lines]
+        lines[0] = "["+lines[0][1:]
+        lines[-1] = lines[-1] + "]"
+        return '\n'.join(lines)
     __str__ = shortstr
 
     def __repr__(self):
