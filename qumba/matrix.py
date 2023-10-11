@@ -6,7 +6,7 @@ Algebraic groups: matrix groups over Z/pZ.
 """
 
 
-from random import shuffle
+from random import shuffle, choice
 from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
 from operator import add, mul
@@ -58,7 +58,7 @@ def complement(H):
 
 
 class Matrix(object):
-    def __init__(self, A, p=DEFAULT_P, shape=None, name=""):
+    def __init__(self, A, p=DEFAULT_P, shape=None, name="?"):
         if type(A) == list or type(A) == tuple:
             A = numpy.array(A, dtype=scalar)
         elif isinstance(A, Matrix):
@@ -79,6 +79,9 @@ class Matrix(object):
         self.key = (self.p, self.A.tobytes())
         self._hash = hash(self.key)
         self.shape = A.shape
+        #assert name != "?"
+        if type(name) is str:
+            name = name,
         self.name = name
 
     @classmethod
@@ -141,16 +144,16 @@ class Matrix(object):
         assert self.shape == other.shape
         return self.key < other.key
 
-#    def __add__(self, other):
-#        assert self.p == other.p
-#        A = self.A + other.A
-#        return Matrix(A, self.p)
-#
-#    def __sub__(self, other):
-#        assert self.p == other.p
-#        assert self.shape == other.shape
-#        A = self.A - other.A
-#        return Matrix(A, self.p)
+    def __add__(self, other):
+        assert self.p == other.p
+        A = self.A + other.A
+        return Matrix(A, self.p)
+
+    def __sub__(self, other):
+        assert self.p == other.p
+        assert self.shape == other.shape
+        A = self.A - other.A
+        return Matrix(A, self.p)
 
     def __neg__(self):
         A = -self.A
@@ -184,7 +187,8 @@ class Matrix(object):
 
     def transpose(self):
         A = self.A
-        return Matrix(A.transpose(), self.p)
+        name = self.name + ("t",)
+        return Matrix(A.transpose(), self.p, None, name)
 
     @property
     def t(self):
@@ -228,7 +232,7 @@ def symplectic_form(n, p=DEFAULT_P):
     F = zeros2(2*n, 2*n)
     for i in range(n):
         F[2*i:2*i+2, 2*i:2*i+2] = [[0,1],[p-1,0]]
-    F = Matrix(F, p)
+    F = Matrix(F, p, name="F")
     return F
 
 
@@ -253,24 +257,25 @@ class SymplecticSpace(object):
         assert M.shape == (nn, nn)
         return F == M*F*M.transpose()
 
-    def identity(self):
+    def get_identity(self):
         A = identity2(self.nn)
-        M = Matrix(A, self.p)
+        M = Matrix(A, self.p, name=())
         return M
 
     def get_perm(self, f):
         n, nn = self.n, 2*self.n
         assert len(f) == n
         assert set([f[i] for i in range(n)]) == set(range(n))
+        name = "P(%s)"%(",".join(str(i) for i in f))
         A = zeros2(nn, nn)
         for i in range(n):
             A[2*i, 2*f[i]] = 1
             A[2*i+1, 2*f[i]+1] = 1
-        M = Matrix(A, self.p)
+        M = Matrix(A, self.p, None, name)
         assert self.is_symplectic(M)
         return M
 
-    def get(self, M, idx=None):
+    def get(self, M, idx=None, name="?"):
         assert M.shape == (2,2)
         assert isinstance(M, Matrix)
         n = self.n
@@ -279,7 +284,7 @@ class SymplecticSpace(object):
         for i in idxs:
             A[2*i:2*i+2, 2*i:2*i+2] = M.A
         A = A.transpose()
-        return Matrix(A, self.p)
+        return Matrix(A, self.p, None, name)
 
     def invert(self, M):
         F = self.F
@@ -287,18 +292,21 @@ class SymplecticSpace(object):
 
     def get_H(self, idx=None):
         # swap X<-->Z on bit idx
-        H = Matrix([[0,1],[1,0]])
-        return self.get(H, idx)
+        H = Matrix([[0,1],[1,0]], name="H")
+        name = "H(%s)"%idx
+        return self.get(H, idx, name)
 
     def get_S(self, idx=None):
         # swap X<-->Y
-        S = Matrix([[1,1],[0,1]])
-        return self.get(S, idx)
+        S = Matrix([[1,1],[0,1]], name="S")
+        name = "S(%s)"%idx
+        return self.get(S, idx, name)
 
     def get_SH(self, idx=None):
         # X-->Z-->Y-->X 
-        SH = Matrix([[0,1],[1,1]])
-        return self.get(SH, idx)
+        SH = Matrix([[0,1],[1,1]], name="SH")
+        name = "SH(%s)"%idx
+        return self.get(SH, idx, name)
 
     def get_CZ(self, idx=0, jdx=1):
         assert idx != jdx
@@ -307,7 +315,8 @@ class SymplecticSpace(object):
         A[2*idx, 2*jdx+1] = 1
         A[2*jdx, 2*idx+1] = 1
         A = A.transpose()
-        return Matrix(A, self.p)
+        name="CZ(%d,%d)"%(idx,jdx)
+        return Matrix(A, self.p, None, name)
 
     def get_CNOT(self, idx=0, jdx=1):
         assert idx != jdx
@@ -316,13 +325,130 @@ class SymplecticSpace(object):
         A[2*jdx+1, 2*idx+1] = 1
         A[2*idx, 2*jdx] = 1
         A = A.transpose()
-        return Matrix(A, self.p)
+        name="CNOT(%d,%d)"%(idx,jdx)
+        return Matrix(A, self.p, None, name)
+
+    @cache
+    def get_borel(self, verbose=False):
+        # _generate the Borel group
+        n = self.n
+        gen = []
+        for i in range(n):
+            gen.append(self.get_S(i))
+            for j in range(i+1, n):
+                gen.append(self.get_CNOT(i, j))
+                gen.append(self.get_CZ(i, j))
+    
+        G = mulclose(gen, verbose=verbose)
+        return G
+
+    @cache
+    def get_weyl(self, verbose=False):
+        # _generate the Weyl group
+        n = self.n
+        I = self.get_identity()
+        gen = [I]
+        for i in range(n):
+            gen.append(self.get_H(i))
+            for j in range(i+1, n):
+                perm = list(range(n))
+                perm[i], perm[j] = perm[j], perm[i]
+                gen.append(self.get_perm(perm))
+    
+        G = mulclose(gen, verbose=verbose)
+        return G
+
+    @cache
+    def get_sp(self, verbose=False):
+        n = self.n
+        gen = []
+        for i in range(n):
+            gen.append(self.get_S(i))
+            gen.append(self.get_H(i))
+            for j in range(i+1, n):
+                gen.append(self.get_CZ(i, j))
+        G = mulclose(gen, verbose=verbose)
+        return G
+    
+    def bruhat_decompose(space, g):
+        n = space.n
+        W = space.get_weyl()
+        I = space.get_identity()
+        print(g)
+
+    def bruhat_decompose_fail(space, g): # FAIL FAIL
+        n = space.n
+        W = space.get_weyl()
+        I = space.get_identity()
+        print(g)
+        pairs = [(i,j) for i in range(n) for j in range(i+1,n)]
+        left, right = [], []
+        # right Borel
+        for (i,j) in pairs:
+            h = space.get_CNOT(i,j)
+            gh = g*h
+            if gh.sum() < g.sum():
+                right.append(h)
+                g = gh
+                print(g)
+            
+        for (i,j) in pairs:
+            h = space.get_CZ(i,j)
+            gh = g*h
+            if gh.sum() < g.sum():
+                right.append(h)
+                g = gh
+                print(g)
+    
+        for i in range(n):
+            h = space.get_S(i)
+            gh = g*h
+            print("try:", h.name)
+            print(gh, "?")
+            if gh.sum() < g.sum():
+            #if (gh+I).sum() < (g+I).sum():
+                right.append(h)
+                g = gh
+                print(g)
+            else:
+                print("no")
+        del gh, h
+    
+        # left Borel
+        for i in range(n):
+            h = space.get_S(i)
+            hg = h*g
+            if hg.sum() < g.sum():
+            #if (hg+I).sum() < (g+I).sum():
+                left.append(h)
+                g = hg
+                print(g)
+    
+        for (i,j) in pairs:
+            h = space.get_CZ(i,j)
+            hg = h*g
+            if hg.sum() < g.sum():
+                left.append(h)
+                g = hg
+                print(g)
+    
+        for (i,j) in pairs:
+            h = space.get_CNOT(i,j)
+            hg = h*g
+            if hg.sum() < g.sum():
+                left.append(h)
+                g = hg
+                print(g)
+            
+        left = list(reversed(left))
+        assert(g in W)
+        
 
 
 def test():
 
     space = SymplecticSpace(2)
-    I = space.identity()
+    I = space.get_identity()
     CZ = space.get_CZ(0, 1)
     HH = space.get_H()
     S = space.get_perm([1, 0])
@@ -340,6 +466,98 @@ def test():
     assert len(G) == 46080
     
 
+def test_bruhat():
+
+    n = 2
+    space = SymplecticSpace(n)
+    I = space.get_identity()
+
+    B = space.get_borel()
+    print("B", len(B))
+
+    W = space.get_weyl()
+    print("W", len(W))
+
+    Sp = space.get_sp()
+    print("Sp", len(Sp))
+    Sp = list(Sp)
+
+    pairs = [(i,j) for i in range(n) for j in range(i+1,n)]
+
+    # compute a normal form...
+    G_S = mulclose([I]+[space.get_S(i) for i in range(n)])
+    G_CZ = mulclose([I]+[space.get_CZ(i,j) for (i,j) in pairs])
+    G_CNOT = mulclose([I]+[space.get_CNOT(i,j) for (i,j) in pairs])
+    right = [s*cz*cnot for s in G_S for cz in G_CZ for cnot in G_CNOT]
+    left = [cnot*cz*s for s in G_S for cz in G_CZ for cnot in G_CNOT]
+    normal = {l*w*r for l in left for w in W for r in right}
+    print("normal:", len(normal))
+    #for g in normal:
+    #    print(g.name)
+
+    #g = choice(Sp)
+    #Sp = list(Sp)
+    Sp = list(normal)
+    Sp.sort(key = str)
+    normal = dict((g,g) for g in normal)
+
+    print("F =")
+    print(space.F)
+
+    nn = 2*n
+
+    E = {}
+    idxs = [3, 2, 1, 0]
+    E[1,3] = space.get_CNOT(0, 1) # 1<--3
+    E[2,3] = space.get_S(1).transpose() # 2<--3
+    E[0,1] = space.get_S(0).transpose() # 0<--1
+    E[0,3] = space.get_H(0) * space.get_CNOT(0, 1) #* space.get_H(0) # 0<--3
+    for key in E.keys():
+        print(key, "=", E[key][key]) # should be 1
+
+    #g = Sp[3]
+    for g in Sp:
+        print()
+        print("="*79)
+        print(g.name)
+        print(g)
+        row = nn-1
+        pivots = []
+        print("row elimination ================")
+        while row>=0:
+            print("row =", row)
+            print(g)
+            for col in range(nn):
+                if g[row, col]:
+                    break
+            else:
+                assert 0
+            pivots.append((row, col))
+            print("pivot:", pivots[-1])
+            row1 = row-1
+            while row1 >= 0:
+                if g[row1, col] and E.get((row1, row)) is not None:
+                    print("reduce", row1, "<---", row)
+                    op = E[row1, row]
+                    g = op*g
+                    print(g)
+                row1 -= 1
+            row -= 1
+        print("col elimination ================")
+        for (row, col) in pivots:
+            for col1 in range(col+1, nn):
+                if g[row, col1] and E.get((col, col1)) is not None:
+                    print("reduce", col, "<---", col1)
+                    op = E[col, col1]
+                    g = g*op
+                    print(g)
+    
+        assert g in W
+
+#    for g in Sp[:5]:
+#        print()
+#        print(normal[g].name)
+#        space.bruhat_decompose(g)
 
 
 if __name__ == "__main__":
