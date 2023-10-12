@@ -79,13 +79,14 @@ class Matrix(object):
         self.key = (self.p, self.A.tobytes())
         self._hash = hash(self.key)
         self.shape = A.shape
-        assert name != "?"
+        #assert name != "?"
+        assert name != ""
         if type(name) is str:
             name = name,
         self.name = name
 
     @classmethod
-    def promote(cls, item, p=DEFAULT_P, name=""):
+    def promote(cls, item, p=DEFAULT_P, name="?"):
         if item is None:
             return None
         if isinstance(item, Matrix):
@@ -93,7 +94,7 @@ class Matrix(object):
         return Matrix(item, p, name=name)
 
     @classmethod
-    def perm(cls, items, p=DEFAULT_P, name=""):
+    def perm(cls, items, p=DEFAULT_P, name="?"):
         n = len(items)
         A = numpy.zeros((n, n), dtype=scalar)
         for i, ii in enumerate(items):
@@ -190,6 +191,7 @@ class Matrix(object):
         name = self.name
         names = []
         for n in reversed(name):
+            assert len(n), name
             if n.endswith(".t"):
                 names.append(n[:-2])
             elif n[0] == "H":

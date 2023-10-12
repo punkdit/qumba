@@ -55,7 +55,7 @@ def find_logicals(Ax, Az):
     Mi = space.F * M.t * space.F
     #Mi = dot2(space.F, M.transpose(), space.F)
     #I = identity2(code.nn)
-    I = space.identity()
+    I = space.get_identity()
     #assert eq2(dot2(M, Mi), I)
     #assert eq2(dot2(Mi, M), I)
     assert M*Mi == I

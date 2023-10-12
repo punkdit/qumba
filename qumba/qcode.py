@@ -18,7 +18,8 @@ from qumba import solve
 from qumba.solve import (
     array2, zeros2, shortstr, dot2, solve2, linear_independent, row_reduce, kernel,
     span, intersect, rank, enum2, shortstrx, identity2, eq2, pseudo_inverse)
-from qumba.matrix import SymplecticSpace, Matrix, flatten, symplectic_form
+from qumba.matrix import Matrix, flatten
+from qumba.symplectic import SymplecticSpace, symplectic_form
 from qumba.csscode import CSSCode
 from qumba.argv import argv
 from qumba.smap import SMap
