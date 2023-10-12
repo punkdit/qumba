@@ -189,6 +189,11 @@ class SymplecticSpace(object):
             A = choice(gen) * A
         return A
 
+    @cache
+    def get_building(self):
+        building = Building(self)
+        return building
+
 
 class Building(object):
     """

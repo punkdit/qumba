@@ -530,6 +530,7 @@ def test_encoder():
     code = construct.get_422()
     E = code.get_encoder()
     space = code.space
+    n = code.n
     print(E)
 
     building = Building(space)
@@ -539,6 +540,17 @@ def test_encoder():
     print(w.name)
     print(r.name)
 
+    from qumba.clifford_sage import Clifford
+    cliff = Clifford(3)
+    P = cliff.get_P(1, 2, 0)
+    print(P)
+    cliff = Clifford(n)
+
+    L = cliff.get_expr(l.name)
+    R = cliff.get_expr(r.name)
+    W = cliff.get_expr(w.name)
+
+    E = L*W*R
 
 
 def test():
