@@ -504,17 +504,57 @@ def test_bruhat():
     print("F =")
     print(space.F)
 
-    nn = 2*n
 
     E = {}
     idxs = [3, 2, 1, 0]
     E[1,3] = space.get_CNOT(0, 1) # 1<--3
     E[2,3] = space.get_S(1).transpose() # 2<--3
     E[0,1] = space.get_S(0).transpose() # 0<--1
-    E[0,3] = space.get_H(0) * space.get_CNOT(0, 1) #* space.get_H(0) # 0<--3
+    #E[0,3] = space.get_H(0) * space.get_CNOT(0, 1) #* space.get_H(0) # 0<--3
+    E[0,3] = space.get_CNOT() * space.get_S(1).transpose() * space.get_S(0).transpose() * space.get_CNOT() * space.get_S(0).transpose() # hack this... wtf
     for key in E.keys():
         print(key, "=", E[key][key]) # should be 1
+    assert E[1,3][2,0] == 1
+    assert E[0,3][2,1] == 1
 
+    if 0:
+        gen = list(E.values())
+        B = mulclose(gen)
+        print(len(B))
+        for g in B:
+            if g[0,3] == 1 and g[2,1] == 1:
+                print(g, g.name)
+        return
+
+    decompose_attempt_1(space, Sp, W, E)
+
+def decompose_attempt_1(space, Sp, W, E):
+    n = space.n
+    nn = 2*n
+    #g = Sp[3]
+    B = list(E.values())
+    for g in Sp:
+        print()
+        print("="*79)
+        print(g.name)
+        print(g)
+
+        for h in B:
+            hg = h*g
+            if (hg).sum() < g.sum():
+                g = hg
+        for h in B:
+            gh = g*h
+            if (gh).sum() < g.sum():
+                g = gh
+        print(g)
+        print(g in W)
+
+
+
+def decompose_attempt_0(space, Sp, W, E):
+    n = space.n
+    nn = 2*n
     #g = Sp[3]
     for g in Sp:
         print()
@@ -522,20 +562,26 @@ def test_bruhat():
         print(g.name)
         print(g)
         row = nn-1
+        #rows = [3, 1, 0, 2]
         pivots = []
         print("row elimination ================")
+        cols = list(range(nn))
         while row>=0:
+        #for irow, row in enumerate(rows):
             print("row =", row)
             print(g)
-            for col in range(nn):
+            #for col in range(nn):
+            for col in cols:
                 if g[row, col]:
                     break
             else:
                 assert 0
             pivots.append((row, col))
+            cols.remove(col)
             print("pivot:", pivots[-1])
             row1 = row-1
             while row1 >= 0:
+            #for row1 in rows[irow+1:]:
                 if g[row1, col] and E.get((row1, row)) is not None:
                     print("reduce", row1, "<---", row)
                     op = E[row1, row]
@@ -543,15 +589,23 @@ def test_bruhat():
                     print(g)
                 row1 -= 1
             row -= 1
+        print("pivots:", pivots)
         print("col elimination ================")
         for (row, col) in pivots:
             for col1 in range(col+1, nn):
-                if g[row, col1] and E.get((col, col1)) is not None:
+                if g[row, col1]:
                     print("reduce", col, "<---", col1)
-                    op = E[col, col1]
+                if g[row, col1] and E.get((col1, col)) is not None:
+                    print("reduce", col, "<---", col1)
+                    op = E[col1, col]
                     g = g*op
                     print(g)
     
+        if not g in W:
+            print("FAIL:")
+            print("w =")
+            #print(space.get_H(0) * space.get_perm([1,0]) * space.get_H(0))
+            print(space.get_perm([1,0])*space.get_H(0))
         assert g in W
 
 #    for g in Sp[:5]:
