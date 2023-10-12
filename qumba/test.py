@@ -14,6 +14,7 @@ from qumba.qcode import QCode, SymplecticSpace
 from qumba.csscode import CSSCode
 from qumba import csscode, construct
 from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
+from qumba.symplectic import Building
 from qumba.argv import argv
 
 
@@ -523,6 +524,21 @@ def test_biplanar():
     #print(shortstr(code.Hx))
     #print(Hx.sum(0), Hx.sum(1))
     #print(shortstr(code.Lx))
+
+
+def test_encoder():
+    code = construct.get_422()
+    E = code.get_encoder()
+    space = code.space
+    print(E)
+
+    building = Building(space)
+    l, w, r = building.decompose(E)
+
+    print(l.name)
+    print(w.name)
+    print(r.name)
+
 
 
 def test():
