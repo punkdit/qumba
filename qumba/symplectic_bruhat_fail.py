@@ -69,9 +69,6 @@ class SymplecticSpace(object):
         assert self.is_symplectic(M)
         return M
 
-    def get_P(self, *args):
-        return self.get_perm(args)
-
     def get(self, M, idx=None, name="?"):
         assert M.shape == (2,2)
         assert isinstance(M, Matrix)
@@ -124,16 +121,6 @@ class SymplecticSpace(object):
         A = A.transpose()
         name="CNOT(%d,%d)"%(idx,jdx)
         return Matrix(A, self.p, None, name)
-
-    def get_expr(self, expr):
-        if expr == ():
-            op = self.get_identity()
-        elif type(expr) is tuple:
-            op = reduce(mul, [self.get_expr(e) for e in expr]) # recurse
-        else:
-            expr = "self.get_"+expr
-            op = eval(expr, {"self":self})
-        return op
 
     @cache
     def get_borel(self, verbose=False):
@@ -188,9 +175,81 @@ class SymplecticSpace(object):
         for i in range(10*self.n):
             A = choice(gen) * A
         return A
-
-
     
+    def bruhat_decompose(space, g):
+        n = space.n
+        W = space.get_weyl()
+        I = space.get_identity()
+        print(g)
+
+    def bruhat_decompose_fail(space, g): # FAIL FAIL
+        n = space.n
+        W = space.get_weyl()
+        I = space.get_identity()
+        print(g)
+        pairs = [(i,j) for i in range(n) for j in range(i+1,n)]
+        left, right = [], []
+        # right Borel
+        for (i,j) in pairs:
+            h = space.get_CNOT(i,j)
+            gh = g*h
+            if gh.sum() < g.sum():
+                right.append(h)
+                g = gh
+                print(g)
+            
+        for (i,j) in pairs:
+            h = space.get_CZ(i,j)
+            gh = g*h
+            if gh.sum() < g.sum():
+                right.append(h)
+                g = gh
+                print(g)
+    
+        for i in range(n):
+            h = space.get_S(i)
+            gh = g*h
+            print("try:", h.name)
+            print(gh, "?")
+            if gh.sum() < g.sum():
+            #if (gh+I).sum() < (g+I).sum():
+                right.append(h)
+                g = gh
+                print(g)
+            else:
+                print("no")
+        del gh, h
+    
+        # left Borel
+        for i in range(n):
+            h = space.get_S(i)
+            hg = h*g
+            if hg.sum() < g.sum():
+            #if (hg+I).sum() < (g+I).sum():
+                left.append(h)
+                g = hg
+                print(g)
+    
+        for (i,j) in pairs:
+            h = space.get_CZ(i,j)
+            hg = h*g
+            if hg.sum() < g.sum():
+                left.append(h)
+                g = hg
+                print(g)
+    
+        for (i,j) in pairs:
+            h = space.get_CNOT(i,j)
+            hg = h*g
+            if hg.sum() < g.sum():
+                left.append(h)
+                g = hg
+                print(g)
+            
+        left = list(reversed(left))
+        assert(g in W)
+        
+
 
 def test():
 
@@ -229,7 +288,138 @@ def test_bruhat():
     print("Sp", len(Sp))
     Sp = list(Sp)
 
+    pairs = [(i,j) for i in range(n) for j in range(i+1,n)]
 
+    # compute a normal form...
+    G_S = mulclose([I]+[space.get_S(i) for i in range(n)])
+    G_CZ = mulclose([I]+[space.get_CZ(i,j) for (i,j) in pairs])
+    G_CNOT = mulclose([I]+[space.get_CNOT(i,j) for (i,j) in pairs])
+    right = [s*cz*cnot for s in G_S for cz in G_CZ for cnot in G_CNOT]
+    left = [cnot*cz*s for s in G_S for cz in G_CZ for cnot in G_CNOT]
+    normal = {l*w*r for l in left for w in W for r in right}
+    print("normal:", len(normal))
+    #for g in normal:
+    #    print(g.name)
+
+    #g = choice(Sp)
+    #Sp = list(Sp)
+    Sp = list(normal)
+    Sp.sort(key = str)
+    normal = dict((g,g) for g in normal)
+
+    print("F =")
+    print(space.F)
+
+
+    E = {}
+    idxs = [3, 2, 1, 0]
+    E[1,3] = space.get_CNOT(0, 1) # 1<--3
+    E[2,0] = E[1,3]
+    E[2,3] = space.get_S(1).transpose() # 2<--3
+    E[0,1] = space.get_S(0).transpose() # 0<--1
+    #E[0,3] = space.get_H(0) * space.get_CNOT(0, 1) #* space.get_H(0) # 0<--3
+    E[0,3] = space.get_CNOT() * space.get_S(1).transpose() * space.get_S(0).transpose() * space.get_CNOT() * space.get_S(0).transpose() # hack this... wtf
+    E[2,1] = E[0,3]
+    for key in E.keys():
+        print(key, "=", E[key][key]) # should be 1
+    assert E[1,3][2,0] == 1
+    assert E[0,3][2,1] == 1
+
+    if 0:
+        gen = list(E.values())
+        B = mulclose(gen)
+        print(len(B))
+        for g in B:
+            if g[0,3] == 1 and g[2,1] == 1:
+                print(g, g.name)
+        return
+
+    decompose_attempt_0(space, Sp, W, E)
+
+def decompose_attempt_1(space, Sp, W, E):
+    n = space.n
+    nn = 2*n
+    #g = Sp[3]
+    B = list(E.values())
+    for g in Sp:
+        print()
+        print("="*79)
+        print(g.name)
+        print(g)
+
+        for h in B:
+            hg = h*g
+            if (hg).sum() < g.sum():
+                g = hg
+        for h in B:
+            gh = g*h
+            if (gh).sum() < g.sum():
+                g = gh
+        print(g)
+        print(g in W)
+
+
+
+def decompose_attempt_0(space, Sp, W, E):
+    n = space.n
+    nn = 2*n
+    #g = Sp[3]
+    for g in Sp:
+        print()
+        print("="*79)
+        print(g.name)
+        print(g)
+        row = nn-1
+        #rows = [3, 1, 0, 2]
+        pivots = []
+        print("row elimination ================")
+        cols = list(range(nn))
+        while row>=0:
+        #for irow, row in enumerate(rows):
+            print("row =", row)
+            print(g)
+            #for col in range(nn):
+            for col in cols:
+                if g[row, col]:
+                    break
+            else:
+                assert 0
+            pivots.append((row, col))
+            cols.remove(col)
+            print("pivot:", pivots[-1])
+            row1 = row-1
+            while row1 >= 0:
+            #for row1 in rows[irow+1:]:
+                if g[row1, col] and E.get((row1, row)) is not None:
+                    print("reduce", row1, "<---", row)
+                    op = E[row1, row]
+                    g = op*g
+                    print(g)
+                row1 -= 1
+            row -= 1
+        print("pivots:", pivots)
+        print("col elimination ================")
+        for (row, col) in pivots:
+            for col1 in range(col+1, nn):
+                if g[row, col1]:
+                    print("reduce", col, "<---", col1)
+                if g[row, col1] and E.get((col1, col)) is not None:
+                    print("reduce", col, "<---", col1)
+                    op = E[col1, col]
+                    g = g*op
+                    print(g)
+    
+        if not g in W:
+            print("FAIL:")
+            print("w =")
+            #print(space.get_H(0) * space.get_perm([1,0]) * space.get_H(0))
+            print(space.get_perm([1,0])*space.get_H(0))
+        assert g in W
+
+#    for g in Sp[:5]:
+#        print()
+#        print(normal[g].name)
+#        space.bruhat_decompose(g)
 
 
 if __name__ == "__main__":

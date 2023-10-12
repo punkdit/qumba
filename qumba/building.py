@@ -3,6 +3,12 @@
 """
 Bruhat-Tits building & Bruhat decomposition 
 
+The main thing here is we use a different symplectic form
+compared to symplectic.py: here we use a "uturn" order, and
+in symplectic.py we use a "zip" order.
+Converting between these is done in methods
+from_ziporder and to_ziporder .
+
 ported from: 
 https://github.com/punkdit/bruhat/blob/master/bruhat/algebraic.py
 
@@ -117,7 +123,7 @@ class Algebraic(object):
     def Sp_4_2(cls, F, **kw):
         A = numpy.array([[1,0,1,1],[1,0,0,1],[0,1,0,1],[1,1,1,1]], dtype=scalar)
         B = numpy.array([[0,0,1,0],[1,0,0,0],[0,0,0,1],[0,1,0,0]], dtype=scalar)
-        gen = [Matrix(A, 2), Matrix(B, 2)]
+        gen = [Matrix(A, 2, None, "A"), Matrix(B, 2, None, "B")]
         return Sp(gen, 720, p=2, invariant_form=F, **kw)
 
     @classmethod
@@ -130,7 +136,7 @@ class Algebraic(object):
         for i in range(n//2):
             F[i, n-i-1] = 1
             F[i + n//2, n//2-i-1] = p-1
-        F = Matrix(F, p)
+        F = Matrix(F, p, None, "F")
 
         for i in range(1, p):
             vals = set((i**k)%p for k in range(p+1))
@@ -166,7 +172,7 @@ class Algebraic(object):
                 B[i+m, i+m+1] = 1
             B[0, m] = 1
             B[n-1, m-1] = 1
-            gen = [Matrix(A, 2), Matrix(B, 2)]
+            gen = [Matrix(A, 2, None, "A"), Matrix(B, 2, None, "B")]
         else:
             m = n//2
             A = numpy.zeros((n, n), dtype=scalar)
@@ -184,7 +190,7 @@ class Algebraic(object):
             B[n-2, m-1] = 1
             B[n-1, m-1] = ifgen
 
-            gen = [Matrix(A, p), Matrix(B, p)]
+            gen = [Matrix(A, p, None, "A"), Matrix(B, p, None, "B")]
 
         G = Sp(gen, order_sp(n, p), p=p, invariant_form=F, **kw)
         return G
@@ -211,6 +217,54 @@ class GL(Algebraic):
 
 
 class Sp(Algebraic):
+
+#    def get_zip_uturn(self):
+#        nn = self.n
+#        n = nn//2
+#        U = numpy.zeros((nn, nn), dtype=scalar)
+#        for i in range(n):
+#            U[2*i, i] = 1
+#            U[2*i+1, n+i] = 1
+#        return Matrix(U, name="U")
+
+    def invert(self, M):
+        F = self.invariant_form
+        return F * M.t * F
+
+    U = None # cache
+    def get_zip_uturn(self):
+        if self.U is not None:
+            return self.U
+        nn = self.n
+        n = nn//2
+        U = numpy.zeros((nn,nn), dtype=scalar)
+        cols = [2*i for i in range(n)] + list(reversed([2*i+1 for i in range(n)]))
+        for i in range(nn):
+            U[i, cols[i]] = 1
+        U = Matrix(U, name="U")
+        self.U = U
+        return U
+
+    def from_ziporder(self, M):
+        nn = self.n
+        assert M.shape == (nn, nn)
+        U = self.get_zip_uturn()
+        M1 = U*M*U.t
+        return M1
+
+    def to_ziporder(self, M):
+        nn = self.n
+        assert M.shape == (nn, nn)
+        U = self.get_zip_uturn()
+        M1 = U.t*M*U
+        return M1
+
+    def is_symplectic(self, M):
+        assert isinstance(M, Matrix)
+        nn = self.n
+        F = self.invariant_form
+        assert M.shape == (nn, nn)
+        return F == M*F*M.transpose()
 
     def get_pairs(self):
         n = self.n//2
@@ -310,7 +364,7 @@ class Sp(Algebraic):
             assert i<j
             A = numpy.identity(self.n, dtype=scalar)
             A[i, j] = 1
-            M = Matrix(A, self.p, name="E%d%d"%(j,i))
+            M = Matrix(A, self.p, name="E(%d,%d)"%(j,i))
             gen.append(M)
             lookup[j, i] = M
 
@@ -327,7 +381,7 @@ class Sp(Algebraic):
             A[a, c] = 1
             A[d, b] = self.p-1
 
-            M = Matrix(A, self.p, name="E%d%d"%(b,d))
+            M = Matrix(A, self.p, name="E(%d,%d)"%(b,d))
             gen.append(M)
             lookup[b, d] = M # b>d
             assert (c, a) not in lookup
@@ -341,7 +395,7 @@ class Sp(Algebraic):
             A[a, c] = 1
             A[d, b] = 1
 
-            M = Matrix(A, self.p, name="E%d%d"%(b,d))
+            M = Matrix(A, self.p, name="E(%d,%d)"%(b,d))
             gen.append(M)
             lookup[b, d] = M
             assert (c, a) not in lookup
@@ -448,13 +502,114 @@ def test_building():
         assert b2 in B
         assert w in W
         print("b1 =")
-        print(b1)
+        print(b1, b1.name)
         print("w =")
-        print(w)
+        print(w, w.name)
         print("b2 =")
-        print(b2)
+        print(b2, b2.name)
         if found is not None:
             assert w == found[g][1]
+
+
+
+def test_ziporder():
+    from qumba.symplectic import SymplecticSpace
+
+    for n in [2, 3, 4]:
+        space = SymplecticSpace(n)
+        sp = Algebraic.Sp(2*n)
+
+        for M in [
+            space.get_CNOT(), space.get_CNOT(n-1, n-2), 
+            space.get_S(0), space.get_H(1)]:
+        
+            M1 = sp.from_ziporder(M)
+            assert sp.is_symplectic(M1)
+    
+            M2 = sp.to_ziporder(M1)
+            assert M2 == M
+
+    n = 3
+    space = SymplecticSpace(n)
+    I = space.get_identity()
+    uturn = Algebraic.Sp(2*n)
+    building = Building(uturn)
+    #ops = space.get_sp(verbose=True)
+
+    for trial in range(10):
+        g = space.sample_sp()
+        g1 = uturn.from_ziporder(g)
+        gi = uturn.invert(g1)
+        assert g1 * gi == I
+        left, right = building.decompose(g1)
+        w = left*g1*right # Weyl element
+        assert g1 == uturn.invert(left) * w * uturn.invert(right)
+        #print(left.name, right.name)
+
+        left, right = uturn.invert(left), uturn.invert(right)
+        left = uturn.to_ziporder(left)
+        right = uturn.to_ziporder(right)
+        w = uturn.to_ziporder(w)
+        assert g == left * w * right # we recover the original g
+        assert w in space.get_weyl()
+
+
+    B = space.get_borel()
+    W = space.get_weyl()
+    W = dict((w,w) for w in W)
+    ops = [space.get_S(i) for i in range(n)]
+    ops += [space.get_CNOT(i, j) for i in range(n) for j in range(i+1,n)]
+    ops += [space.get_CZ(i, j) #*space.get_H(i)*space.get_H(j) 
+        for i in range(n) for j in range(i+1,n)]
+        
+    # send "E(i,j)" names --> S, CNOT, CZ in symplectic ziporder
+    rename = {"I":I}
+    lookup = uturn.get_borel().lookup # these are the "E(i,j)" borel's
+    for key in lookup.keys():
+        M = lookup[key]
+        name = M.name[0]
+        assert name[0] == "E"
+
+        M = uturn.to_ziporder(M)
+        assert space.is_symplectic(M)
+
+        #print(key, lookup[key].name, M.t in ops, ops[ops.index(M.t)].name)
+        assert M.t in ops
+        rename[name] = ops[ops.index(M.t)]
+
+    def convert(op):
+        #print(op.name)
+        assert uturn.is_symplectic(op)
+        op = reduce(mul, [rename[name] for name in op.name])
+        assert space.is_symplectic(op)
+        return op
+
+    for trial in range(10):
+        g = space.sample_sp()
+        g1 = uturn.from_ziporder(g)
+        gi = uturn.invert(g1)
+        assert g1 * gi == I
+        left, right = building.decompose(g1)
+        w = left*g1*right # Weyl element
+
+        w = uturn.to_ziporder(w)
+        assert space.is_symplectic(w)
+        assert w in W
+        w = W[w]
+
+        left = convert(left)
+        right = convert(right)
+
+        print(left.name)
+        print("\t", w.name)
+        print("\t", right.name)
+
+        for op in [left, w, right]:
+            assert (op == space.get_expr(op.name))
+
+        F = space.F
+        print(left * w.t * right == g)
+            
 
 
 def main():
