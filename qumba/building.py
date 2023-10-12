@@ -573,19 +573,31 @@ def test_ziporder():
         M = uturn.to_ziporder(M)
         assert space.is_symplectic(M)
 
-        #print(key, lookup[key].name, M.t in ops, ops[ops.index(M.t)].name)
+        # for inverse just reverse the order of the generators,
+        # because these are self-inverse
+        Mi = space.invert(M)
+        #print(key, lookup[key].name, 
+        #    ops[ops.index(M.t)].name[0], ops[ops.index(Mi.t)].name[0])
         assert M.t in ops
         rename[name] = ops[ops.index(M.t)]
+        print(name, "-->", rename[name].name)
 
-    def convert(op):
+    def convert(op): # uturn borel --> zip borel (transpose)
         #print(op.name)
         assert uturn.is_symplectic(op)
-        op = reduce(mul, [rename[name] for name in op.name])
+        op = reduce(mul, [rename[name].transpose() for name in op.name])
         assert space.is_symplectic(op)
+        return op
+
+    def invert(op):
+        assert space.is_symplectic(op)
+        name = tuple(reversed(op.name))
+        op = space.get_expr(name)
         return op
 
     for trial in range(10):
         g = space.sample_sp()
+
         g1 = uturn.from_ziporder(g)
         gi = uturn.invert(g1)
         assert g1 * gi == I
@@ -597,18 +609,37 @@ def test_ziporder():
         assert w in W
         w = W[w]
 
+        l = uturn.to_ziporder(left)
+        r = uturn.to_ziporder(right)
+        assert l * g * r == w
+
         left = convert(left)
         right = convert(right)
-
-        print(left.name)
-        print("\t", w.name)
-        print("\t", right.name)
+        assert left == l
+        assert right == r
 
         for op in [left, w, right]:
             assert (op == space.get_expr(op.name))
 
-        F = space.F
-        print(left * w.t * right == g)
+        li = invert(left)
+        ri = invert(right)
+        assert g == li * w * ri
+
+        print()
+        print(li.name)
+        print("\t", w.name)
+        print("\t", li.name)
+        print("\t", left * g * right == w)
+        print("\t", g == li * w * ri )
+
+#        F = space.F
+#        #print(w == w.t)
+#        print(left * g * right == w, end=" ")
+#        print(left * g * right == w.t, end=" ")
+#        print(left.t * g * right.t == w, end=" ")
+#        #print(left.t * g * right.t == w.t, end=" ")
+#        #print(left * g * right == w.t, end=" ")
+#        print()
             
 
 

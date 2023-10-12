@@ -190,6 +190,111 @@ class SymplecticSpace(object):
         return A
 
 
+class Building(object):
+    """
+        Provide an interface to qumba.building which uses a
+        different symplectic form (the uturn form).
+    """
+    def __init__(self, space):
+        from qumba.building import Algebraic, Building
+        n = space.n
+        uturn = Algebraic.Sp(2*n)
+        building = Building(uturn)
+        I = space.get_identity()
+        #B = space.get_borel()
+        W = space.get_weyl()
+        W = dict((w,w) for w in W)
+        ops = [space.get_S(i) for i in range(n)]
+        ops += [space.get_CNOT(i, j) for i in range(n) for j in range(i+1,n)]
+        ops += [space.get_CZ(i, j) #*space.get_H(i)*space.get_H(j)
+            for i in range(n) for j in range(i+1,n)]
+    
+        # send "E(i,j)" names --> S, CNOT, CZ in symplectic ziporder
+        rename = {"I":I}
+        lookup = uturn.get_borel().lookup # these are the "E(i,j)" borel's
+        for key in lookup.keys():
+            M = lookup[key]
+            name = M.name[0]
+            assert name[0] == "E"
+    
+            M = uturn.to_ziporder(M)
+            assert space.is_symplectic(M)
+    
+            #Mi = space.invert(M)
+            #print(key, lookup[key].name,
+            #    ops[ops.index(M.t)].name[0], ops[ops.index(Mi.t)].name[0])
+            assert M.t in ops
+            rename[name] = ops[ops.index(M.t)]
+            #print(name, "-->", rename[name].name)
+        self.n = n
+        self.uturn = uturn
+        self.building = building
+        self.space = space
+        self.W = W
+        self.rename = rename
+    
+    def convert(self, op): 
+        " uturn borel --> zip borel (transpose) "
+        #print(op.name)
+        space = self.space
+        uturn = self.uturn
+        rename = self.rename
+        assert uturn.is_symplectic(op)
+        op = reduce(mul, [rename[name].transpose() for name in op.name])
+        assert space.is_symplectic(op)
+        return op
+
+    def invert(self, op):
+        """ for inverse just reverse the order of the generators,
+        because these are self-inverse """
+        space = self.space
+        uturn = self.uturn
+        assert space.is_symplectic(op)
+        name = tuple(reversed(op.name))
+        op = space.get_expr(name)
+        return op
+
+    def decompose(self, _g):
+
+        g = _g.t # work with transpose
+
+        space = self.space
+        n = self.n
+        uturn = self.uturn
+        assert space.is_symplectic(g)
+        g1 = uturn.from_ziporder(g)
+        gi = uturn.invert(g1)
+        I = space.get_identity()
+        assert g1 * gi == I
+        left, right = self.building.decompose(g1)
+        w = left*g1*right # Weyl element
+ 
+        w = uturn.to_ziporder(w)
+        assert space.is_symplectic(w)
+
+        assert w in self.W
+        w = self.W[w]
+ 
+        l = uturn.to_ziporder(left)
+        r = uturn.to_ziporder(right)
+        assert l * g * r == w
+ 
+        left = self.convert(left)
+        right = self.convert(right)
+        assert left == l
+        assert right == r
+ 
+        for op in [left, w, right]:
+            assert (op == space.get_expr(op.name))
+ 
+        li = self.invert(left)
+        ri = self.invert(right)
+        assert g == li * w * ri
+
+        return ri.t, w.t, li.t # undo transpose
+
+
+
     
 
 def test():
@@ -229,6 +334,19 @@ def test_bruhat():
     print("Sp", len(Sp))
     Sp = list(Sp)
 
+    n = 3
+    space = SymplecticSpace(n)
+    building = Building(space)
+    for trial in range(10):
+        g = space.sample_sp()
+        l, w, r = building.decompose(g)
+        print(g)
+        print(l.name)
+        print("\t", w.name)
+        print("\t", r.name)
+        assert g == l*w*r
+        for op in [l, w, r]:
+            assert op == space.get_expr(op.name)
 
 
 

@@ -187,7 +187,17 @@ class Matrix(object):
 
     def transpose(self):
         A = self.A
-        name = self.name + ("t",)
+        name = self.name
+        names = []
+        for n in reversed(name):
+            if n.endswith(".t"):
+                names.append(n[:-2])
+            elif n[0] == "H":
+                names.append(n) # symmetric
+            else:
+                names.append(n+".t")
+        #name = tuple(n[:-2] if n.endswith(".t") else n+".t" for n in reversed(name))
+        name = tuple(names)
         return Matrix(A.transpose(), self.p, None, name)
 
     @property
