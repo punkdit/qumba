@@ -73,8 +73,8 @@ def mulclose_hom(gen1, gen2, verbose=False, maxsize=None):
     bdy = list(gen1)
     changed = True 
     while bdy:
-        #if verbose:
-        #    print "mulclose:", len(hom)
+        if verbose:
+            print(len(hom), end=" ", flush=True)
         _bdy = []
         for A in gen1:
             for B in bdy:
@@ -82,9 +82,15 @@ def mulclose_hom(gen1, gen2, verbose=False, maxsize=None):
                 if C1 not in hom: 
                     hom[C1] = hom[A] * hom[B]
                     _bdy.append(C1)
-                    if maxsize and len(els)>=maxsize:
-                        return list(els)
+                    if maxsize and len(hom)>=maxsize:
+                        if verbose:
+                            print()
+                        return hom
+                else:
+                    assert hom[A] * hom[B] == hom[C1], "not a hom!"
         bdy = _bdy
+    if verbose:
+        print()
     return hom 
 
 

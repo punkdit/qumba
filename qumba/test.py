@@ -3,7 +3,7 @@
 from time import time
 start_time = time()
 from random import shuffle, randint
-from operator import add
+from operator import add, matmul
 import operator
 from functools import reduce
 
@@ -15,6 +15,7 @@ from qumba.qcode import QCode, SymplecticSpace, strop
 from qumba.csscode import CSSCode
 from qumba import csscode, construct
 from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
+from qumba.action import mulclose, mulclose_hom
 from qumba.symplectic import Building
 from qumba.argv import argv
 
@@ -527,17 +528,18 @@ def test_biplanar():
     #print(shortstr(code.Lx))
 
 
-def translate_clifford(space, sop):
+def translate_clifford(space, sop, verbose=False):
     """
     _translate symplectic matrix sop to 2**n by 2**n clifford unitaries
     """
     building = space.get_building()
     l, w, r = building.decompose(sop)
 
-    print("translate_clifford:")
-    print("\t", l.name)
-    print("\t", w.name)
-    print("\t", r.name)
+    if verbose:
+        print("translate_clifford:")
+        print("\t", l.name)
+        print("\t", w.name)
+        print("\t", r.name)
 
     # translate to 2**n by 2**n clifford unitaries
     from qumba.clifford_sage import Clifford
@@ -552,10 +554,65 @@ def translate_clifford(space, sop):
     return cop
 
 
+def test_clifford():
+    from qumba.clifford_sage import Clifford, green, red, I, r2, half
+
+    n = 2
+    space = SymplecticSpace(n)
+    c3 = Clifford(n)
+
+    src, tgt = [], []
+    for i in range(n):
+        E = space.get_H(i)
+        U = translate_clifford(space, E)
+        src.append(U)
+        tgt.append(E)
+        assert U == c3.get_H(i)
+
+        E = space.get_S(i)
+        U = translate_clifford(space, E)
+        src.append(U)
+        tgt.append(E)
+        assert U == c3.get_S(i)
+
+    for i in range(n):
+      for j in range(n):
+        if i==j:
+            continue
+
+        E = space.get_CNOT(i, j)
+        U = translate_clifford(space, E)
+        src.append(U)
+        tgt.append(E)
+        assert U == c3.get_CNOT(i, j)
+
+        E = space.get_CZ(i, j)
+        U = translate_clifford(space, E)
+        src.append(U)
+        tgt.append(E)
+        assert U == c3.get_CZ(i, j)
+
+    hom = mulclose_hom(src, tgt, verbose=True, maxsize=1000)
+    gen = [c3.wI(), c3.get_X(0), c3.get_X(1), c3.get_Z(0), c3.get_Z(1)] 
+    G = mulclose(gen)
+    assert len(G) == 128 # Pauli with w8 phase group
+    #assert len(G) == 64
+    for s,t in hom.items():
+        U = translate_clifford(space, t)
+        for g in G:
+            if g*U == s:
+                break
+        else:
+            assert 0
+
+
 def test_encoder():
     code = construct.get_422()
+    code = construct.get_513()
+    #code = QCode.fromstr("XX ZZ")
+    #code = QCode.fromstr("ZZI IZZ")
     space = code.space
-    n = code.n
+    m, n, k = code.m, code.n, code.k
 
     from qumba.clifford_sage import Clifford, green, red, I, r2, half
 
@@ -573,7 +630,6 @@ def test_encoder():
     P = reduce(operator.mul, [half*(stab + cliff.I) for stab in stabs])
     PP = P*P
     assert PP == P
-    print(P)
     P0 = P # save
 
     E = code.get_encoder() # symplectic matrix
@@ -581,25 +637,51 @@ def test_encoder():
 
     E = translate_clifford(space, E)
     D = translate_clifford(space, D)
+    pauli = D*E
+    assert pauli * pauli == cliff.I
+    D = pauli*D
     assert D*E == cliff.I
     assert E*D == cliff.I
 
-    p = half * red(1,0) * red(0,1)
+    #p = half * red(1,0) * red(0,1)
+    p = half * green(1,0) * green(0,1) # why is this green ??!?!?
+    assert p*p == p
 
     # codespace projector
-    P = E * (p @ p @ I @ I) * D
+    items = [I]*n
+    for i in range(m):
+        items[i] = p
+    p = reduce(matmul, items) 
+    P = E * p * D
     PP = P*P
     assert P == PP
-    while 1:
-        idxs = list(range(n))
-        shuffle(idxs)
-        U = cliff.get_P(*idxs)
-        if U*P*U.t == P0:
-            print("found", idxs)
-            break
+
+    #print(P0)
+    #print()
+    #print(P)
+    #print( pauli*P == P0 )
+    #print( pauli*P*pauli == P0 )
+
+    assert P*P0 == P0*P
+
+    gen = []
+    for i in range(n):
+        gen.append(cliff.get_X(i))
+        gen.append(cliff.get_Z(i))
+    G = mulclose(gen, verbose=True)
+    print(len(G))
+
+    for g in G:
+      for h in G:
+        if P*g == h*P0:
+            print("found!")
+            return
+    print("no pauli")
+
+    #assert P == P0 # up to some pauli? ... argh...
 
     # logical encoder
-    L = E * (red(1,0) @ red(1,0) @ I @ I)
+    #L = E * (red(1,0) @ red(1,0) @ I @ I)
 
 
 

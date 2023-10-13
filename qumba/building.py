@@ -4,8 +4,8 @@
 Bruhat-Tits building & Bruhat decomposition 
 
 The main thing here is we use a different symplectic form
-compared to symplectic.py: here we use a "uturn" order, and
-in symplectic.py we use a "zip" order.
+compared to qumba.symplectic: here we use a "uturn" order, and
+in qumba.symplectic we use a "zip" order.
 Converting between these is done in methods
 from_ziporder and to_ziporder .
 
