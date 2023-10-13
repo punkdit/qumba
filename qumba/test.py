@@ -4,13 +4,14 @@ from time import time
 start_time = time()
 from random import shuffle, randint
 from operator import add
+import operator
 from functools import reduce
 
 import numpy
 
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum)
-from qumba.qcode import QCode, SymplecticSpace
+from qumba.qcode import QCode, SymplecticSpace, strop
 from qumba.csscode import CSSCode
 from qumba import csscode, construct
 from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
@@ -526,31 +527,81 @@ def test_biplanar():
     #print(shortstr(code.Lx))
 
 
+def translate_clifford(space, sop):
+    """
+    _translate symplectic matrix sop to 2**n by 2**n clifford unitaries
+    """
+    building = space.get_building()
+    l, w, r = building.decompose(sop)
+
+    print("translate_clifford:")
+    print("\t", l.name)
+    print("\t", w.name)
+    print("\t", r.name)
+
+    # translate to 2**n by 2**n clifford unitaries
+    from qumba.clifford_sage import Clifford
+    cliff = Clifford(space.n)
+    l = cliff.get_expr(l.name)
+    r = cliff.get_expr(r.name)
+    w = cliff.get_expr(w.name)
+
+    # clifford unitary 
+    cop = l*w*r
+
+    return cop
+
+
 def test_encoder():
     code = construct.get_422()
-    E = code.get_encoder()
     space = code.space
     n = code.n
-    print(E)
 
-    building = Building(space)
-    l, w, r = building.decompose(E)
+    from qumba.clifford_sage import Clifford, green, red, I, r2, half
 
-    print(l.name)
-    print(w.name)
-    print(r.name)
+    k0 = (r2/2)*red(1,0) #   |0>
+    k1 = (r2/2)*red(1,0,2) # |1>
 
-    from qumba.clifford_sage import Clifford
-    cliff = Clifford(3)
-    P = cliff.get_P(1, 2, 0)
-    print(P)
     cliff = Clifford(n)
 
-    L = cliff.get_expr(l.name)
-    R = cliff.get_expr(r.name)
-    W = cliff.get_expr(w.name)
+    #print(code.longstr())
+    stabs = strop(code.H).split()
+    stabs = [cliff.get_pauli(stab) for stab in stabs]
+    for g in stabs:
+      for h in stabs:
+        assert g*h == h*g
+    P = reduce(operator.mul, [half*(stab + cliff.I) for stab in stabs])
+    PP = P*P
+    assert PP == P
+    print(P)
+    P0 = P # save
 
-    E = L*W*R
+    E = code.get_encoder() # symplectic matrix
+    D = code.get_encoder(True) # symplectic matrix
+
+    E = translate_clifford(space, E)
+    D = translate_clifford(space, D)
+    assert D*E == cliff.I
+    assert E*D == cliff.I
+
+    p = half * red(1,0) * red(0,1)
+
+    # codespace projector
+    P = E * (p @ p @ I @ I) * D
+    PP = P*P
+    assert P == PP
+    while 1:
+        idxs = list(range(n))
+        shuffle(idxs)
+        U = cliff.get_P(*idxs)
+        if U*P*U.t == P0:
+            print("found", idxs)
+            break
+
+    # logical encoder
+    L = E * (red(1,0) @ red(1,0) @ I @ I)
+
+
 
 
 def test():
