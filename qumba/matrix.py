@@ -18,6 +18,7 @@ from qumba.solve import (shortstr, dot2, identity2, eq2, intersect, direct_sum, 
     kernel, span)
 from qumba.solve import int_scalar as scalar
 from qumba.action import mulclose
+from qumba.decode.network import TensorNetwork
 
 
 DEFAULT_P = 2 # qubits
@@ -238,10 +239,67 @@ class Matrix(object):
             u = Matrix(u)
             yield u
 
+    def to_spider(self):
+        from decode.network import green, red, TensorNetwork
+        #print("spider_matrix")
+        #print(S)
+        S = self.A
+        m, n = S.shape
+        net = TensorNetwork()
+    
+        for j in range(n):
+            #print("col =", j)
+            A = green(S[:, j].sum(), 1)
+            #print("shape:", A.shape)
+            links = [(i, j) for i in range(m) if S[i, j]] + [("*", j)]
+            #print("links:", links)
+            net.append(A, links)
+    
+        for i in range(m):
+            #print("row =", i)
+            A = red(1, S[i, :].sum())
+            #print("shape:", A.shape)
+            links = [(i, "*")] + [(i, j) for j in range(n) if S[i, j]]
+            #print("links:", links)
+            net.append(A, links)
+    
+        #print(net.freelinks())
+        #net.dump()
+        #net.todot("S.dot")
+        #net.contract_all()
+        idxs = list(zip(*numpy.where(S)))
+        #print(idxs)
+        for link in idxs:
+            net.contract_slow(link)
+        #net.dump()
+    
+        assert len(net)
+        A = reduce((lambda a,b:numpy.tensordot(a,b,axes=([],[]))), net.As)
+        links = reduce(add, net.linkss)
+        #print(A.shape, links)
+        assert len(A.shape) == len(links)
+        E = numpy.zeros((2**m, 2**n), dtype=int)
+        tgt = [(i, "*") for i in range(m)]+[("*", j) for j in range(n)]
+        #for (A, links) in net:
+        #print(A.shape, links)
+        idxs = tuple(tgt.index(link) for link in links)
+        #print("idxs:", idxs)
+        jdxs = [None]*len(idxs)
+        for i,idx in enumerate(idxs):
+            jdxs[idx] = i
+        #print("jdxs:", jdxs)
+        E = A.transpose(jdxs)
+        E = E.astype(int)
+        E = E.reshape(2**m, 2**n)
+        return E
+
+
+
 
 def test():
     I = Matrix.identity(5)
     assert I*I == I
+
 
 
 

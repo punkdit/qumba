@@ -684,6 +684,38 @@ def test_encoder():
     #L = E * (red(1,0) @ red(1,0) @ I @ I)
 
 
+def test_spider():
+    s1 = SymplecticSpace(1)
+    s2 = SymplecticSpace(2)
+    S = s1.get_S()
+    HSH = S.transpose()
+    CNOT = s2.get_CNOT()
+    CZ = s2.get_CZ()
+
+    from qumba.solve import shortstr
+    from qumba.clifford_sage import Clifford, Matrix, K
+    c2 = Clifford(2)
+    c4 = Clifford(4)
+
+    E = S.to_spider()
+    E1 = c2.get_CNOT()
+    assert(Matrix(K, E) == E1)
+
+    E = HSH.to_spider()
+    E1 = c2.get_CNOT(1, 0)
+    assert(Matrix(K, E) == E1)
+
+    E = CNOT.to_spider()
+    E1 = c4.get_CNOT(0, 2)*c4.get_CNOT(3, 1)
+    assert(Matrix(K, E) == E1)
+
+    E = CZ.to_spider()
+    E1 = c4.get_CNOT(0, 3)*c4.get_CNOT(2, 1)
+    assert(Matrix(K, E) == E1)
+
+    SI = s2.get_S()
+
+
 
 
 def test():
