@@ -4,14 +4,16 @@ import sys
 import math
 from random import choice, randint, seed, shuffle
 from time import time
-from operator import mul
-from functools import reduce
+from operator import mul, add
+from functools import reduce, lru_cache
+cache = lru_cache(maxsize=None)
 
 import numpy
 from numpy import dot
 is_close = numpy.allclose
 import numpy.linalg
 
+from qumba.argv import argv
 from qumba.tool import write
 
 def genidx(shape):
@@ -1072,7 +1074,7 @@ class TensorNetwork(object):
         linkss = self.linkss
         links = []
         for link in self.get_links():
-            if sum(1 for links in linkss if links.count(link))>1:
+            if sum(1 for links in linkss if links.count(link))==1:
                 links.append(link)
         return links
 
@@ -1805,11 +1807,190 @@ def test_net():
     print("OK")
 
 
-if __name__=="__main__":
+def green(m, n):
+    "green spider: m output <--- n input "
+    #print("green:", 2**m, 2**n)
+    #print("green(%d, %d)"%(m, n))
+    A = numpy.zeros((2**m, 2**n))
+    A[0, 0] = 1
+    A[2**m - 1, 2**n - 1] = 1
+    A.shape = (2,)*m + (2,)*n
+    #print("\t", A.shape)
+    return A
+
+
+@cache
+def hadamard(m):
+    H = numpy.array(([1,1],[1,-1]))
+    Hm = reduce(numpy.kron, [H]*m)
+    #Hm.shape = (2,)*m + (2,)*m
+    return Hm
+
+def red(m, n):
+    "red spider: m output <--- n input "
+    #print("red(%d, %d)"%(m, n))
+    A = green(m, n)
+    A = A.view()
+    A.shape = (2**m, 2**n)
+    if m > 0:
+        HA = numpy.dot(hadamard(m), A)
+    else:
+        HA = A
+    if n > 0:
+        HAH = numpy.dot(HA, hadamard(n))
+    else:
+        HAH = HA
+    HAH //= 2
+    #print("\t", HAH.shape)
+    HAH.shape = (2,)*m + (2,)*n
+    return HAH
+
+
+def spider_matrix(S):
+    #print("spider_matrix")
+    #print(S)
+    m, n = S.shape
+    S = S.astype(int)
+    net = TensorNetwork()
+
+    for j in range(n):
+        #print("col =", j)
+        A = green(S[:, j].sum(), 1)
+        #print("shape:", A.shape)
+        links = [(i, j) for i in range(m) if S[i, j]] + [("*", j)]
+        #print("links:", links)
+        net.append(A, links)
+    
+    for i in range(m):
+        #print("row =", i)
+        A = red(1, S[i, :].sum())
+        #print("shape:", A.shape)
+        links = [(i, "*")] + [(i, j) for j in range(n) if S[i, j]]
+        #print("links:", links)
+        net.append(A, links)
+    
+    #print(net.freelinks())
+    #net.dump()
+    #net.todot("S.dot")
+    #net.contract_all()
+    idxs = list(zip(*numpy.where(S)))
+    #print(idxs)
+    for link in idxs:
+        net.contract_slow(link)
+    #net.dump()
+
+    assert len(net)
+    A = reduce((lambda a,b:numpy.tensordot(a,b,axes=([],[]))), net.As)
+    links = reduce(add, net.linkss)
+    #print(A.shape, links)
+    assert len(A.shape) == len(links)
+    E = numpy.zeros((2**m, 2**n), dtype=int)
+    tgt = [(i, "*") for i in range(m)]+[("*", j) for j in range(n)]
+    #for (A, links) in net:
+    #print(A.shape, links)
+    idxs = tuple(tgt.index(link) for link in links)
+    #print("idxs:", idxs)
+    jdxs = [None]*len(idxs)
+    for i,idx in enumerate(idxs):
+        jdxs[idx] = i
+    #print("jdxs:", jdxs)
+    E = A.transpose(jdxs)
+    E = E.astype(int)
+    E = E.reshape(2**m, 2**n)
+    return E
+
+
+def test_spider():
+    A = red(2,1)
+
+    S = numpy.array([
+        [1, 0],
+        [1, 1],
+    ])
+    HSH = numpy.array([
+        [1, 1],
+        [0, 1],
+    ])
+    CNOT = numpy.array([
+        [1, 0, 0, 0], 
+        [0, 1, 0, 1],
+        [1, 0, 1, 0], 
+        [0, 0, 0, 1],
+    ])
+    CZ = numpy.array([
+        [1,0,0,0],
+        [0,1,1,0],
+        [0,0,1,0],
+        [1,0,0,1],
+    ])
+
+    from qumba.solve import shortstr
+    from qumba.clifford_sage import Clifford, Matrix, K
+    c2 = Clifford(2)
+    c4 = Clifford(4)
+
+    E = spider_matrix(S)
+    E1 = c2.get_CNOT()
+    print(Matrix(K, E) == E1)
+
+    E = spider_matrix(HSH)
+    E1 = c2.get_CNOT(1, 0)
+    print(Matrix(K, E) == E1)
+
+    E = spider_matrix(CNOT)
+    E1 = c4.get_CNOT(0, 2)*c4.get_CNOT(3, 1)
+    print(Matrix(K, E) == E1)
+
+    E = spider_matrix(CZ)
+    E1 = c4.get_CNOT(0, 3)*c4.get_CNOT(2, 1)
+    print(Matrix(K, E) == E1)
+
+    SI = numpy.array([
+        [1, 1, 0, 0], 
+        [0, 1, 0, 0],
+        [0, 0, 1, 0], 
+        [0, 0, 0, 1],
+    ])
+    E = spider_matrix(SI)
+
+
+def test():
 
     test_mps()
     test_net()
     #test_gauge()
+
+
+
+if __name__ == "__main__":
+
+    start_time = time()
+
+
+    profile = argv.profile
+    name = argv.next() or "test"
+    _seed = argv.get("seed")
+    if _seed is not None:
+        print("seed(%s)"%(_seed))
+        seed(_seed)
+
+    if profile:
+        import cProfile as profile
+        profile.run("%s()"%name)
+
+    elif name is not None:
+        fn = eval(name)
+        fn()
+
+    else:
+        test()
+
+
+    t = time() - start_time
+    print("OK! finished in %.3f seconds\n"%t)
+
+
+
 
 
 
