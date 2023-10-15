@@ -548,6 +548,16 @@ def translate_clifford(space, sop, verbose=False):
     r = cliff.get_expr(r.name)
     w = cliff.get_expr(w.name)
 
+    if 0:
+        print(w)
+        f = w.to_perm()
+        from qumba.matrix import Matrix
+        p = Matrix.perm(f)
+        assert w == p
+        print(p.name) # no it's not a perm, it's got H and perm, FAIL
+        w = cliff.get_expr(p.name)
+        print(w)
+
     # clifford unitary 
     cop = l*w*r
 
@@ -607,10 +617,11 @@ def test_clifford():
 
 
 def test_encoder():
-    code = construct.get_422()
-    code = construct.get_513()
     #code = QCode.fromstr("XX ZZ")
     #code = QCode.fromstr("ZZI IZZ")
+    code = construct.get_422()
+    #code = construct.get_513()
+    #code = construct.get_10_2_3()
     space = code.space
     m, n, k = code.m, code.n, code.k
 
@@ -664,19 +675,21 @@ def test_encoder():
 
     assert P*P0 == P0*P
 
-    gen = []
-    for i in range(n):
-        gen.append(cliff.get_X(i))
-        gen.append(cliff.get_Z(i))
-    G = mulclose(gen, verbose=True)
-    print(len(G))
-
-    for g in G:
-      for h in G:
-        if P*g == h*P0:
-            print("found!")
-            return
-    print("no pauli")
+    if argv.slow:
+    
+        gen = []
+        for i in range(n):
+            gen.append(cliff.get_X(i))
+            gen.append(cliff.get_Z(i))
+        G = mulclose(gen, verbose=True)
+        print(len(G))
+    
+        for g in G:
+          for h in G:
+            if P*g == h*P0:
+                print("found!")
+                return
+        print("no pauli")
 
     #assert P == P0 # up to some pauli? ... argh...
 
@@ -717,6 +730,11 @@ def test_spider():
     E = SI.to_spider()
     E1 = c4.get_CNOT()
     assert Matrix(K, E) == E1
+
+    code = get_513()
+    e = code.get_encoder()
+    E = e.to_spider(verbose=True)
+    print(E.shape)
 
 
 

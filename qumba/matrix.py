@@ -95,12 +95,23 @@ class Matrix(object):
         return Matrix(item, p, name=name)
 
     @classmethod
-    def perm(cls, items, p=DEFAULT_P, name="?"):
+    def perm(cls, items, p=DEFAULT_P, name=None):
         n = len(items)
         A = numpy.zeros((n, n), dtype=scalar)
         for i, ii in enumerate(items):
             A[ii, i] = 1
+        if name is None:
+            name = "P"+str(tuple(items))
         return Matrix(A, p, name=name)
+
+    def to_perm(self):
+        A = self.A
+        perm = []
+        for row in A:
+            idx = numpy.where(row)[0]
+            assert len(idx) == 1, "not a perm"
+            perm.append(idx[0])
+        return perm
 
     @classmethod
     def identity(cls, n, p=DEFAULT_P):
@@ -239,39 +250,52 @@ class Matrix(object):
             u = Matrix(u)
             yield u
 
-    def to_spider(self):
-        from decode.network import green, red, TensorNetwork
-        #print("spider_matrix")
-        #print(S)
+    def to_spider(self, scalar=int, verbose=True):
+        from qumba.decode import network
+        scalar = numpy.int8
+        network.scalar = scalar
+        from qumba.decode.network import green, red, TensorNetwork
         S = self.A
         m, n = S.shape
         net = TensorNetwork()
     
         for j in range(n):
-            #print("col =", j)
-            A = green(S[:, j].sum(), 1)
-            #print("shape:", A.shape)
+            A = green(S[:, j].sum(), 1, scalar)
             links = [(i, j) for i in range(m) if S[i, j]] + [("*", j)]
-            #print("links:", links)
             net.append(A, links)
     
         for i in range(m):
-            #print("row =", i)
-            A = red(1, S[i, :].sum())
-            #print("shape:", A.shape)
+            A = red(1, S[i, :].sum(), scalar)
             links = [(i, "*")] + [(i, j) for j in range(n) if S[i, j]]
-            #print("links:", links)
             net.append(A, links)
     
-        #print(net.freelinks())
-        #net.dump()
-        #net.todot("S.dot")
-        #net.contract_all()
         idxs = list(zip(*numpy.where(S)))
-        #print(idxs)
-        for link in idxs:
-            net.contract_slow(link)
-        #net.dump()
+        while idxs and len(net) > 1:
+            #print("net:")
+            #for (A, links) in zip(net.As, net.linkss):
+            #    print("\t", links, len(links), len(set(links)))
+            size = {link : 1 for link in net.get_links()}
+            for (A, links) in zip(net.As, net.linkss):
+                s = reduce(mul, A.shape)
+                for link in links:
+                    size[link] *= s
+            idxs.sort( key = lambda link : size.get(link, 0) )
+            if not idxs:
+                break
+            link = idxs.pop()
+            #print(size)
+            #print("contract at", link, size.get(link, 0))
+            pair = []
+            for (i, (A, links)) in enumerate(zip(net.As, net.linkss)):
+                if link in links:
+                    pair.append(i)
+                if len(pair) == 2:
+                    break
+            else:
+            #    print("no pair left")
+                break
+            net.contract_pair(*pair)
+        #print("done contract")
     
         assert len(net)
         A = reduce((lambda a,b:numpy.tensordot(a,b,axes=([],[]))), net.As)

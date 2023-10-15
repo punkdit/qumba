@@ -207,8 +207,11 @@ class Building(object):
         building = Building(uturn)
         I = space.get_identity()
         #B = space.get_borel()
-        W = space.get_weyl()
-        W = dict((w,w) for w in W)
+        if space.n <= 8:
+            W = space.get_weyl()
+            W = dict((w,w) for w in W)
+        else:
+            W = None
         ops = [space.get_S(i) for i in range(n)]
         ops += [space.get_CNOT(i, j) for i in range(n) for j in range(i+1,n)]
         ops += [space.get_CZ(i, j) #*space.get_H(i)*space.get_H(j)
@@ -277,8 +280,9 @@ class Building(object):
         w = uturn.to_ziporder(w)
         assert space.is_symplectic(w)
 
-        assert w in self.W
-        w = self.W[w]
+        if self.W is not None:
+            assert w in self.W
+            w = self.W[w]
  
         l = uturn.to_ziporder(left)
         r = uturn.to_ziporder(right)
@@ -289,8 +293,10 @@ class Building(object):
         assert left == l
         assert right == r
  
-        for op in [left, w, right]:
+        for op in [left, right]:
             assert (op == space.get_expr(op.name))
+        if self.W is not None:
+            assert (w == space.get_expr(w.name))
  
         li = self.invert(left)
         ri = self.invert(right)

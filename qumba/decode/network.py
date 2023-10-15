@@ -1426,7 +1426,7 @@ class TensorNetwork(object):
         #        print link, type(link[0][0])
         idxs = [i for i in range(self.n) if link in linkss[i]]
 
-        assert len(idxs) in (0, 2)
+        assert len(idxs) in (0, 2), len(idxs)
         #assert len(idxs) <= 2
         if len(idxs)==2:
             A, B = As[idxs[-2]], As[idxs[-1]]
@@ -1478,6 +1478,23 @@ class TensorNetwork(object):
                 self.cleanup(verbose) # XXX too slow XXX
 
         assert self.check()
+
+    def contract_pair(self, i, j):
+        assert i != j
+        assert 0 <= i < self.n
+        assert 0 <= j < self.n
+        if j < i:
+            i, j = j, i
+        B, minks = self.pop(j)
+        A, links = self.pop(i)
+        ninks = [idx for idx in links if idx in minks]
+        left = [links.index(idx) for idx in ninks]
+        right = [minks.index(idx) for idx in ninks]
+        C = numpy.tensordot(A, B, (left, right))
+        for i in ninks:
+            links.remove(i)
+            minks.remove(i)
+        self.append(C, links + minks)
 
     def contract_scalars(self, verbose=False):
         r = 1.
@@ -1807,11 +1824,11 @@ def test_net():
     print("OK")
 
 
-def green(m, n):
+def green(m, n, dtype=int):
     "green spider: m output <--- n input "
     #print("green:", 2**m, 2**n)
     #print("green(%d, %d)"%(m, n))
-    A = numpy.zeros((2**m, 2**n))
+    A = numpy.zeros((2**m, 2**n), dtype=dtype)
     A[0, 0] = 1
     A[2**m - 1, 2**n - 1] = 1
     A.shape = (2,)*m + (2,)*n
@@ -1820,24 +1837,24 @@ def green(m, n):
 
 
 @cache
-def hadamard(m):
-    H = numpy.array(([1,1],[1,-1]))
+def hadamard(m, dtype=int):
+    H = numpy.array([[1,1],[1,-1]], dtype=dtype)
     Hm = reduce(numpy.kron, [H]*m)
     #Hm.shape = (2,)*m + (2,)*m
     return Hm
 
-def red(m, n):
+def red(m, n, dtype=int):
     "red spider: m output <--- n input "
     #print("red(%d, %d)"%(m, n))
-    A = green(m, n)
+    A = green(m, n, dtype)
     A = A.view()
     A.shape = (2**m, 2**n)
     if m > 0:
-        HA = numpy.dot(hadamard(m), A)
+        HA = numpy.dot(hadamard(m, dtype), A)
     else:
         HA = A
     if n > 0:
-        HAH = numpy.dot(HA, hadamard(n))
+        HAH = numpy.dot(HA, hadamard(n, dtype))
     else:
         HAH = HA
     HAH //= 2

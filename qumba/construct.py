@@ -91,6 +91,16 @@ def get_10_2_3():
     return toric
 
 
+def get_512():
+    toric = QCode.fromstr("""
+    ZZZ..
+    ..ZZZ
+    X.XX.
+    .XX.X
+    """, d=2)
+    return toric
+
+
 def toric(rows, cols, delta_row=0, delta_col=0):
     n = 2*rows*cols
 

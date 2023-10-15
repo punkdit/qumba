@@ -85,7 +85,7 @@ class Matrix(object):
     __repr__ = __str__
 
     def __mul__(self, other):
-        assert isinstance(other, Matrix)
+        assert isinstance(other, Matrix), type(other)
         assert self.ring == other.ring
         assert self.shape[1] == other.shape[0], (
             "cant multiply %sx%s by %sx%s"%(self.shape + other.shape))
@@ -163,18 +163,17 @@ class Matrix(object):
     def t(self):
         return self.transpose()
 
+    def dagger(self):
+        M = self.M.conjugate_transpose()
+        return Matrix(self.ring, M)
+
+    @property
+    def d(self):
+        return self.dagger()
+
     def is_diagonal(self):
         M = self.M
         return M.is_diagonal()
-        print(' '.join(dir(M)))
-        n = len(M) # XX
-        for i in range(n):
-          for j in range(n):
-            if i==j:
-                continue
-            if M[i,j] != 0:
-                return False
-        return True
 
     def is_zero(self):
         return self == -self
