@@ -699,22 +699,24 @@ def test_spider():
 
     E = S.to_spider()
     E1 = c2.get_CNOT()
-    assert(Matrix(K, E) == E1)
+    assert Matrix(K, E) == E1
 
     E = HSH.to_spider()
     E1 = c2.get_CNOT(1, 0)
-    assert(Matrix(K, E) == E1)
+    assert Matrix(K, E) == E1
 
     E = CNOT.to_spider()
     E1 = c4.get_CNOT(0, 2)*c4.get_CNOT(3, 1)
-    assert(Matrix(K, E) == E1)
+    assert Matrix(K, E) == E1
 
     E = CZ.to_spider()
     E1 = c4.get_CNOT(0, 3)*c4.get_CNOT(2, 1)
-    assert(Matrix(K, E) == E1)
+    assert Matrix(K, E) == E1
 
-    SI = s2.get_S()
-
+    SI = s2.get_S(0)
+    E = SI.to_spider()
+    E1 = c4.get_CNOT()
+    assert Matrix(K, E) == E1
 
 
 
