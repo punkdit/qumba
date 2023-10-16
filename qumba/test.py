@@ -3,8 +3,7 @@
 from time import time
 start_time = time()
 from random import shuffle, randint
-from operator import add, matmul
-import operator
+from operator import add, matmul, mul
 from functools import reduce
 
 import numpy
@@ -17,6 +16,7 @@ from qumba import csscode, construct
 from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
 from qumba.action import mulclose, mulclose_hom
 from qumba.symplectic import Building
+from qumba.smap import SMap
 from qumba.argv import argv
 
 
@@ -30,12 +30,12 @@ def is_identity(f):
             return False
     return True
 
-def mul(f, g):
-    return [f[g[i]] for i in range(len(g))]
-        
 
 def find_logicals(Ax, Az):
 
+    def mul(f, g):
+        return [f[g[i]] for i in range(len(g))]
+        
     Hx = linear_independent(Ax)
     Hz = linear_independent(Az)
     code = QCode.build_css(Hx, Hz)
@@ -638,7 +638,7 @@ def test_encoder():
     for g in stabs:
       for h in stabs:
         assert g*h == h*g
-    P = reduce(operator.mul, [half*(stab + cliff.I) for stab in stabs])
+    P = reduce(mul, [half*(stab + cliff.I) for stab in stabs])
     PP = P*P
     assert PP == P
     P0 = P # save
@@ -706,7 +706,7 @@ def test_spider():
     CZ = s2.get_CZ()
 
     from qumba.solve import shortstr
-    from qumba.clifford_sage import Clifford, Matrix, K
+    from qumba.clifford_sage import Clifford, Matrix, K, r2
     c2 = Clifford(2)
     c4 = Clifford(4)
 
@@ -732,10 +732,111 @@ def test_spider():
     assert Matrix(K, E) == E1
 
     code = get_513()
+    c1 = Clifford(1)
+    I, H = c1.get_identity(), c1.get_H()
+    IH = reduce(matmul, [I,H]*code.n)
+    print("IH", IH.shape)
     e = code.get_encoder()
     E = e.to_spider(verbose=True)
+    print(type(E), E.shape)
+    E = Matrix(K, list(E))
+    E = E*IH
+    E = 4*r2*E
     print(E.shape)
+    #for i in range(1024):
+    #  for j in range(1024):
+    #    if E[i,j]:
+    #        print(E[i,j], end=" ")
+    #  print()
+    return E
+    
 
+
+
+def test_1():
+
+    for ht in [
+        "X Z", "Z X", "Y Z",
+    ]:
+        h, t = ht.split()
+        code = QCode.fromstr(Hs=h, Ts=t)
+        #print(code)
+
+    space = SymplecticSpace(1)
+    I = space.get_identity()
+    H, S = space.get_H(0), space.get_S(0)
+    G = mulclose([I, H, S])
+    assert len(G) == 6
+
+    from qumba.unwrap import unwrap_encoder
+    for g in [
+        I, S, H, H*S, S*H, S*H*S # == H*S*H
+    ]:
+        code = QCode.from_encoder(g)
+        print("*".join(g.name))
+        print(strop(code.H), strop(code.T))
+        print("-----")
+        c2 = unwrap_encoder(code)
+
+        h, t = (strop(c2.H), strop(c2.T))
+        smap = SMap()
+        smap[0, 0] = h
+        smap[0, 3] = t
+        print(smap)
+        E = c2.get_encoder()
+        #translate_clifford(c2.space, E, verbose=True)
+        print()
+        #print(g.to_spider())
+        #print()
+    print("="*79)
+
+
+    space = SymplecticSpace(2)
+    CX = space.get_CNOT(0, 1)
+    SWAP = space.get_perm([1, 0])
+    I = space.get_identity()
+    HI = space.get_H(0)
+    IH = space.get_H(1)
+    for E in [
+        I,
+        CX,
+        SWAP,
+        SWAP*CX,
+        CX*SWAP,
+        CX*SWAP*CX,
+    ]:
+        E = E*IH
+        code = QCode.from_encoder(E)
+        h, t = (strop(code.H), strop(code.T))
+        smap = SMap()
+        smap[0, 0] = h
+        smap[0, 3] = t
+        print(E.name)
+        print(smap)
+        print()
+
+
+def test_412_unwrap():
+    code = QCode.fromstr("XYZI IXYZ ZIXY")
+    from qumba.unwrap import unwrap_encoder
+    dode = unwrap_encoder(code)
+
+    space = dode.space
+    E = dode.get_encoder()
+    Ei = space.invert(E)
+    #[space.get_CZ(2*i, 2*i+1) for i in range(4)]
+    cz = reduce(mul, [space.get_CZ(2*i, 2*i+1) for i in range(4)])
+    logop = space.get_H()
+    perm = reduce(add, [[2*i+1, 2*i] for i in range(4)])
+    logop = space.get_perm(perm) * logop
+
+    I = space.get_identity()
+    #print(Ei * logop * E == I)
+    eode = QCode.from_encoder(logop*E, m=dode.m)
+    print(eode.get_params())
+    print(eode.is_equiv(dode))
+    
+    translate_clifford(space, E, verbose=True)
 
 
 def test():

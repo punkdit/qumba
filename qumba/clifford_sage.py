@@ -246,6 +246,9 @@ class Clifford(object):
         w = self.w
         return w*self.I
 
+    def get_identity(self):
+        return self.I
+
     def mkop(self, i, g):
         n = self.n
         K = self.K
