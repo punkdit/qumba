@@ -120,6 +120,26 @@ class Algebraic(object):
         return set(self.get_elements()) == set(other.get_elements())
 
     @classmethod
+    def SL(cls, n, p=DEFAULT_P, **kw):
+        "special linear group"
+        assert int(n)==n
+        assert int(p)==p
+        assert n>0
+        assert isprime(p)
+
+        I = numpy.identity(n, scalar)
+        gen = []
+        for i in range(n):
+            for j in range(n):
+                if i==j:
+                    continue
+                A = I.copy()
+                A[i, j] = 1
+                gen.append(Matrix(A, p))
+        order = order_sl(n, p)
+        return cls(gen, order, p=p, **kw)
+
+    @classmethod
     def Sp_4_2(cls, F, **kw):
         A = numpy.array([[1,0,1,1],[1,0,0,1],[0,1,0,1],[1,1,1,1]], dtype=scalar)
         B = numpy.array([[0,0,1,0],[1,0,0,0],[0,0,0,1],[0,1,0,0]], dtype=scalar)
