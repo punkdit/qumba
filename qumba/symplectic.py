@@ -17,7 +17,7 @@ import numpy
 from qumba.solve import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
     kernel, span)
 from qumba.solve import int_scalar as scalar
-from qumba.action import mulclose
+from qumba.action import mulclose, mulclose_find
 from qumba.matrix import Matrix, DEFAULT_P
 
 
@@ -149,9 +149,7 @@ class SymplecticSpace(object):
         G = mulclose(gen, verbose=verbose)
         return G
 
-    @cache
-    def get_weyl(self, verbose=False):
-        # _generate the Weyl group
+    def get_weyl_gen(self):
         n = self.n
         I = self.get_identity()
         gen = [I]
@@ -161,7 +159,12 @@ class SymplecticSpace(object):
                 perm = list(range(n))
                 perm[i], perm[j] = perm[j], perm[i]
                 gen.append(self.get_perm(perm))
+        return gen
     
+    @cache
+    def get_weyl(self, verbose=False):
+        # _generate the Weyl group
+        gen = self.get_weyl_gen()
         G = mulclose(gen, verbose=verbose)
         return G
 
@@ -207,7 +210,7 @@ class Building(object):
         building = Building(uturn)
         I = space.get_identity()
         #B = space.get_borel()
-        if space.n <= 8:
+        if space.n <= 6:
             W = space.get_weyl()
             W = dict((w,w) for w in W)
         else:
@@ -283,6 +286,9 @@ class Building(object):
         if self.W is not None:
             assert w in self.W
             w = self.W[w]
+        else:
+            gen = space.get_weyl_gen()
+            w = mulclose_find(gen, w, verbose=True)
  
         l = uturn.to_ziporder(left)
         r = uturn.to_ziporder(right)

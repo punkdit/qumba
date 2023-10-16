@@ -818,8 +818,11 @@ def test_1():
 
 def test_412_unwrap():
     code = QCode.fromstr("XYZI IXYZ ZIXY")
+    translate_clifford(code.space, code.get_encoder(), verbose=True)
+
     from qumba.unwrap import unwrap_encoder
     dode = unwrap_encoder(code)
+    print(dode.longstr())
 
     space = dode.space
     E = dode.get_encoder()
@@ -836,7 +839,7 @@ def test_412_unwrap():
     print(eode.get_params())
     print(eode.is_equiv(dode))
     
-    translate_clifford(space, E, verbose=True)
+    #translate_clifford(space, E, verbose=True)
 
 
 def test():

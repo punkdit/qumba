@@ -94,6 +94,36 @@ def mulclose_hom(gen1, gen2, verbose=False, maxsize=None):
     return hom 
 
 
+def mulclose_find(gen, tgt, verbose=False, maxsize=None):
+    bdy = list(set(gen))
+    names = set(gen)
+    if tgt in gen:
+        return tgt
+    while bdy:
+        if verbose:
+            print(len(names), end=" ", flush=True)
+        _bdy = []
+        for A in gen:
+            for B in bdy:
+                C = A*B
+                if C not in names:
+                    #els.add(C)
+                    names.add(C)
+                    _bdy.append(C)
+                    if C == tgt:
+                        if verbose:
+                            print()
+                        return C
+                    if maxsize and len(names)>=maxsize:
+                        if verbose:
+                            print()
+                        return
+        bdy = _bdy
+    if verbose:
+        print()
+    return
+
+
 def identity(items):
     return dict((i, i) for i in items)
 
