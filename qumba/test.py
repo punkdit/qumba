@@ -10,7 +10,7 @@ import numpy
 
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum)
-from qumba.qcode import QCode, SymplecticSpace, strop
+from qumba.qcode import QCode, SymplecticSpace, strop, Matrix
 from qumba.csscode import CSSCode
 from qumba import csscode, construct
 from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
@@ -818,6 +818,16 @@ def test_1():
 
 def test_412_unwrap():
     code = QCode.fromstr("XYZI IXYZ ZIXY")
+    print(code.longstr())
+
+    E = code.get_encoder()
+    Ei = code.get_encoder(True)
+    v = [[0,0, 0,0, 0,1, 1,0]] # IIZX
+    v = Matrix(v)
+    print(Ei*v.t)
+
+    return
+
     translate_clifford(code.space, code.get_encoder(), verbose=True)
 
     from qumba.unwrap import unwrap_encoder
