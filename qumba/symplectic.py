@@ -202,6 +202,14 @@ class SymplecticSpace(object):
         l, w, r = building.decompose(sop)
         return l, w, r
 
+    def render(self, sop):
+        l, w, r = self.decompose(sop)
+        name = l.name + w.name + r.name
+        from huygens.zx import Circuit
+        c = Circuit(self.n)
+        cvs = c.render_expr(name)
+        return cvs
+
     def translate_clifford(self, sop, verbose=False):
         """
         _translate symplectic matrix sop to 2**n by 2**n clifford unitaries
