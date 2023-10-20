@@ -197,6 +197,46 @@ class SymplecticSpace(object):
         building = Building(self)
         return building
 
+    def decompose(self, sop):
+        building = self.get_building()
+        l, w, r = building.decompose(sop)
+        return l, w, r
+
+    def translate_clifford(self, sop, verbose=False):
+        """
+        _translate symplectic matrix sop to 2**n by 2**n clifford unitaries
+        """
+    
+        l, w, r = self.decompose(sop)
+        if verbose:
+            print("translate_clifford:")
+            print("\t", l.name)
+            print("\t", w.name)
+            print("\t", r.name)
+    
+        from qumba.clifford_sage import Clifford
+        cliff = Clifford(self.n)
+        l = cliff.get_expr(l.name)
+        r = cliff.get_expr(r.name)
+        w = cliff.get_expr(w.name)
+    
+        if 0:
+            print(w)
+            f = w.to_perm()
+            from qumba.matrix import Matrix
+            p = Matrix.perm(f)
+            assert w == p
+            print(p.name) # no it's not a perm, it's got H and perm, FAIL
+            w = cliff.get_expr(p.name)
+            print(w)
+    
+        # clifford unitary
+        cop = l*w*r
+    
+        return cop
+
+
+
 
 class Building(object):
     """

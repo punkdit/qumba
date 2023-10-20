@@ -528,42 +528,6 @@ def test_biplanar():
     #print(shortstr(code.Lx))
 
 
-def translate_clifford(space, sop, verbose=False):
-    """
-    _translate symplectic matrix sop to 2**n by 2**n clifford unitaries
-    """
-    building = space.get_building()
-    l, w, r = building.decompose(sop)
-
-    if verbose:
-        print("translate_clifford:")
-        print("\t", l.name)
-        print("\t", w.name)
-        print("\t", r.name)
-
-    # translate to 2**n by 2**n clifford unitaries
-    from qumba.clifford_sage import Clifford
-    cliff = Clifford(space.n)
-    l = cliff.get_expr(l.name)
-    r = cliff.get_expr(r.name)
-    w = cliff.get_expr(w.name)
-
-    if 0:
-        print(w)
-        f = w.to_perm()
-        from qumba.matrix import Matrix
-        p = Matrix.perm(f)
-        assert w == p
-        print(p.name) # no it's not a perm, it's got H and perm, FAIL
-        w = cliff.get_expr(p.name)
-        print(w)
-
-    # clifford unitary 
-    cop = l*w*r
-
-    return cop
-
-
 def test_clifford():
     from qumba.clifford_sage import Clifford, green, red, I, r2, half
 
@@ -574,13 +538,13 @@ def test_clifford():
     src, tgt = [], []
     for i in range(n):
         E = space.get_H(i)
-        U = translate_clifford(space, E)
+        U = space.translate_clifford(E)
         src.append(U)
         tgt.append(E)
         assert U == c3.get_H(i)
 
         E = space.get_S(i)
-        U = translate_clifford(space, E)
+        U = space.translate_clifford(E)
         src.append(U)
         tgt.append(E)
         assert U == c3.get_S(i)
@@ -591,13 +555,13 @@ def test_clifford():
             continue
 
         E = space.get_CNOT(i, j)
-        U = translate_clifford(space, E)
+        U = space.translate_clifford(E)
         src.append(U)
         tgt.append(E)
         assert U == c3.get_CNOT(i, j)
 
         E = space.get_CZ(i, j)
-        U = translate_clifford(space, E)
+        U = space.translate_clifford(E)
         src.append(U)
         tgt.append(E)
         assert U == c3.get_CZ(i, j)
@@ -608,7 +572,7 @@ def test_clifford():
     assert len(G) == 128 # Pauli with w8 phase group
     #assert len(G) == 64
     for s,t in hom.items():
-        U = translate_clifford(space, t)
+        U = space.translate_clifford(t)
         for g in G:
             if g*U == s:
                 break
@@ -646,8 +610,8 @@ def test_encoder():
     E = code.get_encoder() # symplectic matrix
     D = code.get_encoder(True) # symplectic matrix
 
-    E = translate_clifford(space, E)
-    D = translate_clifford(space, D)
+    E = space.translate_clifford(E)
+    D = space.translate_clifford(D)
     pauli = D*E
     assert pauli * pauli == cliff.I
     D = pauli*D
@@ -849,7 +813,7 @@ def test_412_unwrap():
     print(eode.get_params())
     print(eode.is_equiv(dode))
     
-    #translate_clifford(space, E, verbose=True)
+    #space.translate_clifford(E, verbose=True)
 
 
 def test():
