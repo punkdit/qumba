@@ -816,6 +816,42 @@ def test_412_unwrap():
     #space.translate_clifford(E, verbose=True)
 
 
+def test_generate():
+    s = SymplecticSpace(2)
+    gen = [s.get_S(0), s.get_S(1), s.get_H(0), s.get_H(1), s.get_CNOT(0,1)]
+    G = mulclose(gen)
+    print("|G| =", len(G))
+
+    equs = {g:set() for g in G}
+    inv = {g:s.invert(g) for g in G}
+    for g in G:
+      for h in G:
+        equs[g].add( inv[h]*g*h )
+
+    cgys = set()
+    for g in G:
+        cgy = equs[g]
+        cgy = list(cgy)
+        cgy.sort(key = str)
+        cgy = tuple(cgy)
+        cgys.add(cgy)
+    print("cgys:", len(cgys))
+    cgys = list(cgys)
+    cgys.sort(key = len)
+    for cgy in cgys:
+        print("\t%d"%len(cgy))
+        best = None
+        for g in cgy:
+            name = s.get_name(g)
+            #print("\t\t%s"%
+            if best is None or len(best[0]) > len(name):
+                best = [name]
+            elif len(best[0]) == len(name):
+                best.append(name)
+        for name in best:
+            print("\t\t%s"%("*".join(name)))
+
+
 def test():
     print("\ntest()")
     get_422()

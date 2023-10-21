@@ -202,6 +202,10 @@ class SymplecticSpace(object):
         l, w, r = building.decompose(sop)
         return l, w, r
 
+    def get_name(self, sop):
+        l, w, r = self.decompose(sop)
+        return l.name + w.name + r.name
+
     def render(self, sop):
         l, w, r = self.decompose(sop)
         name = l.name + w.name + r.name
