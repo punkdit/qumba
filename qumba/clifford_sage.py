@@ -21,7 +21,7 @@ from sage.all_cmdline import FiniteField, CyclotomicField, latex, block_diagonal
 from sage import all_cmdline 
 
 from qumba.solve import zeros2, identity2
-from qumba.action import mulclose
+from qumba.action import mulclose, mulclose_names
 from qumba.argv import argv
 
 K = CyclotomicField(8)
@@ -29,6 +29,7 @@ w8 = K.gen() # primitive eighth root of unity
 half = K.one()/2
 w4 = w8**2
 r2 = w8 + w8**7
+ir2 = r2 / 2
 assert r2**2 == 2
 
 def simplify_latex(self):
@@ -955,6 +956,74 @@ def test_CCZ():
     gen = [ns[name] for name in names]
     #name = mulclose_find(gen, names, g, verbose=True)
     #print(name)
+
+
+def test_platonic():
+
+    c = Clifford(1)
+    I = c.I
+    wI = c.wI()
+    S = c.get_S()
+    H = c.get_H()
+    J = w8*H
+
+    Z = S*S
+    X = H*Z*H
+    G = mulclose([Z, X])
+    assert len(G) == 8
+
+    i = w4
+    A = half*Matrix(K, [[-1+i,-1+i],[1+i,-1-i]])
+    B = -half*Matrix(K, [[-1-i,-1-i],[1-i,-1+i]])
+    
+    # binary tetrahedral group
+    G_2T = mulclose([A, B])
+    assert len(G_2T) == 24
+    names = mulclose_names([A, B], "AB")
+    for g,name in names.items():
+        if g == -I:
+            print(g, ''.join(name), "in 2T")
+    print(Z in G_2T, X in G_2T)
+
+    # binary octahedral group
+    #C = ir2 * Matrix(K, [[1+i, 0], [0, 1-i]]) # has order 8
+    C = w8*S # simpler to generate
+    print(C, "=C")
+    #print([I==C**j for j in range(10)])
+    G_2O = mulclose([A, C])
+    assert len(G_2O) == 48
+    names = mulclose_names([A, C], "AC")
+    for g,name in names.items():
+        if g == B:
+            print(g, ''.join(name), "in 2O")
+    print(Z in G_2O, X in G_2O)
+
+    # Clifford group
+    G = mulclose([S, H])
+    assert len(G) == 192
+    assert wI in G
+    for g in G_2O:
+        assert g in G
+    print(Z in G, X in G)
+
+    names = mulclose_names([I, w8*I, S, H], list("IwSH"))
+    assert len(names) == 192
+    for g,name in names.items():
+        if g == C:
+            print(g, ''.join(name), "= C in Clifford")
+
+    # Semi-Clifford group
+    G = mulclose([S, J])
+    assert w4*I in G
+    assert len(G) == 96
+    print(Z in G, X in G)
+
+    #names = mulclose_names([I, w4*I, S, J], list("IiSJ"))
+    names = mulclose_names([I, S, J], list("ISJ"))
+    for g,name in names.items():
+        if g == w4*I:
+            print(g, ''.join(name), "in Semi-Clifford")
+
 
 
 def test():
