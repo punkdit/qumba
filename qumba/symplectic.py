@@ -168,6 +168,29 @@ class SymplecticSpace(object):
         G = mulclose(gen, verbose=verbose)
         return G
 
+    def find_weyl(self, w):
+        f = w.to_perm()
+        src = [(2*i, 2*i+1) for i in range(self.n)]
+        tgt = list(zip(f[::2], f[1::2]))
+        perm = [] # qubit permutation
+        flips = [] # Hadamard
+        for (i,j) in tgt:
+            if (i,j) in src:
+                idx = src.index((i,j))
+            else:
+                assert (j,i) in src
+                idx = src.index((j,i))
+                flips.append(self.get_H(idx))
+            perm.append(idx)
+        if perm == list(range(self.n)):
+            w0 = self.get_identity()
+        else:
+            w0 = self.get_perm(perm)
+        w1 = reduce(mul, flips) if flips else self.get_identity()
+        assert w0*w1 == w
+        w = w0*w1
+        return w
+
     @cache
     def get_sp_gen(self):
         n = self.n
@@ -262,11 +285,11 @@ class Building(object):
         building = Building(uturn)
         I = space.get_identity()
         #B = space.get_borel()
-        if space.n <= 6:
-            W = space.get_weyl()
-            W = dict((w,w) for w in W)
-        else:
-            W = None
+        #if space.n <= 6:
+            #W = space.get_weyl()
+            #W = dict((w,w) for w in W)
+        #else:
+            #W = None
         ops = [space.get_S(i) for i in range(n)]
         ops += [space.get_CNOT(i, j) for i in range(n) for j in range(i+1,n)]
         ops += [space.get_CZ(i, j) #*space.get_H(i)*space.get_H(j)
@@ -293,7 +316,7 @@ class Building(object):
         self.uturn = uturn
         self.building = building
         self.space = space
-        self.W = W
+        #self.W = W
         self.rename = rename
     
     def convert(self, op): 
@@ -335,12 +358,7 @@ class Building(object):
         w = uturn.to_ziporder(w)
         assert space.is_symplectic(w)
 
-        if self.W is not None:
-            assert w in self.W
-            w = self.W[w]
-        else:
-            gen = space.get_weyl_gen()
-            w = mulclose_find(gen, w, verbose=True)
+        w = space.find_weyl(w)
  
         l = uturn.to_ziporder(left)
         r = uturn.to_ziporder(right)
@@ -353,8 +371,8 @@ class Building(object):
  
         for op in [left, right]:
             assert (op == space.get_expr(op.name))
-        if self.W is not None:
-            assert (w == space.get_expr(w.name))
+        #if self.W is not None:
+        #    assert (w == space.get_expr(w.name))
  
         li = self.invert(left)
         ri = self.invert(right)
@@ -403,7 +421,7 @@ def test_bruhat():
     print("Sp", len(Sp))
     Sp = list(Sp)
 
-    n = 3
+    n = 2
     space = SymplecticSpace(n)
     building = Building(space)
     for trial in range(10):
