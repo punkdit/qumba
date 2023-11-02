@@ -127,6 +127,13 @@ class Matrix(object):
         return '\n'.join(lines)
     __str__ = shortstr
 
+    def latex(self):
+        A = self.A
+        rows = ['&'.join('.1'[i] for i in row) for row in A]
+        rows = r'\\'.join(rows)
+        rows = r"\begin{bmatrix}%s\end{bmatrix}"%rows
+        return rows
+
     def __repr__(self):
         return "Matrix(%s)"%str(self.A)
 
