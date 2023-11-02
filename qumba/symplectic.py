@@ -229,12 +229,12 @@ class SymplecticSpace(object):
         l, w, r = self.decompose(sop)
         return l.name + w.name + r.name
 
-    def render(self, sop):
+    def render(self, sop, *args, **kw):
         l, w, r = self.decompose(sop)
         name = l.name + w.name + r.name
         from huygens.zx import Circuit
         c = Circuit(self.n)
-        cvs = c.render_expr(name)
+        cvs = c.render_expr(name, *args, **kw)
         return cvs
 
     def translate_clifford(self, sop, verbose=False):

@@ -842,7 +842,7 @@ def test_generate():
     cvs = Canvas()
     x, y = 0, 0
     for g in G:
-        fg = s.render(g)
+        fg = s.render(g, width=2., height=2.)
         bb = fg.get_bound_box()
         cvs.insert(x-bb.width, y, fg)
         cvs.text(x+0.4, y+0.4, "$%s$"%g.latex(), st_southwest)
