@@ -816,45 +816,6 @@ def test_412_unwrap():
     #space.translate_clifford(E, verbose=True)
 
 
-def test_generate():
-    s = SymplecticSpace(2)
-    gen = [s.get_S(0), s.get_S(1), s.get_H(0), s.get_H(1), s.get_CNOT(0,1)]
-    G = mulclose(gen)
-    print("|G| =", len(G))
-    #for g in G:
-    #    s.decompose(g)
-    #return
-
-    G = list(G)
-    G.sort( key = lambda g : (str(g).count('1'), str(g)))
-    #G = G[:8+16]
-    G = G[100:110]
-    for g in G:
-        print(g)
-        print(g.latex())
-    #return
-
-    G = [s.get_CZ(), s.get_CNOT()]
-
-    from huygens.zx import Canvas, path, st_southwest, Relation, Black, White
-    lhs = reduce(matmul, [Black(1,1)]*4)
-    rhs = reduce(matmul, [White(1,1)]*4)
-    cvs = Canvas()
-    x, y = 0, 0
-    for g in G:
-        fg = s.render(g, width=2., height=2.)
-        bb = fg.get_bound_box()
-        cvs.insert(x-bb.width, y, fg)
-        cvs.text(x+0.4, y+0.4, "$%s$"%g.latex(), st_southwest)
-        #cvs.fill(path.circle(x, y, 0.1))
-        box = Relation(g)
-        #box = lhs * box * rhs
-        fg = box.render(width=4, height=4)
-        cvs.insert(x + 4, y, fg)
-        y -= 4.5
-    cvs.writePDFfile("Sp4.pdf")
-
-
 def test_conjugacy():
     s = SymplecticSpace(2)
     gen = [s.get_S(0), s.get_S(1), s.get_H(0), s.get_H(1), s.get_CNOT(0,1)]
