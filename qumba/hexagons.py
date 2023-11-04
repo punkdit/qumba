@@ -22,6 +22,15 @@ from qumba.argv import argv
 from huygens.zx import Spider, Circuit, Canvas, path, st_southwest, Relation, Black, White, black, white
 
 
+def latex(A):
+    rows = ['&'.join(str(i) for i in row) for row in A]
+    rows = r'\\'.join(rows)
+    rows = r"\begin{bmatrix}%s\end{bmatrix}"%rows
+    rows = rows.replace("0",".")
+    #return "$%s$"%rows
+    return rows
+
+
 def test():
     s2 = SymplecticSpace(2)
     gen = [s2.get_S(0), s2.get_S(1), s2.get_H(0), s2.get_H(1), s2.get_CNOT(0,1)]
@@ -31,9 +40,9 @@ def test():
     G.sort( key = lambda g : (str(g).count('1'), str(g)))
     #G = G[:8+16]
     G = G[100:110]
-    for g in G:
-        print(g)
-        print(g.latex())
+    #for g in G:
+    #    print(g)
+    #    print(g.latex())
     #return
 
     s3 = SymplecticSpace(3)
@@ -56,6 +65,19 @@ def test():
         s3.get_CNOT(2,1) * s3.get_CNOT(0,1),
         s3.get_CNOT(1,2) * s3.get_CNOT(1,0),
     ]
+    G = [
+        s2.get_CNOT(),
+        s2.get_CNOT(0,1)*s2.get_CNOT(1,0),
+        s2.get_CNOT(0,1)*s2.get_H(1)*s2.get_CNOT(0,1),
+        s2.get_CNOT(0,1)*s2.get_H(0)*s2.get_CNOT(0,1),
+        s2.get_H(0)*s2.get_CNOT(0,1)*s2.get_H(0)*s2.get_CNOT(0,1),
+        s2.get_H(1)*s2.get_CNOT(0,1)*s2.get_H(1)*s2.get_CNOT(0,1),
+        s3.get_CNOT(0,1)*s3.get_CNOT(1,2),
+        s3.get_CNOT(0,1)*s3.get_CNOT(1,2)*s3.get_CNOT(1,0),
+        s3.get_CNOT(0,1)*s3.get_CNOT(2,1),
+        s3.get_CNOT(0,1)*s3.get_CNOT(0,2),
+        s3.get_CNOT(1,2)*s3.get_CNOT(0,2),
+    ]
     assert s2.get_CNOT()*s2.get_CZ() == s2.get_CZ()*s2.get_CNOT()
 
     lhs = reduce(matmul, [Black(1,1)]*4)
@@ -70,36 +92,28 @@ def test():
     cvs = Canvas()
     x, y = 0, 0
     for g in G:
-        if len(g) == 4:
-            IIII = Circuit(4).get_identity()
-            HH = s2.get_H()
-            fg = s2.render_expr(g.name, width=4., height=2.)
-            bb = fg.get_bound_box()
-            cvs.insert(x-bb.width, y, fg)
-            cvs.text(x+0.4, y+0.4, "$%s$"%g.latex(), st_southwest)
-            right = Relation(g, bcvs, wcvs)
-            left = Relation(HH*g.transpose()*HH, bcvs, wcvs)
-            box = IIII * left * IIII * right * IIII
-            #box = lhs * box * rhs
-            fg = box.render(width=5, height=4)
-            #fg = box.render()
-            cvs.insert(x + 3, y, fg)
-            y -= 4.5
-        else:
-            IIII = Circuit(6).get_identity()
-            HH = s3.get_H()
-            fg = s3.render_expr(g.name, width=4., height=2.)
-            bb = fg.get_bound_box()
-            cvs.insert(x-bb.width, y, fg)
-            cvs.text(x+0.4, y+0.4, "$%s$"%g.latex(), st_southwest)
-            right = Relation(g, bcvs, wcvs)
-            left = Relation(HH*g.transpose()*HH, bcvs, wcvs)
-            box = IIII * left * IIII * right * IIII
-            #box = lhs * box * rhs
-            fg = box.render(width=5, height=4)
-            #fg = box.render()
-            cvs.insert(x + 3, y, fg)
-            y -= 4.5
+        s = SymplecticSpace(len(g)//2)
+        I = Circuit(len(g)).get_identity()
+
+        HH = s.get_H()
+        fg = s.render_expr(g.name, width=4., height=2.)
+        bb = fg.get_bound_box()
+        cvs.insert(x-bb.width, y, fg)
+        cvs.text(x+0.4, y+0.4, "$%s$"%g.latex(), st_southwest)
+        right = Relation(g, bcvs, wcvs)
+        left = Relation(HH*g.transpose()*HH, bcvs, wcvs)
+
+        A = numpy.dot(left.A, right.A)
+        #print(str(A).replace("0", "."))
+
+        cvs.text(x+9.4, y+0.4, "$%s$"%latex(A), st_southwest)
+
+        box = I * left * I * right * I
+        #box = lhs * box * rhs
+        fg = box.render(width=5, height=4)
+        #fg = box.render()
+        cvs.insert(x + 3, y, fg)
+        y -= 4.5
     cvs.writePDFfile("Sp4.pdf")
 
 
