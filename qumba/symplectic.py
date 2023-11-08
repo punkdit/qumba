@@ -72,6 +72,12 @@ class SymplecticSpace(object):
     def get_P(self, *args):
         return self.get_perm(args)
 
+    def get_SWAP(self, i, j):
+        assert i!=j
+        f = list(range(self.n))
+        f[i], f[j] = f[j], f[i]
+        return self.get_perm(f)
+
     def get(self, M, idx=None, name="?"):
         assert M.shape == (2,2)
         assert isinstance(M, Matrix)

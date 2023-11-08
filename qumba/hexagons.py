@@ -2,7 +2,7 @@
 
 from time import time
 start_time = time()
-from random import shuffle, randint
+from random import shuffle, randint, choice, seed
 from operator import add, matmul, mul
 from functools import reduce
 
@@ -32,6 +32,7 @@ def latex(A):
 
 
 def test():
+    s1 = SymplecticSpace(1)
     s2 = SymplecticSpace(2)
     gen = [s2.get_S(0), s2.get_S(1), s2.get_H(0), s2.get_H(1), s2.get_CNOT(0,1)]
     G = mulclose(gen)
@@ -46,6 +47,8 @@ def test():
     #return
 
     s3 = SymplecticSpace(3)
+    s4 = SymplecticSpace(4)
+    assert s2.get_CNOT()*s2.get_CZ() == s2.get_CZ()*s2.get_CNOT()
 
     G = [
         s2.get_CZ(),
@@ -67,21 +70,47 @@ def test():
     ]
     G = [
         s2.get_CNOT(),
+        s2.get_CNOT(1,0),
         s2.get_CNOT(0,1)*s2.get_CNOT(1,0),
-        s2.get_CNOT(0,1)*s2.get_H(1)*s2.get_CNOT(0,1),
-        s2.get_CNOT(0,1)*s2.get_H(0)*s2.get_CNOT(0,1),
-        s2.get_H(0)*s2.get_CNOT(0,1)*s2.get_H(0)*s2.get_CNOT(0,1),
-        s2.get_H(1)*s2.get_CNOT(0,1)*s2.get_H(1)*s2.get_CNOT(0,1),
+        #s2.get_CNOT(0,1)*s2.get_H(1)*s2.get_CNOT(0,1),
+        #s2.get_CNOT(0,1)*s2.get_H(0)*s2.get_CNOT(0,1),
+        #s2.get_H(0)*s2.get_CNOT(0,1)*s2.get_H(0)*s2.get_CNOT(0,1),
+        #s2.get_H(1)*s2.get_CNOT(0,1)*s2.get_H(1)*s2.get_CNOT(0,1),
+        s3.get_CNOT(0,1)*s3.get_CNOT(0,2),
         s3.get_CNOT(0,1)*s3.get_CNOT(1,2),
-        s3.get_CNOT(0,1)*s3.get_CNOT(1,2)*s3.get_CNOT(1,0),
+        s3.get_CNOT(1,2)*s3.get_CNOT(0,1),
+        s3.get_CNOT(0,1)*s3.get_CNOT(1,2)*s3.get_CNOT(2,0),
         s3.get_CNOT(0,1)*s3.get_CNOT(2,1),
         s3.get_CNOT(0,1)*s3.get_CNOT(0,2),
         s3.get_CNOT(1,2)*s3.get_CNOT(0,2),
+        s4.get_CNOT(1,3)*s4.get_CNOT(3,0)*s4.get_CNOT(2,0)*s4.get_CNOT(2,1) ,
+        s4.get_CNOT(2,0)*s4.get_CNOT(2,1)*s4.get_CNOT(2,3),
     ]
-    assert s2.get_CNOT()*s2.get_CZ() == s2.get_CZ()*s2.get_CNOT()
+    S, H = s1.get_S(), s1.get_H()
+    _G = [
+        S, H, S*H, H*S, H*S*H,
+        s2.get_CNOT(),
+        s2.get_S(0) * s2.get_CNOT(),
+        s2.get_S(1) * s2.get_CNOT(),
+        s2.get_H(0) * s2.get_CNOT(),
+        s2.get_H(1) * s2.get_CNOT(),
+    ]
 
-    lhs = reduce(matmul, [Black(1,1)]*4)
-    rhs = reduce(matmul, [White(1,1)]*4)
+    gen = [
+#        s4.get_CNOT(i,j) for i in range(4) for j in range(4) if i!=j
+        s4.get_CNOT(i,j) for i in range(4) for j in range(i+1,4)
+    ]
+    print(len(gen))
+    #seed(1)
+
+    for i in range(0):
+        g = gen[0]
+        for _ in range(43):
+            h = choice(gen)
+            g = h*g
+        g.name = s4.get_name(g)
+        G.append(g)
+
 
     radius = Spider.pip_radius
     p = path.circle(+radius, 0, radius)
@@ -90,32 +119,103 @@ def test():
     wcvs = Canvas().fill(p, [white]).stroke(p)
 
     cvs = Canvas()
-    x, y = 0, 0
+    y = 0
     for g in G:
-        s = SymplecticSpace(len(g)//2)
-        I = Circuit(len(g)).get_identity()
 
-        HH = s.get_H()
-        fg = s.render_expr(g.name, width=4., height=2.)
-        bb = fg.get_bound_box()
-        cvs.insert(x-bb.width, y, fg)
+        x = 0.
+        n = len(g)//2
+        s = SymplecticSpace(n)
+        I = Circuit(2*n).get_identity()
+        I.min_width = 0.5
+
+        H = s.get_H()
+        if g.name is not None:
+            fg = s.render_expr(g.name, width=n+2, height=2.)
+            bb = fg.get_bound_box()
+            cvs.insert(x-bb.width, y, fg)
+
         cvs.text(x+0.4, y+0.4, "$%s$"%g.latex(), st_southwest)
-        right = Relation(g, bcvs, wcvs)
-        left = Relation(HH*g.transpose()*HH, bcvs, wcvs)
+        min_width = 1.5
+        right = Relation(g, bcvs, wcvs, min_width=2*min_width)
+        left = Relation(H*g.transpose()*H, bcvs, wcvs, min_width=min_width)
+
+        box = I * left * I * right * I
+        fg = box.render(width=(I.min_width*3 + left.min_width + right.min_width), height=4)
+        #fg = box.render()
+        cvs.insert(x + n + 1, y, fg)
+        x += n + 1 + fg.get_bound_box().width
 
         A = numpy.dot(left.A, right.A)
         #print(str(A).replace("0", "."))
+        cvs.text(x, y+0.4, "$%s$"%latex(A), st_southwest)
 
-        cvs.text(x+9.4, y+0.4, "$%s$"%latex(A), st_southwest)
 
-        box = I * left * I * right * I
-        #box = lhs * box * rhs
-        fg = box.render(width=5, height=4)
-        #fg = box.render()
-        cvs.insert(x + 3, y, fg)
         y -= 4.5
     cvs.writePDFfile("Sp4.pdf")
 
+
+
+def hexagons_2():
+
+    n = 2
+    s = SymplecticSpace(n)
+    F = s.F
+    
+    def get_paths(g):
+        h = F*g.transpose()*F
+        A = numpy.dot(h.A, g.A)
+        return A
+
+    gen = [s.get_CNOT(i,j) for i in range(n) for j in range(n) if i!=j]
+    #gen = [s.get_SWAP(i,i+1) for i in range(n-1)]
+    gen += [s.get_S(i) for i in range(n)]
+    gen += [s.get_H(i) for i in range(n)]
+
+    G = mulclose(gen)
+    print(len(G))
+
+    for g in G:
+        if g[0,1]:
+            print(g, g.name)
+            break
+
+
+def hexagons_4():
+
+    n = 4
+    s = SymplecticSpace(n)
+    F = s.F
+    
+    def get_paths(g):
+        h = F*g.transpose()*F
+        A = numpy.dot(h.A, g.A)
+        return A
+
+    gs = {(i,j):s.get_CNOT(i,j) for i in range(n) for j in range(n) if i!=j}
+    gen = [s.get_CNOT(i,j) for i in range(n) for j in range(n) if i!=j]
+
+    I = s.get_identity()
+
+    while 1:
+        g = s.get_identity()
+        for i in range(4):
+            g = g*choice(gen)
+        print(g, ''.join(g.name))
+        A = get_paths(g) #- I.A
+        print(str(A).replace('0', '.'))
+        assert A.max() <= 3, A.max()
+        print()
+
+    if 0:
+        #g = gs[0,1]*gs[1,2]*gs[2,3]*gs[3,0]
+        g = gs[0,1]*gs[1,2]*gs[2,3]
+        #g = gs[1,2]*gs[2,0]*gs[0,1]
+    
+        A = get_paths(g) #- I.A
+        print(str(A).replace('0', '.'))
+        assert A.max() <= 2, A.max()
+        print()
+    
 
 
 
