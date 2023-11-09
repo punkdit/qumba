@@ -18,7 +18,7 @@ from qumba.solve import (shortstr, dot2, identity2, eq2, intersect, direct_sum, 
     kernel, span)
 from qumba.solve import int_scalar as scalar
 from qumba.action import mulclose, mulclose_find
-from qumba.matrix import Matrix, DEFAULT_P
+from qumba.matrix import Matrix, DEFAULT_P, pullback
 
 
 @cache
@@ -391,7 +391,141 @@ class Building(object):
         return ri.t, w.t, li.t # undo transpose
 
 
+class Span(object):
+    def __init__(self, left=None, right=None):
+        if right is None:
+            n = left.shape[1]
+            right = Matrix.identity(n)
+        if left is None:
+            n = right.shape[1]
+            left = Matrix.identity(n)
+        assert left.shape[1] == right.shape[1]
+        self.left = left
+        self.right = right
+        self.hom = (left.shape[0], right.shape[0]) # tgt, src
 
+    def __str__(self):
+        left = str(self.left).replace("\n", "")
+        right = str(self.right).replace("\n", "")
+        return "Span(%s, %s)"%(left, right)
+    __repr__ = __str__
+
+    def __eq__(self, other):
+        return self.left==other.left and self.right==other.right
+
+    def __hash__(self):
+        return hash((self.left, self.right))
+
+    def __matmul__(self, other):
+        assert isinstance(other, Span)
+        left = self.left.direct_sum(other.left)
+        right = self.right.direct_sum(other.right)
+        return Span(left, right)
+
+    def __mul__(self, other):
+        assert isinstance(other, Span)
+        assert self.hom[1] == other.hom[0]
+        a, b = self.right, other.left
+        #print("pullback")
+        #print(a, a.shape)
+        #print(b, b.shape)
+        c, d = pullback(a, b)
+        #print("==")
+        #print(c, c.shape)
+        #print(d, d.shape)
+        left = self.left * c
+        right = other.right * d
+        return Span(left, right)
+
+    def get_hom(self, other):
+        a, b = self.left, self.right
+        c, d = other.left, other.right
+        ab = a.concatenate(b)
+        cd = c.concatenate(d)
+        cdi = cd.pseudo_inverse()
+        f = cdi * ab
+        if cd*f == ab:
+            return f
+
+    def is_iso(self, other):
+        f = self.get_hom(other)
+        if f is None:
+            return False
+        m, n = f.shape
+        if m!=n:
+            return False
+        return f.rank() == m
+
+    @property
+    def t(self):
+        return Span(self.right, self.left)
+
+    @classmethod
+    def black(cls, m, n):
+        if m==1:
+            # add the inputs
+            A = zeros2(1, n)
+            A[:] = 1
+            left = Matrix(A)
+            span = Span(left, None)
+        elif n==1:
+            span = cls.black(n, m)
+            span = span.t
+        else:
+            span = cls.black(m, 1) * cls.black(1, n) # recurse
+        return span
+
+    @classmethod
+    def white(cls, m, n):
+        if n==1:
+            # copy the inputs
+            A = zeros2(m, 1)
+            A[:] = 1
+            left = Matrix(A)
+            span = Span(left, None)
+        elif m==1:
+            span = cls.white(n, m)
+            span = span.t
+        else:
+            span = cls.white(m, 1) * cls.white(1, n) # recurse
+        return span
+        
+
+
+def test_span():
+
+    b_bb = Span.black(1, 2)
+    bb_b = Span.black(2, 1)
+    ww_w = Span.white(2, 1)
+    w_ww = Span.white(1, 2)
+    v = b_bb * ww_w
+
+    I = Span(Matrix([[1]]))
+    assert (I@I) == Span(Matrix.identity(2))
+
+    Span.black(2, 2)
+    Span.white(2, 2)
+
+    swap = Matrix([[0,1],[1,0]])
+    swap = Span(swap)
+
+    rhs = (I @ swap @ I) * (bb_b @ ww_w)
+    rhs = rhs @ I @ I
+
+    lhs = (w_ww @ b_bb) * (I @ swap @ I)
+    lhs = I @ I @ lhs
+
+    g = lhs * rhs
+    print(g)
+
+    s = SymplecticSpace(2)
+    h = Span(s.get_CNOT(1, 0))
+    print(h)
+
+    assert g.is_iso(h)
+    
+    h = Span(s.get_CNOT(0, 1))
+    assert not g.is_iso(h)
     
 
 def test():

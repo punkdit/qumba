@@ -15,8 +15,9 @@ from math import prod
 import numpy
 
 from qumba.solve import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
-    kernel, span)
+    kernel, span, pseudo_inverse, rank)
 from qumba.solve import int_scalar as scalar
+from qumba import solve
 from qumba.action import mulclose
 from qumba.decode.network import TensorNetwork
 
@@ -119,12 +120,14 @@ class Matrix(object):
         return Matrix(A, p, name="I")
 
     def shortstr(self):
-        s = shortstr(self.A)
-        lines = s.split()
-        lines = [" ["+line+"]" for line in lines]
-        lines[0] = "["+lines[0][1:]
-        lines[-1] = lines[-1] + "]"
-        return '\n'.join(lines)
+        return str(self.A).replace("0", ".")
+        # XXX broken:
+        #s = shortstr(self.A)
+        #lines = s.split()
+        #lines = [" ["+line+"]" for line in lines]
+        #lines[0] = "["+lines[0][1:]
+        #lines[-1] = lines[-1] + "]"
+        #return '\n'.join(lines)
     __str__ = shortstr
 
     def latex(self):
@@ -234,6 +237,10 @@ class Matrix(object):
         K = Matrix(K, self.p)
         return K
 
+    def pseudo_inverse(self):
+        A = pseudo_inverse(self.A)
+        return Matrix(A)
+
     def where(self):
         return list(zip(*numpy.where(self.A))) # list ?
 
@@ -256,6 +263,9 @@ class Matrix(object):
             u.shape = 1, n
             u = Matrix(u)
             yield u
+
+    def rank(self):
+        return rank(self.A)
 
     def to_spider(self, scalar=int, verbose=True):
         from qumba.decode import network
@@ -323,6 +333,37 @@ class Matrix(object):
         E = E.astype(int)
         E = E.reshape(2**m, 2**n)
         return E
+
+
+def pushout(j, k, j1=None, k1=None):
+    assert j.shape[1] == k.shape[1]
+    J = j.A
+    K = k.A
+    if j1 is not None:
+        J1 = j1.A
+        K1 = k1.A
+        JJ, KK, F = solve.pushout(J, K, J1, K1)
+        jj = Matrix(JJ)
+        kk = Matrix(KK)
+        f = Matrix(F)
+        return jj, kk, f
+
+    else:
+        JJ, KK = solve.pushout(J, K)
+        jj = Matrix(JJ)
+        kk = Matrix(KK)
+        return jj, kk
+
+
+def pullback(j, k, j1=None, k1=None):
+    assert j.shape[0] == k.shape[0]
+    if j1 is not None:
+        jj, kk, f = pushout(j.t, k.t, j1.t, k1.t)
+        return jj.t, kk.t, f.t
+
+    else:
+        jj, kk = pushout(j.t, k.t)
+        return jj.t, kk.t
 
 
 
