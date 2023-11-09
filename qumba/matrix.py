@@ -15,7 +15,7 @@ from math import prod
 import numpy
 
 from qumba.solve import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
-    kernel, span, pseudo_inverse, rank)
+    kernel, span, pseudo_inverse, rank, row_reduce)
 from qumba.solve import int_scalar as scalar
 from qumba import solve
 from qumba.action import mulclose
@@ -244,8 +244,8 @@ class Matrix(object):
     def where(self):
         return list(zip(*numpy.where(self.A))) # list ?
 
-    def concatenate(self, *others):
-        A = numpy.concatenate((self.A,)+tuple(other.A for other in others))
+    def concatenate(self, *others, axis=0):
+        A = numpy.concatenate((self.A,)+tuple(other.A for other in others), axis=axis)
         return Matrix(A, self.p)
 
     def max(self):
@@ -266,6 +266,10 @@ class Matrix(object):
 
     def rank(self):
         return rank(self.A)
+
+    def row_reduce(self):
+        A = row_reduce(self.A)
+        return Matrix(A)
 
     def to_spider(self, scalar=int, verbose=True):
         from qumba.decode import network

@@ -285,7 +285,7 @@ class SymplecticSpace(object):
 
 class Building(object):
     """
-        Provide an interface to qumba.building which uses a
+        Provide an interface to qumba.building _which uses a
         different symplectic form (the uturn form).
     """
     def __init__(self, space):
@@ -391,6 +391,17 @@ class Building(object):
         return ri.t, w.t, li.t # undo transpose
 
 
+def reduce(left, right):
+    # is this joint monotinicity ? or what.. not sure
+    tgt, src = left.shape[0], right.shape[0]
+    m = left.concatenate(right)
+    assert m.shape[0] == tgt+src
+    m = m.t.row_reduce().t
+    assert m.shape[0] == tgt+src
+    left, right = m[:tgt, :], m[tgt:, :]
+    return left, right
+
+
 class Span(object):
     def __init__(self, left=None, right=None):
         if right is None:
@@ -399,6 +410,7 @@ class Span(object):
         if left is None:
             n = right.shape[1]
             left = Matrix.identity(n)
+        left, right = reduce(left, right)
         assert left.shape[1] == right.shape[1]
         self.left = left
         self.right = right
@@ -411,7 +423,7 @@ class Span(object):
     __repr__ = __str__
 
     def __eq__(self, other):
-        return self.left==other.left and self.right==other.right
+        return self.hom==other.hom and self.left.shape[1]==other.left.shape[1] and self.left==other.left and self.right==other.right
 
     def __hash__(self):
         return hash((self.left, self.right))
@@ -426,13 +438,7 @@ class Span(object):
         assert isinstance(other, Span)
         assert self.hom[1] == other.hom[0]
         a, b = self.right, other.left
-        #print("pullback")
-        #print(a, a.shape)
-        #print(b, b.shape)
         c, d = pullback(a, b)
-        #print("==")
-        #print(c, c.shape)
-        #print(d, d.shape)
         left = self.left * c
         right = other.right * d
         return Span(left, right)
@@ -491,23 +497,84 @@ class Span(object):
         return span
         
 
+def test_special_comm_frob(i, swap, _g, g_gg, g_, gg_g):
+    assert g_gg * (i @ g_gg) == g_gg * (g_gg @ i)
+    assert g_gg * (i @ g_) == i
+    assert g_gg * (g_ @ i) == i
+    assert g_gg * swap == g_gg
+    assert (i @ gg_g) * gg_g == (gg_g@i)*gg_g
+    assert (i@_g) * gg_g == i
+    assert (_g@i) * gg_g == i
+    assert swap * gg_g == gg_g
+    assert g_gg * gg_g == i
+
 
 def test_span():
 
-    b_bb = Span.black(1, 2)
-    bb_b = Span.black(2, 1)
-    ww_w = Span.white(2, 1)
-    w_ww = Span.white(1, 2)
-    v = b_bb * ww_w
+    black = Span.black
+    white = Span.white
+
+    b_ = black(1, 0)
+    _b = black(0, 1)
+    _w = white(0, 1)
+    w_ = white(1, 0)
+    b_bb = black(1, 2)
+    bb_b = black(2, 1)
+    ww_w = white(2, 1)
+    w_ww = white(1, 2)
 
     I = Span(Matrix([[1]]))
-    assert (I@I) == Span(Matrix.identity(2))
-
-    Span.black(2, 2)
-    Span.white(2, 2)
-
     swap = Matrix([[0,1],[1,0]])
     swap = Span(swap)
+
+    v = b_bb * ww_w
+
+    assert (I@I) == Span(Matrix.identity(2))
+
+    assert I == black(1, 1)
+    assert I == white(1, 1)
+
+    rhs = black(1,2)*black(2,1)
+    assert I == black(1, 2)*black(2,1)
+    assert I == white(1, 2)*white(2,1)
+
+    assert black(2, 2) == black(2,1)*black(1,2)
+    assert white(2, 2) == white(2,1)*white(1,2)
+
+    test_special_comm_frob(I, swap, _w, w_ww, w_, ww_w)
+    #test_special_comm_frob(I, swap, _b, b_bb, b_, bb_b)
+
+    # should Span.__eq__ be Span.is_iso ?
+    # or some other normal form ?
+
+    assert (b_bb * (I @ b_bb)).is_iso( b_bb * (b_bb @ I) )
+    assert b_bb * (I @ b_) == I
+    assert b_bb * (b_ @ I) == I
+    assert (b_bb * swap).is_iso( b_bb )
+    assert ((I @ bb_b) * bb_b).is_iso( (bb_b@I)*bb_b )
+    assert (I@_b) * bb_b == I
+    assert (_b@I) * bb_b == I
+    assert swap * bb_b == bb_b
+    assert b_bb * bb_b == I
+
+    # bialgebra
+    lhs = bb_b * w_ww
+    rhs = (w_ww @ w_ww) * (I @ swap @ I) * (bb_b @ bb_b)
+    assert lhs.is_iso(rhs)
+
+    # bialgebra
+    lhs = ww_w * b_bb
+    rhs = (b_bb @ b_bb) * (I @ swap @ I) * (ww_w @ ww_w)
+    assert lhs.is_iso(rhs)
+
+    #print(black(0, 1).hom)
+    #print(white(0, 1).hom)
+    #print(black(0, 3))
+    #print(white(0, 3))
+    #assert black(0, 2) == white(0, 2) # yes, but...
+
+    # -------------------------------
+    # test CNOT
 
     rhs = (I @ swap @ I) * (bb_b @ ww_w)
     rhs = rhs @ I @ I
@@ -516,12 +583,9 @@ def test_span():
     lhs = I @ I @ lhs
 
     g = lhs * rhs
-    print(g)
 
     s = SymplecticSpace(2)
     h = Span(s.get_CNOT(1, 0))
-    print(h)
-
     assert g.is_iso(h)
     
     h = Span(s.get_CNOT(0, 1))
