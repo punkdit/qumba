@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Symplectic spaces and their symplectic transformations
+Spans of matrices.
 
 """
 
@@ -12,7 +12,10 @@ cache = lru_cache(maxsize=None)
 from operator import add, mul
 from math import prod
 
-from qumba.solve import zeros2
+import numpy
+
+from qumba.solve import zeros2, solve
+from qumba.smap import SMap
 from qumba.matrix import Matrix, DEFAULT_P, pullback
 from qumba.symplectic import SymplecticSpace
 
@@ -22,7 +25,8 @@ def reduce(left, right):
     tgt, src = left.shape[0], right.shape[0]
     m = left.concatenate(right)
     assert m.shape[0] == tgt+src
-    m = m.t.row_reduce().t
+    #m = m.t.row_reduce().t
+    m = m.t.linear_independent().t
     assert m.shape[0] == tgt+src
     left, right = m[:tgt, :], m[tgt:, :]
     return left, right
@@ -41,6 +45,11 @@ class Span(object):
         self.left = left
         self.right = right
         self.hom = (left.shape[0], right.shape[0]) # tgt, src
+        self.n = left.shape[1]
+
+    @property
+    def subspace(self):
+        return self.left.concatenate(self.right)
 
     def __str__(self):
         left = str(self.left).replace("\n", "")
@@ -48,8 +57,23 @@ class Span(object):
         return "Span(%s, %s)"%(left, right)
     __repr__ = __str__
 
+    def relstr(self):
+        smap = SMap()
+        m, n = self.hom
+        ab = self.left.concatenate(self.right)
+        for row,u in enumerate(numpy.ndindex((2,)*m)):
+            for col,v in enumerate(numpy.ndindex((2,)*n)):
+                uv = numpy.array(u+v)
+                uv.shape = (m+n,1)
+                if solve(ab.A, uv) is not None:
+                    smap[row, col] = '1'
+                else:
+                    smap[row, col] = '.'
+        return str(smap)
+
     def __eq__(self, other):
-        return self.hom==other.hom and self.left.shape[1]==other.left.shape[1] and self.left==other.left and self.right==other.right
+        # just use is_iso? would break __hash__ .
+        return self.hom==other.hom and self.n==other.n and self.left==other.left and self.right==other.right
 
     def __hash__(self):
         return hash((self.left, self.right))
@@ -121,6 +145,38 @@ class Span(object):
         else:
             span = cls.white(m, 1) * cls.white(1, n) # recurse
         return span
+
+    def _is_symplectic(self):
+        m, n = self.hom
+        assert self.n%2 == 0
+        assert m%2 == 0
+        assert n%2 == 0
+        top = SymplecticSpace(self.n//2)
+        m = SymplecticSpace(m//2)
+        n = SymplecticSpace(n//2)
+        left, right = self.left, self.right
+        # left : top --> m
+        # right : top --> n
+        left.t * m.F * left == top.F 
+        right.t * n.F * right == top.F
+        return left.t * m.F * left == top.F and right.t * n.F * right == top.F
+        
+    def is_lagrangian(self):
+        m, n = self.hom
+        if self.n != (m+n)//2: # maximal
+            return False
+        return self.is_isotropic()
+
+    def is_isotropic(self):
+        m, n = self.hom
+        #assert self.n%2 == 0
+        assert m%2 == 0
+        assert n%2 == 0
+        space = SymplecticSpace((m+n)//2)
+        left, right = self.left, self.right
+        A = self.subspace
+        F = space.F
+        return (A.t * F * A).sum() == 0
         
 
 def test_special_comm_frob(i, swap, _g, g_gg, g_, gg_g):
@@ -180,7 +236,7 @@ def test():
     assert ((I @ bb_b) * bb_b).is_iso( (bb_b@I)*bb_b )
     assert (I@_b) * bb_b == I
     assert (_b@I) * bb_b == I
-    assert swap * bb_b == bb_b
+    assert (swap * bb_b).is_iso( bb_b )
     assert b_bb * bb_b == I
 
     # bialgebra
@@ -199,23 +255,45 @@ def test():
     #print(white(0, 3))
     #assert black(0, 2) == white(0, 2) # yes, but...
 
+    if 0:
+        print("_w")
+        print( _w.relstr() )
+        print("_b")
+        print( _b.relstr() )
+        print("ww_w")
+        print( ww_w.relstr() )
+        print("bb_b")
+        print( bb_b.relstr() )
+        print("w_ww")
+        print( w_ww.relstr() )
+        print("b_bb")
+        print( b_bb.relstr() )
+
     # -------------------------------
     # test CNOT
 
     rhs = (I @ swap @ I) * (bb_b @ ww_w)
+    assert rhs.is_lagrangian()
     rhs = rhs @ I @ I
+    assert rhs.is_lagrangian()
 
     lhs = (w_ww @ b_bb) * (I @ swap @ I)
+    assert lhs.is_lagrangian()
     lhs = I @ I @ lhs
+    assert lhs.is_lagrangian()
+    assert not (w_ww @ b_bb).is_lagrangian()
 
     g = lhs * rhs
 
     s = SymplecticSpace(2)
     h = Span(s.get_CNOT(1, 0))
+    assert h.is_lagrangian()
     assert g.is_iso(h)
+    assert g.is_lagrangian()
     
     h = Span(s.get_CNOT(0, 1))
     assert not g.is_iso(h)
+    assert h.is_lagrangian()
     
 
 

@@ -15,7 +15,7 @@ from math import prod
 import numpy
 
 from qumba.solve import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
-    kernel, span, pseudo_inverse, rank, row_reduce)
+    kernel, span, pseudo_inverse, rank, row_reduce, linear_independent)
 from qumba.solve import int_scalar as scalar
 from qumba import solve
 from qumba.action import mulclose
@@ -194,6 +194,10 @@ class Matrix(object):
         A = r*self.A
         return Matrix(A, self.p)
 
+    def __matmul__(self, other):
+        A = numpy.kron(self.A, other.A)
+        return Matrix(A)
+
     def direct_sum(self, other):
         "direct_sum"
         A = direct_sum(self.A, other.A)
@@ -269,6 +273,20 @@ class Matrix(object):
 
     def row_reduce(self):
         A = row_reduce(self.A)
+        return Matrix(A)
+
+    def linear_independent(self):
+        A = linear_independent(self.A)
+        return Matrix(A)
+
+    def get_projector(A):
+        "project onto the colspace"
+        P = A*A.pseudo_inverse()
+        return P
+
+    def reshape(self, shape):
+        A = self.A.view()
+        A.shape = shape
         return Matrix(A)
 
     def to_spider(self, scalar=int, verbose=True):
