@@ -71,12 +71,13 @@ class Span(object):
                     smap[row, col] = '.'
         return str(smap)
 
-    def __eq__(self, other):
-        # just use is_iso? would break __hash__ .
+    def eq(self, other):
+        # strict equality...
         return self.hom==other.hom and self.n==other.n and self.left==other.left and self.right==other.right
 
-    def __hash__(self):
-        return hash((self.left, self.right))
+    # not compatible with __eq__
+    #def __hash__(self):
+    #    return hash((self.left, self.right))
 
     def __matmul__(self, other):
         assert isinstance(other, Span)
@@ -111,6 +112,9 @@ class Span(object):
         if m!=n:
             return False
         return f.rank() == m
+
+    def __eq__(self, other):
+        return self.eq(other) or self.is_iso(other)
 
     @property
     def t(self):
@@ -226,28 +230,25 @@ def test():
     test_special_comm_frob(I, swap, _w, w_ww, w_, ww_w)
     #test_special_comm_frob(I, swap, _b, b_bb, b_, bb_b)
 
-    # should Span.__eq__ be Span.is_iso ?
-    # or some other normal form ?
-
-    assert (b_bb * (I @ b_bb)).is_iso( b_bb * (b_bb @ I) )
+    assert (b_bb * (I @ b_bb)) == ( b_bb * (b_bb @ I) )
     assert b_bb * (I @ b_) == I
     assert b_bb * (b_ @ I) == I
-    assert (b_bb * swap).is_iso( b_bb )
-    assert ((I @ bb_b) * bb_b).is_iso( (bb_b@I)*bb_b )
+    assert (b_bb * swap) == ( b_bb )
+    assert ((I @ bb_b) * bb_b) == ( (bb_b@I)*bb_b )
     assert (I@_b) * bb_b == I
     assert (_b@I) * bb_b == I
-    assert (swap * bb_b).is_iso( bb_b )
+    assert (swap * bb_b) == ( bb_b )
     assert b_bb * bb_b == I
 
     # bialgebra
     lhs = bb_b * w_ww
     rhs = (w_ww @ w_ww) * (I @ swap @ I) * (bb_b @ bb_b)
-    assert lhs.is_iso(rhs)
+    assert lhs == (rhs)
 
     # bialgebra
     lhs = ww_w * b_bb
     rhs = (b_bb @ b_bb) * (I @ swap @ I) * (ww_w @ ww_w)
-    assert lhs.is_iso(rhs)
+    assert lhs == (rhs)
 
     #print(black(0, 1).hom)
     #print(white(0, 1).hom)
@@ -270,6 +271,25 @@ def test():
         print( b_bb.relstr() )
 
     # -------------------------------
+    # test S
+
+    S = (I @ b_bb) * (ww_w @ I)
+    assert S.is_lagrangian()
+    assert S*S == I@I
+
+    H = swap
+    assert H.is_lagrangian()
+    assert (H*H) == ( I@I )
+
+    Q = (I @ w_ww) * (bb_b @ I)
+    assert Q.is_lagrangian()
+    assert Q*Q == I@I
+
+    assert Q  == H*S*H
+    assert (H*S).is_lagrangian()
+    assert (S*H).is_lagrangian()
+
+    # -------------------------------
     # test CNOT
 
     rhs = (I @ swap @ I) * (bb_b @ ww_w)
@@ -283,17 +303,39 @@ def test():
     assert lhs.is_lagrangian()
     assert not (w_ww @ b_bb).is_lagrangian()
 
-    g = lhs * rhs
+    CNOT = lhs * rhs
 
     s = SymplecticSpace(2)
     h = Span(s.get_CNOT(1, 0))
     assert h.is_lagrangian()
-    assert g.is_iso(h)
-    assert g.is_lagrangian()
+    assert CNOT == (h)
+    assert CNOT.is_lagrangian()
     
     h = Span(s.get_CNOT(0, 1))
-    assert not g.is_iso(h)
+    assert CNOT != h
     assert h.is_lagrangian()
+    
+    # -------------------------------
+    # test CZ
+
+    rhs = (I @ swap @ I) * (ww_w @ bb_b)
+    assert rhs.is_lagrangian()
+    rhs = rhs @ I @ I
+    assert rhs.is_lagrangian()
+
+    lhs = (w_ww @ b_bb) * (I @ swap @ I)
+    assert lhs.is_lagrangian()
+    lhs = I @ I @ lhs
+    assert lhs.is_lagrangian()
+
+    CZ = lhs * (I@I@H@I@I) * rhs
+    assert CNOT != CZ
+
+    s = SymplecticSpace(2)
+    h = Span(s.get_CZ(0, 1))
+    assert h.is_lagrangian()
+    assert CZ == h
+    assert CZ.is_lagrangian()
     
 
 
