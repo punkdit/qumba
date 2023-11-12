@@ -6,7 +6,7 @@ Spans of matrices.
 """
 
 
-from random import shuffle, choice
+from random import shuffle, choice, randint
 from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
 from operator import add, mul
@@ -23,6 +23,9 @@ from qumba.symplectic import SymplecticSpace
 def reduce(left, right):
     # is this joint monotinicity ? or what.. not sure
     tgt, src = left.shape[0], right.shape[0]
+    if tgt == src == 0:
+        left, right = Matrix([[]], shape=(0,0)), Matrix([[]], shape=(0,0))
+        return left, right
     m = left.concatenate(right)
     assert m.shape[0] == tgt+src
     #m = m.t.row_reduce().t
@@ -51,10 +54,16 @@ class Span(object):
     def subspace(self):
         return self.left.concatenate(self.right)
 
+    @classmethod
+    def identity(cls, n):
+        I = Matrix.identity(n)
+        return Span(I, I)
+
     def __str__(self):
         left = str(self.left).replace("\n", "")
         right = str(self.right).replace("\n", "")
         return "Span(%s, %s)"%(left, right)
+        #return "Span(%s%s, %s%s)"%(left, self.left.shape, right, self.right.shape)
     __repr__ = __str__
 
     def relstr(self):
@@ -66,7 +75,7 @@ class Span(object):
                 uv = numpy.array(u+v)
                 uv.shape = (m+n,1)
                 if solve(ab.A, uv) is not None:
-                    smap[row, col] = '1'
+                    smap[row, col] = '*'
                 else:
                     smap[row, col] = '.'
         return str(smap)
@@ -75,9 +84,8 @@ class Span(object):
         # strict equality...
         return self.hom==other.hom and self.n==other.n and self.left==other.left and self.right==other.right
 
-    # not compatible with __eq__
-    #def __hash__(self):
-    #    return hash((self.left, self.right))
+    def __hash__(self):
+        return hash(self.relstr())
 
     def __matmul__(self, other):
         assert isinstance(other, Span)
@@ -114,7 +122,12 @@ class Span(object):
         return f.rank() == m
 
     def __eq__(self, other):
-        return self.eq(other) or self.is_iso(other)
+        #return self.eq(other) or self.is_iso(other)
+        return self.eq(other) or self.relstr() == other.relstr()
+
+    def is_function(self):
+        m, n = self.right.shape
+        return m==n
 
     @property
     def t(self):
@@ -208,6 +221,13 @@ def test():
     bb_b = black(2, 1)
     ww_w = white(2, 1)
     w_ww = white(1, 2)
+    _ww = white(0, 2)
+    assert _ww == black(0, 2)
+
+    assert _b*b_ == black(0, 0)
+
+    g = _ww * (b_ @ w_)
+    assert g == black(0, 0)
 
     I = Span(Matrix([[1]]))
     swap = Matrix([[0,1],[1,0]])
@@ -270,19 +290,56 @@ def test():
         print("b_bb")
         print( b_bb.relstr() )
 
+    g = (I @ swap @ I) * (bb_b @ ww_w)
+    assert g.is_lagrangian()
+
+    g = (b_bb * ww_w) @ (w_ww * bb_b)
+    assert g.is_lagrangian()
+
+    g = (b_bb * ww_w) @ (b_bb * ww_w)
+    assert not g.is_lagrangian()
+
+    ww_ww = white(2, 2)
+    assert ww_ww == ww_w*w_ww
+    bb_bb = black(2, 2)
+    assert bb_bb == bb_b*b_bb
+    g = (I@swap@I) * (ww_ww @ bb_bb) * (I@swap@I)
+    assert g.is_lagrangian()
+    g = (I@swap@I) * (I@I @ bb_bb) * (I@swap@I)
+    assert not g.is_lagrangian()
+
+    g = _b @ _w
+    assert g.is_lagrangian()
+    g = b_ @ w_
+    assert g.is_lagrangian()
+
+    found = set()
+    cup = black(2,0)
+    cap = black(0,2)
+    for l in [b_@w_, w_@b_, cup]:
+      for r in [_b@_w, _w@_b, cap]:
+        g = l*r
+        found.add(g)
+        #print(g.relstr())
+        #print()
+    assert len(found) == 9
+
     # -------------------------------
     # test S
 
     S = (I @ b_bb) * (ww_w @ I)
     assert S.is_lagrangian()
+    assert S.is_function()
     assert S*S == I@I
 
     H = swap
     assert H.is_lagrangian()
+    assert H.is_function()
     assert (H*H) == ( I@I )
 
     Q = (I @ w_ww) * (bb_b @ I)
     assert Q.is_lagrangian()
+    assert Q.is_function()
     assert Q*Q == I@I
 
     assert Q  == H*S*H
@@ -310,6 +367,7 @@ def test():
     assert h.is_lagrangian()
     assert CNOT == (h)
     assert CNOT.is_lagrangian()
+    assert CNOT.is_function()
     
     h = Span(s.get_CNOT(0, 1))
     assert CNOT != h
@@ -330,6 +388,7 @@ def test():
 
     CZ = lhs * (I@I@H@I@I) * rhs
     assert CNOT != CZ
+    assert CZ.is_function()
 
     s = SymplecticSpace(2)
     h = Span(s.get_CZ(0, 1))
@@ -337,6 +396,42 @@ def test():
     assert CZ == h
     assert CZ.is_lagrangian()
     
+
+def test_complete():
+    from bruhat.dev.geometry import all_codes
+    n = 2
+    I = Span.identity(n)
+    s = SymplecticSpace(n)
+    F = s.F
+    found = set()
+    count = 0
+    for A in all_codes(n, 2*n):
+        M = Matrix(A).t
+        left = M[:n, :]
+        right = M[n:, :]
+        g = Span(left, right)
+        if not g.is_lagrangian():
+            continue
+        if g.is_function():
+            print("is_function:")
+            print(g.relstr())
+            print()
+        else:
+            assert g*g==g
+        found.add(g)
+        if len(found)%100 == 0:
+            print(len(found))
+        #print(span.relstr())
+        #print()
+        count += 1
+    print(len(found), count)
+
+    monoid = list(found)
+    for i in range(1000):
+        a = monoid[randint(0,len(found)-1)]
+        b = monoid[randint(0,len(found)-1)]
+        assert a*b in found
+
 
 
 if __name__ == "__main__":
