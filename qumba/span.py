@@ -59,12 +59,18 @@ class Span(object):
         I = Matrix.identity(n)
         return Span(I, I)
 
-    def __str__(self):
+    def __repr__(self):
         left = str(self.left).replace("\n", "")
         right = str(self.right).replace("\n", "")
         return "Span(%s, %s)"%(left, right)
         #return "Span(%s%s, %s%s)"%(left, self.left.shape, right, self.right.shape)
-    __repr__ = __str__
+
+    def __str__(self):
+        smap = SMap()
+        smap[0, 0] = str(self.left)
+        j = self.left.shape[1] + 8
+        smap[0, j] = str(self.right)
+        return str(smap)
 
     def relstr(self):
         smap = SMap()
@@ -125,13 +131,28 @@ class Span(object):
         #return self.eq(other) or self.is_iso(other)
         return self.eq(other) or self.relstr() == other.relstr()
 
+    #def is_function(self):
+    #    m, n = self.right.shape
+    #    return m==n
+
     def is_function(self):
-        m, n = self.right.shape
-        return m==n
+        g = self.op
+        s = g.relstr()
+        lines = s.split()
+        for line in lines:
+            if line.count("*") != 1:
+                return False
+        return True
+
+    @property
+    def op(self):
+        return Span(self.right, self.left)
 
     @property
     def t(self):
-        return Span(self.right, self.left)
+        left, right = self.left, self.right
+        l, r = pullback(right.t, left.t)
+        return Span(l, r)
 
     @classmethod
     def black(cls, m, n):
@@ -143,7 +164,7 @@ class Span(object):
             span = Span(left, None)
         elif n==1:
             span = cls.black(n, m)
-            span = span.t
+            span = span.op
         else:
             span = cls.black(m, 1) * cls.black(1, n) # recurse
         return span
@@ -158,7 +179,7 @@ class Span(object):
             span = Span(left, None)
         elif m==1:
             span = cls.white(n, m)
-            span = span.t
+            span = span.op
         else:
             span = cls.white(m, 1) * cls.white(1, n) # recurse
         return span
@@ -332,6 +353,11 @@ def test():
     assert S.is_function()
     assert S*S == I@I
 
+#    print(S)
+#    print(S.op, S.op.is_function())
+#    print(S.t, S.t.is_function())
+#    print(S.op == S.t)
+
     H = swap
     assert H.is_lagrangian()
     assert H.is_function()
@@ -396,6 +422,32 @@ def test():
     assert CZ == h
     assert CZ.is_lagrangian()
     
+    # -------------------------------
+    # 
+
+    n = 1
+    F = Span(SymplecticSpace(n).F)
+    I = Span.identity(2*n)
+    assert F*F == I
+
+    g = (b_bb * ww_w) @ (w_ww * bb_b)
+    assert g.is_lagrangian()
+    lhs = F * g.t * F * g
+    print(lhs.get_hom(I))
+    print(I.get_hom(lhs))
+    print(lhs)
+    print(lhs.relstr())
+    print(I.relstr())
+    return
+
+    n = 2
+    F = Span(SymplecticSpace(n).F)
+    I = Span.identity(2*n)
+    assert F*F == I
+
+    print( F * CZ.t * F * CZ == I )
+    print( F * CNOT.t * F * CNOT == I )
+
 
 def test_complete():
     from bruhat.dev.geometry import all_codes
@@ -403,8 +455,31 @@ def test_complete():
     I = Span.identity(n)
     s = SymplecticSpace(n)
     F = s.F
+    for A in all_codes(n, 2*n):
+        M = Matrix(A).t
+        left = M[:n, :]
+        right = M[n:, :]
+        g = Span(left, right)
+        if not g.is_lagrangian():
+            continue
+        print(g.relstr())
+        smap = SMap()
+        smap[0, 0] = str(g.left)
+        smap[0, 8] = str(g.right)
+        print(smap)
+        print()
+
+
+def test_complete_4():
+    from bruhat.dev.geometry import all_codes
+    n = 4
+    I = Span.identity(n)
+    s = SymplecticSpace(n)
+    F = s.F
     found = set()
     count = 0
+    funcs = 0
+    idems = 0
     for A in all_codes(n, 2*n):
         M = Matrix(A).t
         left = M[:n, :]
@@ -413,18 +488,24 @@ def test_complete():
         if not g.is_lagrangian():
             continue
         if g.is_function():
-            print("is_function:")
-            print(g.relstr())
-            print()
+            funcs += 1
+            #print("is_function:")
+            #print(g.relstr())
+            #print()
+            print("f", end="", flush=True)
+        elif g*g==g:
+            idems += 1
+            print("i", end="", flush=True)
         else:
-            assert g*g==g
+            print(".", end="", flush=True)
         found.add(g)
         if len(found)%100 == 0:
             print(len(found))
         #print(span.relstr())
         #print()
         count += 1
-    print(len(found), count)
+    print()
+    print(len(found), count, idems, funcs)
 
     monoid = list(found)
     for i in range(1000):
