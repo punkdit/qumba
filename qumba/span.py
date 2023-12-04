@@ -470,6 +470,29 @@ def test_complete():
         print()
 
 
+def test_gl():
+    n = 3
+    I = Span.identity(n)
+    count = 0
+    for bits in numpy.ndindex((2,)*n*n):
+        A = numpy.array(list(bits))
+        A.shape = (n,n)
+        M = Matrix(A)
+        g = Span(M)
+        if g*g.op != I:
+            continue
+        assert g.op*g == I
+        count += 1
+        print(g.relstr())
+        smap = SMap()
+        smap[0, 0] = str(g.left)
+        smap[0, 2*n+4] = str(g.right)
+        print(smap)
+        print()
+    print(count)
+    assert count==168
+
+
 def test_complete_4():
     from bruhat.dev.geometry import all_codes
     n = 4

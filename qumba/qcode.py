@@ -20,7 +20,6 @@ from qumba.solve import (
     span, intersect, rank, enum2, shortstrx, identity2, eq2, pseudo_inverse)
 from qumba.matrix import Matrix, flatten
 from qumba.symplectic import SymplecticSpace, symplectic_form
-from qumba.csscode import CSSCode
 from qumba.argv import argv
 from qumba.smap import SMap
 
@@ -316,6 +315,7 @@ class QCode(object):
         return True
 
     def to_css(self):
+        from qumba.csscode import CSSCode
         H = self.H
         m, nn = H.shape
         Hx = H[:, 0:nn:2]

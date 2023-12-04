@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from time import time
-start_time = time()
 from random import shuffle, randint
 from operator import add, matmul, mul
 from functools import reduce
@@ -866,6 +864,8 @@ def test():
 
 if __name__ == "__main__":
 
+    from time import time
+    start_time = time()
     start_time = time()
 
 
