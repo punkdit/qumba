@@ -68,7 +68,7 @@ class Matrix(object):
         elif isinstance(A, numpy.ndarray):
             A = A.astype(scalar) # will always make a copy
         else:
-            raise TypeError
+            raise TypeError( "whats this: %s"%(type(A)) )
         A = flatten(A)
         if shape is not None:
             A.shape = shape
@@ -186,6 +186,8 @@ class Matrix(object):
         if isinstance(other, Matrix):
             assert self.p == other.p
             A = numpy.dot(self.A, other.A)
+            if A.shape == ():
+                return A%self.p
             return Matrix(A, self.p, name=self.name+other.name)
         else:
             return NotImplemented
@@ -232,9 +234,12 @@ class Matrix(object):
     def t(self):
         return self.transpose()
 
-    def sum(self):
+    def sum(self, axis=None):
         A = self.A
-        return A.astype(numpy.int64).sum()
+        B = A.sum(axis=axis, dtype=numpy.int64)
+        if axis is None:
+            return B
+        return Matrix(B) # ??
 
     def kernel(self):
         K = kernel(self.A)

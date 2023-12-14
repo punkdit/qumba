@@ -280,6 +280,47 @@ class SymplecticSpace(object):
     
         return cop
 
+    @cache
+    def get_majorana_modes(self):
+        F = self.F
+        n, nn = self.n, self.nn
+        Xs, Zs = [], []
+        for i in range(n):
+            Xs.append(2*i)
+            #Zs.append(n + n-i-1) # ziporder
+            Zs.append(2*i+1)
+        modes = []
+        for i in range(n):
+            u = numpy.zeros((nn,), dtype=scalar)
+            v = numpy.zeros((nn,), dtype=scalar)
+            for j in range(i-1):
+                u[Zs[j]] = 1
+                v[Zs[j]] = 1
+            u[Xs[i]] = 1
+            v[Xs[i]] = 1
+            v[Zs[i]] = 1
+            #u.shape = 1,nn
+            #v.shape = 1,nn
+            u, v = Matrix(u), Matrix(v)
+            #print()
+            #print(u)
+            #print(v)
+            #print(F*v.transpose())
+            uv = u*F*v.transpose()
+            #print(uv)
+            assert uv == 1, uv
+            modes.append(u)
+            modes.append(v)
+        modes = numpy.array(modes, dtype=scalar)
+        modes = Matrix(modes) 
+        modes_i = modes.pseudo_inverse()
+        return modes_i
+
+    def is_majorana(self, H):
+        modes_i = self.get_majorana_modes()
+        U = modes_i * H.transpose()
+        U2 = U.sum(0).A % 2
+        return U2.sum() == 0
 
 
 

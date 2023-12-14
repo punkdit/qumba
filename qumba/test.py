@@ -740,6 +740,59 @@ def test_conjugacy():
             print("\t\t%s"%("*".join(name)))
 
 
+def test_majorana():
+    from qumba.unwrap import unwrap
+    from bruhat.algebraic import qchoose_2
+    from bruhat.action import Group
+
+    n, m = 3, 2
+    #G = mulclose([ Matrix.perm([1,0,2]), Matrix.perm([0,2,1])])
+    perms = [[1,0,2], [0,2,1], [1,2,0], [2,0,1]]
+    #assert len(G) == 6
+    nn = 2*n
+    G = Group.symmetric(nn)
+    print(len(G))
+    space = SymplecticSpace(n)
+    uspace = SymplecticSpace(nn)
+    F = space.F
+    count = 0
+    found = 0
+    for H in qchoose_2(nn, m):
+        H = Matrix(H)
+        U = H*F*H.transpose()
+        if U.sum():
+            continue
+        count += 1
+        if space.is_majorana(H):
+            code = QCode(H)
+            found += 1
+            #print("*", end="")
+            #for perm in perms:
+            #    dode = code.apply_perm(perm)
+            #    assert space.is_majorana(dode.H)
+
+        code = QCode(H)
+        dode = unwrap(code)
+        if uspace.is_majorana(dode.H):
+            print("/", end="", flush=True)
+            
+        for g in G:
+            items = [g[i] for i in range(nn)]
+            #print(g, items)
+            eode = dode.apply_perm(items)
+            if uspace.is_majorana(eode.H):
+                print("+", end="", flush=True)
+                break
+        else:
+            print("-", end="", flush=True)
+            #assert 0
+#        HH = dode.H
+#        print(uspace.is_majorana(HH))
+        #print(shortstr(H))
+        #print()
+    print(count, found)
+
+
 def test():
     print("\ntest()")
     get_422()
