@@ -12,6 +12,7 @@ from functools import reduce, cache
 
 #from qumba.util import factorial, all_subsets, write, uniqtuples, cross
 #from qumba.equ import Equ, quotient_rep
+from qumba.util import factorial
 from qumba.argv import argv
 from qumba import isomorph
 from qumba.smap import SMap, tabulate

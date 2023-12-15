@@ -77,10 +77,10 @@ def get_isos(src, tgt):
 
     n, m = src.n, src.m
 
-    H = src.H
+    H = src.H.A.copy()
     m, nn = H.shape
 
-    rhs = normal_form(tgt.H)
+    rhs = normal_form(tgt.H.A.copy())
     #print(shortstr(rhs))
 
     forms = [None]

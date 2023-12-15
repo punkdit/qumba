@@ -12,6 +12,7 @@ from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identit
     rank, rand2, pseudo_inverse, kernel, direct_sum)
 from qumba.qcode import QCode, SymplecticSpace, strop, Matrix
 from qumba.csscode import CSSCode
+from qumba.autos import get_autos
 from qumba import csscode, construct
 from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
 from qumba.action import mulclose, mulclose_hom
@@ -850,6 +851,68 @@ def test_conjugacy():
                 best.append(name)
         for name in best:
             print("\t\t%s"%("*".join(name)))
+
+
+def test_genon():
+
+    code = QCode.fromstr("XYZI IXYZ ZIXY")
+    print(code.longstr())
+
+    G = list(get_autos(code))
+    assert len(G) == 4 # Z/4
+
+    space = SymplecticSpace(1)
+    H = space.get_H()
+    S = space.get_S()
+    cliff = mulclose([H,S])
+    print(len(cliff))
+    
+    from qumba.util import cross
+    n = code.n
+    items = [cliff for i in range(n)]
+    gates = [reduce(Matrix.direct_sum, item) for item in cross(items)]
+    
+    from qumba.action import Group
+    n = code.n
+    bits = list(numpy.ndindex((2,)*n))
+    
+    G = Group.symmetric(n)
+    count = 0
+    found = set()
+    for g in G:
+        #print(g)
+        perm = [g[i] for i in range(n)]
+        dode = code.apply_perm(perm)
+        hit = 0
+        for gate in gates:
+            eode = dode.apply(gate)
+            if not eode.is_equiv(code):
+                continue
+            L = eode.get_logical(code)
+            if L not in found:
+                print(perm)
+                print(L)
+            found.add(L)
+            count += 1
+            hit += 1
+        assert hit == 1
+    print(count, len(found))
+
+    return
+    
+    # look for 2-qubit gates
+    c2 = code + code
+    I = code.space.get_identity()
+    II = I.direct_sum(I)
+    tgt = c2
+    for g1 in gates:
+        for g2 in gates:
+            g = g1.direct_sum(g2)
+            t = tgt.apply(g)
+            if t.is_equiv(c2) and g != II:
+                print("found !")
+    
+
 
 
 def test():
