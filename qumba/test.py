@@ -786,13 +786,15 @@ def test_genon():
         assert hit == 1
     print(count, len(found))
 
-    return
+    #return
     
     # look for 2-qubit gates
     c2 = code + code
+    print(c2.get_encoder())
+    return
+    tgt = c2.apply_ # ???
     I = code.space.get_identity()
     II = I.direct_sum(I)
-    tgt = c2
     for g1 in gates:
         for g2 in gates:
             g = g1.direct_sum(g2)

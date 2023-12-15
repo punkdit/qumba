@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-#!/usr/bin/env python
-
 from random import shuffle
 from functools import reduce
 from operator import add
