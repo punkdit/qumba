@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from time import time
-start_time = time()
 from random import shuffle, randint
 from operator import add, matmul, mul
 from functools import reduce
@@ -11,7 +9,7 @@ import numpy
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum)
 from qumba.qcode import QCode, SymplecticSpace, strop, Matrix
-from qumba.csscode import CSSCode
+from qumba.csscode import CSSCode, find_logicals
 from qumba.autos import get_autos
 from qumba import csscode, construct
 from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
@@ -20,116 +18,6 @@ from qumba.symplectic import Building
 from qumba.smap import SMap
 from qumba.argv import argv
 
-
-
-def fixed(f):
-    return [i for i in range(len(f)) if f[i]==i]
-
-def is_identity(f):
-    for i in range(len(f)):
-        if f[i] != i:
-            return False
-    return True
-
-
-def find_logicals(Ax, Az):
-
-    def mul(f, g):
-        return [f[g[i]] for i in range(len(g))]
-        
-    Hx = linear_independent(Ax)
-    Hz = linear_independent(Az)
-    code = QCode.build_css(Hx, Hz)
-    print(code)
-    space = code.space
-
-    perms = csscode.find_autos(Ax, Az)
-    print("perms:", len(perms))
-
-    duality = csscode.find_zx_duality(Ax, Az)
-
-    dode = code.apply_perm(duality)
-    dode = dode.apply_H()
-    assert code.is_equiv(dode)
-
-    n = code.n
-    kk = 2*code.k
-    K = SymplecticSpace(code.k)
-    M = code.get_encoder()
-    Mi = space.F * M.t * space.F
-    #Mi = dot2(space.F, M.transpose(), space.F)
-    #I = identity2(code.nn)
-    I = space.get_identity()
-    #assert eq2(dot2(M, Mi), I)
-    #assert eq2(dot2(Mi, M), I)
-    assert M*Mi == I
-    assert Mi*M == I
-
-    gens = []
-    #A = dot2(space.get_H(), space.get_perm(duality))
-    A = space.get_H() * space.get_perm(duality)
-    gens.append(A)
-
-    for f in perms:
-        A = space.get_perm(f)
-        gens.append(A)
-
-    for f in perms:
-        # zx duality
-        zx = mul(duality, f)
-        #print("fixed:", len(fixed(zx)), "involution" if is_identity(mul(zx,zx)) else "")
-
-    for f in perms:
-        # zx duality
-        zx = mul(duality, f)
-        if not is_identity(mul(zx, zx)) or len(fixed(zx))%2 != 0:
-            continue
-        # XXX there's more conditions to check
-
-        A = I
-        remain = set(range(n))
-        for i in fixed(zx):
-            #A = dot2(space.get_S(i), A)
-            A = space.get_S(i) * A
-            remain.remove(i)
-        for i in range(n):
-            if i not in remain:
-                continue
-            j = zx[i]
-            assert zx[j] == i
-            remain.remove(i)
-            remain.remove(j)
-            #A = dot2(space.get_CZ(i, j), A)
-            A = space.get_CZ(i, j) * A
-        gens.append(A)
-        #break # sometimes we only need one of these ...
-
-    print("gens:", len(gens))
-
-    logicals = []
-    found = set()
-    for A in gens:
-        dode = QCode.from_encoder(dot2(A, M), code.m)
-        assert dode.is_equiv(code)
-        #MiAM = dot2(Mi, A, M)
-        MiAM = Mi*A*M
-        L = MiAM[-kk:, -kk:]
-        assert K.is_symplectic(L)
-        s = L.shortstr()
-        if s not in found:
-            logicals.append(L)
-            found.add(s)
-    print("logicals:", len(logicals))
-    gens = logicals
-
-    from sage.all_cmdline import GF, matrix, MatrixGroup
-    field = GF(2)
-    logicals = [matrix(field, kk, A.A.copy()) for A in logicals]
-    G = MatrixGroup(logicals)
-    print("|G| =", G.order())
-    print("G =", G.structure_description())
-
-    return gens
 
 
 def test_bring():
@@ -913,6 +801,57 @@ def test_genon():
                 print("found !")
     
 
+def test_majorana():
+    from qumba.unwrap import unwrap
+    from bruhat.algebraic import qchoose_2
+    from bruhat.action import Group
+
+    n, m = 3, 2
+    #G = mulclose([ Matrix.perm([1,0,2]), Matrix.perm([0,2,1])])
+    perms = [[1,0,2], [0,2,1], [1,2,0], [2,0,1]]
+    #assert len(G) == 6
+    nn = 2*n
+    G = Group.symmetric(nn)
+    print(len(G))
+    space = SymplecticSpace(n)
+    uspace = SymplecticSpace(nn)
+    F = space.F
+    count = 0
+    found = 0
+    for H in qchoose_2(nn, m):
+        H = Matrix(H)
+        U = H*F*H.transpose()
+        if U.sum():
+            continue
+        count += 1
+        if space.is_majorana(H):
+            code = QCode(H)
+            found += 1
+            #print("*", end="")
+            #for perm in perms:
+            #    dode = code.apply_perm(perm)
+            #    assert space.is_majorana(dode.H)
+
+        code = QCode(H)
+        dode = unwrap(code)
+        if uspace.is_majorana(dode.H):
+            print("/", end="", flush=True)
+            
+        for g in G:
+            items = [g[i] for i in range(nn)]
+            #print(g, items)
+            eode = dode.apply_perm(items)
+            if uspace.is_majorana(eode.H):
+                print("+", end="", flush=True)
+                break
+        else:
+            print("-", end="", flush=True)
+            #assert 0
+#        HH = dode.H
+#        print(uspace.is_majorana(HH))
+        #print(shortstr(H))
+        #print()
+    print(count, found)
 
 
 def test():
@@ -929,6 +868,8 @@ def test():
 
 if __name__ == "__main__":
 
+    from time import time
+    start_time = time()
     start_time = time()
 
 

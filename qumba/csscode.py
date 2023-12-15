@@ -13,10 +13,122 @@ dot = numpy.dot
 
 from qumba import solve
 from qumba import qcode
+from qumba.qcode import QCode, SymplecticSpace
 from qumba.isomorph import Tanner, search
 from qumba.solve import (
     shortstr, shortstrx, eq2, dot2, compose2, rand2,
     pop2, insert2, append2, array2, zeros2, identity2, rank, linear_independent)
+
+
+
+def fixed(f):
+    return [i for i in range(len(f)) if f[i]==i]
+
+def is_identity(f):
+    for i in range(len(f)):
+        if f[i] != i:
+            return False
+    return True
+
+def mul(f, g):
+    return [f[g[i]] for i in range(len(g))]
+        
+
+def find_logicals(Ax, Az):
+
+    Hx = linear_independent(Ax)
+    Hz = linear_independent(Az)
+    code = QCode.build_css(Hx, Hz)
+    print(code)
+    space = code.space
+
+    perms = find_autos(Ax, Az)
+    print("perms:", len(perms))
+
+    duality = find_zx_duality(Ax, Az)
+
+    dode = code.apply_perm(duality)
+    dode = dode.apply_H()
+    assert code.is_equiv(dode)
+
+    n = code.n
+    kk = 2*code.k
+    K = SymplecticSpace(code.k)
+    M = code.get_encoder()
+    Mi = space.F * M.t * space.F
+    #Mi = dot2(space.F, M.transpose(), space.F)
+    #I = identity2(code.nn)
+    I = space.get_identity()
+    #assert eq2(dot2(M, Mi), I)
+    #assert eq2(dot2(Mi, M), I)
+    assert M*Mi == I
+    assert Mi*M == I
+
+    gens = []
+    #A = dot2(space.get_H(), space.get_perm(duality))
+    A = space.get_H() * space.get_perm(duality)
+    gens.append(A)
+
+    for f in perms:
+        A = space.get_perm(f)
+        gens.append(A)
+
+    for f in perms:
+        # zx duality
+        zx = mul(duality, f)
+        #print("fixed:", len(fixed(zx)), "involution" if is_identity(mul(zx,zx)) else "")
+
+    for f in perms:
+        # zx duality
+        zx = mul(duality, f)
+        if not is_identity(mul(zx, zx)) or len(fixed(zx))%2 != 0:
+            continue
+        # XXX there's more conditions to check
+
+        A = I
+        remain = set(range(n))
+        for i in fixed(zx):
+            #A = dot2(space.get_S(i), A)
+            A = space.get_S(i) * A
+            remain.remove(i)
+        for i in range(n):
+            if i not in remain:
+                continue
+            j = zx[i]
+            assert zx[j] == i
+            remain.remove(i)
+            remain.remove(j)
+            #A = dot2(space.get_CZ(i, j), A)
+            A = space.get_CZ(i, j) * A
+        gens.append(A)
+        #break # sometimes we only need one of these ...
+
+    print("gens:", len(gens))
+
+    logicals = []
+    found = set()
+    for A in gens:
+        dode = QCode.from_encoder(dot2(A, M), code.m)
+        assert dode.is_equiv(code)
+        #MiAM = dot2(Mi, A, M)
+        MiAM = Mi*A*M
+        L = MiAM[-kk:, -kk:]
+        assert K.is_symplectic(L)
+        s = L.shortstr()
+        if s not in found:
+            logicals.append(L)
+            found.add(s)
+    print("logicals:", len(logicals))
+    gens = logicals
+
+    from sage.all_cmdline import GF, matrix, MatrixGroup
+    field = GF(2)
+    logicals = [matrix(field, kk, A.A.copy()) for A in logicals]
+    G = MatrixGroup(logicals)
+    print("|G| =", G.order())
+    print("G =", G.structure_description())
+
+    return gens
 
 
     
@@ -609,9 +721,28 @@ class CSSCode(object):
         return dx, dz
 
     def find_autos(self):
-        return find_autos(self.Hx, self.Hz)
+        return find_autos(self.Ax, self.Az)
 
     def find_zx_duality(self):
-        return find_zx_duality(self.Hx, self.Hz)
+        return find_zx_duality(self.Ax, self.Az)
+
+    def find_zx_duality_for_cz(self):
+        "find all the zx dualities that give rise to a cz gate"
+        found = []
+        duality = self.find_zx_duality()
+        if duality is None:
+            return found
+
+        perms = self.find_autos()
+        for f in perms:
+            # zx duality
+            zx = mul(duality, f)
+            if not is_identity(mul(zx, zx)) or len(fixed(zx))%2 != 0:
+                continue
+            # XXX there's more conditions to check
+
+            found.append(zx)
+
+        return found
 
 
