@@ -1,6 +1,10 @@
 #!/usr/bin/env python
+"""
+looking for transversal logical clifford operations
+"""
 
 from functools import reduce
+from operator import add
 
 import numpy
 
@@ -8,6 +12,8 @@ import z3
 from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver
 
 from qumba.qcode import QCode, SymplecticSpace, Matrix
+from qumba.action import mulclose
+from qumba import construct 
 from qumba.argv import argv
 
 
@@ -70,6 +76,8 @@ class Const(Expr):
         self.value = value
     def get(self):
         return bool(self.value == 1)
+    def get_interp(self, model):
+        return bool(self.value == 1)
     def __str__(self):
         return str(self.value)
     __repr__ = __str__
@@ -88,6 +96,9 @@ class Var(Expr):
         Var.count += 1
     def get(self):
         return self.v
+    def get_interp(self, model):
+        value = model.get_interp(self.v)
+        return bool(value)
     def __str__(self):
         return self.name
     __repr__ = __str__
@@ -99,6 +110,10 @@ class Add(Expr):
     def get(self):
         a, b = self.items
         return Xor(a.get(), b.get())
+    def get_interp(self, model):
+        a, b = self.items
+        a, b = a.get_interp(model), b.get_interp(model)
+        return a != b
     def __str__(self):
         return "(%s+%s)"%self.items
     __repr__ = __str__
@@ -107,6 +122,10 @@ class Mul(Add):
     def get(self):
         a, b = self.items
         return And(a.get(), b.get())
+    def get_interp(self, model):
+        a, b = self.items
+        a, b = a.get_interp(model), b.get_interp(model)
+        return a and b
     def __str__(self):
         return "%s*%s"%self.items
     __repr__ = __str__
@@ -201,21 +220,19 @@ class UMatrix(object):
         for idx in numpy.ndindex(shape):
             value = self[idx]
             if isinstance(value, Expr):
-                value = value.get()
-                #print(value, type(value))
-                if type(value) != bool:
-                    value = model.get_interp(value)
+                value = value.get_interp(model)
+                assert type(value) is bool
+                #if type(value) != bool:
+                #    try:
+                #        value = model.get_interp(value)
+                #    except:
+                #        print("value =", value, "type(value) =", type(value))
+                #        raise
             A[idx] = bool(value)
         A = Matrix(A)
         return A
         
         
-
-def find(code):
-    n = code.n
-    
-
-
 def test():
     solver = Solver()
     add = solver.add
@@ -242,16 +259,12 @@ def test():
     result = solver.check()
     assert str(result) == "sat"
 
-
-def main():
-    test()
+    # ------------------------
 
     code = QCode.fromstr("XYZI IXYZ ZIXY")
     #code = QCode.fromstr("XXXX ZZZZ XXII")
     n = code.n
     nn = 2*n
-
-    # ------------------------
 
     solver = Solver()
     add = solver.add
@@ -271,101 +284,189 @@ def main():
 
     # ------------------------
 
+
+def find_transversal(*codes, constant=False, verbose=True):
     solver = Solver()
-    add = solver.add
+    Add = solver.add
 
-    c2 = code + code
-    #c2 = code + code.apply_perm([1,2,3,0])
-    #c2 = code + code.apply_perm([2,3,1,0])
-    #print(c2.longstr())
-    
-    space = SymplecticSpace(2)
-    F2 = space.F
-    CZ = space.get_CZ() # target gate
-    M = Matrix.identity(12).direct_sum(CZ)
-    E, D = c2.get_encoder(), c2.get_decoder()
-    L = E*M*D
-    tgt = c2.apply(L)
-    assert tgt.is_equiv(c2)
-    
-    H = c2.H
-    L = c2.L
+    m = len(codes)
+    n = codes[0].n
+    code = reduce(add, codes)
+    H = code.H
+    L = code.L
+    k = code.k
 
-    if 1:
+    space = SymplecticSpace(m)
+    Fm = space.F
+
+    if not constant:
         items = []
         for i in range(n):
-            U = UMatrix.unknown(4, 4)
-            add(U.t*F2*U == F2) # quadratic constraint
+            U = UMatrix.unknown(2*m, 2*m)
+            Add(U.t*Fm*U == Fm) # quadratic constraint
             items.append(U)
         U = reduce(UMatrix.direct_sum, items)
         U0 = None
 
     else:
-        U0 = UMatrix.unknown(4, 4)
-        add(U0.t*F2*U0 == F2) # quadratic constraint
+        U0 = UMatrix.unknown(2*m, 2*m)
+        Add(U0.t*Fm*U0 == Fm) # quadratic constraint
         U = reduce(UMatrix.direct_sum, [U0]*n)
 
-    P = c2.space.get_perm([0,4,1,5,2,6,3,7])
+    perm = numpy.array(list(range(n*m)))
+    perm.shape = (m, n)
+    perm = perm.transpose().copy()
+    perm.shape = m*n
+    perm = list(perm)
+    P = code.space.get_perm(perm)
     U = P.t * U * P
-    #print(U)
 
     HU = H * U.t
     LU = L * U.t
-    F = c2.space.F
+    F = code.space.F
     R = HU * F * L.t
-    #print(R)
-    add(R==0) # linear constraint
+    Add(R==0) # linear constraint
     R = HU * F * H.t
-    #print(R)
-    add(R==0) # linear constraint
+    Add(R==0) # linear constraint
 
-    E, D = c2.get_encoder(), c2.get_decoder()
+    E, D = code.get_encoder(), code.get_decoder()
     LU = D*U*E
-    LU = LU[-4:, -4:]
-    #print(LU)
-    #return
-    I = Matrix.identity(4)
-    add(LU!=I)
-    #add(L == space.get_CNOT())
+    LU = LU[-2*k:, -2*k:]
+    #I = Matrix.identity(2*k)
+    #Add(LU!=I)
 
     found = set()
+    gen = set()
+    fgen = set()
     count = 0
     while 1:
-    #for i in range(100):
         count += 1
         result = solver.check()
         if result != z3.sat:
             break
-        if count%100==0:
-            print(".", end="", flush=True)
+        #if count%100==0:
+        #    print(".", end="", flush=True)
     
         model = solver.model()
         M = U.get_interp(model)
         assert M.t*F*M == F
     
-        dode = c2.apply(M)
-        assert dode.is_equiv(c2)
-        L = dode.get_logical(c2)
+        dode = code.apply(M)
+        assert dode.is_equiv(code)
+        #L = dode.get_logical(code)
+        L = LU.get_interp(model)
+        #print(LU)
+        #print(LU.get_interp(model))
+        #print(L)
+        #assert L == LU.get_interp(model) # whoops.. not the same..
         if L not in found:
-            print()
-            print(dode.longstr())
-            print((D*M*E)[-4:, -4:])
-            print("M=")
-            print(M)
-            if U0 is not None:
-                print("U0=")
-                print(U0.get_interp(model))
-            print("L=")
-            print(L)
+            yield M, L
             found.add(L)
-            add(LU != L)
-            #break
+            #Add(LU != L) # slows things down..
+        gen.add(M)
+        Add(U != M)
+        if verbose:
+            print("mulclose...", end="", flush=True)
+        G = mulclose(gen, verbose=verbose)
+        if verbose:
+            print("done")
+        for g in G:
+            if g not in fgen:
+                #if U0 is not None:
+                #    Add(U0 != g[:2*m, :2*m]) # doesn't work..
+                #else:
+                Add(U != g)
+                fgen.add(g)
+        if verbose:
+            print("gen:", len(gen), "fgen:", len(fgen))
+
+
+def main():
+    test()
+
+    if argv.code == (4,2,2):
+        code = QCode.fromstr("XXXX ZZZZ")
+    elif argv.code == (5,1,3):
+        code = construct.get_513()
+    elif argv.code == (4,1,2):
+        code = QCode.fromstr("XYZI IXYZ ZIXY")
+    elif argv.code == (10,1,4):
+        code = QCode.fromstr("""
+        XZ.Z.X.ZZ.
+        .Y.ZZY..ZZ
+        ..YZZY.X..
+        .ZZY.YZ..Z
+        .Z..XYZY..
+        .ZZ.ZZXXZZ
+        ..ZZZZZ.XZ
+        .ZZZZ..ZZX
+        ZZZZZZ....
+        """)
+    elif argv.code == (13,1,5):
+        n = 13
+        check = "ZXIIIIIIXZIII"
+        checks = [''.join(check[(i+j)%13] for i in range(n)) for j in range(n-1)]
+        code = QCode.fromstr(' '.join(checks))
+        print(code.get_params())
+    else:
+        return
+
+    for N in [1, 2, 3, 4, 5, 6]:
+        count = 0
+        gen = []
+        arg = [code]*N
+        print("N =", N)
+        for M,L in find_transversal(*arg, constant=argv.constant):
+            print(L)
+            gen.append(L)
+            count += 1
+        print("gen:", len(gen))
+        G = mulclose(gen)
+        print("|G| =", len(G))
+        print()
+
+
+def all_codes():
+    from bruhat.algebraic import qchoose_2
+
+    #n, k, d = 4, 1, 2
+    #n, k, d = 5, 1, 3
+    n, k, d = argv.get("code", (4,1,2))
+
+    space = SymplecticSpace(n)
+    F = space.F
+    count = 0
+    found = []
+    for H in qchoose_2(2*n, n-k):
+        H = Matrix(H)
+        U = H*F*H.transpose()
+        if U.sum():
+            continue
+        count += 1
+        code = QCode(H)
+        if code.get_distance() < d:
+            #print("x", end='', flush=True)
+            continue
+        found.append(code)
+
+        items = list(find_transversal(code, constant=True, verbose=False))
+        gen = [item[1] for item in items]
+        G = mulclose(gen)
+        if len(G) > 3:
+            print()
+            print(code.H)
+            print("|G| =", len(G))
+        elif len(G) == 3:
+            print("[3]", end='', flush=True)
+        else:
+            print(".", end='', flush=True)
+
+
+    print()
+    print("count", count)
+    print("found", len(found))
+    #print(len([code for code in found if not code.is_css()]))
     
-        add(U != M)
-
-    print("\ndone.")
-
-
 
 if __name__ == "__main__":
     from time import time

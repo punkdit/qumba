@@ -763,13 +763,14 @@ def test_genon():
     from qumba.action import Group
     n = code.n
     bits = list(numpy.ndindex((2,)*n))
+    I = space.get_identity()
     
     G = Group.symmetric(n)
     count = 0
     found = set()
     for g in G:
-        #print(g)
         perm = [g[i] for i in range(n)]
+        #print(perm)
         dode = code.apply_perm(perm)
         hit = 0
         for gate in gates:
@@ -777,30 +778,17 @@ def test_genon():
             if not eode.is_equiv(code):
                 continue
             L = eode.get_logical(code)
-            if L not in found:
-                print(perm)
-                print(L)
+            if L==I:
+                print(perm, "==I")
+            #if L not in found:
+            #    print(perm)
+            #    print(L)
             found.add(L)
             count += 1
             hit += 1
         assert hit == 1
     print(count, len(found))
 
-    #return
-    
-    # look for 2-qubit gates
-    c2 = code + code
-    print(c2.get_encoder())
-    return
-    tgt = c2.apply_ # ???
-    I = code.space.get_identity()
-    II = I.direct_sum(I)
-    for g1 in gates:
-        for g2 in gates:
-            g = g1.direct_sum(g2)
-            t = tgt.apply(g)
-            if t.is_equiv(c2) and g != II:
-                print("found !")
     
 
 def test_majorana():
