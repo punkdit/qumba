@@ -64,6 +64,8 @@ def test_codetables():
         if code.is_selfdual():
             print("selfdual, ", end="")
         print("autos:", N)
+        print(code.longstr())
+        print()
 
 
 def test_isomorphism():

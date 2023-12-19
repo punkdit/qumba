@@ -12,7 +12,7 @@ import z3
 from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver
 
 from qumba.qcode import QCode, SymplecticSpace, Matrix
-from qumba.action import mulclose
+from qumba.action import mulclose, Group
 from qumba import construct 
 from qumba.argv import argv
 
@@ -381,6 +381,58 @@ def find_transversal(*codes, constant=False, verbose=True):
             print("gen:", len(gen), "fgen:", len(fgen))
 
 
+def find_local_clifford(tgt, src, constant=False, verbose=True):
+    #print("find_local_clifford")
+    solver = Solver()
+    Add = solver.add
+
+    assert tgt.n == src.n
+    assert tgt.k == src.k
+    m = 1
+    n = src.n
+
+    space = SymplecticSpace(m)
+    Fm = space.F
+
+    if not constant:
+        items = []
+        for i in range(n):
+            U = UMatrix.unknown(2*m, 2*m)
+            Add(U.t*Fm*U == Fm) # quadratic constraint
+            items.append(U)
+        U = reduce(UMatrix.direct_sum, items)
+        U0 = None
+
+    else:
+        U0 = UMatrix.unknown(2*m, 2*m)
+        Add(U0.t*Fm*U0 == Fm) # quadratic constraint
+        U = reduce(UMatrix.direct_sum, [U0]*n)
+
+    HU = src.H * U.t
+    LU = src.L * U.t
+    F = src.space.F
+    R = HU * F * tgt.L.t
+    Add(R==0) # linear constraint
+    R = HU * F * tgt.H.t
+    Add(R==0) # linear constraint
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("result:", result)
+            break
+    
+        model = solver.model()
+        M = U.get_interp(model)
+        assert M.t*F*M == F
+    
+        dode = src.apply(M)
+        assert dode.is_equiv(tgt)
+        yield M
+
+        Add(U != M)
+
+
 def main():
     test()
 
@@ -390,6 +442,8 @@ def main():
         code = construct.get_513()
     elif argv.code == (4,1,2):
         code = QCode.fromstr("XYZI IXYZ ZIXY")
+    elif argv.code == (6,2,2):
+        code = QCode.fromstr("XXXIXI ZZIZIZ IYZXII IIYYYY")
     elif argv.code == (10,1,4):
         code = QCode.fromstr("""
         XZ.Z.X.ZZ.
@@ -466,6 +520,60 @@ def all_codes():
     print("count", count)
     print("found", len(found))
     #print(len([code for code in found if not code.is_css()]))
+
+
+def test_local_clifford():
+    print("test_local_clifford")
+    if argv.code == (4,2,2):
+        code = QCode.fromstr("XXXX ZZZZ")
+    elif argv.code == (5,1,3):
+        code = construct.get_513()
+    elif argv.code == (4,1,2):
+        code = QCode.fromstr("XYZI IXYZ ZIXY")
+    elif argv.code == (6,2,2):
+        code = QCode.fromstr("XXXIXI ZZIZIZ IYZXII IIYYYY")
+    elif argv.code == (8,2,3):
+        code = QCode.fromstr("""
+            X...YZZZ
+            .X.ZYX.X
+            .ZX.YYZX
+            .ZZYZXZZ
+            ..Z...YX
+            ZZZZZZZZ
+        """)
+    elif argv.code == (8,3,2):
+        code = QCode.fromstr("""
+            XXXXIIII
+            ZIZIZIZI
+            IIYYYYII
+            IZIZIZIZ
+            IIIIXXXX
+        """)
+
+    print(code.get_params())
+
+    n = code.n
+    src = code
+    G = Group.symmetric(src.n)
+    count = 0
+    gen = set()
+    for g in G:
+        #if g.is_identity():
+        #    continue
+        perm = [g[i] for i in range(n)]
+        tgt = src.apply_perm(perm)
+        for M in find_local_clifford(src, tgt):
+            code = tgt.apply(M)
+            assert code.is_equiv(src)
+            L = code.get_logical(src)
+            if L not in gen:
+                print(M, g)
+                print(L)
+                gen.add(L)
+            count += 1
+    print(count)
+    G = mulclose(gen)
+    print("|G| =", len(G))
     
 
 if __name__ == "__main__":
