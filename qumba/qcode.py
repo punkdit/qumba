@@ -124,7 +124,10 @@ def monte_carlo(H, v, p=0.5, trials=10000):
     return d0
 
 def strop(H):
-    assert len(H.shape) == 2, H.shape
+    assert len(H.shape) in (1,2), H.shape
+    if len(H.shape) == 1:
+        shape = (1,)+H.shape
+        H = H.reshape(*shape)
     smap = SMap()
     m, nn = H.shape
     for i in range(m):

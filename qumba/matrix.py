@@ -95,6 +95,11 @@ class Matrix(object):
             return item
         return Matrix(item, p, name=name)
 
+    def reshape(self, *shape):
+        A = self.A
+        A = A.reshape(*shape)
+        return Matrix(A)
+
     @classmethod
     def perm(cls, items, p=DEFAULT_P, name=None):
         n = len(items)
@@ -289,10 +294,10 @@ class Matrix(object):
         P = A*A.pseudo_inverse()
         return P
 
-    def reshape(self, shape):
-        A = self.A.view()
-        A.shape = shape
-        return Matrix(A)
+#    def reshape(self, shape):
+#        A = self.A.view()
+#        A.shape = shape
+#        return Matrix(A)
 
     def to_spider(self, scalar=int, verbose=True):
         from qumba.decode import network
