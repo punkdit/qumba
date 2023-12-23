@@ -444,6 +444,10 @@ def main():
         code = QCode.fromstr("XYZI IXYZ ZIXY")
     elif argv.code == (6,2,2):
         code = QCode.fromstr("XXXIXI ZZIZIZ IYZXII IIYYYY")
+    elif argv.code == (7,1,3):
+        code = construct.get_713()
+    elif argv.code == (10,2,3):
+        code = construct.get_10_2_3()
     elif argv.code == (10,1,4):
         code = QCode.fromstr("""
         XZ.Z.X.ZZ.
@@ -482,22 +486,34 @@ def main():
 
 def all_codes():
     from bruhat.algebraic import qchoose_2
+    from bruhat.sp_pascal import i_grassmannian
 
     #n, k, d = 4, 1, 2
     #n, k, d = 5, 1, 3
     n, k, d = argv.get("code", (4,1,2))
 
+    perm = []
+    for i in range(n):
+        perm.append(i)
+        perm.append(2*n - i - 1)
+
     space = SymplecticSpace(n)
     F = space.F
     count = 0
     found = []
-    for H in qchoose_2(2*n, n-k):
+    #for H in qchoose_2(2*n, n-k):
+    for _,H in i_grassmannian(n, n-k):
+        H = H[:, perm]
+        #print(H, H.shape)
         H = Matrix(H)
-        U = H*F*H.transpose()
-        if U.sum():
-            continue
+        #U = H*F*H.transpose()
+        #if U.sum():
+        #    continue
+        #assert U.sum() == 0
         count += 1
-        code = QCode(H)
+        #if count > 5:
+        #    break
+        code = QCode(H, check=False)
         if code.get_distance() < d:
             #print("x", end='', flush=True)
             continue
