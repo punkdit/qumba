@@ -142,6 +142,12 @@ def get_isos(src, tgt):
           idx = stack.pop()+1
 
 
+def is_iso(code, dode):
+    for iso in get_isos(code, dode):
+        return True
+    return False
+
+
 def get_autos(code):
     return list(get_isos(code, code))
 

@@ -14,6 +14,7 @@ from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver
 from qumba.qcode import QCode, SymplecticSpace, Matrix
 from qumba.action import mulclose, Group
 from qumba import construct 
+from qumba import autos
 from qumba.argv import argv
 
 
@@ -444,8 +445,14 @@ def main():
         code = QCode.fromstr("XYZI IXYZ ZIXY")
     elif argv.code == (6,2,2):
         code = QCode.fromstr("XXXIXI ZZIZIZ IYZXII IIYYYY")
-    elif argv.code == (7,1,3):
+    elif argv.code == (7,1,3) and argv.css:
         code = construct.get_713()
+    elif argv.code == (7,1,3):
+        code = QCode.fromstr("""
+        XIXIIII IZIIZII XXIXXII ZIZZIZI IIIYZXX IIIIIZZ
+        """)
+        #print(code.get_params())
+        #return
     elif argv.code == (10,2,3):
         code = construct.get_10_2_3()
     elif argv.code == (10,1,4):
@@ -469,7 +476,8 @@ def main():
     else:
         return
 
-    for N in [1, 2, 3, 4, 5, 6]:
+    #for N in [1, 2, 3, 4, 5, 6]:
+    for N in [1, 2, 3]:
         count = 0
         gen = []
         arg = [code]*N
@@ -517,7 +525,6 @@ def all_codes():
         if code.get_distance() < d:
             #print("x", end='', flush=True)
             continue
-        found.append(code)
 
         items = list(find_transversal(code, constant=True, verbose=False))
         gen = [item[1] for item in items]
@@ -527,9 +534,17 @@ def all_codes():
             print(code.H)
             print("|G| =", len(G))
         elif len(G) == 3:
-            print("[3]", end='', flush=True)
+            print("\n[3]", end='', flush=True)
+
+            for dode in found:
+                if autos.is_iso(dode, code):
+                    print("+", end="", flush=True)
+                else:
+                    print("-", end="", flush=True)
+            found.append(code)
+
         else:
-            print(".", end='', flush=True)
+            print(" ", end='', flush=True)
 
 
     print()
