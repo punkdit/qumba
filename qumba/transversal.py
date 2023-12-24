@@ -13,6 +13,7 @@ from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver
 
 from qumba.qcode import QCode, SymplecticSpace, Matrix
 from qumba.action import mulclose, Group
+from qumba import equ
 from qumba import construct 
 from qumba import autos
 from qumba.argv import argv
@@ -492,65 +493,97 @@ def main():
         print()
 
 
+def get_codes(n, k, d):
+    from bruhat.sp_pascal import i_grassmannian
+    perm = []
+    for i in range(n):
+        perm.append(i)
+        perm.append(2*n - i - 1)
+    found = []
+    for _,H in i_grassmannian(n, n-k):
+        H = H[:, perm]
+        H = Matrix(H)
+        code = QCode(H, check=False)
+        if code.get_distance() < d:
+            #print("x", end='', flush=True)
+            continue
+        found.append(code)
+        print(".", end='', flush=True)
+    print()
+    return found
+
+
 def all_codes():
-    from bruhat.algebraic import qchoose_2
     from bruhat.sp_pascal import i_grassmannian
 
     #n, k, d = 4, 1, 2
     #n, k, d = 5, 1, 3
     n, k, d = argv.get("code", (4,1,2))
+    constant = argv.get("constant", True)
 
+    space = SymplecticSpace(n)
+    gen = []
     perm = []
     for i in range(n):
         perm.append(i)
         perm.append(2*n - i - 1)
+        gen.append(space.get_S(i))
+        gen.append(space.get_H(i))
+    Cliff = mulclose(gen)
+    print("|Cliff| =", len(Cliff))
+    found = []
 
-    space = SymplecticSpace(n)
+    if 0:
+        code = construct.get_513()
+        for g in Cliff:
+            dode = code.apply(g)
+            found.append(dode)
+        print(len(found))
+        hom = equ.quotient_rep(found, QCode.is_equiv)
+        found = list(set(hom.values()))
+        print(len(found))
+        return
+
     F = space.F
     count = 0
-    found = []
-    #for H in qchoose_2(2*n, n-k):
+    #found = []
     for _,H in i_grassmannian(n, n-k):
         H = H[:, perm]
-        #print(H, H.shape)
         H = Matrix(H)
-        #U = H*F*H.transpose()
-        #if U.sum():
-        #    continue
-        #assert U.sum() == 0
         count += 1
-        #if count > 5:
-        #    break
         code = QCode(H, check=False)
         if code.get_distance() < d:
             #print("x", end='', flush=True)
             continue
 
-        items = list(find_transversal(code, constant=True, verbose=False))
+        items = list(find_transversal(code, constant=constant, verbose=False))
         gen = [item[1] for item in items]
         G = mulclose(gen)
         if len(G) > 3:
             print()
             print(code.H)
             print("|G| =", len(G))
-        elif len(G) == 3:
-            print("\n[3]", end='', flush=True)
 
-            for dode in found:
-                if autos.is_iso(dode, code):
-                    print("+", end="", flush=True)
-                else:
-                    print("-", end="", flush=True)
+        elif len(G) == 3:
+            print("[3]", end='', flush=True)
             found.append(code)
 
         else:
-            print(" ", end='', flush=True)
+            print(".", end='', flush=True)
 
+        #if len(found) > 6:
+        #    break
 
     print()
     print("count", count)
     print("found", len(found))
     #print(len([code for code in found if not code.is_css()]))
+
+    hom = equ.quotient_rep(found, autos.is_iso)
+    found = list(set(hom.values()))
+    print("hom:", len(found))
+
+    return found
 
 
 def test_local_clifford():
