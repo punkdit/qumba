@@ -41,13 +41,51 @@ def get_832():
     )
 
 
-def get_513():
-    H = """
-    XZZX.
-    .XZZX
-    X.XZZ
-    ZX.XZ
-    """
+def get_513(idx=None):
+    if idx is None:
+        H = """
+        XZZX.
+        .XZZX
+        X.XZZ
+        ZX.XZ
+        """
+    else:
+        # some other 5,1,3 codes:
+        data = """
+        Y.ZZX ZYZ.Y ZZXZ. .ZZYZ
+        XZZX. ZY.XZ .ZXZZ Z.ZZX
+        YZ.ZY ZXZ.Y Z.YZZ .ZZYZ
+        Y.ZZX ZX.XX .ZXYX ZZZ.Z
+        YZZ.Z ZYZZ. .ZXZX ZZ.XY
+        XZZY. .XZZX Z.YYX ZZ.ZZ
+        X.ZXX ZX.XZ .ZYXY ZZZZ.
+        X.ZXZ ZX.ZZ .ZXYZ ZZZ.Y
+        YZXZ. .YYZX ZZ.YX Z.ZZZ
+        Y.ZZY ZY.ZZ .ZXZX ZZZX.
+        X.ZZX ZY.ZZ ZZY.X .ZZXZ
+        YZX.X .XYZX Z.ZXX ZZ.ZZ
+        Y.ZZZ ZYZ.Y .ZYZY ZZ.YZ
+        XZX.X ZXXZ. Z.ZYX .ZZZZ
+        YZZ.Y .YZZX ZZYZ. Z.ZXZ
+        XZZ.Y ZYZZ. .ZXZX ZZ.YZ
+        XZZX. .XZZZ Z.XXZ ZZ.ZX
+        XZ.ZY .YZZX ZZY.X Z.ZYY
+        XZXZ. ZXX.Z .ZZYZ Z.ZZY
+        Y.ZZX ZXZY. .ZYYX ZZ.ZZ
+        XZZZ. ZX.ZZ ZZX.X Z.ZYY
+        YZZZ. ZX.ZX ZZX.Y Z.ZXZ
+        YZ.ZX .YZZY ZZY.Y Z.ZYX
+        Y.ZZY ZX.ZX ZZY.Y .ZZXX
+        YZZ.X .YZZY ZZXZ. Z.ZYZ
+        X.ZZZ ZYZ.Y ZZYZ. .ZZXX
+        YZ.ZY .YZZX ZZX.X Z.ZYY
+        YZ.ZY ZXZZ. ZZY.X .ZZXZ
+        YZ.XZ .XZZZ Z.YYZ ZZZ.X
+        X.ZYZ ZX.ZZ .ZXXZ ZZZ.X
+        YZ.ZX ZYZZ. ZZY.Z .ZZYY
+        """.strip().split('\n')
+        H = data[idx]
+
     code = QCode.fromstr(H)
     return code
 

@@ -16,6 +16,7 @@ from qumba.action import mulclose, Group
 from qumba import equ
 from qumba import construct 
 from qumba import autos
+from qumba.unwrap import unwrap
 from qumba.argv import argv
 
 
@@ -478,7 +479,7 @@ def main():
         return
 
     #for N in [1, 2, 3, 4, 5, 6]:
-    for N in [1, 2, 3]:
+    for N in range(1, argv.get("N", 4)+1):
         count = 0
         gen = []
         arg = [code]*N
@@ -508,8 +509,6 @@ def get_codes(n, k, d):
             #print("x", end='', flush=True)
             continue
         found.append(code)
-        print(".", end='', flush=True)
-    print()
     return found
 
 
@@ -529,11 +528,11 @@ def all_codes():
         perm.append(2*n - i - 1)
         gen.append(space.get_S(i))
         gen.append(space.get_H(i))
-    Cliff = mulclose(gen)
-    print("|Cliff| =", len(Cliff))
     found = []
 
     if 0:
+        Cliff = mulclose(gen)
+        print("|Cliff| =", len(Cliff))
         code = construct.get_513()
         for g in Cliff:
             dode = code.apply(g)
@@ -568,8 +567,12 @@ def all_codes():
             print("[3]", end='', flush=True)
             found.append(code)
 
-        else:
-            print(".", end='', flush=True)
+        elif len(G) == 2:
+            print("[2]", end='', flush=True)
+            found.append(code)
+
+        #else:
+        #    print(".", end='', flush=True)
 
         #if len(found) > 6:
         #    break
@@ -638,6 +641,84 @@ def test_local_clifford():
     print(count)
     G = mulclose(gen)
     print("|G| =", len(G))
+
+
+def find_clifford(code, pairs, constant=False, verbose=True):
+    solver = Solver()
+    Add = solver.add
+
+    m = 2
+    Fm = SymplecticSpace(m).F
+    n = code.n // m
+    space = code.space
+
+    U0 = UMatrix.unknown(2*m, 2*m)
+    Add(U0.t*Fm*U0 == Fm) # quadratic constraint
+    U = reduce(UMatrix.direct_sum, [U0]*n)
+    perm = reduce(add, pairs)
+    P = space.get_perm(perm)
+    U = P.t*U*P
+
+    HU = code.H * U.t
+    LU = code.L * U.t
+    F = code.space.F
+    R = HU * F * code.L.t
+    Add(R==0) # linear constraint
+    R = HU * F * code.H.t
+    Add(R==0) # linear constraint
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("result:", result)
+            break
+    
+        model = solver.model()
+        M = U.get_interp(model)
+        assert M.t*F*M == F
+    
+        dode = code.apply(M)
+        assert dode.is_equiv(code)
+        yield M
+
+        Add(U != M)
+
+
+
+def main_unwrap():
+
+    for idx in range(31):
+        code = construct.get_513(idx)
+        n = code.n
+    
+        dode = unwrap(code)
+        pairs = [(i, i+n) for i in range(n)]
+        perm = [i+n for i in range(n)] + list(range(n))
+    
+        eode = dode.apply_perm(perm)
+        eode = eode.apply_H()
+        assert eode.is_equiv(dode)
+    
+        eode = dode
+        for (i,j) in pairs:
+            eode = eode.apply_CZ(i, j)
+        assert eode.is_equiv(dode)
+    
+        count = 0
+        gen = []
+        for M in find_clifford(dode, pairs):
+            count += 1
+            #print(M)
+            eode = dode.apply(M)
+            assert eode.is_equiv(dode)
+            L = eode.get_logical(dode)
+            #print(L)
+            gen.append(L)
+        print(count)
+        G = mulclose(gen)
+        assert count == len(G)
+
+
     
 
 if __name__ == "__main__":
