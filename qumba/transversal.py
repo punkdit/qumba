@@ -714,10 +714,28 @@ def main_unwrap():
             L = eode.get_logical(dode)
             #print(L)
             gen.append(L)
-        print(count)
+        print(count, end=" ")
         G = mulclose(gen)
         assert count == len(G)
 
+        if not argv.autos:
+            print()
+            continue
+
+        A = autos.get_autos(dode)
+        #print(len(A), end=" ")
+
+        for perm in A:
+            #P = dode.space.get_perm(perm)
+            eode = dode.apply_perm(perm)
+            assert eode.is_equiv(dode)
+            L = eode.get_logical(dode)
+            #print(L)
+            gen.append(L)
+        #    print(perm)
+        #continue
+        G = mulclose(gen)
+        print(len(G))
 
     
 

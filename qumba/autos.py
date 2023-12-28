@@ -130,7 +130,7 @@ def get_isos(src, tgt):
           break
       #print(stack)
       #gen.append(stack)
-      yield stack
+      yield list(stack)
       #if len(gen) > 4000:
       #  return
       dode = src.apply_perm(stack)
