@@ -86,10 +86,9 @@ class Complex(object):
         grades, lookup = self.grades, self.lookup
         for (dim, grade) in enumerate(grades):
             for i,cell in enumerate(grade):
-                assert lookup[cell] == (dim, i)
-        for (cell, k) in lookup.items():
-            dim, i = k
-            assert grades[dim][i] is cell
+                assert lookup[cell] == i
+        for (cell, i) in lookup.items():
+            assert grades[cell.dim][i] is cell
         for e in self.edges:
             assert len(e) == 2
             vals = []
@@ -151,7 +150,7 @@ class Complex(object):
         for j,cell in enumerate(src):
             #print(j, cell)
             for dell,r in cell.children.items():
-                _, i = lookup[dell]
+                i = lookup[dell]
                 #i = tgt.index(dell)
                 #print('\t', (i, j), "<--", r)
                 H[i, j] = r
@@ -213,20 +212,20 @@ class Complex(object):
     def cell(self, dim=0, children=[]):
         cell = Cell(dim, children)
         grade = self.grades[dim]
-        self.lookup[cell] = (dim, len(grade))
+        self.lookup[cell] = len(grade)
         grade.append(cell)
         self.check()
         return cell
 
     def remove(self, cell):
         grades, lookup = self.grades, self.lookup
-        dim, idx = lookup[cell]
-        grade = grades[dim]
+        idx = lookup[cell]
+        grade = grades[cell.dim]
         assert grade.pop(idx) == cell
         del lookup[cell]
         for jdx in range(idx, len(grade)):
             cell = grade[jdx]
-            lookup[cell] = (dim, jdx)
+            lookup[cell] = jdx
         self.check()
 
     def face(self, children):
@@ -465,9 +464,7 @@ def test():
 
 def get_code(cx):
     H0, H1 = cx.bdy()
-    H0 %= 2
-    H1 %= 2
-    A = numpy.dot(H0, H1) # vert -- face
+    A = numpy.dot(H0%2, H1%2) # vert -- face
     #print(A)
     vdeg = (cx.bdy(0)%2).sum(1)
     assert vdeg.min() >= 3
@@ -520,15 +517,40 @@ def get_code(cx):
             assert 0
 
     print(cx)
-    print(H1)
     lookup = cx.lookup
-    for i,e in enumerate(cx.edges):
-        faces = [f for j,f in enumerate(cx.faces) if e in f]
-        assert len(faces) == 2
-        idxs = [lookup[v] for v in e]
+    walls = {} # map edge -> 0,1
+    for i,edge in enumerate(cx.edges):
+        jdxs = [j for j,f in enumerate(cx.faces) if edge in f]
+        assert len(jdxs) == 2
+        idxs = lookup[edge.src], lookup[edge.tgt]
+        config = ''.join([H[jdx,idx] for jdx in jdxs for idx in idxs])
+        top, bot = config[:2], config[2:]
+        if top in ['XX','ZZ'] or bot in ['XX','ZZ']:
+            value = 0
+        elif top in ['XZ','ZX'] or bot in ['XZ','ZX']:
+            value = 1
+        elif config in 'XYYX YXXY ZYYZ YZZY'.split():
+            value = 1
+        elif config in 'XYYZ YXZY ZYYX YZXY'.split():
+            value = 0
+        else:
+            assert 0, config
+        walls[edge] = value
+    for jdx,face in enumerate(cx.faces):
+        value = 0
+        for edge in face:
+            value += walls[edge]
+        for idx in range(H.shape[1]):
+            if H[jdx, idx] == 'Y':
+                value += 1
+        print(value, end=' ')
+        assert value%2 == 0
+    print()
 
+    print('_'*len(cx.verts))
     shortstr = lambda H : ('\n'.join(''.join(row) for row in H))
     print(shortstr(H))
+    print('_'*len(cx.verts))
     print()
 
     H = fromstr(H)
@@ -577,6 +599,8 @@ def mutate(cx):
 
 
 def main():
+    test()
+
     cx = make_octahedron()
     code = get_code(cx)
     assert code.k == 0
@@ -589,7 +613,7 @@ def main():
     code = get_code(cx)
     assert code.get_params() == (8, 3, 2)
 
-    return
+    #return
 
     while 1:
         cx = make_torus()
