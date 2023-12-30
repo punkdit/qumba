@@ -442,7 +442,6 @@ class QCode(object):
         return self.apply(M)
     CNOT = apply_CNOT
 
-
     def row_reduce(self):
         H = self.H.copy()
         m, n = self.shape
