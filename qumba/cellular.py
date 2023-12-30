@@ -518,10 +518,18 @@ def get_code(cx):
             #print('       ', ''.join(H[:,i].transpose()))
         else:
             assert 0
+
+    print(cx)
+    print(H1)
+    lookup = cx.lookup
+    for i,e in enumerate(cx.edges):
+        faces = [f for j,f in enumerate(cx.faces) if e in f]
+        assert len(faces) == 2
+        idxs = [lookup[v] for v in e]
+
     shortstr = lambda H : ('\n'.join(''.join(row) for row in H))
     print(shortstr(H))
     print()
-    #H = H[:-1, :]
 
     H = fromstr(H)
     H = linear_independent(H)
@@ -547,21 +555,21 @@ def mutate(cx):
             f = choice(cx.faces)
             cx.cut_face(f)
         assert cx.euler == ch
-        print(cx)
+        #print(cx)
     H0, H1 = cx.bdy()
     H0 %= 2
     H1 %= 2
     vdeg = H0.sum(1)
     fdeg = H1.sum(0)
-    print(vdeg)
-    print(fdeg)
+    #print(vdeg)
+    #print(fdeg)
     verts = list(cx.verts)
     for i,v in enumerate(verts):
         if vdeg[i] > 4:
             cx.bevel(v)
     vdeg = (cx.bdy(0)%2).sum(1)
-    assert vdeg.min() == 3
-    assert vdeg.max() == 4
+    assert vdeg.min() >= 3
+    assert vdeg.max() <= 4
     v3 = (vdeg==3).sum()
     v4 = (vdeg==4).sum()
     assert len(cx.faces) - v3//2 - v4 == ch
@@ -581,12 +589,18 @@ def main():
     code = get_code(cx)
     assert code.get_params() == (8, 3, 2)
 
-    cx = mutate(cx)
-    code = get_code(cx)
-    print(code.get_params())
+    return
 
-    d = distance_z3(code)
-    print("d =", d)
+    while 1:
+        cx = make_torus()
+        cx = mutate(cx)
+        code = get_code(cx)
+        print(code.get_params())
+    
+        #d = distance_z3(code)
+        #print("d =", d)
+
+        break
 
 
 if __name__ == "__main__":
