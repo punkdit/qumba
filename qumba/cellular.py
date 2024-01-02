@@ -14,6 +14,7 @@ import numpy
 from qumba.argv import argv
 from qumba.distance import distance_z3
 from qumba.qcode import QCode, fromstr, linear_independent
+from qumba.transversal import is_local_clifford_equiv
 
 
 class Cell(object):
@@ -462,7 +463,7 @@ def test():
     assert cx.sig == [24, 36, 14]
 
 
-def get_code(cx):
+def get_code(cx, verbose=False):
     H0, H1 = cx.bdy()
     A = numpy.dot(H0%2, H1%2) # vert -- face
     #print(A)
@@ -488,7 +489,9 @@ def get_code(cx):
                 if A[i,j]:
                     H[j,i] = labels.pop()
         elif vdeg[i] == 4:
-            labels = list('XZXZ')
+            labels = choice("XXZZ XXYY ZZYY".split()) # no...
+            #labels = "XXZZ"
+            labels = list(labels)
             shuffle(labels)
             jdxs = [j for j in range(m) if A[i,j]]
             for j in jdxs:
@@ -516,7 +519,7 @@ def get_code(cx):
         else:
             assert 0
 
-    print(cx)
+    #print(cx)
     lookup = cx.lookup
     walls = {} # map edge -> 0,1
     for i,edge in enumerate(cx.edges):
@@ -541,17 +544,22 @@ def get_code(cx):
         for edge in face:
             value += walls[edge]
         for idx in range(H.shape[1]):
-            if H[jdx, idx] == 'Y':
+            # go through each vertex with valence 3
+            w = (H0[idx,:]%2).sum()
+            if w==3 and H[jdx, idx] == 'Y': # H[face, vert]
+                # there's a twist here
+                print("*", end="")
                 value += 1
         print(value, end=' ')
         assert value%2 == 0
     print()
 
-    print('_'*len(cx.verts))
-    shortstr = lambda H : ('\n'.join(''.join(row) for row in H))
-    print(shortstr(H))
-    print('_'*len(cx.verts))
-    print()
+    if verbose:
+        print('_'*len(cx.verts))
+        shortstr = lambda H : ('\n'.join(''.join(row) for row in H))
+        print(shortstr(H))
+        print('_'*len(cx.verts))
+        print()
 
     H = fromstr(H)
     H = linear_independent(H)
@@ -559,10 +567,10 @@ def get_code(cx):
     return code
 
 
-def mutate(cx):
+def mutate(cx, count=3):
     ch = cx.euler
 
-    for _ in range(3):
+    for _ in range(count):
         i = randint(0, 2)
         if i==0:
             v = choice(cx.verts)
@@ -613,10 +621,23 @@ def main():
     code = get_code(cx)
     assert code.get_params() == (8, 3, 2)
 
-    #return
+    for _ in range(4):
+    #while 1:
+        #cx = make_cube()
+        cx = make_torus(3, 3)
+        cx = mutate(cx, 2)
+        code = get_code(cx)
+        print(code.get_params())
+        for trial in range(3):
+            dode = get_code(cx)
+            assert is_local_clifford_equiv(code, dode)
+            print(code.is_equiv(dode))
 
-    while 1:
-        cx = make_torus()
+    return
+
+    #while 1:
+    for trial in range(100):
+        cx = choice([make_torus, make_tetrahedron])()
         cx = mutate(cx)
         code = get_code(cx)
         print(code.get_params())
@@ -624,7 +645,6 @@ def main():
         #d = distance_z3(code)
         #print("d =", d)
 
-        break
 
 
 if __name__ == "__main__":

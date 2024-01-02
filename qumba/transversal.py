@@ -435,6 +435,10 @@ def find_local_clifford(tgt, src, constant=False, verbose=True):
 
         Add(U != M)
 
+def is_local_clifford_equiv(tgt, src, constant=False, verbose=False):
+    for M in find_local_clifford(tgt, src, constant, verbose):
+        return True
+
 
 def main():
     test()
