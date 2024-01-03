@@ -741,6 +741,51 @@ def main_unwrap():
         G = mulclose(gen)
         print(len(G))
 
+
+def test_412():
+    space = SymplecticSpace(1)
+    I = space.get_identity()
+    H = space.get_H()
+    S = space.get_S()
+    names = {
+        I : "I",
+        S : "S",
+        H : "H",
+        S*H : r"(S\cdot H)",
+        H*S : r"(H\cdot S)",
+        H*S*H : r"(H\cdot S\cdot H)",
+    }
+
+    code = QCode.fromstr("XYZI IXYZ ZIXY")
+    space = code.space
+    n = code.n
+    G = Group.symmetric(n)
+    perms = [tuple(g[i] for i in range(n)) for g in G]
+    perms.sort()
+    for perm in perms:
+        print(tuple(i+1 for i in perm), "&", end=" ")
+        dode = code.apply_perm(perm)
+        if dode.is_equiv(code):
+            eode = dode
+            U = space.get_identity()
+        else:
+            U = None
+            found = list(find_local_clifford(code, dode))
+            assert len(found) == 1
+            U = found[0]
+            eode = dode.apply(U)
+        assert eode.is_equiv(code)
+        name = [names[U[i:i+2, i:i+2]] for i in range(0,space.nn,2)]
+        name = r"".join(name)
+        print(name, "&", end=" ")
+        L = eode.get_logical(code)
+        print(names[L], end=" ")
+        print(r"\\")
+
+    E = code.get_encoder()
+    print(E)
+    space = code.space
+    print(space.get_name(E))
     
 
 if __name__ == "__main__":
