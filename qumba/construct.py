@@ -12,6 +12,8 @@ from qumba.qcode import QCode, SymplecticSpace, get_weight, fromstr
 from qumba.csscode import CSSCode, find_zx_duality
 from qumba.argv import argv
 
+def get_412():
+    return QCode.fromstr("XYZI IXYZ ZIXY")
 
 def get_422():
     return QCode.fromstr("XXXX ZZZZ", None, "XXII ZIZI XIXI ZZII")
