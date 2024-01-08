@@ -124,7 +124,7 @@ class Matrix(object):
         A = numpy.identity(n, dtype=scalar)
         return Matrix(A, p, name="I")
 
-    def shortstr(self):
+    def __str__(self):
         return str(self.A).replace("0", ".")
         # XXX broken:
         #s = shortstr(self.A)
@@ -133,7 +133,6 @@ class Matrix(object):
         #lines[0] = "["+lines[0][1:]
         #lines[-1] = lines[-1] + "]"
         #return '\n'.join(lines)
-    __str__ = shortstr
 
     def latex(self):
         A = self.A
