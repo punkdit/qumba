@@ -8,7 +8,7 @@ import numpy
 
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     zeros2, rank, rand2, pseudo_inverse, kernel, direct_sum, span)
-from qumba.qcode import QCode, SymplecticSpace, get_weight, fromstr
+from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr
 from qumba.csscode import CSSCode, find_zx_duality
 from qumba.argv import argv
 
@@ -240,6 +240,30 @@ def classical_codes(n, m, distance=3):
         #print("d =", d)
         if d>=distance:
             yield H
+
+
+def all_codes(n=4, k=1, d=2):
+    from bruhat.sp_pascal import i_grassmannian
+
+    space = SymplecticSpace(n)
+    gen = []
+    perm = []
+    for i in range(n):
+        perm.append(i)
+        perm.append(2*n - i - 1)
+        gen.append(space.get_S(i))
+        gen.append(space.get_H(i))
+    found = []
+
+    F = space.F
+    for _,H in i_grassmannian(n, n-k):
+        H = H[:, perm] # reshuffle to qumba symplectic
+        H = Matrix(H)
+        code = QCode(H, check=False)
+        if code.get_distance() < d:
+            continue
+        yield code
+
 
 
 def kron(A, B):

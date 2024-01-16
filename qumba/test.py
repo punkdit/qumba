@@ -15,6 +15,7 @@ from qumba import csscode, construct
 from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
 from qumba.action import mulclose, mulclose_hom
 from qumba.symplectic import Building
+from qumba.unwrap import unwrap, unwrap_encoder
 from qumba.smap import SMap
 from qumba.argv import argv
 
@@ -623,7 +624,6 @@ def test_1():
     G = mulclose([I, H, S])
     assert len(G) == 6
 
-    from qumba.unwrap import unwrap_encoder
     for g in [
         I, S, H, H*S, S*H, S*H*S # == H*S*H
     ]:
@@ -685,7 +685,6 @@ def test_412_unwrap():
 
     translate_clifford(code.space, code.get_encoder(), verbose=True)
 
-    from qumba.unwrap import unwrap_encoder
     dode = unwrap_encoder(code)
     print(dode.longstr())
 
@@ -794,7 +793,6 @@ def test_genon():
     
 
 def test_majorana():
-    from qumba.unwrap import unwrap
     from bruhat.algebraic import qchoose_2
     from bruhat.action import Group
 

@@ -14,15 +14,13 @@ from math import prod
 
 import numpy
 
+from qumba.default_p import DEFAULT_P
 from qumba.solve import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
     kernel, span, pseudo_inverse, rank, row_reduce, linear_independent)
 from qumba.solve import int_scalar as scalar
 from qumba import solve
 from qumba.action import mulclose
 from qumba.decode.network import TensorNetwork
-
-
-DEFAULT_P = 2 # qubits
 
 
 def flatten(H):
@@ -136,7 +134,7 @@ class Matrix(object):
 
     def latex(self):
         A = self.A
-        rows = ['&'.join('.1'[i] for i in row) for row in A]
+        rows = ['&'.join('.123456'[i] for i in row) for row in A]
         rows = r'\\'.join(rows)
         rows = r"\begin{bmatrix}%s\end{bmatrix}"%rows
         return rows

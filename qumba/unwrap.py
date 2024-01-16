@@ -11,6 +11,7 @@ from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identit
 from qumba.matrix import Matrix
 from qumba.qcode import QCode, SymplecticSpace
 from qumba import construct
+from qumba.distance import distance_z3
 from qumba.autos import get_isos
 from qumba.argv import argv
 
@@ -89,6 +90,32 @@ def zxcat(code, duality):
     return code
 
 
+def test_codetables():
+    for code in QCode.load_codetables():
+        if code.n < 11:
+            continue
+        if code.n > 20:
+            break
+        if code.k == 0:
+            continue
+        code2 = unwrap(code)
+        code2.get_params()
+        if code2.d is None:
+            code2.d = distance_z3(code2)
+        print(code, code2)
+
+
+def test_all_codes():
+    n, k, d = argv.get("params", (4, 1, 2))
+    found = set()
+    for code in construct.all_codes(n, k, d):
+        dode = unwrap(code)
+        dode.get_params()
+        desc = "%s %s"%(code, dode)
+        if desc not in found:
+            print(desc)
+            found.add(desc)
+
 
 def test_zx():
     for code in QCode.load_codetables():
@@ -98,7 +125,7 @@ def test_zx():
             continue
         print()
         code2 = unwrap(code)
-        #code2.get_params()
+        code2.get_params()
         print(code, code2)
         dode = code2.get_dual()
         #iso = code2.get_iso(dode)
