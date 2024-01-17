@@ -114,6 +114,9 @@ def test_all_codes():
         desc = "%s %s"%(code, dode)
         if desc not in found:
             print(desc)
+            print(code.longstr())
+            print("-->")
+            print(dode.longstr())
             found.add(desc)
 
 
