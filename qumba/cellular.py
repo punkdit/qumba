@@ -12,9 +12,10 @@ from random import choice, randint, seed, shuffle
 import numpy
 
 from qumba.argv import argv
-from qumba.distance import distance_z3
-from qumba.qcode import QCode, fromstr, linear_independent
+from qumba.distance import distance_z3, search_distance_z3
+from qumba.qcode import QCode, fromstr, linear_independent, strop
 from qumba.transversal import is_local_clifford_equiv
+from qumba.unwrap import unwrap
 
 
 class Cell(object):
@@ -548,11 +549,11 @@ def get_code(cx, verbose=False):
             w = (H0[idx,:]%2).sum()
             if w==3 and H[jdx, idx] == 'Y': # H[face, vert]
                 # there's a twist here
-                print("*", end="")
+                #print("*", end="")
                 value += 1
-        print(value, end=' ')
+        #print(value, end=' ')
         assert value%2 == 0
-    print()
+    #print()
 
     if verbose:
         print('_'*len(cx.verts))
@@ -606,8 +607,27 @@ def mutate(cx, count=3):
     return cx
 
 
+def remove_d2(code):
+    print("remove_d2")
+    while 1:
+        print('\t', code.get_params())
+        #L = strop(code.L).split()
+        #L = [l for l in L if l.count('.')==code.n-2]
+        #l = L[0]
+        l = search_distance_z3(code, 2)
+        if l is None or code.k==0:
+            break
+        l = strop(l)
+        H = strop(code.H)
+        H = l + '\n' + H
+        code = QCode.fromstr(H)
+
+    return code
+    
+
+
 def main():
-    test()
+    #test()
 
     cx = make_octahedron()
     code = get_code(cx)
@@ -621,17 +641,32 @@ def main():
     code = get_code(cx)
     assert code.get_params() == (8, 3, 2)
 
-    for _ in range(4):
-    #while 1:
+    #for _ in range(1):
+    while 1:
         #cx = make_cube()
         cx = make_torus(3, 3)
         cx = mutate(cx, 2)
-        code = get_code(cx)
+        c0 = get_code(cx)
+        if c0.k == 0:
+            continue
+        code = remove_d2(c0)
+        code.d = distance_z3(code)
         print(code.get_params())
-        for trial in range(3):
-            dode = get_code(cx)
-            assert is_local_clifford_equiv(code, dode)
-            print(code.is_equiv(dode))
+        c2 = unwrap(code)
+        c2.d = distance_z3(c2)
+        print(c2.get_params())
+        if c2.d > code.d:
+            print("unwrap:", c2.d)
+            print(cx)
+            print(c0.longstr())
+            print(code.longstr())
+            break
+
+        #for trial in range(3):
+        #    dode = get_code(cx)
+        #    assert is_local_clifford_equiv(code, dode)
+        #    print(code.is_equiv(dode))
+        #print()
 
     return
 

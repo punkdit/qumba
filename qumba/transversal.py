@@ -498,22 +498,22 @@ def main():
         print()
 
 
-def get_codes(n, k, d):
-    from bruhat.sp_pascal import i_grassmannian
-    perm = []
-    for i in range(n):
-        perm.append(i)
-        perm.append(2*n - i - 1)
-    found = []
-    for _,H in i_grassmannian(n, n-k):
-        H = H[:, perm]
-        H = Matrix(H)
-        code = QCode(H, check=False)
-        if code.get_distance() < d:
-            #print("x", end='', flush=True)
-            continue
-        found.append(code)
-    return found
+#def get_codes(n, k, d):
+#    from bruhat.sp_pascal import i_grassmannian
+#    perm = []
+#    for i in range(n):
+#        perm.append(i)
+#        perm.append(2*n - i - 1)
+#    found = []
+#    for _,H in i_grassmannian(n, n-k):
+#        H = H[:, perm]
+#        H = Matrix(H)
+#        code = QCode(H, check=False)
+#        if code.get_distance() < d:
+#            #print("x", end='', flush=True)
+#            continue
+#        found.append(code)
+#    return found
 
 
 def all_codes():
@@ -551,7 +551,7 @@ def all_codes():
     count = 0
     #found = []
     for _,H in i_grassmannian(n, n-k):
-        H = H[:, perm]
+        H = H[:, perm] # reshuffle to qumba symplectic
         H = Matrix(H)
         count += 1
         code = QCode(H, check=False)

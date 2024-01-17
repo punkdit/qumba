@@ -545,7 +545,7 @@ class QCode(object):
         return d
 
     def get_params(self, max_mk=22):
-        d = self.get_distance(max_mk)
+        d = self.d or self.get_distance(max_mk)
         return self.n, self.kk//2, d
 
     def bound_distance(self):

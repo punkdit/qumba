@@ -71,14 +71,17 @@ def search_distance_z3(code, d):
     u = dot2(code.L, F, v)
     assert u.sum() != 0, "bug bug... try updating z3?"
     assert get_weight(v) == d, "bug bug... try updating z3?"
-    return True
+    return v
 
 
 def distance_z3(code):
 
+    if code.k == 0:
+        return code.n
+
     d = 1
     while 1:
-        if search_distance_z3(code, d):
+        if search_distance_z3(code, d) is not None:
             return d
         d += 1
 
