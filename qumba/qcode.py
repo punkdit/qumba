@@ -173,6 +173,8 @@ class QCode(object):
             assert T.shape == (self.m, nn)
         if check:
             self.check()
+        if self.d is None and self.n < 10:
+            self.get_distance()
 
     def __eq__(self, other):
         assert isinstance(other, QCode)

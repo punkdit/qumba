@@ -17,6 +17,8 @@ def search_distance_z3(code, d):
     import z3
     from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver
 
+    if code.k == 0:
+        return 
     H, L = code.H, code.L
 
     #print("search_distance: d=%d"%d)

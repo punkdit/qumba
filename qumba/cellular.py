@@ -118,7 +118,7 @@ class Complex(object):
         return [len(g) for g in self.grades]
 
     def __str__(self):
-        return "Complex(%s)"%(self.sig,)
+        return "Complex%s"%(tuple(self.sig),)
 
     @property
     def verts(self):
@@ -159,12 +159,13 @@ class Complex(object):
         return H
 
     @classmethod
-    def frombdy(cls, H0, H1):
+    def frombdy(cls, H0, H1, check=True):
         #print("frombdy")
         #print(H0)
         #print(H1)
-        HH = numpy.dot(H0, H1)
-        assert numpy.alltrue(HH==0)
+        if check:
+            HH = numpy.dot(H0, H1)
+            assert numpy.alltrue(HH==0)
         cx = cls()
         m, n = H0.shape
         verts = [cx.vertex() for i in range(m)]
@@ -243,6 +244,7 @@ class Complex(object):
         return cell
 
     def cut_edge(self, e):
+        # add new vertex bisecting edge
         assert e.dim == 1
         self.remove(e)
         v0 = e.src
@@ -261,6 +263,7 @@ class Complex(object):
         return e0, e1
 
     def cut_face(self, face):
+        # add new vertex in center of face, with edge to each vertex of face
         assert face.dim == 2
         self.remove(face)
         cv = self.vertex() # center
@@ -274,6 +277,24 @@ class Complex(object):
             e0 = edges[e.src]
             e1 = edges[e.tgt]
             self.face({e:r, e1:r, e0:-r})
+        self.check()
+
+    def split_edge(self, edge):
+        # insert bigon face at this edge
+        assert edge.dim == 1
+        v0, v1 = edge.src, edge.tgt
+        faces = [face for face in self.faces if edge in face]
+        assert len(faces) == 2
+        #print("split_edge", [face[edge] for face in faces])
+        f0, f1 = faces
+        if f0[edge] == -1:
+            f0, f1 = f1, f0
+        assert f0[edge] == 1
+        assert f1[edge] == -1
+        del f1[edge]
+        e0, e1 = edge, self.edge(v0, v1)
+        f2 = self.face({e0:-1, e1:1})
+        f1[e1] = -1
         self.check()
 
     def barycenter(self, face):
@@ -334,6 +355,56 @@ class Complex(object):
         f = self.face(face)
         self.check()
         return f
+
+    def find_bone(cx):
+        "find edge with 2 degree 3 verts"
+        # ARRRGGGGHHHH cache this stuff ???!?!?!?!!!
+        H0 = cx.bdy(0)
+        m, n = H0.shape
+        A0 = numpy.abs(H0)
+        v_degree = A0.sum(1)
+        def degree_vertex(d):
+            for i in range(m):
+                if v_degree[i] == d:
+                    yield i
+        def incident_edge(vidx):
+            for eidx in range(n):
+                # for each incident edge
+                if A0[vidx,eidx]:
+                    yield eidx
+        def incident_vert(eidx):
+            for vidx in range(m):
+                # for each incident vert
+                if A0[vidx,eidx]:
+                    yield vidx
+        #print(shortstr(A0), A0.shape)
+        found = set()
+        for vidx in degree_vertex(3):
+            for eidx in incident_edge(vidx):
+                for v1 in incident_vert(eidx):
+                    if v1!=vidx and v_degree[v1]==3:
+                        #print("edge", eidx, vidx, v1)
+                        return cx.edges[eidx]
+
+    def get_degree(self):
+        H0 = self.bdy(0)
+        m, n = H0.shape
+        A0 = numpy.abs(H0)
+        v_degree = A0.sum(1)
+        return v_degree
+
+    def get_genons(self):
+        v_degree = self.get_degree()
+        return [self.verts[i] for i in range(len(self.verts)) if v_degree[i] == 3]
+    
+    def remove_bones(self):
+        #print("remove_bones", self)
+        while 1:
+            edge = self.find_bone()
+            if edge is None:
+                break
+            self.split_edge(edge) # mutates indexes
+
 
 
 def make_ball():
@@ -468,7 +539,7 @@ def get_code(cx, verbose=False):
     H0, H1 = cx.bdy()
     A = numpy.dot(H0%2, H1%2) # vert -- face
     #print(A)
-    vdeg = (cx.bdy(0)%2).sum(1)
+    vdeg = (H0%2).sum(1)
     assert vdeg.min() >= 3
     assert vdeg.max() <= 4
 
@@ -563,8 +634,11 @@ def get_code(cx, verbose=False):
         print()
 
     H = fromstr(H)
+    #print("get_code", H.shape)
     H = linear_independent(H)
+    #print("get_code", H.shape)
     code = QCode(H)
+    #print("get_code", code)
     return code
 
 
@@ -608,15 +682,14 @@ def mutate(cx, count=3):
 
 
 def remove_d2(code):
+    # remove distance 2 logops by adding these as stabilizers
     print("remove_d2")
     while 1:
         print('\t', code.get_params())
-        #L = strop(code.L).split()
-        #L = [l for l in L if l.count('.')==code.n-2]
-        #l = L[0]
         l = search_distance_z3(code, 2)
         if l is None or code.k==0:
             break
+        print("adding logop")
         l = strop(l)
         H = strop(code.H)
         H = l + '\n' + H
@@ -625,10 +698,13 @@ def remove_d2(code):
     return code
     
 
+def shortstr(H):
+    rows = [''.join(['%2s'%(i or '.') for i in row]) for row in H]
+    return '\n'.join(rows)
 
-def main():
-    #test()
 
+
+def test_mutate():
     cx = make_octahedron()
     code = get_code(cx)
     assert code.k == 0
@@ -641,25 +717,149 @@ def main():
     code = get_code(cx)
     assert code.get_params() == (8, 3, 2)
 
-    #for _ in range(1):
-    while 1:
-        #cx = make_cube()
-        cx = make_torus(3, 3)
+
+
+def main():
+    #test()
+    #test_mutate()
+    #test_torus()
+
+    key = argv.get("key", (5,4))
+#    for idx in range(7, 13):
+    for idx in range(90):
+        build_geometry(key, idx)
+
+
+def build_geometry(key=(5,4), idx=8):
+    from bruhat.qcode import Geometry, get_adj, Group
+    geometry = Geometry(key, idx)
+    G = geometry.G
+    print("|G| = %d, idx = %d" % (len(G), idx))
+    if len(G) < 80:
+        return
+
+    G = geometry.G
+    gens = G.gens
+    v, e, f = gens # vert, edge, face
+    H = Group.generate([f*e, f*v, e*v])
+    assert len(G) % len(H) == 0
+    index = len(G) // len(H)
+    assert index in [1, 2]
+    orientable = index==2
+
+    H = Group.generate([v,e]) # face stabilizer
+    assert len(H) == 2*key[0], len(H)
+    H = Group.generate([f,e]) # vert stabilizer
+    assert len(H) == 2*4
+    H = Group.generate([v,e,v*e*v*e*f*e*f*e])
+    assert len(G)%len(H)==0
+    index = len(G)//len(H)
+    assert index in [1, 2]
+    bicolour = index==2
+
+    # um, poincare dual:
+    faces = geometry.get_cosets([0,1,1])
+    edges = geometry.get_cosets([1,0,1])
+    verts = geometry.get_cosets([1,1,0])
+    #print("faces=%d, edges=%d, verts=%d"%(len(faces), len(edges), len(verts)))
+
+    chi = len(verts) - len(edges) + len(faces)
+    #assert chi%2 == 0
+    print("chi=%d"%chi, "g=%d"%(1-chi//2), "orientable=%s"%orientable, 
+        "bicolour=%s"%bicolour, )
+    A = get_adj(faces, edges)
+    B = get_adj(edges, verts)
+
+    m, n = A.shape
+    for col in range(n):
+        for row in range(m):
+            if A[row, col]:
+                A[row, col] = -1
+                break
+
+    if 0:
+        print("A =")
+        print(shortstr(A), A.shape)
+        print("B =")
+        print(shortstr(B), B.shape)
+    cx = Complex.frombdy(A, B, check=False)
+    #print(cx)
+    vd = cx.get_degree()
+    assert numpy.alltrue(vd==4), vd
+
+    try:
+        code = get_code(cx)
+    except AssertionError:
+        print("AssertionError", e)
+        return
+    code.d = distance_z3(code)
+    print("code:", code)
+    print()
+
+
+def make_klein():
+    "Klein's quartic"
+    # um... fail..
+    # 2 verts, 7 edges, 1 face
+    # genus 3
+    cx = Complex()
+    v0 = cx.vertex()
+    v1 = cx.vertex()
+    # edge identification
+    pairs = [(1,6), (2,11), (3,8), (4,13), (5,10), (7,12), (9,14)]
+    pairs = [(i-1,j-1) for (i,j) in pairs]
+    # see page 139 Girondo et al
+
+
+def test_torus():
+
+    for _ in range(20):
+        cx = make_torus(3,3)
         cx = mutate(cx, 2)
+        cx.remove_bones()
+        m = len(cx.get_genons())
+        assert m%2 ==0
+        code = get_code(cx)
+        assert code.k == 1 + m//2
+        print(code)
+
+    for _ in range(1):
+    #while 1:
+        #cx = make_cube()
+        print()
+        cx = make_torus(3, 4)
+        print("torus:", cx)
         c0 = get_code(cx)
+        print("c0:", c0.get_params())
+
+        cx = mutate(cx, 2)
+        print("mutate", cx)
+        cx.remove_bones()
+        print("remove_bones", cx)
+        c0 = get_code(cx)
+        print("c0:", c0.get_params())
+        print("genons:", len(cx.get_genons()))
+        g = len(cx.get_genons())
+        assert g%2 == 0
+        assert c0.k == g//2 + 1
         if c0.k == 0:
             continue
-        code = remove_d2(c0)
-        code.d = distance_z3(code)
-        print(code.get_params())
-        c2 = unwrap(code)
+        #code = remove_d2(c0)
+        c0.d = distance_z3(c0)
+        assert c0.d > 2
+        print("c0:", c0.get_params())
+        c2 = unwrap(c0)
         c2.d = distance_z3(c2)
-        print(c2.get_params())
-        if c2.d > code.d:
-            print("unwrap:", c2.d)
-            print(cx)
+        print("c2:", c2.get_params())
+
+        continue
+
+        if c2.k and c2.d > c0.d:
+            #print("unwrap:", c2.d)
+            #print(cx)
             print(c0.longstr())
-            print(code.longstr())
+            print("------>")
+            print(c2.longstr())
             break
 
         #for trial in range(3):
