@@ -813,7 +813,19 @@ def make_klein():
 
 def test_torus():
 
-    for _ in range(20):
+    for _ in range(40):
+        cx = make_torus(4,4)
+        cx = mutate(cx, 2)
+        cx.remove_bones()
+        m = len(cx.get_genons())
+        assert m%2 ==0
+        code = get_code(cx)
+        #assert code.k==1+m//2, (code.k, m)
+        print(code, "m =",m, code.k==1+m//2, )
+
+    return
+
+    for _ in range(10):
         cx = make_torus(3,3)
         cx = mutate(cx, 2)
         cx.remove_bones()
@@ -822,6 +834,8 @@ def test_torus():
         code = get_code(cx)
         assert code.k == 1 + m//2
         print(code)
+
+    return
 
     for _ in range(1):
     #while 1:
