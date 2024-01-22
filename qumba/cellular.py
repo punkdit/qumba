@@ -14,6 +14,7 @@ import numpy
 from qumba.argv import argv
 from qumba.distance import distance_z3, search_distance_z3
 from qumba.qcode import QCode, fromstr, linear_independent, strop
+from qumba.matrix import Matrix
 from qumba.transversal import is_local_clifford_equiv
 from qumba.unwrap import unwrap
 
@@ -236,6 +237,8 @@ class Complex(object):
         return cell
 
     def edge(self, v0, v1):
+        assert isinstance(v0, Cell)
+        assert isinstance(v1, Cell)
         cell = self.cell(1, {v0:-1, v1:+1})
         return cell
 
@@ -447,8 +450,8 @@ class Complex(object):
             vs.sort()
             faces.append(vs)
         faces.sort()
-        for face in faces:
-            print('\t',face)
+#        for face in faces:
+#            print('\t',face)
 #        for eidx, edge in enumerate(self.edges):
 #            for v in edge:
 #                print("v%s -- e%s;"%(self.verts.index(v), eidx), file=f)
@@ -457,7 +460,7 @@ class Complex(object):
 #                print("e%s -- f%s;"%(self.edges.index(e), fidx), file=f)
 
         print('}', file=f)
-        exit()
+        #exit()
         
 
 
@@ -848,7 +851,7 @@ def make_ramified():
     print("make_ramified")
     #key = (3, 8)
     key = (5,4)
-    idx = argv.get("idx", 7)
+    idx = argv.get("idx", 9)
     geometry = Geometry(key, idx, False)
 
     v, e, f = (0, 1, 2)
@@ -907,7 +910,7 @@ def make_ramified():
     chi = len(cx.verts) - len(cx.edges) + len(cx.faces)
     print("chi=%d"%chi, "g=%d"%(1-chi//2))
 
-    cx.todot("complex.dot")
+    #cx.todot("complex.dot")
 
     try:
         code = get_code(cx)
@@ -933,6 +936,82 @@ def make_klein():
     pairs = [(1,6), (2,11), (3,8), (4,13), (5,10), (7,12), (9,14)]
     pairs = [(i-1,j-1) for (i,j) in pairs]
     # see page 139 Girondo et al
+
+
+#def test_15_4_3():
+    
+
+
+def test_12_4_2():
+    code = QCode.fromstr("""
+    XXIIXZXIIIII
+    IYYIIIYYIIII
+    ZIXXZIIZIIII
+    IIIIZXIIZZXI
+    IIIIIYYIIIYY
+    IIIIXIXXXIIX
+    ZZXIIIIIXXII
+    IIYYIIIIIYYI
+    """)
+    code.d = distance_z3(code)
+    print(code)
+    print(code.longstr())
+    V = fromstr("""
+    XIIIIIIIIIII
+    ZIIIIIIIIIII
+    YIIIIIIIIIII
+    IXIIIIIIIIII
+    IZIIIIIIIIII
+    IYIIIIIIIIII
+    IIXIIIIIIIII
+    IIZIIIIIIIII
+    IIYIIIIIIIII
+    IIIXIIIIIIII
+    IIIZIIIIIIII
+    IIIYIIIIIIII
+    """)
+    print()
+    V = Matrix(V)
+    F = code.space.F
+    for u in V.rowspan():
+        if u.sum() == 0:
+            continue
+        if (u * F * code.H.t).sum() == 0:
+            print(strop(u))
+    return
+
+
+    cx = Complex()
+    N = 12
+    for i in range(N):
+        cx.vertex()
+    verts = cx.verts
+    lookup = {}
+    for d in [0,4,8]:
+        for (i,j) in [(0,1),(1,2),(2,3),(3,0),(0,4),(1,6),(2,7) ]:
+            e = cx.edge(verts[(i+d)%N], verts[(j+d)%N])
+            lookup[(i+d)%N, (j+d)%N] = e
+            print(e, end=" ")
+    print()
+    for d in [0,4,8]:
+        for face in [(0,1,6,5,4), (1,2,7,6), (2,3,0,4,7)]:
+            face = [(f+d)%N for f in face]
+            n = len(face)
+            edges = {}
+            for idx in range(n):
+                v0,v1 = face[idx],face[(idx+1)%n]
+                if (v0,v1) in lookup:
+                    edges[lookup[v0,v1]] = +1
+                elif (v1,v0) in lookup:
+                    edges[lookup[v1,v0]] = -1
+                else:
+                    assert 0
+            cx.face(edges)
+    print(cx)
+    code = get_code(cx)
+    code.d = distance_z3(code)
+    print(code)
+    print(code.longstr())
 
 
 def test_torus():
