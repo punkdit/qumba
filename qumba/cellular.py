@@ -262,6 +262,31 @@ class Complex(object):
         self.check()
         return e0, e1
 
+    def join_edge(self, v):
+        "join two edges at a vertex"
+        edges = [e for e in self.edges if v in e]
+        assert len(edges) == 2
+        e0, e1 = edges
+        if e1.tgt == v:
+            e0, e1 = e1, e0
+        assert e0.tgt == v
+        assert e1.src == v
+        # (+1) <--e1-- v <--e0-- (-1)
+        v1 = e1.tgt
+        self.remove(e1)
+        self.remove(v)
+        del e0[v]
+        e0[v1] = 1
+        # v1 <---e0--- (-1)
+        count = 0
+        for face in self.faces:
+            if e1 in face:
+                del face[e1]
+                assert e0 in face
+                count += 1
+        assert count == 2
+        self.check()
+
     def cut_face(self, face):
         # add new vertex in center of face, with edge to each vertex of face
         assert face.dim == 2
@@ -404,6 +429,36 @@ class Complex(object):
             if edge is None:
                 break
             self.split_edge(edge) # mutates indexes
+
+    def todot(self, name):
+        from string import ascii_letters
+        labels = ["%s%d"%(l, i) for l in ascii_letters for i in range(5)]
+        lookup = {v:idx for (idx,v) in enumerate(self.verts)}
+        f = open(name, 'w')
+        print('graph\n{', file=f)
+        for eidx, edge in enumerate(self.edges):
+            v0, v1 = edge.src, edge.tgt
+            print("v%s -- v%s;"%(lookup[v0], lookup[v1]), file=f)
+        print("faces:")
+        faces = []
+        for face in self.faces:
+            vs = set(lookup[v] for edge in face for v in edge )
+            vs = list(vs)
+            vs.sort()
+            faces.append(vs)
+        faces.sort()
+        for face in faces:
+            print('\t',face)
+#        for eidx, edge in enumerate(self.edges):
+#            for v in edge:
+#                print("v%s -- e%s;"%(self.verts.index(v), eidx), file=f)
+#        for fidx, face in enumerate(self.faces):
+#            for e in face:
+#                print("e%s -- f%s;"%(self.edges.index(e), fidx), file=f)
+
+        print('}', file=f)
+        exit()
+        
 
 
 
@@ -566,6 +621,7 @@ def get_code(cx, verbose=False):
             labels = list(labels)
             shuffle(labels)
             jdxs = [j for j in range(m) if A[i,j]]
+            assert len(jdxs)==4, jdxs
             for j in jdxs:
                 H[j,i] = labels.pop()
             j0, j1, j2, j3 = jdxs
@@ -719,17 +775,6 @@ def test_mutate():
 
 
 
-def main():
-    #test()
-    #test_mutate()
-    #test_torus()
-
-    key = argv.get("key", (5,4))
-#    for idx in range(7, 13):
-    for idx in range(90):
-        build_geometry(key, idx)
-
-
 def build_geometry(key=(5,4), idx=8):
     from bruhat.qcode import Geometry, get_adj, Group
     geometry = Geometry(key, idx)
@@ -764,9 +809,8 @@ def build_geometry(key=(5,4), idx=8):
     #print("faces=%d, edges=%d, verts=%d"%(len(faces), len(edges), len(verts)))
 
     chi = len(verts) - len(edges) + len(faces)
-    #assert chi%2 == 0
     print("chi=%d"%chi, "g=%d"%(1-chi//2), "orientable=%s"%orientable, 
-        "bicolour=%s"%bicolour, )
+        "bicolour=%s"%bicolour, end=" ")
     A = get_adj(faces, edges)
     B = get_adj(edges, verts)
 
@@ -783,18 +827,98 @@ def build_geometry(key=(5,4), idx=8):
         print("B =")
         print(shortstr(B), B.shape)
     cx = Complex.frombdy(A, B, check=False)
-    #print(cx)
+    print(cx)
     vd = cx.get_degree()
     assert numpy.alltrue(vd==4), vd
 
     try:
         code = get_code(cx)
     except AssertionError:
-        print("AssertionError", e)
+        print("AssertionError")
+        raise
         return
     code.d = distance_z3(code)
     print("code:", code)
     print()
+
+
+def make_ramified():
+    from bruhat.qcode import Geometry, get_adj, Group
+
+    print("make_ramified")
+    #key = (3, 8)
+    key = (5,4)
+    idx = argv.get("idx", 7)
+    geometry = Geometry(key, idx, False)
+
+    v, e, f = (0, 1, 2)
+    hgens = [(f,v)]
+    #hgens = []
+    graph = geometry.build_graph(hgens=hgens)
+
+    graph = graph.compress()
+    print(len(graph))
+
+    faces = graph.components([(1,), (2,)])
+    print("faces:", len(faces))
+    print([len(c) for c in faces])
+
+    edges = graph.components([(0,), (2,)])
+    print("edges:", len(edges))
+    print([len(c) for c in edges])
+
+    verts = graph.components([(0,), (1,)])
+    print("verts:", len(verts))
+    print([len(c) for c in verts])
+
+    A = get_adj(faces, edges)
+    B = get_adj(edges, verts)
+    cols = list(range(len(edges)))
+
+    m, n = A.shape
+    for col in range(n):
+        flag = 1
+        for row in range(m):
+            if A[row, col]:
+                A[row, col] = flag
+                if flag==-1:
+                    break
+                flag = -flag
+        else:
+            cols.remove(col)
+
+    A = A[:, cols]
+    B = B[cols, :]
+
+    print(shortstr(A), A.shape)
+    print(shortstr(B), B.shape)
+    cx = Complex.frombdy(A, B, check=False)
+    print(cx)
+
+    #print(cx)
+    vd = cx.get_degree()
+    print(vd)
+    verts = [cx.verts[i] for i in range(len(cx.verts)) if vd[i]==2]
+    for v in verts:
+        cx.join_edge(v)
+    vd = cx.get_degree()
+    print(vd)
+
+    chi = len(cx.verts) - len(cx.edges) + len(cx.faces)
+    print("chi=%d"%chi, "g=%d"%(1-chi//2))
+
+    cx.todot("complex.dot")
+
+    try:
+        code = get_code(cx)
+    except AssertionError:
+        print("AssertionError")
+        raise
+    code.d = distance_z3(code)
+    print(code.longstr())
+    print("code:", code)
+    print()
+
 
 
 def make_klein():
@@ -894,6 +1018,18 @@ def test_torus():
         #d = distance_z3(code)
         #print("d =", d)
 
+
+
+
+def main():
+    #test()
+    #test_mutate()
+    #test_torus()
+
+    key = argv.get("key", (5,4))
+#    for idx in range(7, 13):
+    for idx in range(90):
+        build_geometry(key, idx)
 
 
 if __name__ == "__main__":
