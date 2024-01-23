@@ -938,80 +938,28 @@ def make_klein():
     # see page 139 Girondo et al
 
 
-#def test_15_4_3():
-    
 
+def test_12_4_3():
 
-def test_12_4_2():
-    code = QCode.fromstr("""
-    XXIIXZXIIIII
-    IYYIIIYYIIII
-    ZIXXZIIZIIII
-    IIIIZXIIZZXI
-    IIIIIYYIIIYY
-    IIIIXIXXXIIX
-    ZZXIIIIIXXII
-    IIYYIIIIIYYI
-    """)
+    n = 12
+    ops = """
+    XZXIZXIIIIII
+    IYYYIIIIIIYI
+    ZIXZXIIXIIII
+    """.split()
+    stabs = []
+    for di in [0, 4, 8]:
+        for op in ops:
+            stabs.append( ''.join(op[(i+di)%n] for i in range(n)) )
+
+    print(stabs, len(stabs))
+    H = fromstr(stabs)
+    H = H[:-1]
+    code = QCode(H)
     code.d = distance_z3(code)
     print(code)
     print(code.longstr())
-    V = fromstr("""
-    XIIIIIIIIIII
-    ZIIIIIIIIIII
-    YIIIIIIIIIII
-    IXIIIIIIIIII
-    IZIIIIIIIIII
-    IYIIIIIIIIII
-    IIXIIIIIIIII
-    IIZIIIIIIIII
-    IIYIIIIIIIII
-    IIIXIIIIIIII
-    IIIZIIIIIIII
-    IIIYIIIIIIII
-    """)
-    print()
-    V = Matrix(V)
-    F = code.space.F
-    for u in V.rowspan():
-        if u.sum() == 0:
-            continue
-        if (u * F * code.H.t).sum() == 0:
-            print(strop(u))
-    return
 
-
-    cx = Complex()
-    N = 12
-    for i in range(N):
-        cx.vertex()
-    verts = cx.verts
-    lookup = {}
-    for d in [0,4,8]:
-        for (i,j) in [(0,1),(1,2),(2,3),(3,0),(0,4),(1,6),(2,7) ]:
-            e = cx.edge(verts[(i+d)%N], verts[(j+d)%N])
-            lookup[(i+d)%N, (j+d)%N] = e
-            print(e, end=" ")
-    print()
-    for d in [0,4,8]:
-        for face in [(0,1,6,5,4), (1,2,7,6), (2,3,0,4,7)]:
-            face = [(f+d)%N for f in face]
-            n = len(face)
-            edges = {}
-            for idx in range(n):
-                v0,v1 = face[idx],face[(idx+1)%n]
-                if (v0,v1) in lookup:
-                    edges[lookup[v0,v1]] = +1
-                elif (v1,v0) in lookup:
-                    edges[lookup[v1,v0]] = -1
-                else:
-                    assert 0
-            cx.face(edges)
-    print(cx)
-    code = get_code(cx)
-    code.d = distance_z3(code)
-    print(code)
-    print(code.longstr())
 
 
 def test_torus():
