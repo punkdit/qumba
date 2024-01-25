@@ -236,10 +236,10 @@ class Complex(object):
         cell = self.cell(2, children)
         return cell
 
-    def edge(self, v0, v1):
-        assert isinstance(v0, Cell)
-        assert isinstance(v1, Cell)
-        cell = self.cell(1, {v0:-1, v1:+1})
+    def edge(self, src, tgt):
+        assert isinstance(src, Cell)
+        assert isinstance(tgt, Cell)
+        cell = self.cell(1, {src:-1, tgt:+1})
         return cell
 
     def vertex(self):
@@ -678,7 +678,7 @@ def get_code(cx, verbose=False):
             # go through each vertex with valence 3
             w = (H0[idx,:]%2).sum()
             if w==3 and H[jdx, idx] == 'Y': # H[face, vert]
-                # there's a twist here
+                # there's a _twist here
                 #print("*", end="")
                 value += 1
         #print(value, end=' ')
@@ -698,6 +698,8 @@ def get_code(cx, verbose=False):
     #print("get_code", H.shape)
     code = QCode(H)
     #print("get_code", code)
+    code.walls = walls
+    code.cx = cx
     return code
 
 
@@ -776,6 +778,147 @@ def test_mutate():
     code = get_code(cx)
     assert code.get_params() == (8, 3, 2)
 
+
+def get_double(code):
+    cx = code.cx
+    V, E, F = len(cx.verts), len(cx.edges), len(cx.faces)
+    chi = F-E+V
+    genus = 1 - chi//2
+    if code.k == V-F+2:
+        bicolour = True
+    elif code.k == V-F+1:
+        bicolour = False
+    else:
+        assert 0
+
+    twists = set()
+    if not bicolour:
+        H = code.H
+        h = H.sum(0)
+        h = h.reshape((1, code.nn))
+        H = numpy.concatenate((H, h))
+        assert len(H) == len(cx.faces)
+        H = numpy.array([list(h) for h in strop(H).split()])
+        #print(H, H.shape)
+        for i in range(code.n):
+            w = sum(H[:, i] != '.')
+            if w == 3:
+                # trivalent vertex
+                for j in range(len(H)):
+                    if H[j,i] == 'Y':
+                        twists.add((cx.faces[j], cx.verts[i]))
+        assert len(twists)%2 == 0
+        assert code.k == 2*genus + len(twists)//2 - 1
+        #print("twists:", twists)
+        for vert in cx.verts:
+            assert len([t for t in twists if t[1] == vert]) <= 1
+
+    walls = code.walls
+    #print("get_double", cx)
+    #print(strop(code.H))
+    dx = Complex()
+    n = code.n
+    send_vert = {}
+    for vert in cx.verts:
+        fiber = [dx.vertex(), dx.vertex()]
+        send_vert[vert] = fiber
+    send_edge = {}
+    for edge in cx.edges:
+        v0, v1 = edge.src, edge.tgt
+        w = walls[edge]
+        e0 = dx.edge(send_vert[v0][0], send_vert[v1][w])
+        e1 = dx.edge(send_vert[v0][1], send_vert[v1][(1+w)%2])
+        send_edge[edge] = [e0, e1]
+        #print(edge, walls[edge])
+    # each twist creates a new edge in the fiber
+    twists = {(f,v) : dx.edge(*send_vert[v]) for (f,v) in twists}
+    for face in cx.faces:
+        #print(face)
+        found = set()
+        e_start = iter(face).__next__() # pick an edge in the base
+        for e_up in send_edge[e_start]:
+            e_dn = e_start
+            v_dn = e_dn.src # start here & walk around the base 
+            children = {} # build a face
+            while e_up not in found:
+                # add this edge
+                children[e_up] = face[e_dn]
+                found.add(e_up)
+
+                # in the base, find the next vertex in this edge
+                vs = [v for v in e_dn if v != v_dn]
+                assert len(vs)==1
+                v_dn = vs[0] # go to next vert
+
+                vs = [v for v in send_vert[v_dn] if v in e_up]
+                assert len(vs) == 1
+                v_up = vs[0]
+
+                # is this now a twist ? if so add the fiber edge
+                if (face, v_dn) in twists:
+                    #print("*")
+                    e = twists[face, v_dn]
+                    if e.src in e_up:
+                        children[e] = 1 # forwards
+                        v_up = e.tgt
+
+                    elif e.tgt in e_up:
+                        children[e] = -1 # backwards
+                        v_up = e.src
+                    else:
+                        assert 0
+                    e_up = e
+
+                # go to next edge in the base
+                es = [e for e in face if v_dn in e and e != e_dn]
+                assert len(es)==1
+                e_dn = es[0]
+
+                # find the next edge in the cover
+                e0, e1 = send_edge[e_dn]
+                if v_up in e0:
+                    assert not v_up in e1
+                    e_up = e0
+                elif v_up in e1:
+                    assert not v_up in e0
+                    e_up = e1
+                else:
+                    assert 0
+            if children:
+                f = dx.face(children)
+    #print(dx)
+    dode = get_code(dx)
+    return dode
+
+
+def test_double():
+    for cx in [
+        make_octahedron(),
+        make_torus(2, 2),
+        make_torus(3, 3),
+        make_torus(3, 4),
+        make_cube(),
+        make_tetrahedron(),
+    ]:
+        cx = mutate(cx, 2)
+    
+        code = get_code(cx)
+        distance_z3(code)
+        print(code)
+    
+        dode = get_double(code)
+        distance_z3(dode)
+        print(dode)
+
+        cx.remove_bones()
+
+        code = get_code(cx)
+        distance_z3(code)
+        print(code)
+    
+        dode = get_double(code)
+        distance_z3(dode)
+        print(dode)
 
 
 def build_geometry(key=(5,4), idx=8):

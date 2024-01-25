@@ -84,6 +84,8 @@ def distance_z3(code):
     d = 1
     while 1:
         if search_distance_z3(code, d) is not None:
+            if code.d is None:
+                code.d = d
             return d
         d += 1
 
