@@ -16,8 +16,13 @@ from qumba.autos import get_isos
 from qumba.argv import argv
 
 
-def unwrap(code, check=True):
-    H0 = code.deepH
+def unwrap_matrix(H):
+    if isinstance(H, Matrix):
+        H = H.A
+    H0 = H.view()
+    m, nn = H.shape
+    n = nn//2
+    H0.shape = m, n, 2
     m, n, _ = H0.shape
     Sx = H0[:, :, 0]
     Sz = H0[:, :, 1]
@@ -26,6 +31,13 @@ def unwrap(code, check=True):
     H = zeros2(2*m, 2*n, 2)
     H[:m, :, 0] = Sxz
     H[m:, :, 1] = Szx
+    H.shape = 2*m, 2*nn
+    H = Matrix(H)
+    return H
+
+
+def unwrap(code, check=True):
+    H = unwrap_matrix(code.H)
     code = QCode(H, check=check)
     return code
 

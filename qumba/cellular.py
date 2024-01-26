@@ -593,13 +593,18 @@ def test():
     assert cx.sig == [24, 36, 14]
 
 
-def get_code(cx, verbose=False):
+def get_code(cx, cleanup=False, verbose=False):
+    # cleanup: no Y's at valence 4 vertices 
     H0, H1 = cx.bdy()
     A = numpy.dot(H0%2, H1%2) # vert -- face
     #print(A)
     vdeg = (H0%2).sum(1)
     assert vdeg.min() >= 3
     assert vdeg.max() <= 4
+
+    config_labels = "XXZZ XXYY ZZYY".split()
+    if cleanup:
+        config_labels = ["XXZZ"]
 
     n = len(cx.verts)
     m = len(cx.faces)
@@ -619,8 +624,7 @@ def get_code(cx, verbose=False):
                 if A[i,j]:
                     H[j,i] = labels.pop()
         elif vdeg[i] == 4:
-            labels = choice("XXZZ XXYY ZZYY".split()) # no...
-            #labels = "XXZZ"
+            labels = choice(config_labels)
             labels = list(labels)
             shuffle(labels)
             jdxs = [j for j in range(m) if A[i,j]]
@@ -891,7 +895,36 @@ def get_double(code):
     return dode
 
 
+def check_double(cx):
+    code = get_code(cx, cleanup=True)
+    distance_z3(code)
+    print(code)
+    print(code.longstr())
+
+    dode = get_double(code)
+    distance_z3(dode)
+    #print(dode)
+    #print(dode.longstr())
+
+    #if code.k == 0:
+    #    return True
+
+    eode = unwrap(code)
+    n = dode.n
+    space = dode.space
+    perm = [2*i for i in range(n//2)] + [2*i+1 for i in range(n//2)]
+    perm = space.get_perm(perm).t
+    eode = eode.apply(perm)
+    return is_local_clifford_equiv(eode, dode)
+
+
 def test_double():
+
+    cx = make_tetrahedron()
+    cx = make_cube()
+    cx = make_torus(3,3)
+    assert check_double(cx)
+
     for cx in [
         make_octahedron(),
         make_torus(2, 2),
@@ -900,25 +933,11 @@ def test_double():
         make_cube(),
         make_tetrahedron(),
     ]:
+        assert check_double(cx)
         cx = mutate(cx, 2)
-    
-        code = get_code(cx)
-        distance_z3(code)
-        print(code)
-    
-        dode = get_double(code)
-        distance_z3(dode)
-        print(dode)
-
+        assert check_double(cx)
         cx.remove_bones()
-
-        code = get_code(cx)
-        distance_z3(code)
-        print(code)
-    
-        dode = get_double(code)
-        distance_z3(dode)
-        print(dode)
+        assert check_double(cx)
 
 
 def build_geometry(key=(5,4), idx=8):

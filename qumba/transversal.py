@@ -414,8 +414,9 @@ def find_local_clifford(tgt, src, constant=False, verbose=True):
     HU = src.H * U.t
     LU = src.L * U.t
     F = src.space.F
-    R = HU * F * tgt.L.t
-    Add(R==0) # linear constraint
+    if tgt.k:
+        R = HU * F * tgt.L.t
+        Add(R==0) # linear constraint
     R = HU * F * tgt.H.t
     Add(R==0) # linear constraint
 
@@ -438,6 +439,7 @@ def find_local_clifford(tgt, src, constant=False, verbose=True):
 def is_local_clifford_equiv(tgt, src, constant=False, verbose=False):
     for M in find_local_clifford(tgt, src, constant, verbose):
         return True
+    return False
 
 
 def main():
