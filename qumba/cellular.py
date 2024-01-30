@@ -77,6 +77,25 @@ class Cell(object):
                 return cell
         assert 0, self.children
 
+    def walk_edges(self, e0=None, v0=None):
+        assert self.dim == 2, "not an face"
+        if e0 is None:
+            e0 = iter(self.children).__next__()
+        if v0 is None:
+            v0 = e0.src
+        e,v = e0,v0
+        while 1:
+            yield e,v
+            v1 = e.tgt if v==e.src else e.src
+            for e1 in self.children:
+                if v1 in e1 and e!=e1:
+                    break
+            else:
+                assert 0
+            e,v = e1,v1
+            if e == e0:
+                break
+
 
 class Complex(object):
     def __init__(self, grades=None):
@@ -305,6 +324,32 @@ class Complex(object):
             e0 = edges[e.src]
             e1 = edges[e.tgt]
             self.face({e:r, e1:r, e0:-r})
+        self.check()
+
+    def split_face(self, face, v0, v1):
+        assert face.dim == 2
+        assert v0 != v1
+        self.remove(face)
+        for e0 in face:
+            if v0 in e0:
+                break
+        else:
+            assert 0
+        sign = e0[v0] * face[e0]
+        edge = self.edge(v0, v1)
+        left = {edge:sign}
+        for e,v in face.walk_edges(e0, v0):
+            if v==v1:
+                break
+            left[e] = face[e]
+        self.face(left)
+        right = {edge:-sign}
+        for e,v in face.walk_edges(e, v):
+            if v==v0:
+                break
+            assert e not in left
+            right[e] = face[e]
+        self.face(right)
         self.check()
 
     def split_edge(self, edge):
@@ -593,8 +638,8 @@ def test():
     assert cx.sig == [24, 36, 14]
 
 
-def get_code(cx, cleanup=False, verbose=False):
-    # cleanup: no Y's at valence 4 vertices 
+def get_code(cx, clean=False, verbose=False):
+    # clean: no Y's at valence 4 vertices 
     H0, H1 = cx.bdy()
     A = numpy.dot(H0%2, H1%2) # vert -- face
     #print(A)
@@ -603,7 +648,7 @@ def get_code(cx, cleanup=False, verbose=False):
     assert vdeg.max() <= 4
 
     config_labels = "XXZZ XXYY ZZYY".split()
-    if cleanup:
+    if clean:
         config_labels = ["XXZZ"]
 
     n = len(cx.verts)
@@ -783,7 +828,7 @@ def test_mutate():
     assert code.get_params() == (8, 3, 2)
 
 
-def get_double(code):
+def get_double(code, clean=False):
     cx = code.cx
     V, E, F = len(cx.verts), len(cx.edges), len(cx.faces)
     chi = F-E+V
@@ -891,20 +936,20 @@ def get_double(code):
             if children:
                 f = dx.face(children)
     #print(dx)
-    dode = get_code(dx)
+    dode = get_code(dx, clean=clean)
     return dode
 
 
 def check_double(cx):
-    code = get_code(cx, cleanup=True)
+    code = get_code(cx, clean=True)
     distance_z3(code)
     print(code)
     print(code.longstr())
 
     dode = get_double(code)
     distance_z3(dode)
-    #print(dode)
-    #print(dode.longstr())
+    print(dode)
+    print(dode.longstr())
 
     #if code.k == 0:
     #    return True
@@ -1208,6 +1253,83 @@ def test_torus():
         #print("d =", d)
 
 
+def test_cube():
+    cx = make_cube()
+    f0 = cx.faces[0]
+    for e,v in f0.walk_edges():
+        assert v in e
+
+    for f1 in cx.faces:
+        if not f1.intersect(f0):
+            break
+
+    vs = [v for e,v in f0.walk_edges()]
+    v00, v01 = vs[0], vs[2]
+
+    for e in cx.edges:
+        if v00 in e and e not in f0:
+            break
+    v_skip = e.tgt if e.src==v00 else e.src
+    vs = [v for e,v in f1.walk_edges()]
+    idx = vs.index(v_skip)
+    if idx in [1,3]:
+        v10, v11 = vs[0], vs[2]
+    else:
+        assert idx in [0,2]
+        v10, v11 = vs[1], vs[3]
+
+    print(cx)
+    code = get_code(cx)
+    print(code.get_params())
+
+    cx.split_face(f0, v00, v01)
+    cx.split_face(f1, v10, v11)
+    print(cx)
+
+    assert check_double(cx)
+    return
+
+    code = get_code(cx, clean=True)
+    #print(code.get_params())
+
+    dode = get_double(code, clean=True)
+    print(dode.get_params())
+    #print(strop(dode.H))
+    # CSS version:
+    """
+    X.X.....X..X....
+    .Z.Z.....ZZ.....
+    .....ZZ.....Z.ZZ  5
+    ....X..X.....XXX  5
+    .X.XXXX.........  5
+    Z.Z.ZZ.Z........  5
+    .........XX.X..X
+    ........Z..Z.ZZ.
+    ZZ....Z.Z.......
+    XX.....X.X......
+    ......X.X.....X.
+    .......Z.Z.....Z
+    ..Z.......ZZZ...
+    ...X......XX.X..
+    """
+    eode = unwrap(code)
+    print(strop(eode.H))
+    """
+    X....X...X..X...
+    ..XX..XX..X.....  5
+    .XX.....X..X....
+    ....XX.X.....XXX  6
+    X..XX...X.......
+    ...........XX..X  3
+    .X....X......X..  3
+    .Z..Z...Z....Z..
+    ..Z.......ZZ..ZZ  5
+    Z..Z.....ZZ.....
+    .....ZZZ....ZZ.Z  6
+    Z.......Z..ZZ...
+    ...ZZ..Z........  3
+    .....Z...Z....Z.  3
+    """
 
 
 def main():
