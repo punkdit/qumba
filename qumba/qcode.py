@@ -145,17 +145,23 @@ def strop(H):
 
 
 class QCode(object):
-    def __init__(self, H, T=None, L=None, J=None, d=None, check=True):
+    def __init__(self, H=None, T=None, L=None, J=None, A=None, d=None, check=True):
+        A = Matrix.promote(A)
+        if H is None:
+            assert A is not None
+            H = A.linear_independent()
+        else:
+            H = flatten(H) # stabilizers
+            H = Matrix.promote(H)
         assert len(H)==0 or H.max() <= 1
-        H = flatten(H) # stabilizers
         m, nn = H.shape
         assert nn%2 == 0
         n = nn//2
-        H = Matrix.promote(H)
         T = Matrix.promote(T)
         L = Matrix.promote(L)
         J = Matrix.promote(J)
         self.H = H # stabilizers
+        self.A = A # redundant stabilizers
         self.T = T # destabilizers
         self.L = L # logicals
         self.J = J # gauge generators

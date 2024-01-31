@@ -2,7 +2,7 @@
 
 """
 Build some 
-2-dimensional cellular complexes, mostly by mutation.
+2-dimensional cellular complexes, mostly by _mutation.
 """
 
 
@@ -20,11 +20,13 @@ from qumba.unwrap import unwrap
 
 
 class Cell(object):
-    def __init__(self, dim=0, children=[]):
+    def __init__(self, cx, dim=0, children=[]):
+        self.cx = cx 
         self.dim = dim
         if type(children) in [list, tuple, set]:
             children = {child:1 for child in children}
         self.children = dict(children)
+        self.__class__ = [Vert, Edge, Face][dim]
 
     def __str__(self):
         name = "Vert Edge Face".split()[self.dim]
@@ -59,6 +61,43 @@ class Cell(object):
     def intersect(self, other):
         return [child for child in self if child in other]
 
+
+class Vert(Cell):
+    def walk(self):
+        cx = self.cx
+        flags = []
+        for face in cx.faces: # ARGHHFFF
+            for edge in face:
+                if self in edge:
+                    flags.append((face, edge))
+        #print("flags:", len(flags))
+        f0, e0 = flags.pop()
+        yield f0, e0
+        while flags:
+            #print("flags:", len(flags))
+            # change the edge
+            for (f1, e1) in flags:
+                if f1==f0: # same face
+                    break
+            else:
+                assert 0, len(flags)
+            flags.remove((f1, e1))
+            yield f1, e1
+            #print("flags:", len(flags))
+            if not flags:
+                break
+            # change the face
+            for (f2, e2) in flags:
+                if e2==e1: # same edge
+                    break
+            else:
+                assert 0, len(flags)
+            flags.remove((f2, e2))
+            yield f2, e2
+            f0, e0 = f2, e2
+
+
+class Edge(Cell):
     @property
     def src(self):
         assert self.dim == 1, "not an edge"
@@ -77,8 +116,10 @@ class Cell(object):
                 return cell
         assert 0, self.children
 
-    def walk_edges(self, e0=None, v0=None):
-        assert self.dim == 2, "not an face"
+
+class Face(Cell):
+    def walk(self, e0=None, v0=None):
+        assert self.dim == 2, "not a face"
         if e0 is None:
             e0 = iter(self.children).__next__()
         if v0 is None:
@@ -233,7 +274,7 @@ class Complex(object):
         return True
 
     def cell(self, dim=0, children=[]):
-        cell = Cell(dim, children)
+        cell = Cell(self, dim, children)
         grade = self.grades[dim]
         self.lookup[cell] = len(grade)
         grade.append(cell)
@@ -338,13 +379,13 @@ class Complex(object):
         sign = e0[v0] * face[e0]
         edge = self.edge(v0, v1)
         left = {edge:sign}
-        for e,v in face.walk_edges(e0, v0):
+        for e,v in face.walk(e0, v0):
             if v==v1:
                 break
             left[e] = face[e]
         self.face(left)
         right = {edge:-sign}
-        for e,v in face.walk_edges(e, v):
+        for e,v in face.walk(e, v):
             if v==v0:
                 break
             assert e not in left
@@ -507,6 +548,21 @@ class Complex(object):
         print('}', file=f)
         #exit()
         
+    @property
+    def bicolour(self):
+        V, E, F = len(self.verts), len(self.edges), len(self.faces)
+        code = self.code
+        chi = F-E+V
+        genus = 1 - chi//2
+        if code.k == V-F+2:
+            bicolour = True
+        elif code.k == V-F+1:
+            bicolour = False
+        else:
+            assert 0
+        return bicolour
+
+
 
 
 
@@ -541,6 +597,11 @@ def make_torus(rows=2, cols=2):
             hedge[(i+1)%rows,j]:-1, vedge[i,j]:-1})
     return cx
 
+
+def make_tri():
+    cx = make_ball()
+    cx.split_face(cx.faces[0], cx.verts[0], cx.verts[1])
+    return cx
 
 def make_tetrahedron():
     cx = make_ball()
@@ -742,13 +803,10 @@ def get_code(cx, clean=False, verbose=False):
         print()
 
     H = fromstr(H)
-    #print("get_code", H.shape)
-    H = linear_independent(H)
-    #print("get_code", H.shape)
-    code = QCode(H)
-    #print("get_code", code)
+    code = QCode(A=H)
     code.walls = walls
     code.cx = cx
+    cx.code = code # married for life
     return code
 
 
@@ -989,7 +1047,7 @@ def build_geometry(key=(5,4), idx=8):
     from bruhat.qcode import Geometry, get_adj, Group
     geometry = Geometry(key, idx)
     G = geometry.G
-    print("|G| = %d, idx = %d" % (len(G), idx))
+    #print("|G| = %d, idx = %d" % (len(G), idx))
     if len(G) < 80:
         return
 
@@ -1019,8 +1077,8 @@ def build_geometry(key=(5,4), idx=8):
     #print("faces=%d, edges=%d, verts=%d"%(len(faces), len(edges), len(verts)))
 
     chi = len(verts) - len(edges) + len(faces)
-    print("chi=%d"%chi, "g=%d"%(1-chi//2), "orientable=%s"%orientable, 
-        "bicolour=%s"%bicolour, end=" ")
+    #print("chi=%d"%chi, "g=%d"%(1-chi//2), "orientable=%s"%orientable, 
+    #    "bicolour=%s"%bicolour, end=" ")
     A = get_adj(faces, edges)
     B = get_adj(edges, verts)
 
@@ -1037,9 +1095,9 @@ def build_geometry(key=(5,4), idx=8):
         print("B =")
         print(shortstr(B), B.shape)
     cx = Complex.frombdy(A, B, check=False)
-    print(cx)
     vd = cx.get_degree()
     assert numpy.alltrue(vd==4), vd
+    return cx
 
     try:
         code = get_code(cx)
@@ -1171,7 +1229,7 @@ def test_12_4_3():
 
 def test_torus():
 
-    for _ in range(40):
+    for _ in range(4):
         cx = make_torus(4,4)
         cx = mutate(cx, 2)
         cx.remove_bones()
@@ -1256,21 +1314,21 @@ def test_torus():
 def test_cube():
     cx = make_cube()
     f0 = cx.faces[0]
-    for e,v in f0.walk_edges():
+    for e,v in f0.walk():
         assert v in e
 
     for f1 in cx.faces:
         if not f1.intersect(f0):
             break
 
-    vs = [v for e,v in f0.walk_edges()]
+    vs = [v for e,v in f0.walk()]
     v00, v01 = vs[0], vs[2]
 
     for e in cx.edges:
         if v00 in e and e not in f0:
             break
     v_skip = e.tgt if e.src==v00 else e.src
-    vs = [v for e,v in f1.walk_edges()]
+    vs = [v for e,v in f1.walk()]
     idx = vs.index(v_skip)
     if idx in [1,3]:
         v10, v11 = vs[0], vs[2]
@@ -1332,15 +1390,186 @@ def test_cube():
     """
 
 
-def main():
-    #test()
-    #test_mutate()
-    #test_torus()
+def get_edge_code(cx):
+    from qumba.solve import (parse, rank, row_reduce, shortstr, normal_form,
+        kernel, eq2, zeros2, intersect, dot2)
+
+    #print("get_edge_code")
+
+    # trivalent edges
+    G = parse("""
+    11....
+    .11...
+    ..11..
+    ...11.
+    ....11
+    1....1
+    """)
+    G = normal_form(G)
+    #print(shortstr(G), G.shape)
+    H3 = parse("111111")
+    K = kernel(H3)
+    K = normal_form(K)
+    assert eq2(K, G)
+
+    # four valent edges
+    G = parse("""
+    11......
+    ..11....
+    ....11..
+    ......11
+    ...1...1
+    1...1...
+    .1...1..
+    ..1...1.
+    """)
+    G = normal_form(G)
+    #print(shortstr(G), G.shape)
+    H4 = parse("..11..11\n11..11..")
+    K = kernel(H4)
+    K = normal_form(K)
+    assert eq2(K, G)
+
+    elookup = {e:[] for e in cx.edges}
+    lookup = {}
+    for face in cx.faces:
+      for edge in face:
+        lookup[face, edge] = len(lookup)
+        elookup[edge].append(face)
+    N = len(lookup)
+
+    e_sigma = zeros2(len(cx.edges), N)
+    for i,edge in enumerate(cx.edges):
+        for face in elookup[edge]:
+            idx = lookup[face, edge]
+            e_sigma[i, idx] = 1
+    #print(shortstr(e_sigma))
+    
+    f_sigma = zeros2(len(cx.faces), N)
+    for i,face in enumerate(cx.faces):
+        for edge in face:
+            idx = lookup[face, edge]
+            f_sigma[i, idx] = 1
+    #print("f_sigma")
+    #print(shortstr(f_sigma))
+    
+    rows = []
+    v3 = v4 = 0
+    for v0 in cx.verts:
+        items = list(v0.walk())
+        valence = len(items)//2
+        idxs = [lookup[f,e] for f,e in items]
+        #print('\t', idxs)
+        if valence == 3:
+            row = zeros2(len(H3), N)
+            row[:, idxs] = H3
+            rows.append(row)
+            v3 += 1
+        elif valence == 4:
+            row = zeros2(len(H4), N)
+            row[:, idxs] = H4
+            rows.append(row)
+            v4 += 1
+        else:
+            assert 0
+    f = len(cx.faces)
+    e = len(cx.edges)
+    v = len(cx.verts)
+    H = numpy.concatenate(tuple(rows))
+    #print("H =")
+    #print(shortstr(H), H.shape)
+    K = kernel(H)
+    #print(shortstr(K), K.shape)
+    code = get_code(cx)
+    A = code.A
+    assert A.shape == (f, 2*v)
+    e_sigma = intersect(e_sigma, K)
+    assert len(f_sigma) == f
+    assert rank(f_sigma) == f
+    assert len(intersect(f_sigma, K)) == f
+    #print("H*f_sigma.t")
+    #print(shortstr(dot2(H, f_sigma.transpose())))
+    print(
+        "n=%2d m=%2d k=%2d  v3=%2d v4=%2d e=%2d f=%2d  "
+        "len(H)=%3d  rank(H)=%3d  dim(S)=%3d  excess=%2d bicolour=%d  "
+        "f_sigma=%2d e_sigma=%2d"
+        %(code.n, code.m, code.k, v3, v4, e, f,
+        len(H), rank(H), len(K), len(K)-2*code.n, int(cx.bicolour),
+        len(f_sigma), len(e_sigma)
+        )
+    )
+    #assert len(e_sigma)==e
+    assert 2*e-len(H)==2*code.n
+    assert len(H) == v3 + 2*v4
+    assert len(K)+rank(H) == 2*e
+
+    if cx.bicolour:
+        assert code.k == v - f + 2
+        assert len(K) == 2*code.n+2 == 2*f+2*code.k - 2
+    else:
+        assert code.k == v - f + 1
+        assert len(K) == 2*code.n+1 == 2*f+2*code.k - 1
+
+    return [1, int(cx.bicolour), f, code.k], len(K)
+    return [1, int(cx.bicolour), code.n], len(K)
+    return [1, int(cx.bicolour), v3, v4, e, f, code.k], len(K)
+
+
+def test_edges():
+
+    lhs, rhs = [], []
+    for cx in [
+        #make_tri(),
+        make_tetrahedron(),
+        make_cube(),
+        make_octahedron(),
+        make_torus(2, 2),
+        make_torus(3, 3),
+        make_torus(3, 4),
+        build_geometry((5,4), 9),
+        #build_geometry((5,4), 10),
+        #build_geometry((3,6), 12),
+    ]:
+        l, r = get_edge_code(cx)
+        lhs.append(l)
+        rhs.append(r)
+        try:
+            cx = mutate(cx, 2)
+        except AssertionError:
+            print("*\n")
+            continue
+        l, r = get_edge_code(cx)
+        lhs.append(l)
+        rhs.append(r)
+        #cx.remove_bones()
+        #get_edge_code(cx)
+        #print()
+
+    from bruhat.gelim import array, solve
+    lhs = array(lhs)
+    rhs = array(rhs)
+    print(lhs, lhs.shape)
+    print(rhs, rhs.shape)
+    A = solve(lhs, rhs)
+    if A is not None:
+        print("A =", ' '.join([str(x) for x in A]))
+    else:
+        print("A =", A)
+
+    
+
+def test_geometry():
 
     key = argv.get("key", (5,4))
 #    for idx in range(7, 13):
     for idx in range(90):
         build_geometry(key, idx)
+
+def main():
+    test()
+    test_mutate()
+    test_torus()
+    test_cube()
 
 
 if __name__ == "__main__":

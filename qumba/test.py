@@ -733,13 +733,17 @@ def test_conjugacy():
         best = None
         for g in cgy:
             name = s.get_name(g)
-            #print("\t\t%s"%
+            print("\t\t%s"%("*".join(name)))
             if best is None or len(best[0]) > len(name):
                 best = [name]
             elif len(best[0]) == len(name):
                 best.append(name)
-        for name in best:
-            print("\t\t%s"%("*".join(name)))
+        #for name in best:
+        #    print("\t\t%s"%("*".join(name)))
+        if len(cgy) > 10:
+            break
+    H = mulclose(cgy)
+    print(len(H))
 
 
 def test_genon():
