@@ -665,6 +665,22 @@ class QCode(object):
             items.append(len(J))
         return tuple(items)
 
+    def get_projector(self):
+        "get Clifford projector onto codepsace"
+        from qumba.clifford_sage import Clifford, half
+        H = self.H
+        n = self.n
+        assert n < 16, "wup.. too big ?"
+        c = Clifford(n)
+        I = c.get_identity()
+        P = I
+        gens = []
+        for u in H:
+            desc = strop(u)
+            g = c.get_pauli(desc)
+            P *= half * (I + g)
+        return P
+
 
 
 

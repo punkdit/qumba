@@ -286,6 +286,10 @@ class Matrix(object):
         A = linear_independent(self.A)
         return Matrix(A)
 
+    def intersect(self, other):
+        A = intersect(self.A, other.A)
+        return Matrix(A)
+
     def get_projector(A):
         "project onto the colspace"
         P = A*A.pseudo_inverse()

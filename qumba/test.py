@@ -681,9 +681,9 @@ def test_412_unwrap():
     v = Matrix(v)
     print(Ei*v.t)
 
-    return
+    #return
 
-    translate_clifford(code.space, code.get_encoder(), verbose=True)
+    #translate_clifford(code.space, code.get_encoder(), verbose=True)
 
     dode = unwrap_encoder(code)
     print(dode.longstr())

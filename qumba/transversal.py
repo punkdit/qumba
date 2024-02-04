@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-looking for transversal logical clifford operations
+_looking for transversal logical clifford operations
 """
 
 from functools import reduce
@@ -11,7 +11,7 @@ import numpy
 import z3
 from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver
 
-from qumba.qcode import QCode, SymplecticSpace, Matrix
+from qumba.qcode import QCode, SymplecticSpace, Matrix, fromstr, shortstr, strop
 from qumba.action import mulclose, Group
 from qumba import equ
 from qumba import construct 
@@ -788,6 +788,140 @@ def test_412():
     print(E)
     space = code.space
     print(space.get_name(E))
+
+
+def test_412_clifford():
+    from qumba.clifford_sage import Clifford, half, mulclose_names
+    code = QCode.fromstr("XYZI IXYZ ZIXY")
+    #print(code.get_params())
+    #print(code.longstr())
+
+    perm = [1,0,3,2]    
+    #perm = [1,2,3,0]
+    dode = code.apply_perm(perm)
+    #print(dode.longstr())
+
+    eode = dode
+    space = code.space
+    gen = [space.get_identity()]
+    for i in range(4):
+        gen.append( space.get_S(i) )
+        gen.append( space.get_H(i) )
+    G = mulclose(gen)
+    print(len(G))
+    for g in G:
+        eode = dode.apply(g)
+        if eode.is_equiv(code):
+            break
+    name = g.name
+    print("local clifford:", name)
+
+    H = code.H
+    n = code.n
+    c = Clifford(4)
+    P = code.get_projector()
+    assert P*P == P
+    
+    p = c.get_P(*perm)
+    gate = c.get_expr(name)
+    gate = gate*p
+    print(gate*P == P*gate)
+    
+    #S4 = Group.symmetric(4)
+    #for g in S4:
+    #    c_g = c.get_P(*[g[i] for i in range(4)])
+    #    if c_g*P == P*c_g:
+    #        print("commutes:", g)
+    
+    names = ['I']
+    gen = [c.get_identity()]
+    for i in [0,1,2,3]:
+        X, Z = c.get_X(i), c.get_Z(i)
+        names.append("X%d"%i)
+        names.append("Z%d"%i)
+        gen += [X, Z]
+    names = mulclose_names(gen, names)
+    print(len(names))
+    
+    #print(len(G))
+    for g,name in names.items():
+        #print(g)
+        op = gate*g
+        if(op*P == P*op):
+            print(name)
+            break
+    #print(g)
+    
+
+
+
+def test_dehn():
+    lookup = {}
+    rows, cols = 4, 4
+    for i in range(rows):
+      for j in range(cols):
+        lookup[i,j] = len(lookup)
+    n = len(lookup)
+    for i in range(rows):
+      for j in range(cols):
+        for di in (-rows, 0, rows):
+          for dj in (-cols, 0, cols):
+            lookup[i+di,j+dj] = lookup[i,j]
+    facess = [[], []]
+    parity = 0
+    for i in range(rows):
+      for j in range(cols):
+        face = [lookup[i,j] 
+            for (i,j) in [(i,j), (i+1,j), (i+1,j+1), (i,j+1)]]
+        facess[parity].append(face)
+        parity = (parity+1)%2
+      parity = (parity+1)%2
+    #print(facess, n)
+    stabs = []
+    for (faces, op) in zip(facess, list('XZ')):
+      for face in faces:
+        stab = ['I']*n
+        for idx in face:
+            stab[idx] = op
+        stab = fromstr(''.join(stab))
+        #print(stab)
+        stabs.append(stab)
+    #stabs = numpy.array(stabs)
+    stabs = numpy.concatenate(stabs)
+    #print(stabs.shape)
+    code = QCode(A=stabs)
+    print(code)
+
+    perm = []
+    for i in range(rows):
+        p = list(range(i*cols, (i+1)*cols))
+        p = [p[(idx+i)%cols] for idx in range(cols)]
+        perm += p
+    dode = code.apply_perm(perm)
+    #print(dode.is_equiv(code))
+    #for M in find_local_clifford(dode, code):
+    #    print(M)
+
+    H = dode.H.intersect(code.H)
+    print(code.H.shape, "-->", H.shape)
+
+    M = dode.get_encoder() * code.get_decoder()
+    #print(shortstr(M.A))
+
+    op = dode.get_logical(code)
+    s = SymplecticSpace(2)
+    gen = [s.get_CNOT(1,0), s.get_CZ(), 
+        s.get_S(0), s.get_H(0), s.get_S(1), s.get_H(1)]
+    G = mulclose(gen)
+    G = list(G)
+    print(G[0].name)
+    #print(op in mulclose(gen))
+    idx = G.index(op)
+    print(G[idx].name)
+    #print(SymplecticSpace(2).get_name(op))
+
+    return M
+    
     
 
 if __name__ == "__main__":
