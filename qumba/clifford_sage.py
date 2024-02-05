@@ -72,6 +72,7 @@ class Matrix(object):
     def __eq__(self, other):
         assert isinstance(other, Matrix)
         assert self.ring == other.ring
+        assert self.shape == other.shape
         return self.M == other.M
 
     def __hash__(self):
@@ -134,7 +135,10 @@ class Matrix(object):
         return Matrix(self.ring, M)
 
     def __getitem__(self, idx):
-        return self.M[idx]
+        if type(idx) is int:
+            return self.M[idx]
+        M = self.M[idx]
+        return Matrix(self.ring, M)
 
     def _latex_(self):
         M = self.M
@@ -178,6 +182,9 @@ class Matrix(object):
 
     def is_zero(self):
         return self == -self
+
+    def rank(self):
+        return self.M.rank()
 
 
 matrix = lambda rows : Matrix(K, rows)
@@ -340,12 +347,22 @@ class Clifford(object):
     get_CZ = CZ
 
     @cache
+    def CY(self, idx=0, jdx=1):
+        CX = self.CX(idx, jdx)
+        S = self.S(jdx)
+        Si = S.d
+        CY = S*CX*Si
+        return CY
+
+    @cache
     def CNOT(self, idx=0, jdx=1):
         assert idx != jdx
         CZ = self.CZ(idx, jdx)
         H = self.H(jdx)
         return H*CZ*H
+    CX = CNOT
     get_CNOT = CNOT
+    get_CX = CNOT
 
     @cache
     def SWAP(self, idx=0, jdx=1):
@@ -395,12 +412,17 @@ class Clifford(object):
         return op
 
     @cache
-    def pauli_group(self, phase=False):
+    def pauli_group(self, phase=0):
         names = [()]
         gen = [self.get_identity()]
-        if phase:
+        if phase==2:
             names += [('w2I')]
             gen += [self.get_w2I()]
+        elif phase==1:
+            names += [('wI')]
+            gen += [self.get_wI()]
+        else:
+            assert phase==0
         for i in range(self.n):
             X, Z = self.get_X(i), self.get_Z(i)
             names.append("X(%d)"%i)
@@ -594,6 +616,14 @@ def test_clifford():
     lhs = c2.get_expr(('CZ(0,1)', 'CNOT(0,1)'))
     rhs = c2.get_expr('CZ(0,1)') * c2.get_expr('CNOT(0,1)')
     assert lhs==rhs
+
+    c = Clifford(1)
+    X, S, Y = c.X(), c.S(), c.Y()
+    assert Y == S*X*S.d
+
+    c = Clifford(2)
+    M = c.CY()
+    assert M[2:, 2:] == Y
 
 
 def test_clifford3():
@@ -1077,6 +1107,7 @@ def test_higher():
     I1 = c1.get_identity()
     M = I1.direct_sum(R)
     assert M*M == c2.get_CNOT()
+
 
 
 def test():

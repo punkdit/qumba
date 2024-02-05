@@ -537,10 +537,10 @@ def all_codes():
     found = []
 
     if 0:
-        Cliff = mulclose(gen)
-        print("|Cliff| =", len(Cliff))
+        _Cliff = mulclose(gen)
+        print("|_Cliff| =", len(_Cliff))
         code = construct.get_513()
-        for g in Cliff:
+        for g in _Cliff:
             dode = code.apply(g)
             found.append(dode)
         print(len(found))
@@ -793,7 +793,7 @@ def test_412():
 def find_perm_gate(code, perm):
     print("find_perm_gate", perm)
     n = code.n
-    from qumba.clifford_sage import Clifford, half, mulclose_names
+    from qumba.clifford_sage import Clifford, mulclose_names
     dode = code.apply_perm(perm)
     #print(dode.longstr())
 
@@ -847,54 +847,87 @@ def find_perm_gate(code, perm):
         #    found = name
         #    assert 0
         #    break
-    #assert found
-    if not found:
-        return circuit, False
+    assert found
         
     circuit += found
     op = c.get_expr(circuit, rev=True)
     assert op*P == P*op
-    return circuit, True
+    return circuit
 
 
 def test_412_clifford():
+    from qumba.clifford_sage import Clifford, green, red
     from huygens.zx import Circuit, Canvas
     code = QCode.fromstr("XYZI IXYZ ZIXY")
+    E = code.get_encoder()
+    D = code.get_decoder()
+    cvs = code.space.render(E)
+    cvs.writePDFfile("encoder.pdf")
+    assert E*D == code.space.get_identity()
+    assert D*E == code.space.get_identity()
+
+    E = code.space.translate_clifford(E)
+    D = code.space.translate_clifford(D)
+    DE = D*E
+    ED = E*D
+    c = Clifford(code.n)
+#    for g in c.pauli_group(1):
+#        if g*D == E.d:
+#            break
+#    else:
+#        assert 0
+#    print(g.name)
+
+    D = E.d
+    assert E*E.d == c.get_identity()
+
+    P = code.get_projector()
+    lhs = P
+    print(lhs)
+    print(lhs.shape, lhs.M.rank())
+
+    #rr = red(1,0)*red(0,1)
+    ##rr = green(1,0)*green(0,1)
+    #rhs = rr@rr@rr@Clifford(1).get_identity()
+    #print(rhs)
+    #print(rhs.shape, rhs.rank())
+    #print(P)
+    return
 
     S4 = Group.symmetric(code.n)
-    #perms = [[g[i] for i in range(code.n)] for g in S4]
-    #perms.sort()
+    perms = [[g[i] for i in range(code.n)] for g in S4]
+    perms.sort()
 
     found = []
-    #for perm in perms:
-    H = []
-    for g in S4:
-        perm = [g[i] for i in range(code.n)]
+    for perm in perms:
+    #for g in S4:
+    #    perm = [g[i] for i in range(code.n)]
     
         print()
-        circuit, result = find_perm_gate(code, perm)
-        print("result:", result)
+        circuit = find_perm_gate(code, perm)
         
         c = Circuit(code.n)
         cvs = c.render_expr(circuit, width=6, height=4)
         name = "circuit_%s.pdf"%(''.join(str(i) for i in perm))
         print(name)
         cvs.writePDFfile(name)
-        found.append((cvs, result, perm))
+        found.append((cvs, perm))
         #if len(found)>1:
         #    break
 
     print("found:", len(found))
     cvs = Canvas()
     y = 0.
-    for c, result, perm in found:
+    for c, perm in found:
         cvs.insert(0, y, c)
         x = c.get_bound_box().width
-        cvs.text(x, y, "%s:%s"%(result, perm))
+        cvs.text(x, y, "%s"%(perm))
         y -= 1.5*c.get_bound_box().height
     cvs.writePDFfile("circuit.pdf")
 
 
+    code = QCode.fromstr("XIXYY ZIZXX IXYYX IZXXZ")
+    print(code
 
 
 

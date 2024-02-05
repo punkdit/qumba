@@ -848,6 +848,153 @@ def test_majorana():
     print(count, found)
 
 
+def get_encoder(code):
+    from qumba.clifford_sage import Clifford, red, green, Matrix
+    n = code.n
+    c = Clifford(n)
+    CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+
+    E = I = c.get_identity()
+    for src,h in enumerate(code.H):
+        op = strop(h).replace('.', 'I')
+        ctrl = op[src]
+        print(src, op, ctrl, end=":  ")
+        if ctrl=='I':
+            E0 = I
+        elif ctrl in 'XZY':
+            E0 = H(src)
+            print("H(%d)"%src, end=" ")
+        else:
+            assert 0, ctrl
+        
+        for tgt,opi in enumerate(op):
+            if tgt==src:
+                continue
+            if opi=='I':
+                pass
+            elif opi=='X':
+                E0 = CX(src,tgt)*E0
+                print("CX(%d,%d)"%(src,tgt), end=" ")
+            elif opi=='Z':
+                E0 = CZ(src,tgt)*E0
+                print("CZ(%d,%d)"%(src,tgt), end=" ")
+            elif opi=='Y':
+                E0 = CY(src,tgt)*E0
+                print("CY(%d,%d)"%(src,tgt), end=" ")
+            else:
+                assert 0, opi
+
+        if ctrl in 'XI':
+            pass
+        elif ctrl == 'Z':
+            E0 = H(src)*E0
+            print("H(%d)"%src, end=" ")
+        elif ctrl == 'Y':
+            E0 = S(src)*E0
+            print("S(%d)"%src, end=" ")
+        else:
+            assert 0, ctrl
+        print()
+        E = E0 * E
+    return E
+
+
+def test_grassl():
+    # from Grassl 2002 "Algorithmic aspects of quantum error-correcting codes"
+    from qumba.clifford_sage import Clifford, red, green, Matrix
+    if 0:
+        code = QCode.fromstr("XIXYY ZIZXX IXYYX IZXXZ")
+        c = Clifford(code.n)
+        E = get_encoder(code) # FAIL
+
+    elif 0:
+        code = QCode.fromstr("YXIZ ZYXI IZYX")
+        c = Clifford(code.n)
+        CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+        #E = get_encoder(code)
+
+        E2 = CY(2,3)*CZ(2,0)*H(2)
+        E1 = CZ(1,3)*CY(1,2)*H(1)
+        E0 = CZ(0,2)*CY(0,1)*H(0)
+        E = E0*E1*E2 
+        E = c.get_P(3,2,1,0) * E
+        # WORKS
+
+    elif 1:
+        code = QCode.fromstr("XYZI IXYZ ZIXY")
+        c = Clifford(code.n)
+        CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+        #E = get_encoder(code)
+
+        E2 = CZ(2,0)*CY(2,3)*H(2)
+        E1 = CY(1,2)*CZ(1,3)*H(1)
+        E0 = CY(0,1)*CZ(0,2)*H(0)
+        E = E0*E1*E2 # WORKS
+
+    elif 0:
+        c = Clifford(5)
+        CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+        swap = c.get_P(4,3,2,1,0)
+
+        code = QCode.fromstr("XXZIZ YIYZZ YZZYI XZIZX") # standard form
+        assert code.is_equiv(QCode.fromstr("XIXYY ZIZXX IXYYX IZXXZ"))
+        E0 = CZ(0,1) * CZ(0,3) * CX(0,4) * H(0)
+        E1 = S(1) * CZ(1,2) * CZ(1,3) * CY(1,4) * H(1)
+        E2 = S(2) * CZ(2,0) * CZ(2,1) * CY(2,4) * H(2)
+        E3 = CZ(3,0) * CZ(3,2) * CX(3,4) * H(3)
+        E = E0 * E1 * E2 * E3
+        E = swap * E  # put the logical at the end
+    
+    else:
+        c = Clifford(5)
+        CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+        swap = c.get_P(4,3,2,1,0)
+
+        # hadamard on qubit 1
+        code = QCode.fromstr("XZZIZ YIYZZ YXZYI XXIZX")
+        E0 = CZ(0,1) * CX(0,3) * CX(0,4) * H(0)
+        E1 = S(1) * CZ(1,2) * CX(1,3) * CY(1,4) * H(1)
+        E2 = S(2) * CZ(2,0) * CZ(2,1) * CY(2,4) * H(2)
+        E3 = H(3) * CZ(3,0) * CZ(3,2) * CX(3,4) * H(3)
+        E = E0 * E1 * E2 * E3
+        E = swap * E  # put the logical at the end
+
+    P = code.get_projector()
+    assert P.rank() == 2
+
+    assert E.rank() == 2**code.n
+
+    zero = red(1,0)
+    one = red(1,0,2)
+    plus = green(1,0)
+    minus = green(1,0,2)
+
+    stabs = []
+    for h in code.H:
+        #print(strop(h))
+        stabs.append(c.get_pauli(strop(h)))
+
+    for idx in range(4):
+        # zero, one, plus, minus
+        v = [0]*code.n
+        v[-1] = idx
+        v = reduce(matmul, [[zero,one,plus,minus][i] for i in v])
+        u = E*v
+        #for g in stabs:
+        #    print( g*u == u )
+        assert P*u==u
+        for g in stabs:
+            assert g*u == u
+
+    lhs = E.d * P * E
+    rr = red(1,0)*red(0,1)
+    I = Clifford(1).get_identity()
+    rhs = [rr]*code.n
+    rhs[-1] = I
+    rhs = reduce(matmul, rhs)
+    assert (2**code.m)*lhs == rhs
+
+
 def test():
     print("\ntest()")
     get_422()
@@ -857,6 +1004,7 @@ def test():
     test_10_2_3()
     test_codetables()
     #test_bring() # slow..
+    test_grassl()
 
 
 
