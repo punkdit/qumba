@@ -112,7 +112,7 @@ class Matrix(object):
     def __pow__(self, n):
        assert n>=0
        if n==0:
-           return Matrix.identity(self.ring, n)
+           return Matrix.identity(self.ring, self.shape[0])
        return reduce(mul, [self]*n)
 
     def __rmul__(self, r):
@@ -236,6 +236,12 @@ class FactorGroup(object):
 
 class Clifford(object):
     "clifford group on n qubits"
+
+    @cache
+    def __new__(cls, n):
+        ob = object.__new__(cls)
+        return ob
+
     def __init__(self, n):
         self.n = n
         K = CyclotomicField(8)
@@ -246,9 +252,16 @@ class Clifford(object):
     def wI(self):
         w = self.w
         return w*self.I
+    get_wI = wI
+
+    def w2I(self):
+        w2 = self.w**2
+        return w2*self.I
+    get_w2I = w2I
 
     def get_identity(self):
         return self.I
+    get_I = get_identity
 
     def mkop(self, i, g):
         n = self.n
@@ -358,10 +371,12 @@ class Clifford(object):
         M = Matrix(self.K, rows)
         return M
 
-    def get_expr(self, expr):
+    def get_expr(self, expr, rev=False):
         if expr == ():
             op = self.I
         elif type(expr) is tuple:
+            if rev:
+                expr = reversed(expr)
             op = reduce(mul, [self.get_expr(e) for e in expr]) # recurse
         else:
             expr = "self.get_"+expr
@@ -378,6 +393,22 @@ class Clifford(object):
             pauli = method(i)
             op = pauli*op
         return op
+
+    @cache
+    def pauli_group(self, phase=False):
+        names = [()]
+        gen = [self.get_identity()]
+        if phase:
+            names += [('w2I')]
+            gen += [self.get_w2I()]
+        for i in range(self.n):
+            X, Z = self.get_X(i), self.get_Z(i)
+            names.append("X(%d)"%i)
+            names.append("Z(%d)"%i)
+            gen += [X, Z]
+        names = mulclose_names(gen, names)
+        return names
+
 
 
 dim = 2 # qubits
@@ -523,6 +554,8 @@ def test_clifford():
     Pauli = mulclose([wI*wI, XI, IX, ZI, IZ])
     assert len(Pauli) == 64
 
+    assert c2 is Clifford(2)
+
     SI = c2.S(0)
     IS = c2.S(1)
     HI = c2.H(0)
@@ -557,6 +590,11 @@ def test_clifford():
     assert HI*ZI*HI == XI
     assert HI*IX*HI == IX
     assert SWAP01 == CNOT01*CNOT10*CNOT01
+
+    lhs = c2.get_expr(('CZ(0,1)', 'CNOT(0,1)'))
+    rhs = c2.get_expr('CZ(0,1)') * c2.get_expr('CNOT(0,1)')
+    assert lhs==rhs
+
 
 def test_clifford3():
     c3 = Clifford(3)
@@ -1025,6 +1063,21 @@ def test_platonic():
             print(g, ''.join(name), "in Semi-Clifford")
 
 
+def test_higher():
+    "higher Clifford group elements"
+    c1 = Clifford(1)
+    c2 = Clifford(2)
+    ring = c1.K
+    w = c1.w
+    T = Matrix(ring, [[1,0],[0,w]])
+    I = c1.get_identity()
+    assert [T**n==I for n in range(1,9)] == [False]*7+[True]
+    H,S = c1.get_H(),c1.get_S()
+    R = H*S*H
+    I1 = c1.get_identity()
+    M = I1.direct_sum(R)
+    assert M*M == c2.get_CNOT()
+
 
 def test():
     test_clifford()
@@ -1034,6 +1087,7 @@ def test():
     test_spider()
     test_perm()
     #test_cocycle() # sloooow
+    test_higher()
 
 
 

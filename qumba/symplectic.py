@@ -322,6 +322,16 @@ class SymplecticSpace(object):
         U2 = U.sum(0).A % 2
         return U2.sum() == 0
 
+    @cache
+    def local_clifford_group(self):
+        assert self.n < 10, "too big?"
+        gen = [self.get_identity()]
+        for i in range(self.n):
+            gen.append(self.get_S(i))
+            gen.append(self.get_H(i))
+        G = mulclose(gen)
+        return G
+
 
 
 class Building(object):

@@ -790,68 +790,112 @@ def test_412():
     print(space.get_name(E))
 
 
-def test_412_clifford():
+def find_perm_gate(code, perm):
+    print("find_perm_gate", perm)
+    n = code.n
     from qumba.clifford_sage import Clifford, half, mulclose_names
-    code = QCode.fromstr("XYZI IXYZ ZIXY")
-    #print(code.get_params())
-    #print(code.longstr())
-
-    perm = [1,0,3,2]    
-    #perm = [1,2,3,0]
     dode = code.apply_perm(perm)
     #print(dode.longstr())
 
     eode = dode
     space = code.space
-    gen = [space.get_identity()]
-    for i in range(4):
-        gen.append( space.get_S(i) )
-        gen.append( space.get_H(i) )
-    G = mulclose(gen)
-    print(len(G))
+    G = space.local_clifford_group()
+    assert len(G) == 6**n
+    found = None
     for g in G:
         eode = dode.apply(g)
         if eode.is_equiv(code):
-            break
-    name = g.name
-    print("local clifford:", name)
+            assert found is None
+            found = g
+    #else:
+    #    assert 0
+    lc_name = found.name
+    del g
+    #print("local clifford:", lc_name)
+
+    circuit = lc_name + space.get_P(*perm).name
+    eode = code.apply(code.space.get_expr(circuit))
+    assert eode.is_equiv(code)
 
     H = code.H
     n = code.n
-    c = Clifford(4)
+    c = Clifford(n)
     P = code.get_projector()
     assert P*P == P
     
     p = c.get_P(*perm)
-    gate = c.get_expr(name)
-    gate = gate*p
+    gate = c.get_expr(lc_name, rev=True)
+    gate = p*gate
     print(gate*P == P*gate)
+
+    print(circuit)
+    assert gate == c.get_expr(circuit, rev=True)
     
-    #S4 = Group.symmetric(4)
-    #for g in S4:
-    #    c_g = c.get_P(*[g[i] for i in range(4)])
-    #    if c_g*P == P*c_g:
-    #        print("commutes:", g)
-    
-    names = ['I']
-    gen = [c.get_identity()]
-    for i in [0,1,2,3]:
-        X, Z = c.get_X(i), c.get_Z(i)
-        names.append("X%d"%i)
-        names.append("Z%d"%i)
-        gen += [X, Z]
-    names = mulclose_names(gen, names)
-    print(len(names))
-    
-    #print(len(G))
+    names = c.pauli_group(False)
+    #print("pauli:", len(names))
+    found = None
     for g,name in names.items():
-        #print(g)
+        #print(g, name)
         op = gate*g
         if(op*P == P*op):
             print(name)
+            found = name
             break
-    #print(g)
+        #op = g*gate
+        #if(op*P == P*op):
+        #    print(name)
+        #    found = name
+        #    assert 0
+        #    break
+    #assert found
+    if not found:
+        return circuit, False
+        
+    circuit += found
+    op = c.get_expr(circuit, rev=True)
+    assert op*P == P*op
+    return circuit, True
+
+
+def test_412_clifford():
+    from huygens.zx import Circuit, Canvas
+    code = QCode.fromstr("XYZI IXYZ ZIXY")
+
+    S4 = Group.symmetric(code.n)
+    #perms = [[g[i] for i in range(code.n)] for g in S4]
+    #perms.sort()
+
+    found = []
+    #for perm in perms:
+    H = []
+    for g in S4:
+        perm = [g[i] for i in range(code.n)]
     
+        print()
+        circuit, result = find_perm_gate(code, perm)
+        print("result:", result)
+        
+        c = Circuit(code.n)
+        cvs = c.render_expr(circuit, width=6, height=4)
+        name = "circuit_%s.pdf"%(''.join(str(i) for i in perm))
+        print(name)
+        cvs.writePDFfile(name)
+        found.append((cvs, result, perm))
+        #if len(found)>1:
+        #    break
+
+    print("found:", len(found))
+    cvs = Canvas()
+    y = 0.
+    for c, result, perm in found:
+        cvs.insert(0, y, c)
+        x = c.get_bound_box().width
+        cvs.text(x, y, "%s:%s"%(result, perm))
+        y -= 1.5*c.get_bound_box().height
+    cvs.writePDFfile("circuit.pdf")
+
+
+
 
 
 
