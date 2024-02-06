@@ -450,13 +450,58 @@ class QCode(object):
         return self.apply(M)
     CNOT = apply_CNOT
 
-    def row_reduce(self):
-        H = self.H.copy()
-        m, n = self.shape
-        H.shape = m, 2*n
-        H = row_reduce(H)
+#    def row_reduce(self):
+#        H = self.H.copy()
+#        m, n = self.shape
+#        H.shape = m, 2*n
+#        H = row_reduce(H)
+#        m, nn = H.shape
+#        return QCode(H)
+
+    def normal_form(self):
+        "row reduce X's for Clifford encoder"
+        H = self.H
+        assert isinstance(H, Matrix)
+        H = H.A.copy()
+        #print("row_reduce", H.shape)
         m, nn = H.shape
-        return QCode(H)
+        n = nn//2
+        #print("="*n)
+        #print(strop(H))
+        #print("="*n)
+    
+        i = j = 0
+        while i < m and j < n:
+    
+            # first find a nonzero X entry in this col
+            for i1 in range(i, m):
+                if H[i1, 2*j]:
+                    break
+            else:
+                j += 1 # move to the next col
+                continue # <----------- continue ------------
+    
+            if i != i1:
+                # swap rows
+                h = H[i, :].copy()
+                H[i, :] = H[i1, :]
+                H[i1, :] = h
+    
+            assert H[i, 2*j]
+            for i1 in range(i+1, m):
+                if H[i1, 2*j]:
+                    H[i1, :] += H[i, :]
+                    H[i1, :] %= 2
+    
+            i += 1
+            j += 1
+    
+        #print("="*n)
+        #print(strop(H))
+        #print("="*n)
+        #H = Matrix(H)
+        code = QCode(H)
+        return code
 
     def get_logops(self):
         if self.L is not None:

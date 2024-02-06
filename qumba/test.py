@@ -850,6 +850,7 @@ def test_majorana():
 
 def get_encoder(code):
     from qumba.clifford_sage import Clifford, red, green, Matrix
+    code = code.normal_form()
     n = code.n
     c = Clifford(n)
     CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
@@ -895,8 +896,76 @@ def get_encoder(code):
         else:
             assert 0, ctrl
         print()
-        E = E0 * E
+        E = E * E0
     return E
+
+
+def test_normal_form():
+    #code = QCode.fromstr("XYZI IXYZ ZIXY")
+    code = QCode.fromstr("""
+    .ZZZZ
+    Y.ZXY
+    ZX.ZY
+    Z.XYZ
+    """)
+    dode = code.normal_form()
+    assert dode.is_equiv(code)
+    #E = get_encoder(code)
+    #test_clifford_encoder(code, E)
+
+    code = QCode.fromstr("""XXXX ZZZZ""")
+    code = construct.get_832() # FAIL
+    code = construct.get_713() # FAIL
+
+    code = construct.get_512() # works
+
+    # 822 toric code
+    code = QCode.fromstr("""
+    XXX..X..
+    X.XX...X
+    .X..XXX.
+    ZZ.ZZ...
+    .ZZZ..Z.
+    Z...ZZ.Z
+    """)
+    E = get_encoder(code)
+    test_clifford_encoder(code, E)
+
+    code = QCode.fromstr("XZXX IXIZ ZIZI") # works
+    E = get_encoder(code)
+    test_clifford_encoder(code, E)
+    return
+
+    code = QCode.fromstr("XXZX IIXZ ZZII") # FAIL
+    #E = get_encoder(code)
+    from qumba.clifford_sage import Clifford, red, green, Matrix
+    c = Clifford(code.n)
+    CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+    E0 = H(0)*CX(0,1)*CZ(0,2)*CX(0,3)
+    E1 = H(2)*CZ(2,3)
+    E2 = CZ(3,0)*CZ(3,1)
+    E = E0*E1*E2
+    test_clifford_encoder(code, E)
+    return
+
+    for code in construct.all_codes():
+        E = get_encoder(code)
+        test_clifford_encoder(code, E)
+
+    return
+
+    for code in QCode.load_codetables():
+        if code.n < 4:
+            continue
+        if code.k != 1:
+            continue
+        if code.n > 10:
+            break
+        print("[[%s, %s, %s]]"%(code.n, code.k, code.d))
+        dode = code.normal_form()
+        assert dode.is_equiv(code)
+        E = get_encoder(code)
+        test_clifford_encoder(code, E)
 
 
 def test_grassl():
@@ -959,15 +1028,21 @@ def test_grassl():
         E = E0 * E1 * E2 * E3
         E = swap * E  # put the logical at the end
 
-    P = code.get_projector()
-    assert P.rank() == 2
+    test_clifford_encoder(code, E)
 
+
+def test_clifford_encoder(code, E):
+    from qumba.clifford_sage import Clifford, red, green, Matrix
+    c = Clifford(code.n)
+    P = code.get_projector()
+    assert P.rank() == 2**code.k
     assert E.rank() == 2**code.n
 
     zero = red(1,0)
     one = red(1,0,2)
     plus = green(1,0)
     minus = green(1,0,2)
+    states = [zero, one, plus, minus]
 
     stabs = []
     for h in code.H:
@@ -977,22 +1052,36 @@ def test_grassl():
     for idx in range(4):
         # zero, one, plus, minus
         v = [0]*code.n
-        v[-1] = idx
-        v = reduce(matmul, [[zero,one,plus,minus][i] for i in v])
+        if code.k:
+            v[-1] = idx
+        v = reduce(matmul, [states[i] for i in v])
         u = E*v
+        print("idx", idx)
+        for g in stabs:
+            print('\t', g*u == u )
+        #assert P*u==u
         #for g in stabs:
-        #    print( g*u == u )
+        #    assert g*u == u
+
+    for idx in range(4):
+        # zero, one, plus, minus
+        v = [0]*code.n
+        if code.k:
+            v[-1] = idx
+        v = reduce(matmul, [states[i] for i in v])
+        u = E*v
         assert P*u==u
         for g in stabs:
             assert g*u == u
 
-    lhs = E.d * P * E
-    rr = red(1,0)*red(0,1)
-    I = Clifford(1).get_identity()
-    rhs = [rr]*code.n
-    rhs[-1] = I
-    rhs = reduce(matmul, rhs)
-    assert (2**code.m)*lhs == rhs
+    if code.k == 1:
+        lhs = E.d * P * E
+        rr = red(1,0)*red(0,1)
+        I = Clifford(1).get_identity()
+        rhs = [rr]*code.n
+        rhs[-1] = I
+        rhs = reduce(matmul, rhs)
+        assert (2**code.m)*lhs == rhs
 
 
 def test():
