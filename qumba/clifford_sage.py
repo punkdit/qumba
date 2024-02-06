@@ -21,7 +21,7 @@ from sage.all_cmdline import FiniteField, CyclotomicField, latex, block_diagonal
 from sage import all_cmdline 
 
 from qumba.solve import zeros2, identity2
-from qumba.action import mulclose, mulclose_names
+from qumba.action import mulclose, mulclose_names, mulclose_find
 from qumba.argv import argv
 
 K = CyclotomicField(8)
@@ -60,14 +60,16 @@ def simplify_latex(self):
     return s
 
 
-
 class Matrix(object):
-    def __init__(self, ring, rows):
+    def __init__(self, ring, rows, name=()):
         M = all_cmdline.Matrix(ring, rows)
         M.set_immutable()
         self.M = M
         self.ring = ring
         self.shape = (M.nrows(), M.ncols())
+        if type(name) is str:
+            name = (name,)
+        self.name = name
 
     def __eq__(self, other):
         assert isinstance(other, Matrix)
@@ -92,7 +94,8 @@ class Matrix(object):
         assert self.shape[1] == other.shape[0], (
             "cant multiply %sx%s by %sx%s"%(self.shape + other.shape))
         M = self.M * other.M
-        return Matrix(self.ring, M)
+        name = self.name + other.name
+        return Matrix(self.ring, M, name)
 
     def __add__(self, other):
         assert isinstance(other, Matrix)
@@ -270,7 +273,7 @@ class Clifford(object):
         return self.I
     get_I = get_identity
 
-    def mkop(self, i, g):
+    def mkop(self, i, g, name):
         n = self.n
         K = self.K
         assert 0<=i<n
@@ -278,6 +281,7 @@ class Clifford(object):
         items = [I]*n
         items[i] = g
         gi = reduce(matmul, items)
+        gi.name = ("%s(%d)"%(name, i),)
         return gi
         #while len(items)>1:
         #    #items[-2:] = [items[-2] @ items[-1]]
@@ -288,7 +292,7 @@ class Clifford(object):
     def Z(self, i=0):
         K = self.K
         Z = Matrix(K, [[1, 0], [0, -1]])
-        Zi = self.mkop(i, Z)
+        Zi = self.mkop(i, Z, "Z")
         return Zi
     get_Z = Z
         
@@ -297,7 +301,7 @@ class Clifford(object):
         K = self.K
         w = self.w
         S = Matrix(K, [[1, 0], [0, w*w]])
-        Si = self.mkop(i, S)
+        Si = self.mkop(i, S, "S")
         return Si
     get_S = S
         
@@ -305,7 +309,7 @@ class Clifford(object):
     def X(self, i=0):
         K = self.K
         X = Matrix(K, [[0, 1], [1,  0]])
-        Xi = self.mkop(i, X)
+        Xi = self.mkop(i, X, "X")
         return Xi
     get_X = X
 
@@ -313,7 +317,7 @@ class Clifford(object):
     def Y(self, i=0):
         K = self.K
         Y = Matrix(K, [[0, -w4], [w4,  0]])
-        Yi = self.mkop(i, Y)
+        Yi = self.mkop(i, Y, "Y")
         return Yi
     get_Y = Y
         
@@ -324,7 +328,7 @@ class Clifford(object):
         r2 = w+w.conjugate()
         ir2 = r2 / 2
         H = Matrix(K, [[ir2, ir2], [ir2, -ir2]])
-        Hi = self.mkop(i, H)
+        Hi = self.mkop(i, H, "H")
         return Hi
     get_H = H
 
@@ -343,7 +347,7 @@ class Clifford(object):
                 A[i, i] = -1
             else:
                 A[i, i] = 1
-        return Matrix(K, A)
+        return Matrix(K, A, "CZ(%d,%d)"%(idx,jdx))
     get_CZ = CZ
 
     @cache
@@ -352,6 +356,7 @@ class Clifford(object):
         S = self.S(jdx)
         Si = S.d
         CY = S*CX*Si
+        CY.name = ("CY(%d,%d)"%(idx,jdx),)
         return CY
 
     @cache
@@ -359,7 +364,9 @@ class Clifford(object):
         assert idx != jdx
         CZ = self.CZ(idx, jdx)
         H = self.H(jdx)
-        return H*CZ*H
+        CX = H*CZ*H
+        CX.name = ("CX(%d,%d)"%(idx,jdx),)
+        return CX
     CX = CNOT
     get_CNOT = CNOT
     get_CX = CNOT
@@ -385,7 +392,8 @@ class Clifford(object):
             row = [0]*N
             row[i] = 1
             rows.append(row)
-        M = Matrix(self.K, rows)
+        name = "P%s"%(perm,)
+        M = Matrix(self.K, rows, name)
         return M
 
     def get_expr(self, expr, rev=False):
@@ -624,6 +632,24 @@ def test_clifford():
     c = Clifford(2)
     M = c.CY()
     assert M[2:, 2:] == Y
+
+
+def test_CY():
+    c = Clifford(2)
+    CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+
+    gen = [H(0), H(1), S(0), S(1), S(0)**3, S(1)**3, CX()]
+    g = mulclose_find(gen, CY())
+    assert g.name == ('S(1)', 'CX(0,1)', 'S(1)', 'S(1)', 'S(1)')
+
+    gen = [H(0), H(1), S(0), S(1), S(0)**3, S(1)**3, CZ()]
+    g = mulclose_find(gen, CY())
+    assert g.name == ('H(1)', 'S(0)', 'CZ(0,1)', 'H(1)', 'CZ(0,1)')
+
+    gen = [H(0), H(1), S(0), S(1), S(0)**3, S(1)**3, CX(1,0)]
+    g = mulclose_find(gen, CY())
+    assert g.name == ('H(0)', 'H(1)', 'CX(1,0)', 'H(1)', 'CX(1,0)', 'H(0)', 'S(0)')
+
 
 
 def test_clifford3():

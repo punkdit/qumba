@@ -629,6 +629,57 @@ class QCode(object):
             return M.t
     get_symplectic = get_encoder
 
+    def get_clifford_encoder(code):
+        from qumba.clifford_sage import Clifford, red, green, Matrix
+        code = code.normal_form()
+        n = code.n
+        c = Clifford(n)
+        CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+    
+        E = I = c.get_identity()
+        for src,h in enumerate(code.H):
+            op = strop(h).replace('.', 'I')
+            ctrl = op[src]
+            print(src, op, ctrl, end=":  ")
+            if ctrl=='I':
+                E0 = I
+            elif ctrl in 'XZY':
+                E0 = H(src)
+                print("H(%d)"%src, end=" ")
+            else:
+                assert 0, ctrl
+    
+            for tgt,opi in enumerate(op):
+                if tgt==src:
+                    continue
+                if opi=='I':
+                    pass
+                elif opi=='X':
+                    E0 = CX(src,tgt)*E0
+                    print("CX(%d,%d)"%(src,tgt), end=" ")
+                elif opi=='Z':
+                    E0 = CZ(src,tgt)*E0
+                    print("CZ(%d,%d)"%(src,tgt), end=" ")
+                elif opi=='Y':
+                    E0 = CY(src,tgt)*E0
+                    print("CY(%d,%d)"%(src,tgt), end=" ")
+                else:
+                    assert 0, opi
+    
+            if ctrl in 'XI':
+                pass
+            elif ctrl == 'Z':
+                E0 = H(src)*E0
+                print("H(%d)"%src, end=" ")
+            elif ctrl == 'Y':
+                E0 = S(src)*E0
+                print("S(%d)"%src, end=" ")
+            else:
+                assert 0, ctrl
+            print()
+            E = E * E0
+        return E
+
     def get_decoder(self):
         return self.get_encoder(True)
 

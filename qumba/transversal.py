@@ -4,7 +4,7 @@ _looking for transversal logical clifford operations
 """
 
 from functools import reduce
-from operator import add
+from operator import add, matmul
 
 import numpy
 
@@ -12,7 +12,7 @@ import z3
 from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver
 
 from qumba.qcode import QCode, SymplecticSpace, Matrix, fromstr, shortstr, strop
-from qumba.action import mulclose, Group
+from qumba.action import mulclose, Group, mulclose_find
 from qumba import equ
 from qumba import construct 
 from qumba import autos
@@ -826,28 +826,22 @@ def find_perm_gate(code, perm):
     p = c.get_P(*perm)
     gate = c.get_expr(lc_name, rev=True)
     gate = p*gate
-    print(gate*P == P*gate)
+    if gate*P == P*gate:
+        print("found gate")
+        return circuit
 
-    print(circuit)
     assert gate == c.get_expr(circuit, rev=True)
     
     names = c.pauli_group(False)
-    #print("pauli:", len(names))
     found = None
     for g,name in names.items():
         #print(g, name)
         op = gate*g
         if(op*P == P*op):
-            print(name)
             found = name
             break
-        #op = g*gate
-        #if(op*P == P*op):
-        #    print(name)
-        #    found = name
-        #    assert 0
-        #    break
     assert found
+    print("pauli correction", found)
         
     circuit += found
     op = c.get_expr(circuit, rev=True)
@@ -856,43 +850,58 @@ def find_perm_gate(code, perm):
 
 
 def test_412_clifford():
-    from qumba.clifford_sage import Clifford, green, red
+    from qumba.clifford_sage import Clifford, green, red, half
     from huygens.zx import Circuit, Canvas
     code = QCode.fromstr("XYZI IXYZ ZIXY")
-    E = code.get_encoder()
-    D = code.get_decoder()
-    cvs = code.space.render(E)
-    cvs.writePDFfile("encoder.pdf")
-    assert E*D == code.space.get_identity()
-    assert D*E == code.space.get_identity()
+#    E = code.get_encoder()
+#    D = code.get_decoder()
+#    cvs = code.space.render(E)
+#    cvs.writePDFfile("encoder.pdf")
+#    assert E*D == code.space.get_identity()
+#    assert D*E == code.space.get_identity()
+#
+#    E = code.space.translate_clifford(E)
+#    D = code.space.translate_clifford(D)
+#    DE = D*E
+#    ED = E*D
+#    c = Clifford(code.n)
+##    for g in c.pauli_group(1):
+##        if g*D == E.d:
+##            break
+##    else:
+##        assert 0
+##    print(g.name)
+#
+#    D = E.d
+#    assert E*E.d == c.get_identity()
+#
+#    P = code.get_projector()
+#    lhs = P
+#    print(lhs)
+#    print(lhs.shape, lhs.M.rank())
+#
+#    #rr = red(1,0)*red(0,1)
+#    ##rr = green(1,0)*green(0,1)
+#    #rhs = rr@rr@rr@Clifford(1).get_identity()
+#    #print(rhs)
+#    #print(rhs.shape, rhs.rank())
+#    #print(P)
+#    return
 
-    E = code.space.translate_clifford(E)
-    D = code.space.translate_clifford(D)
-    DE = D*E
-    ED = E*D
-    c = Clifford(code.n)
-#    for g in c.pauli_group(1):
-#        if g*D == E.d:
-#            break
-#    else:
-#        assert 0
-#    print(g.name)
-
-    D = E.d
-    assert E*E.d == c.get_identity()
-
+    clifford = Clifford(code.n)
+    I = Clifford(1).get_identity()
+    E = code.get_clifford_encoder()
     P = code.get_projector()
-    lhs = P
-    print(lhs)
-    print(lhs.shape, lhs.M.rank())
+    D = E.d
+    lhs = D * P * E
+    rhs = [red(1,0)*red(0,1) for i in range(code.n)]
+    rhs[-1] = I
+    rhs = reduce(matmul, rhs)
+    assert rhs == (2**code.m)*lhs
 
-    #rr = red(1,0)*red(0,1)
-    ##rr = green(1,0)*green(0,1)
-    #rhs = rr@rr@rr@Clifford(1).get_identity()
-    #print(rhs)
-    #print(rhs.shape, rhs.rank())
-    #print(P)
-    return
+    # disc, prep
+    prep = reduce(matmul, [red(1,0)]*code.m + [I]*code.k)
+    disc = reduce(matmul, [red(0,1)]*code.m + [I]*code.k)
 
     S4 = Group.symmetric(code.n)
     perms = [[g[i] for i in range(code.n)] for g in S4]
@@ -905,6 +914,19 @@ def test_412_clifford():
     
         print()
         circuit = find_perm_gate(code, perm)
+        g = Clifford(code.n).get_expr(circuit, rev=True)
+        assert g*P == P*g
+
+        g = disc * D * g * E * prep
+        g = (half**code.m)*g
+        #print(g, g.rank())
+        assert g.rank() == 2
+
+        c = Clifford(1)
+        gen = [c.get_identity(), c.X(), c.Z(), c.Y(), c.H(0), c.S(0), c.wI()**2]
+        g = mulclose_find(gen, g)
+        assert g is not None
+        print("logical:", g.name)
         
         c = Circuit(code.n)
         cvs = c.render_expr(circuit, width=6, height=4)
@@ -925,9 +947,6 @@ def test_412_clifford():
         y -= 1.5*c.get_bound_box().height
     cvs.writePDFfile("circuit.pdf")
 
-
-    code = QCode.fromstr("XIXYY ZIZXX IXYYX IZXXZ")
-    print(code
 
 
 

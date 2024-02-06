@@ -848,58 +848,6 @@ def test_majorana():
     print(count, found)
 
 
-def get_encoder(code):
-    from qumba.clifford_sage import Clifford, red, green, Matrix
-    code = code.normal_form()
-    n = code.n
-    c = Clifford(n)
-    CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
-
-    E = I = c.get_identity()
-    for src,h in enumerate(code.H):
-        op = strop(h).replace('.', 'I')
-        ctrl = op[src]
-        print(src, op, ctrl, end=":  ")
-        if ctrl=='I':
-            E0 = I
-        elif ctrl in 'XZY':
-            E0 = H(src)
-            print("H(%d)"%src, end=" ")
-        else:
-            assert 0, ctrl
-        
-        for tgt,opi in enumerate(op):
-            if tgt==src:
-                continue
-            if opi=='I':
-                pass
-            elif opi=='X':
-                E0 = CX(src,tgt)*E0
-                print("CX(%d,%d)"%(src,tgt), end=" ")
-            elif opi=='Z':
-                E0 = CZ(src,tgt)*E0
-                print("CZ(%d,%d)"%(src,tgt), end=" ")
-            elif opi=='Y':
-                E0 = CY(src,tgt)*E0
-                print("CY(%d,%d)"%(src,tgt), end=" ")
-            else:
-                assert 0, opi
-
-        if ctrl in 'XI':
-            pass
-        elif ctrl == 'Z':
-            E0 = H(src)*E0
-            print("H(%d)"%src, end=" ")
-        elif ctrl == 'Y':
-            E0 = S(src)*E0
-            print("S(%d)"%src, end=" ")
-        else:
-            assert 0, ctrl
-        print()
-        E = E * E0
-    return E
-
-
 def test_normal_form():
     #code = QCode.fromstr("XYZI IXYZ ZIXY")
     code = QCode.fromstr("""
@@ -918,6 +866,8 @@ def test_normal_form():
     code = construct.get_713() # FAIL
 
     code = construct.get_512() # works
+    E = code.get_clifford_encoder()
+    test_clifford_encoder(code, E)
 
     # 822 toric code
     code = QCode.fromstr("""
@@ -928,11 +878,11 @@ def test_normal_form():
     .ZZZ..Z.
     Z...ZZ.Z
     """)
-    E = get_encoder(code)
-    test_clifford_encoder(code, E)
+    #E = code.get_clifford_encoder()
+    #test_clifford_encoder(code, E)
 
     code = QCode.fromstr("XZXX IXIZ ZIZI") # works
-    E = get_encoder(code)
+    E = code.get_clifford_encoder()
     test_clifford_encoder(code, E)
     return
 
@@ -949,7 +899,7 @@ def test_normal_form():
     return
 
     for code in construct.all_codes():
-        E = get_encoder(code)
+        E = code.get_clifford_encoder()
         test_clifford_encoder(code, E)
 
     return
@@ -964,7 +914,7 @@ def test_normal_form():
         print("[[%s, %s, %s]]"%(code.n, code.k, code.d))
         dode = code.normal_form()
         assert dode.is_equiv(code)
-        E = get_encoder(code)
+        E = code.get_clifford_encoder()
         test_clifford_encoder(code, E)
 
 
@@ -1094,7 +1044,7 @@ def test():
     test_codetables()
     #test_bring() # slow..
     test_grassl()
-
+    test_normal_form()
 
 
 if __name__ == "__main__":
