@@ -419,6 +419,12 @@ class QCode(object):
         return self.apply(M)
     permute = apply_perm
 
+    def apply_swap(self, i, j):
+        perm = list(range(self.n))
+        perm[i], perm[j] = perm[j], perm[i]
+        return self.apply_perm(perm)
+    swap = apply_swap
+
     def apply_H(self, idx=None):
         # swap X<-->Z on bit idx
         M = self.space.get_H(idx)
@@ -448,7 +454,10 @@ class QCode(object):
         assert idx != jdx
         M = self.space.get_CNOT(idx, jdx)
         return self.apply(M)
+    apply_CX = apply_CNOT
     CNOT = apply_CNOT
+    CX = CNOT
+
 
 #    def row_reduce(self):
 #        H = self.H.copy()

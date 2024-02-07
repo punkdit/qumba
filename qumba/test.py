@@ -1034,6 +1034,164 @@ def test_clifford_encoder(code, E):
         assert (2**code.m)*lhs == rhs
 
 
+def test_822():
+    src = QCode.fromstr("XYZI IXYZ ZIXY")
+    print(src)
+
+    code = unwrap(src)
+    print(code)
+
+    # note: code.get_autos does not get anything more than below ->
+
+    E = code.get_encoder()
+    D = code.get_decoder()
+    space = code.space
+    fibers = [(i, i+src.n) for i in range(src.n)]
+    g = space.get_identity()
+    for i,j in fibers:
+        g = space.CZ(i, j) * g
+    dode = code.apply(g)
+    assert (dode.is_equiv(code))
+    gen = []
+    gen.append(dode.get_logical(code))
+
+    print("fibers:", fibers)
+
+    def lift_perm(perm):
+        assert len(perm) == src.n
+        f = [fibers[perm[i]] for i in range(src.n)]
+        #print(f)
+        perm = {}
+        for fsrc, ftgt in zip(fibers, f):
+            perm[fsrc[0]] = ftgt[0]
+            perm[fsrc[1]] = ftgt[1]
+        perm = [perm[i] for i in range(code.n)]
+        return perm
+
+    I = SymplecticSpace(2).get_identity()
+
+    perm = lift_perm([1,2,3,0])
+    dode = code.apply_perm(perm)
+    assert dode.is_equiv(code)
+    gen.append(dode.get_logical(code))
+
+    #perm = lift_perm([3,2,1,0]) # logical identity
+    #perm = lift_perm([1,0,3,2]) # logical identity
+    perm = lift_perm([0,3,2,1])
+    #perm = lift_perm([2,1,0,3])
+    dode = code.apply_perm(perm)
+    # now we lift H.H.H.H gate
+    perm = list(range(code.n))
+    for f in fibers:
+        perm[f[0]], perm[f[1]] = perm[f[1]], perm[f[0]]
+    dode = dode.apply_perm(perm)
+    assert dode.is_equiv(code)
+    L = dode.get_logical(code)
+    assert L in gen
+    assert I != L
+
+    def lift_S(code, fiber):
+        return code.apply_CX(*fiber)
+    def lift_SH(code, fiber):
+        code = code.apply_swap(*fiber) # lift H
+        code = code.apply_CX(*fiber) # lift S
+        return code
+    def lift_HS(code, fiber):
+        code = code.apply_CX(*fiber) # lift S
+        code = code.apply_swap(*fiber) # lift H
+        return code
+    def lift_SHS(code, fiber): # == HSH
+        return code.apply_CX(fiber[1], fiber[0])
+    lift_HSH = lift_SHS
+
+    perm = lift_perm([1,0,2,3])
+    dode = code.apply_perm(perm)
+    dode = lift_SH(dode, fibers[0])
+    dode = lift_HS(dode, fibers[1])
+    dode = lift_S(dode, fibers[2])
+    dode = lift_SHS(dode, fibers[3])
+    assert dode.is_equiv(code)
+    gen.append(dode.get_logical(code))
+
+    perm = lift_perm([0,1,3,2])
+    dode = code.apply_perm(perm)
+    dode = lift_S(dode, fibers[0])
+    dode = lift_SHS(dode, fibers[1])
+    dode = lift_SH(dode, fibers[2])
+    dode = lift_HS(dode, fibers[3])
+    assert dode.is_equiv(code)
+    gen.append(dode.get_logical(code))
+
+    for perm, cliff in [
+        ([0,2,1,3], "SHS SH HS S"),
+        ([0,2,3,1], "HS S SHS SH"),
+        ([0,3,1,2], "SH HS S SHS"),
+        #([1,0,2,3], "SH HS S SHS"), # above
+        ([1,2,0,3], "S SHS SH HS"),
+        ([1,3,0,2], "HS S SHS SH"),
+        ([1,3,2,0], "SHS SH HS S"),
+        ([2,0,1,3], "HS S SHS SH"),
+        ([2,0,3,1], "SHS SH HS S"),
+        ([2,1,3,0], "SH HS S SHS"),
+        ([2,3,1,0], "S SHS SH HS"),
+        ([3,0,2,1], "S SHS SH HS"),
+        ([3,1,0,2], "SHS SH HS S"),
+        ([3,1,2,0], "HS S SHS SH"),
+        ([3,2,0,1], "SH HS S SHS"),
+    ]:
+        #print(perm)
+        perm = lift_perm(perm)
+        dode = code.apply_perm(perm)
+        cliff = cliff.split()
+        for i, c in enumerate(cliff):
+            func = eval("lift_%s"%c, locals())
+            dode = func(dode, fibers[i])
+        assert dode.is_equiv(code)
+        gen.append(dode.get_logical(code))
+
+    #for L in gen:
+    #    print(L)
+
+    G = mulclose(gen)
+    print("G:", len(G))
+
+    # --- Clifford -----
+
+    from qumba.clifford_sage import Clifford, red, green, Matrix
+    c = Clifford(code.n)
+    CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+    SWAP = c.SWAP
+    P = c.get_P
+
+    def lift_S(fiber):
+        E = CX(*fiber)
+        return E
+    def lift_SH(fiber):
+        E = SWAP(*fiber) # lift H
+        E = CX(*fiber)*E # lift S
+        return E
+    def lift_HS(fiber):
+        E = CX(*fiber) # lift S
+        E = SWAP(*fiber)*E # lift H
+        return E
+    def lift_SHS(fiber): # == HSH
+        E = CX(fiber[1], fiber[0])
+        return E
+    lift_HSH = lift_SHS
+
+    perm = lift_perm([1,0,2,3])
+    g = P(*perm)
+    g = lift_SH(fibers[0])*g
+    g = lift_HS(fibers[1])*g
+    g = lift_S(fibers[2])*g
+    g = lift_SHS(fibers[3])*g
+
+    P = code.get_projector() # slow...
+    #print(P.shape)
+
+    assert P*g == g*P
+
+
 def test():
     print("\ntest()")
     get_422()

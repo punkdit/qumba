@@ -395,6 +395,7 @@ class Clifford(object):
         name = "P%s"%(perm,)
         M = Matrix(self.K, rows, name)
         return M
+    P = get_P
 
     def get_expr(self, expr, rev=False):
         if expr == ():

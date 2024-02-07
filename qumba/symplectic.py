@@ -98,12 +98,14 @@ class SymplecticSpace(object):
         H = Matrix([[0,1],[1,0]], name="H")
         name = "H(%s)"%idx
         return self.get(H, idx, name)
+    H = get_H
 
     def get_S(self, idx=None):
         # swap X<-->Y
         S = Matrix([[1,1],[0,1]], name="S")
         name = "S(%s)"%idx
         return self.get(S, idx, name)
+    S = get_S
 
     def get_SH(self, idx=None):
         # X-->Z-->Y-->X 
@@ -120,6 +122,7 @@ class SymplecticSpace(object):
         A = A.transpose()
         name="CZ(%d,%d)"%(idx,jdx)
         return Matrix(A, self.p, None, name)
+    CZ = get_CZ
 
     def get_CNOT(self, idx=0, jdx=1):
         assert idx != jdx
@@ -130,6 +133,7 @@ class SymplecticSpace(object):
         A = A.transpose()
         name="CNOT(%d,%d)"%(idx,jdx)
         return Matrix(A, self.p, None, name)
+    CX = get_CNOT
 
     def get_expr(self, expr):
         if expr == ():
