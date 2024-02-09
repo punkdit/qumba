@@ -1192,6 +1192,78 @@ def test_822():
     assert P*g == g*P
 
 
+def test_422():
+    code = construct.get_422()
+    E = code.get_encoder()
+    D = code.get_decoder()
+    s = code.space
+    I = s.get_identity()
+    assert D*E == I
+    
+    code1 = QCode.from_encoder(E*s.CZ(2,3), k=2)
+    #print(code1.longstr())
+    assert code.is_equiv(code1)
+    
+    H4 = s.H(0)*s.H(1)*s.H(2)*s.H(3)
+    code1 = code.apply(H4)
+    assert code.is_equiv(code1)
+    
+    s2 = SymplecticSpace(2)
+    gen = [s2.H(0), s2.H(1), s2.S(0), s2.S(1), s2.CX()]
+    G = mulclose(gen)
+    assert len(G)==720
+    I2 = s2.get_identity()
+    G = [I2.direct_sum(g) for g in G]
+    
+    found = []
+    for g in G:
+        code1 = QCode.from_encoder(E*g, k=2)
+        assert code.is_equiv(code1)
+        code2 = code1.apply(H4)
+        L = code2.get_logical(code1)
+        if L == s2.CZ():
+            found.append(code1)
+    assert len(found) == 48 # two kinds up to 4!==24 perms
+    #for code in found:
+    #    print()
+    #    print(strop(code.L))
+
+    code = QCode.fromstr(Hs="XXXX ZZZZ", Ls="ZIZI YYII ZZII YIYI")
+
+    from qumba.clifford_sage import Clifford, red, green, Matrix
+    #E = code.get_clifford_encoder()
+    E = code.get_encoder()
+    E = code.space.translate_clifford(E)
+    #test_clifford_encoder(code, E) # FAIL
+
+    D = E.d
+    P = code.get_projector()
+    c = Clifford(4)
+    I = c.get_identity()
+    assert D*E == I
+
+    CZ, H = c.CZ, c.H
+    g = CZ(2,3)
+    h = H(0)*H(1)*H(2)*H(3)
+
+    assert h*P == P*h
+
+    return
+
+    Pauli = c.pauli_group(2)
+    print(len(Pauli))
+
+#    lhs = E*g
+#    rhs = h*E
+    #lhs, rhs = g*E, E*h
+    print(lhs == rhs)
+
+    for p in Pauli:
+        if lhs*p == rhs:
+            print("found")
+            break
+
+
 def test():
     print("\ntest()")
     get_422()
