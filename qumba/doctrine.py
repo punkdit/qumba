@@ -1,0 +1,135 @@
+#!/usr/bin/env python
+
+from functools import reduce, lru_cache
+cache = lru_cache(maxsize=None)
+from operator import add, mul, matmul
+
+from qumba.solve import kernel, dot2, normal_form, enum2
+from qumba.clifford_sage import Clifford, green, red, I, r2, half
+from qumba.qcode import QCode
+from qumba.argv import argv
+
+from bruhat.algebraic import qchoose_2
+
+
+def find_css(n, mx, mz):
+    if mx < mz:
+        return find_css(n, mz, mx) # recurse
+    found = set()
+    for Hx in qchoose_2(n, mx):
+        Jz = kernel(Hx)
+        assert mx + len(Jz) == n
+        assert dot2(Hx, Jz.transpose()).sum() == 0
+        for Kz in qchoose_2(len(Jz), mz):
+            Hz = dot2(Kz, Jz)
+            Hz = normal_form(Hz)
+            assert dot2(Hx, Hz.transpose()).sum() == 0
+            key = str((Hx, Hz))
+            assert key not in found
+            found.add(key)
+            yield (Hx, Hz)
+
+
+@cache
+def get_transversal_CZ(n):
+    assert n%2 == 0
+    c = Clifford(n)
+    op = reduce(mul, [c.CZ(2*i, 2*i+1) for i in range(n//2)])
+    return op
+
+
+@cache
+def get_transversal_HHSwap(n):
+    assert n%2 == 0
+    c = Clifford(n)
+    op = reduce(mul, [c.SWAP(2*i, 2*i+1) for i in range(n//2)])
+    op *= reduce(mul, [c.H(i) for i in range(n)])
+    return op
+
+def has_ZX_duality(code):
+    n = code.n
+    assert n%2 == 0
+    dode = code
+    for i in range(n):
+        dode = dode.apply_H(i)
+    perm = []
+    for i in range(n//2):
+        perm.append(2*i+1)
+        perm.append(2*i)
+    dode = dode.apply_perm(perm)
+    return dode.is_equiv(code)
+
+
+def accept(Hx, Hz):
+    code = QCode.build_css(Hx, Hz)
+    P = code.get_projector()
+    n = code.n
+    L2 = get_transversal_HHSwap(n)
+    is_hhswap = L2*P == P*L2
+    is_zx_dual = has_ZX_duality(code)
+    assert is_hhswap==is_zx_dual, (is_hhswap,is_zx_dual)
+
+    even_fibers = None
+    for v in enum2(len(Hx)):
+        h = dot2(v, Hx)
+        h.shape = (n//2, 2)
+        i = str(h).count('[1 1]') % 2
+        if i%2:
+            even_fibers = False
+            break
+    else:
+        even_fibers = True
+
+    L1 = get_transversal_CZ(n)
+    is_cz = L1*P == P*L1
+    #assert is_cz==is_zx_dual
+    assert (is_zx_dual and even_fibers) == is_cz, (even_fibers, is_cz, is_zx_dual)
+    if is_cz:
+        assert is_zx_dual
+    return is_cz
+    
+
+
+def main_0():
+    for n in [2,4,6]:
+        for m in range(1, n+1):
+          count = 0
+          for mx in range(m+1):
+            mz = m-mx
+            for Hx,Hz in find_css(n, mx, mz):
+                if accept(Hx,Hz):
+                    count += 1
+          print(count, end=" ", flush=True)
+        print()
+        
+
+def main():
+    for n in [2,4,6]:
+      for m in range(1, n//2+1):
+        count = 0
+        for Hx,Hz in find_css(n, m, m):
+            if accept(Hx,Hz):
+                count += 1
+        print(count, end=" ", flush=True)
+      print()
+        
+
+
+if __name__ == "__main__":
+    from time import time
+    start_time = time()
+    fn = argv.next() or "main"
+
+    if argv.profile:
+        import cProfile as profile
+        profile.run("%s()"%fn)
+    else:
+        fn = eval(fn)
+        fn()
+
+    print("finished in %.3f seconds.\n"%(time() - start_time))
+
+
+
+
+
