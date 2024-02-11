@@ -6,7 +6,9 @@ from operator import add, mul, matmul
 
 from qumba.solve import kernel, dot2, normal_form, enum2
 from qumba.clifford_sage import Clifford, green, red, I, r2, half
-from qumba.qcode import QCode
+from qumba.qcode import QCode, strop
+from qumba.construct import all_codes
+from qumba.unwrap import unwrap
 from qumba.argv import argv
 
 from bruhat.algebraic import qchoose_2
@@ -60,7 +62,7 @@ def has_ZX_duality(code):
     return dode.is_equiv(code)
 
 
-def accept(Hx, Hz):
+def accept_cz(Hx, Hz):
     code = QCode.build_css(Hx, Hz)
     P = code.get_projector()
     n = code.n
@@ -87,6 +89,39 @@ def accept(Hx, Hz):
     if is_cz:
         assert is_zx_dual
     return is_cz
+
+
+def accept_code_cz(code):
+    P = code.get_projector()
+    n = code.n
+    L1 = get_transversal_CZ(n)
+    is_cz = L1*P == P*L1
+    return is_cz
+
+    
+
+def accept_hhswap(Hx, Hz):
+    code = QCode.build_css(Hx, Hz)
+    #P = code.get_projector()
+    #n = code.n
+    #L2 = get_transversal_HHSwap(n)
+    #is_hhswap = L2*P == P*L2
+    is_zx_dual = has_ZX_duality(code)
+    #assert is_hhswap==is_zx_dual, (is_hhswap,is_zx_dual)
+    return is_zx_dual
+
+def accept_hhswap_not_cz(Hx, Hz):
+    code = QCode.build_css(Hx, Hz)
+    P = code.get_projector()
+    n = code.n
+    L2 = get_transversal_HHSwap(n)
+    is_hhswap = L2*P == P*L2
+    is_zx_dual = has_ZX_duality(code)
+    assert is_hhswap==is_zx_dual, (is_hhswap,is_zx_dual)
+
+    L1 = get_transversal_CZ(n)
+    is_cz = L1*P == P*L1
+    return is_zx_dual and not is_cz
     
 
 
@@ -102,9 +137,30 @@ def main_0():
           print(count, end=" ", flush=True)
         print()
         
+"""
+accept_hhswap
+    3
+    15 15
+    63 315 135
+== C series pascal
 
-def main():
-    for n in [2,4,6]:
+accept_cz:
+    2
+    9 6
+    35 105 30
+
+accept_hhswap_not_cz
+    1
+    6 9
+
+"""
+
+def main_1():
+    accept = argv.get("accept", "accept_cz")
+    print("accept=%s"%accept)
+    accept = eval(accept)
+    ns = argv.get("ns", [2,4])
+    for n in ns:
       for m in range(1, n//2+1):
         count = 0
         for Hx,Hz in find_css(n, m, m):
@@ -113,6 +169,23 @@ def main():
         print(count, end=" ", flush=True)
       print()
         
+
+def main():
+    for n in range(4,6):
+      print("n=%d"%n, end=" ", flush=True)
+      for m in range(1,n+1):
+        k = n-m
+        count = 0
+        for code in all_codes(n, k, 0):
+            dode = unwrap(code, True)
+            #print(strop(dode.H))
+            #print()
+            assert has_ZX_duality(dode)
+            if accept_code_cz(dode):
+                count += 1
+        print(count, end=" ", flush=True)
+      print()
+            
 
 
 if __name__ == "__main__":

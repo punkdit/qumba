@@ -3,6 +3,10 @@
 from time import time
 start_time = time()
 from random import shuffle, choice
+from functools import reduce, lru_cache
+cache = lru_cache(maxsize=None)
+from operator import add, mul, matmul
+
 
 import numpy
 
@@ -15,8 +19,15 @@ from qumba.distance import distance_z3
 from qumba.autos import get_isos
 from qumba.argv import argv
 
+@cache
+def toziporder(n):
+    perm = []
+    for i in range(n):
+        perm.append(i)
+        perm.append(i+n)
+    return perm
 
-def unwrap_matrix(H):
+def unwrap_matrix(H, ziporder=False):
     if isinstance(H, Matrix):
         H = H.A
     H0 = H.view()
@@ -31,13 +42,17 @@ def unwrap_matrix(H):
     H = zeros2(2*m, 2*n, 2)
     H[:m, :, 0] = Sxz
     H[m:, :, 1] = Szx
+    if ziporder:
+        P = toziporder(n)
+        H = H[:, P, :].copy()
+
     H.shape = 2*m, 2*nn
     H = Matrix(H)
     return H
 
 
-def unwrap(code, check=True):
-    H = unwrap_matrix(code.H)
+def unwrap(code, ziporder=False, check=True):
+    H = unwrap_matrix(code.H, ziporder)
     code = QCode(H, check=check)
     return code
 
