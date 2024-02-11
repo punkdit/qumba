@@ -145,9 +145,11 @@ accept_hhswap
 == C series pascal
 
 accept_cz:
-    2
-    9 6
-    35 105 30
+n=2      2
+n=4      9   6
+n=6     35 105 30
+n=8    135           
+           
 
 accept_hhswap_not_cz
     1
@@ -171,7 +173,7 @@ def main_1():
         
 
 def main():
-    for n in range(4,6):
+    for n in range(5,6):
       print("n=%d"%n, end=" ", flush=True)
       for m in range(1,n+1):
         k = n-m
