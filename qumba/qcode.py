@@ -770,7 +770,7 @@ class QCode(object):
             items.append(len(J))
         return tuple(items)
 
-    @cache
+    #@cache
     def get_projector(self):
         "get Clifford projector onto codepsace"
         from qumba.clifford_sage import Clifford, half
