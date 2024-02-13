@@ -98,6 +98,19 @@ def accept_code_cz(code):
     is_cz = L1*P == P*L1
     return is_cz
 
+
+@cache
+def get_cz(space):
+    n = space.n
+    g = space.get_identity()
+    for i in range(n//2):
+        g = g * space.CZ(2*i,2*i+1)
+    return g
+
+def fast_accept_cz(code):
+    g = get_cz(code.space)
+    dode = code.apply(g)
+    return dode.is_equiv(code)
     
 
 def accept_hhswap(Hx, Hz):
@@ -172,7 +185,29 @@ def main_1():
       print()
         
 
-def main():
+def main_cz():
+    for n in [3,4]:
+      print("n=%d"%n, end=" ", flush=True)
+      for m in range(1,n+1):
+      #for m in [1]:
+        k = n-m
+        count = 0
+        found = 0
+        for code in all_codes(n, k, 0):
+            dode = unwrap(code, True)
+            #print(strop(dode.H))
+            #print()
+            #assert has_ZX_duality(dode)
+            #if accept_code_cz(dode):
+            count += 1
+            if fast_accept_cz(dode):
+                found += 1
+        print("%s:%s"%(count,found), end=" ", flush=True)
+      print()
+            
+
+
+def main_unwrap():
     for n in range(5,6):
       print("n=%d"%n, end=" ", flush=True)
       for m in range(1,n+1):
