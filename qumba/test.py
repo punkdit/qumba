@@ -1342,6 +1342,80 @@ def test_422():
             break
 
 
+def test_double():
+    # ------------------------
+    # double Sp(1) --> Sp(2)
+
+    s = SymplecticSpace(1)
+    S, H = s.S(), s.H()
+    F = s.F
+    G = [s.get_identity(), S, H, S*H, H*S, S*H*S]
+    
+    s2 = SymplecticSpace(2)
+    cx, swap = s2.CX(), s2.get_perm([1,0])
+    assert cx*swap*cx == swap*cx*swap
+    G1 = [s2.get_identity(), cx, swap, cx*swap, swap*cx, cx*swap*cx]
+    
+    # convert to ziporder
+    p = Matrix.perm([0,2,1,3])
+    assert p == p.t # ooof
+
+    for g, g1 in zip(G,G1):
+        gi = F*g*F
+        assert gi == g.pseudo_inverse().t
+        ggi = g.direct_sum(gi)
+        ggi = p.t * ggi * p
+        assert s2.is_symplectic(ggi)
+        assert ggi == g1
+
+    # ------------------------
+    # double Sp(2) --> Sp(4)
+
+    s2 = SymplecticSpace(2)
+    F = s2.F
+    cx, swap = s2.CX(), s2.get_perm([1,0])
+    h0, h1, s0, s1 = s2.H(0), s2.H(1), s2.S(0), s2.S(1)
+    gen2 = [cx, swap, h0, h1, s0, s1]
+    G2 = mulclose(gen2)
+    assert len(G2) == 720
+
+    s4 = SymplecticSpace(4)
+    gen4 = [
+        s4.CX(0,2)*s4.CX(3,1), 
+        s4.get_perm([2,3,0,1]),
+        s4.get_perm([1,0,2,3]),
+        s4.get_perm([0,1,3,2]),
+        s4.CX(0,1), 
+        s4.CX(2,3)
+    ]
+    G4 = mulclose(gen4)
+    assert len(G4) == 720
+
+    # extend to hom
+    hom = mulclose_hom(gen2, gen4)
+
+    # convert to ziporder
+    items = []
+    for i in range(4):
+        items.append(i)
+        items.append(i+4)
+    p = Matrix.perm(items)
+
+    for g in G2:
+        #print(g)
+        gi = F*g*F
+        assert gi == g.pseudo_inverse().t
+        ggi = g.direct_sum(gi)
+        ggi = p.t * ggi * p
+        assert s4.is_symplectic(ggi)
+        g4 = hom[g]
+        assert ggi == g4
+        #print(ggi)
+        #print(g4)
+        #print()
+
+
+
 def test():
     print("\ntest()")
     get_422()
