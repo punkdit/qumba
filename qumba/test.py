@@ -1051,7 +1051,8 @@ def test_822():
     for i,j in fibers:
         g = space.CZ(i, j) * g
     dode = code.apply(g)
-    assert (dode.is_equiv(code))
+    assert dode.is_equiv(code)
+
     gen = []
     gen.append(dode.get_logical(code))
 
@@ -1190,6 +1191,83 @@ def test_822():
     #print(P.shape)
 
     assert P*g == g*P
+
+
+def test_822_clifford():
+    src = QCode.fromstr("XYZI IXYZ ZIXY")
+    print(src)
+
+    code = unwrap(src)
+    print(code)
+
+    fibers = [(i, i+src.n) for i in range(src.n)]
+    print("fibers:", fibers)
+
+    # --- Clifford -----
+
+    from qumba.clifford_sage import Clifford, red, green, Matrix
+    c = Clifford(code.n)
+    CX, CY, CZ, H, S, SWAP = c.CX, c.CY, c.CZ, c.H, c.S, c.SWAP
+    I = c.get_identity()
+
+    P = code.get_projector() # slow...
+    
+    g = I
+    for (i,j) in fibers:
+        g = CZ(i,j)*g
+
+    assert g*P != P*g
+
+    g = I
+    for (i,j) in fibers:
+        g = SWAP(i,j)*g
+    for i in range(c.n):
+        g = H(i)*g
+
+    assert g*P == P*g
+
+
+def test_10_2_3_clifford():
+    src = construct.get_513()
+    code = unwrap(src)
+    fibers = [(i, i+src.n) for i in range(src.n)]
+
+    from qumba.clifford_sage import Clifford, red, green, Matrix
+    c = Clifford(code.n)
+    CX, CY, CZ, H, S, SWAP = c.CX, c.CY, c.CZ, c.H, c.S, c.SWAP
+    I = c.get_identity()
+
+    print("P...")
+    P = code.get_projector() # slow...
+    
+    # Transversal CZ
+    print("CZ...")
+    g = I
+    for (i,j) in fibers:
+        g = CZ(i,j)*g
+    assert g*P == P*g
+
+    # Transversal HH SWAP
+    print("HH SWAP...")
+    g = I
+    for (i,j) in fibers:
+        g = SWAP(i,j)*g
+    for i in range(c.n):
+        g = H(i)*g
+    assert g*P == P*g
+
+    # Transversal CX SWAP
+    print("CX SWAP...")
+    def lift_SH(fiber):
+        E = c.SWAP(*fiber) # lift H
+        E = c.CX(*fiber)*E # lift S
+        return E
+    g = I
+    for fiber in fibers:
+        g = g*lift_SH(fiber)
+    assert g*P == P*g
+
+
 
 
 def test_422():
