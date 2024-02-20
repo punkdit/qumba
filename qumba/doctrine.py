@@ -6,7 +6,7 @@ from operator import add, mul, matmul
 
 from qumba.solve import kernel, dot2, normal_form, enum2
 from qumba.clifford_sage import Clifford, green, red, I, r2, half
-from qumba.qcode import QCode, strop
+from qumba.qcode import QCode, strop, Matrix
 from qumba.construct import all_codes
 from qumba.unwrap import unwrap
 from qumba.argv import argv
@@ -183,6 +183,18 @@ def main_1():
                 count += 1
         print(count, end=" ", flush=True)
       print()
+
+
+def no_Y(H):
+    #m, nn = H.shape
+    #for bits in numpy
+    #rows = list(H.rowspan())
+    #H1 = [row for row in H.rowspan() if 'Y' not in strop(row)]
+    H1 = [row for row in H.rowspan() if strop(row).count("Y")%2==0]
+    H1 = reduce(Matrix.concatenate, H1)
+    H1 = H1.linear_independent()
+    #print(H1)
+    return H1
         
 
 def main_cz():
@@ -194,13 +206,24 @@ def main_cz():
         count = 0
         found = 0
         for code in all_codes(n, k, 0):
+            count += 1
             dode = unwrap(code, True)
             #print(strop(dode.H))
             #print()
             #assert has_ZX_duality(dode)
-            #if accept_code_cz(dode):
-            count += 1
-            if fast_accept_cz(dode):
+            assert fast_accept_cz(dode)
+            a = accept_code_cz(dode)
+            H1 = no_Y(code.H)
+            s,t = len(code.H),len(H1)
+            #b = 'Y' in strop(code.H)
+            if a and s!=t:
+                print()
+                print(strop(code.H))
+                print("-"*code.n)
+                print(strop(H1))
+                print("%d!=%d"%(s,t),end=":")
+            print("%d%d"%(int(a), int(s==t)), end=" ", flush=True)
+            if a:
                 found += 1
         print("%s:%s"%(count,found), end=" ", flush=True)
       print()
