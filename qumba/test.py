@@ -13,7 +13,8 @@ from qumba.csscode import CSSCode, find_logicals
 from qumba.autos import get_autos
 from qumba import csscode, construct
 from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
-from qumba.action import mulclose, mulclose_hom
+from qumba.action import mulclose, mulclose_hom, mulclose_find
+from qumba.util import cross
 from qumba.symplectic import Building
 from qumba.unwrap import unwrap, unwrap_encoder
 from qumba.smap import SMap
@@ -760,7 +761,6 @@ def test_genon():
     cliff = mulclose([H,S])
     print(len(cliff))
     
-    from qumba.util import cross
     n = code.n
     items = [cliff for i in range(n)]
     gates = [reduce(Matrix.direct_sum, item) for item in cross(items)]
@@ -1032,6 +1032,154 @@ def test_clifford_encoder(code, E):
         rhs[-1] = I
         rhs = reduce(matmul, rhs)
         assert (2**code.m)*lhs == rhs
+
+
+def test_422_logical():
+    code = construct.get_422()
+    print(code.longstr())
+    E = code.get_encoder()
+
+    
+    s = code.space
+    CX, CZ, H, S, SWAP = s.CX, s.CZ, s.H, s.S, s.SWAP
+    H0, H1, H2, H3 = [H(i) for i in range(4)]
+    S0, S1, S2, S3 = [S(i) for i in range(4)]
+    I = s.get_identity()
+
+    gen = [CX(0,1),CX(1,0), H0, H1] #, S0, S1]
+    G = mulclose(gen)
+    #assert len(G)==720
+    print("|G| =", len(G))
+
+    g = H0 * CX(1,0) * CX(0,1) * H1
+    E1 = E*g
+    dode = QCode.from_encoder(E1, k=2)
+    assert dode.is_equiv(code)
+
+
+
+def test_422_encode():
+    code = construct.get_422()
+    print(code.longstr())
+
+    s = code.space
+    CX, CZ, H, S, SWAP = s.CX, s.CZ, s.H, s.S, s.SWAP
+    H0, H1, H2, H3 = [H(i) for i in range(4)]
+    S0, S1, S2, S3 = [S(i) for i in range(4)]
+    I = s.get_identity()
+    s4 = S0*S1*S2*S3
+    assert s4*s4 == I
+
+    E = code.get_encoder()
+
+    def find_gate(tgt):
+        idxs = list(range(4))
+        gen = [CX(i,j) for i in idxs for j in idxs if i!=j]
+        gen += [CZ(i,j) for i in idxs for j in range(i+1,4)]
+        gen += [SWAP(0,1),SWAP(2,3)]
+        gen += [H0,H1,H2,H3]
+        g = mulclose_find(gen, tgt)
+        return g
+
+    g = CX(0,1)*CX(0,2)*CX(2,0)*CX(0,3)*CX(1,0)*CX(3,1)*CX(1,3)*H(1)
+    assert E==g
+
+    dode = QCode.from_encoder(g, k=2)
+    assert code==dode
+
+    #code = QCode.fromstr("XXXX ZZZZ", None, "XXII ZIZI IXIX IIZZ")
+    #E = code.get_encoder()
+    D = E.pseudo_inverse()
+    g = H0*H1*H2*H3
+    h = D*g*E
+    assert g*E == E*h
+    #h = find_gate(h)
+    #print(h.name)
+    assert h == H0*CX(1,0)*CX(0,1)*H1*SWAP(2,3)*H2*H3
+
+    dode = code.apply(s4)
+    assert dode.is_equiv(code)
+    L = dode.get_logical(code)
+
+    g = S0*S1*S2*S3
+    dode = code.apply(g)
+    assert dode.is_equiv(code)
+    L = dode.get_logical(code)
+    h = D*g*E
+    assert g*E == E*h
+    #print("h =", code.space.get_name(h))
+    #return
+
+    s2 = SymplecticSpace(2)
+    gen = [s2.get_identity(), 
+        s2.H(0), s2.H(1), s2.S(0), s2.S(1), 
+        s2.CX(0,1), s2.CX(1,0), s2.CZ(), s2.get_perm([1,0])]
+    G = mulclose(gen)
+    G = list(G)
+    assert len(G)==720
+    idx = G.index(L)
+    #print(G[idx].name)
+    #print(dode.longstr())
+
+
+    # --------------------------------------------
+    # Clifford
+
+    from qumba.clifford_sage import Clifford, red, green, Matrix
+    P = code.get_projector()
+    c = Clifford(code.n)
+    CX, CY, CZ, H, S, SWAP = c.CX, c.CY, c.CZ, c.H, c.S, c.SWAP
+    H0, H1, H2, H3 = [H(i) for i in range(4)]
+    S0, S1, S2, S3 = [S(i) for i in range(4)]
+    X0, X1, X2, X3 = [c.X(i) for i in range(4)]
+    Z0, Z1, Z2, Z3 = [c.Z(i) for i in range(4)]
+    I = c.get_identity()
+
+    g = S(0)*S(1)
+    h = S(2)*S(3)
+    assert g.d==g*g*g
+    for l in [g*h, g.d*h, g*h.d,g.d*h.d]:
+        assert l*P == P*l
+
+    #E = code.get_clifford_encoder() # broken... 
+    E = CX(0,1)*CX(0,2)*CX(2,0)*CX(0,3)*CX(1,0)*CX(3,1)*CX(1,3)*H(1)
+    #test_clifford_encoder(code, E) # arghhh
+
+    # test the encoder...
+    assert E*X0 == X0*X1*X2*X3*E
+    assert E*Z0 == Z0*Z1*Z2*E
+    assert E*X1 == Z0*Z1*Z2*Z3*E
+    assert E*Z1 == X3*E
+    assert E*X2 == X0*X1*E
+    assert E*Z2 == Z0*Z2*E
+    assert E*X3 == X0*X2*E
+    assert E*Z3 == Z0*Z1*E
+
+    # transversal hadamard
+    g = H0*H1*H2*H3
+    assert P*g == g*P
+    h = H0*CX(1,0)*CX(0,1)*H1*SWAP(2,3)*H2*H3
+    assert g*E == E*h
+
+    ops = mulclose([S1, H1])
+    print(len(ops))
+
+    # transversal CZ
+    for op in [H1*S1*H1, H1*S1.d*H1]:
+        h = CZ(2,3) * op *CX(0,1)
+        for i0,s0 in enumerate([S0, S0.d]):
+         for i1,s1 in enumerate([S1, S1.d]):
+          for i2,s2 in enumerate([S2, S2.d]):
+           for i3,s3 in enumerate([S3, S3.d]):
+            g = s0*s1*s2*s3
+            if P*g!=g*P:
+                continue
+            #print('.',end='')
+            if(g*E==E*h) :
+                print("found!", op.name, i0, i1, i2, i3)
+
+    
+
 
 
 def test_822():

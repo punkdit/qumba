@@ -173,7 +173,8 @@ class Matrix(object):
 
     def dagger(self):
         M = self.M.conjugate_transpose()
-        return Matrix(self.ring, M)
+        name = tuple(name+".d" for name in reversed(self.name))
+        return Matrix(self.ring, M, name)
 
     @property
     def d(self):

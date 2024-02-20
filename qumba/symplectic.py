@@ -77,6 +77,7 @@ class SymplecticSpace(object):
         f = list(range(self.n))
         f[i], f[j] = f[j], f[i]
         return self.get_perm(f)
+    SWAP = get_SWAP
 
     def get(self, M, idx=None, name="?"):
         assert M.shape == (2,2)
