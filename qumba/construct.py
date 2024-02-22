@@ -312,6 +312,72 @@ def hypergraph_product(A, B, check=False):
     return Hx, Hz
 
 
+def get_xzzx(a, b):
+    assert a>0 and b>0, str((a,b))
+    lookup = {}
+    c = max(a, b)
+    deltas = [(0, 0), (a,b), (-a,-b), (-b,a), (b,-a)]
+    deltas = set()
+    for (di,dj) in [(a,b), (-b,a)]:
+      for k in [-2,-1,0,1,2]:
+        deltas.add((k*di,k*dj))
+    deltas.remove((0,0))
+    deltas = list(deltas)
+    deltas.sort()
+    deltas = [(0,0)] + deltas
+    #print(deltas)
+    n = 0
+    keys = []
+    for i in range(a+b):
+        for j in range(c):
+            for di, dj in deltas:
+                tgt = i+di, j+dj
+                if tgt in lookup:
+                    lookup[i,j] = lookup[tgt]
+                    break
+            else:
+                key = (i,j)
+                lookup[key] = n
+                keys.append(key)
+                n += 1
+    # hack this....
+    for i in range(2*(a+b)):
+        for j in range(-2*c,2*c):
+            for di, dj in deltas:
+                tgt = i+di, j+dj
+                if tgt in lookup:
+                    lookup[i,j] = lookup[tgt]
+                    break
+    assert len(keys) == n == a**2 + b**2, len(keys)
+    rows = []
+    for (i,j) in keys:
+        row = ['.']*n
+        row[lookup[i,j]] = 'X'
+        row[lookup[i,j+1]] = 'Z'
+        row[lookup[i+1,j+1]] = 'X'
+        row[lookup[i+1,j]] = 'Z'
+        row = ''.join(row)
+        rows.append(row)
+    assert len(rows) == n
+    rows = ' '.join(rows)
+    H = fromstr(rows)
+    H = linear_independent(H)
+    code = QCode(H)
+    return code
+
+
+def test_xzzx():
+    from qumba.distance import distance_z3
+    code = get_xzzx(1,3)
+    assert code.n == 10
+    assert code.k == 2
+    assert code.get_distance() == 3
+    code = get_xzzx(3,4)
+    assert code.n == 25
+    assert code.k == 1
+    assert distance_z3(code) == 3+4
+    #print(code.longstr())
+
 
 
 def test():

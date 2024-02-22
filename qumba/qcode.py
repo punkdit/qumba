@@ -556,7 +556,7 @@ class QCode(object):
             B = zeros2(len(A), 1)
             B[i] = 1
             tt = solve2(A.A, B) # XXX do this incrementally for more speed XXX
-            assert tt is not None
+            assert tt is not None, strop(H)
             t = tt.transpose()
             t.shape = (1, 2*n)
             T.append(t)
