@@ -16,6 +16,7 @@ from bruhat.algebraic import qchoose_2
 
 def find_css(n, mx, mz):
     if mx < mz:
+        assert 0, "um... reverse this?"
         return find_css(n, mz, mx) # recurse
     found = set()
     for Hx in qchoose_2(n, mx):
@@ -196,6 +197,26 @@ def no_Y(H):
     #print(H1)
     return H1
         
+
+def test_cz():
+    for n in [2,4,6]:
+      print("n=%d"%n, end=" ", flush=True)
+      for m in range(n+1):
+        k = n-m
+        count = 0
+        found = 0
+        for code in all_codes(n, k, 0):
+            count += 1
+            #assert code.T is not None
+            code.check()
+            #print(code.longstr())
+            if fast_accept_cz(code):
+                found += 1
+        print("%s:%s"%(count,found), end=" ", flush=True)
+      print()
+
+def test_cz_css():
+
 
 def main_cz():
     for n in [3,4]:

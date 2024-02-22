@@ -1075,11 +1075,15 @@ def test_422_encode():
     def find_gate(tgt):
         idxs = list(range(4))
         gen = [CX(i,j) for i in idxs for j in idxs if i!=j]
-        gen += [CZ(i,j) for i in idxs for j in range(i+1,4)]
-        gen += [SWAP(0,1),SWAP(2,3)]
+        #gen += [CZ(i,j) for i in idxs for j in range(i+1,4)]
+        #gen += [SWAP(0,1),SWAP(2,3)]
         gen += [H0,H1,H2,H3]
         g = mulclose_find(gen, tgt)
         return g
+
+    #E1 = E*H0*H1
+    #g = find_gate(E1)
+    #print(g.name)
 
     g = CX(0,1)*CX(0,2)*CX(2,0)*CX(0,3)*CX(1,0)*CX(3,1)*CX(1,3)*H(1)
     assert E==g
@@ -1141,9 +1145,7 @@ def test_422_encode():
     for l in [g*h, g.d*h, g*h.d,g.d*h.d]:
         assert l*P == P*l
 
-    #E = code.get_clifford_encoder() # broken... 
     E = CX(0,1)*CX(0,2)*CX(2,0)*CX(0,3)*CX(1,0)*CX(3,1)*CX(1,3)*H(1)
-    #test_clifford_encoder(code, E) # arghhh
 
     # test the encoder...
     assert E*X0 == X0*X1*X2*X3*E
@@ -1155,16 +1157,50 @@ def test_422_encode():
     assert E*X3 == X0*X2*E
     assert E*Z3 == Z0*Z1*E
 
-    # transversal hadamard
+    # transversal hadamard -------------------
     g = H0*H1*H2*H3
     assert P*g == g*P
     h = H0*CX(1,0)*CX(0,1)*H1*SWAP(2,3)*H2*H3
     assert g*E == E*h
 
-    ops = mulclose([S1, H1])
-    print(len(ops))
+    #ops = mulclose([S1, H1])
+    #print(len(ops))
 
-    # transversal CZ
+    # transversal CZ -------------------
+    for op in [H1*S1*H1, H1*S1.d*H1]:
+        h = CZ(2,3) * op *CX(0,1)
+        for i0,s0 in enumerate([S0, S0.d]):
+         for i1,s1 in enumerate([S1, S1.d]):
+          for i2,s2 in enumerate([S2, S2.d]):
+           for i3,s3 in enumerate([S3, S3.d]):
+            g = s0*s1*s2*s3
+            if P*g!=g*P:
+                continue
+            #print('.',end='')
+            if(g*E==E*h) :
+                print("found!", op.name, i0, i1, i2, i3)
+
+    # switch to computational basis
+    E = E*H(0)*H(1)
+    test_clifford_encoder(code, E)
+
+    # test the encoder...
+    assert E*Z0 == X0*X1*X2*X3*E
+    assert E*X0 == Z0*Z1*Z2*E
+    assert E*Z1 == Z0*Z1*Z2*Z3*E
+    assert E*X1 == X3*E
+    assert E*X2 == X0*X1*E
+    assert E*Z2 == Z0*Z2*E
+    assert E*X3 == X0*X2*E
+    assert E*Z3 == Z0*Z1*E
+
+    # transversal hadamard -------------------
+    g = H0*H1*H2*H3
+    assert P*g == g*P
+    h = E.d*g*E
+    assert g*E == E*h
+
+    # transversal CZ -------------------
     for op in [H1*S1*H1, H1*S1.d*H1]:
         h = CZ(2,3) * op *CX(0,1)
         for i0,s0 in enumerate([S0, S0.d]):

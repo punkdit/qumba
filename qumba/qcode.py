@@ -408,6 +408,7 @@ class QCode(object):
 
     def apply(self, M):
         assert isinstance(M, Matrix)
+        self.build()
         Mt = M.t
         H = self.H * Mt
         T = self.T * Mt
@@ -624,6 +625,12 @@ class QCode(object):
 
     #@cache # needs __hash__
     def get_encoder(self, inverse=False):
+        """
+            Return symplectic encoder matrix E.
+            Note: first m qubits are in |+>,|-> basis, 
+            because these are the eigenvectors of X operator.
+            TODO: Is this natural or should we Hadamard these ????? ARGHHH
+        """
         self.build()
         H, T, L = self.H, self.T, self.L
         HT = array2(list(zip(H.A, T.A)))
