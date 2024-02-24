@@ -274,6 +274,7 @@ class QCode(object):
 
     def check(self):
         H = self.H
+        assert H.rank() == len(H)
         m, n = self.shape
         F = self.space.F # the symplectic form
         R = H * F * H.t

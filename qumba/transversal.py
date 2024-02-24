@@ -949,10 +949,50 @@ def test_412_clifford():
 
 
 
+def search_gate(code, dode, *perms):
+    solver = Solver()
+    Add = solver.add
+
+    n = code.n
+    nn = 2*n
+    space = code.space
+    F = space.F
+
+    U = UMatrix.unknown(nn, nn)
+    Add(U.t*F*U == F) # U symplectic
+
+    for perm in perms:
+        P = space.get_perm(perm)
+        U1 = P.t*U*P
+        Add(U==U1)
+
+    HU = code.H * U.t
+    LU = code.L * U.t
+    R = HU * F * dode.L.t
+    Add(R==0) # linear constraint
+    R = HU * F * dode.H.t
+    Add(R==0) # linear constraint
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("result:", result)
+            break
+    
+        model = solver.model()
+        M = U.get_interp(model)
+        assert M.t*F*M == F
+    
+        eode = code.apply(M)
+        assert dode.is_equiv(eode)
+        yield M
+
+        Add(U != M)
 
 
 def test_dehn():
     lookup = {}
+#    rows, cols = 4, 4
     rows, cols = 4, 4
     for i in range(rows):
       for j in range(cols):
@@ -963,6 +1003,7 @@ def test_dehn():
         for di in (-rows, 0, rows):
           for dj in (-cols, 0, cols):
             lookup[i+di,j+dj] = lookup[i,j]
+
     facess = [[], []]
     parity = 0
     for i in range(rows):
@@ -984,9 +1025,9 @@ def test_dehn():
         stabs.append(stab)
     #stabs = numpy.array(stabs)
     stabs = numpy.concatenate(stabs)
-    #print(stabs.shape)
     code = QCode(A=stabs)
     print(code)
+    print(strop(code.H))
 
     perm = []
     for i in range(rows):
@@ -997,26 +1038,53 @@ def test_dehn():
     #print(dode.is_equiv(code))
     #for M in find_local_clifford(dode, code):
     #    print(M)
+    print(dode)
+    print(strop(dode.H))
+    print(code.is_equiv(dode))
 
-    H = dode.H.intersect(code.H)
-    print(code.H.shape, "-->", H.shape)
+    hperm = {}
+    vperm = {}
+    for i in range(rows):
+      for j in range(cols):
+        hperm[lookup[i,j]] = lookup[i+2,j]
+        vperm[lookup[i,j]] = lookup[i,j+2]
+    hperm = [hperm[i] for i in range(n)]
+    vperm = [vperm[i] for i in range(n)]
+    print(hperm)
+    print(vperm)
+    
+    assert code.apply_perm(vperm).is_equiv(code)
+    assert code.apply_perm(hperm).is_equiv(code)
+    assert dode.apply_perm(vperm).is_equiv(dode)
+    assert dode.apply_perm(hperm).is_equiv(dode)
 
-    M = dode.get_encoder() * code.get_decoder()
-    #print(shortstr(M.A))
+    if 0:
+        #return
+    
+        H = dode.H.intersect(code.H)
+        print(code.H.shape, "-->", H.shape)
+    
+        M = dode.get_encoder() * code.get_decoder()
+        #print(shortstr(M.A))
+    
+        op = dode.get_logical(code)
+        s = SymplecticSpace(2)
+        gen = [s.get_CNOT(1,0), s.get_CZ(), 
+            s.get_S(0), s.get_H(0), s.get_S(1), s.get_H(1)]
+        G = mulclose(gen)
+        G = list(G)
+        print(G[0].name)
+        #print(op in mulclose(gen))
+        idx = G.index(op)
+        print(G[idx].name)
+        #print(SymplecticSpace(2).get_name(op))
+    
+        return M
 
-    op = dode.get_logical(code)
-    s = SymplecticSpace(2)
-    gen = [s.get_CNOT(1,0), s.get_CZ(), 
-        s.get_S(0), s.get_H(0), s.get_S(1), s.get_H(1)]
-    G = mulclose(gen)
-    G = list(G)
-    print(G[0].name)
-    #print(op in mulclose(gen))
-    idx = G.index(op)
-    print(G[idx].name)
-    #print(SymplecticSpace(2).get_name(op))
-
-    return M
+    for M in search_gate(code, dode, hperm, vperm):
+        print(M)
+        print(code.space.get_name(M))
+        #break
     
     
 

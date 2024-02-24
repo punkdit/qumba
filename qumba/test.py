@@ -8,7 +8,7 @@ import numpy
 
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum)
-from qumba.qcode import QCode, SymplecticSpace, strop, Matrix
+from qumba.qcode import QCode, SymplecticSpace, strop, Matrix, fromstr
 from qumba.csscode import CSSCode, find_logicals
 from qumba.autos import get_autos
 from qumba import csscode, construct
@@ -77,7 +77,7 @@ def test_isomorphism():
     assert iso == [1, 0]
 
 
-def test_10_2_3():
+def test_10_2_3_logicals():
     Ax = parse("""
     X..X..XX..
     .X..X..XX.
@@ -1307,6 +1307,8 @@ def test_822():
     assert dode.is_equiv(code)
     gen.append(dode.get_logical(code))
 
+    print(code.longstr())
+
     for perm, cliff in [
         ([0,2,1,3], "SHS SH HS S"),
         ([0,2,3,1], "HS S SHS SH"),
@@ -1324,7 +1326,7 @@ def test_822():
         ([3,1,2,0], "HS S SHS SH"),
         ([3,2,0,1], "SH HS S SHS"),
     ]:
-        #print(perm)
+        print(perm, end=" ",)
         perm = lift_perm(perm)
         dode = code.apply_perm(perm)
         cliff = cliff.split()
@@ -1332,7 +1334,11 @@ def test_822():
             func = eval("lift_%s"%c, locals())
             dode = func(dode, fibers[i])
         assert dode.is_equiv(code)
-        gen.append(dode.get_logical(code))
+        logop = dode.get_logical(code)
+        gen.append(logop)
+        print(SymplecticSpace(2).get_name(logop))
+
+    return
 
     #for L in gen:
     #    print(L)
@@ -1409,6 +1415,66 @@ def test_822_clifford():
         g = H(i)*g
 
     assert g*P == P*g
+
+
+def test_10_2_3():
+    src = construct.get_513()
+    code = unwrap(src)
+    fibers = [(i, i+src.n) for i in range(src.n)]
+
+    s = code.space
+    CX, CY, CZ, H, S, SWAP = s.CX, None, s.CZ, s.H, s.S, s.SWAP
+    I = s.get_identity()
+
+    # Transversal CZ
+    print("CZ...")
+    g = I
+    for (i,j) in fibers:
+        g = CZ(i,j)*g
+    #assert g*P == P*g
+    dode = code.apply(g)
+    assert dode.is_equiv(code)
+    l0 = (dode.get_logical(code))
+
+    # Transversal HH SWAP
+    print("HH SWAP...")
+    g = I
+    for (i,j) in fibers:
+        g = SWAP(i,j)*g
+    for i in range(s.n):
+        g = H(i)*g
+    #assert g*P == P*g
+    dode = code.apply(g)
+    assert dode.is_equiv(code)
+    l1 = (dode.get_logical(code))
+
+    # Transversal CX SWAP
+    print("CX SWAP...")
+    def lift_SH(fiber):
+        a, b = fiber
+        E = s.SWAP(a,b) # lift H
+        E = s.CX(b,a)*E # lift S
+        return E
+    g = I
+    for fiber in fibers:
+        g = g*lift_SH(fiber)
+    #assert g*P == P*g
+    dode = code.apply(g)
+    assert dode.is_equiv(code)
+    l2 = (dode.get_logical(code))
+
+    G = mulclose([l0,l1,l2])
+    print("|G| =", len(G))
+    s = SymplecticSpace(2)
+    print(s.get_name(l0))
+    print(s.get_name(l1))
+    print(s.get_name(l2))
+
+    # we get a swap from qubit permutation
+    G = mulclose([l0,l1,l2,s.SWAP(0,1)])
+    print("|G| =", len(G))
+
+
 
 
 def test_10_2_3_clifford():
@@ -1598,6 +1664,61 @@ def test_double():
         #print(g4)
         #print()
 
+
+def test_20_2_6():
+    n = 20
+    ops = [
+        (0, 1, 16, 3, 11, 9, 6, 7),
+        (0, 1, 2, 4, 5, 12, 13, 17),
+        (14, 15, 17, 2, 18, 19, 6, 7),
+        (16, 3, 18, 19, 8, 10, 12, 13),
+        (4, 5, 8, 10, 9, 11, 14, 15),
+        (0, 12, 7, 19),
+        (1, 3, 4, 8),
+        (2, 5, 6, 9),
+        (13, 10, 14, 17),
+        (15, 11, 16, 18),
+    ]
+    for a in ops:
+      assert len(a) in [4,8]
+      assert len(set(a)) == len(a)
+      for b in ops:
+        if a is b:
+            continue
+        c = [i for i in a if i in b]
+        assert len(c) in [0,2], (a,b,len(c))
+    rows = []
+    for op in ops:
+      for c in 'XZ':
+        row = ['.']*n
+        for i in op:
+            row[i] = c
+        row = ''.join(row)
+        rows.append(row)
+    stabs = ' '.join(rows)
+    H = fromstr(stabs)
+    H = linear_independent(H)
+    code = QCode(H)
+    from qumba.distance import distance_z3
+    distance_z3(code)
+    print(code)
+    print(code.longstr())
+    S = code.space.S
+    op = reduce(mul, [S(i) for i in range(n)])
+    dode = code.apply(op)
+    print(dode.is_equiv(code))
+    l = dode.get_logical(code)
+    print(l == SymplecticSpace(2).CX())
+
+    if 0: # too big !
+        from qumba.clifford_sage import Clifford, red, green, Matrix
+        c = Clifford(code.n)
+        CX, CY, CZ, H, S, SWAP = c.CX, c.CY, c.CZ, c.H, c.S, c.SWAP
+        I = c.get_identity()
+    
+        print("P...")
+        P = code.get_projector() # slow...
+    
 
 
 def test():

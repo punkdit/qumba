@@ -312,7 +312,7 @@ def hypergraph_product(A, B, check=False):
     return Hx, Hz
 
 
-def get_xzzx(a, b):
+def make_torus(a, b):
     assert a>0 and b>0, str((a,b))
     lookup = {}
     c = max(a, b)
@@ -349,6 +349,11 @@ def get_xzzx(a, b):
                     lookup[i,j] = lookup[tgt]
                     break
     assert len(keys) == n == a**2 + b**2, len(keys)
+    return lookup, keys
+
+def get_xzzx(a, b):
+    lookup, keys = make_torus(a, b)
+    n = len(keys)
     rows = []
     for (i,j) in keys:
         row = ['.']*n
@@ -366,7 +371,35 @@ def get_xzzx(a, b):
     return code
 
 
+def get_toric(a, b):
+    lookup, keys = make_torus(a, b)
+    n = len(keys)
+    assert n%2 == 0
+    rows = []
+    for (i,j) in keys:
+        row = ['.']*n
+        op = 'X' if (i+j)%2 else 'Z'
+        row[lookup[i,j]] = op
+        row[lookup[i,j+1]] = op
+        row[lookup[i+1,j+1]] = op
+        row[lookup[i+1,j]] = op
+        row = ''.join(row)
+        rows.append(row)
+    assert len(rows) == n
+    rows = ' '.join(rows)
+    H = fromstr(rows)
+    H = linear_independent(H)
+    code = QCode(H)
+    return code
+
+
 def test_xzzx():
+
+    code = get_toric(2, 2)
+    assert code.n == 8
+    assert code.k == 2
+    assert code.get_distance() == 2
+
     from qumba.distance import distance_z3
     code = get_xzzx(1,3)
     assert code.n == 10
