@@ -123,7 +123,8 @@ class Matrix(object):
         return Matrix(A, p, name="I")
 
     def __str__(self):
-        return str(self.A).replace("0", ".")
+        return shortstr(self.A)
+        #return str(self.A).replace("0", ".")
         # XXX broken:
         #s = shortstr(self.A)
         #lines = s.split()
