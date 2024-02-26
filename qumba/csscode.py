@@ -805,16 +805,26 @@ def find_z3(n, mx, mz, d=None):
     Hx = UMatrix.unknown(mx, n)
     Hx[:, :mx] = identity2(mx)
     Hz = UMatrix.unknown(mz, n)
-    Hz[:, :mz] = identity2(mz)
-
-    add(Hx*Hz.t == 0)
+    #Hz[:, :mz] = identity2(mz)
+    Tx = UMatrix.unknown(mz, n)
+    Tz = UMatrix.unknown(mx, n)
 
     k = n - mx - mz
     Lx = UMatrix.unknown(k, n)
     Lz = UMatrix.unknown(k, n)
-    add(Lx*Lz.t == UMatrix(identity2(k)))
-    add(Hz*Lx.t == 0)
+
+    Ik = UMatrix(identity2(k))
+    Imx = UMatrix(identity2(mx))
+    Imz = UMatrix(identity2(mz))
+    add(Hx*Hz.t == 0)
     add(Hx*Lz.t == 0)
+    add(Hx*Tz.t == Imx)
+    add(Hz*Lx.t == 0)
+    add(Hz*Tx.t == Imz)
+    add(Tx*Tz.t == 0)
+    add(Lx*Tz.t == 0)
+    add(Lz*Tx.t == 0)
+    add(Lx*Lz.t == Ik)
 
     vz = UMatrix.unknown(1, n)
     t_parity = (Hx*vz.t == 0)
@@ -846,16 +856,11 @@ def find_z3(n, mx, mz, d=None):
     Lx = Lx.get_interp(model)
     print("Lx =")
     print(Lx)
+    Tz = Tz.get_interp(model)
+    Tx = Tx.get_interp(model)
 
-#    vz = vz.get_interp(model)
-#    print("vz =")
-#    print(vz)
-#    assert (Hx*vz.t).sum() == 0
-#    HzLz = Hz.concatenate(Lz)
-#    assert HzLz.rank() == mx+k
-#    assert HzLz.t.solve(vz.t) is not None
-
-    code = CSSCode(Hx=Hx, Hz=Hz, Lx=Lx, Lz=Lz, check=True)
+    code = CSSCode(Hx=Hx.A, Hz=Hz.A, Lx=Lx.A, Lz=Lz.A, Tx=Tx.A, Tz=Tz.A, check=True)
+    #code = CSSCode(Hx=Hx.A, Hz=Hz.A, check=True)
     return code
 
 
