@@ -789,25 +789,86 @@ class CSSCode(object):
         return found
 
 
-def distance_z3(code):
+def find_z3(n, mx, mz, d=None):
+    print("find_z3", n, mx, mz, d)
+    import z3
+    from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, sat, ForAll
+    from qumba.transversal import UMatrix
 
-    if code.k == 0:
-        return code.n
+    solver = Solver()
+    add = solver.add
 
-    d_x = 1
-    while 1:
-        v = distance_lower_bound_z3(code.Hz, code.Lz, d_x)
-        if v is not None:
-            break
-        d_x += 1
+    Hx = zeros2(mx, n)
+    Hx[:, :mx] = identity2(mx)
+    Hz = zeros2(mz, n)
 
-    d_z = 1
-    while d_z<d_x:
-        v = distance_lower_bound_z3(code.Hx, code.Lx, d_z)
-        if v is not None:
-            break
-        d_z += 1
-    return min(d_x, d_z)
+    Hx = UMatrix.unknown(mx, n)
+    Hx[:, :mx] = identity2(mx)
+    Hz = UMatrix.unknown(mz, n)
+    Hz[:, :mz] = identity2(mz)
+
+    add(Hx*Hz.t == 0)
+
+    k = n - mx - mz
+    Lx = UMatrix.unknown(k, n)
+    Lz = UMatrix.unknown(k, n)
+    add(Lx*Lz.t == UMatrix(identity2(k)))
+    add(Hz*Lx.t == 0)
+    add(Hx*Lz.t == 0)
+
+    vz = UMatrix.unknown(1, n)
+    t_parity = (Hx*vz.t == 0)
+    t_logical = (Lx*vz.t != 0)
+    t_distance = Sum([If(vz[0,i].v,1,0) for i in range(n)]) >= d
+    term = If(And(t_parity, t_logical),t_distance,True)
+    add(ForAll([vz[0,i].v for i in range(n)], term))
+
+    vx = UMatrix.unknown(1, n)
+    t_parity = (Hz*vx.t == 0)
+    t_logical = (Lz*vx.t != 0)
+    t_distance = Sum([If(vx[0,i].v,1,0) for i in range(n)]) >= d
+    term = If(And(t_parity, t_logical),t_distance,True)
+    add(ForAll([vx[0,i].v for i in range(n)], term))
+
+    result = solver.check()
+    assert str(result) == "sat"
+
+    model = solver.model()
+    Hx = Hx.get_interp(model)
+    print("Hx =")
+    print(Hx)
+    Hz = Hz.get_interp(model)
+    print("Hz =")
+    print(Hz)
+    Lz = Lz.get_interp(model)
+    print("Lz =")
+    print(Lz)
+    Lx = Lx.get_interp(model)
+    print("Lx =")
+    print(Lx)
+
+#    vz = vz.get_interp(model)
+#    print("vz =")
+#    print(vz)
+#    assert (Hx*vz.t).sum() == 0
+#    HzLz = Hz.concatenate(Lz)
+#    assert HzLz.rank() == mx+k
+#    assert HzLz.t.solve(vz.t) is not None
+
+    code = CSSCode(Hx=Hx, Hz=Hz, Lx=Lx, Lz=Lz, check=True)
+    return code
+
+
+def test_find():
+    n = argv.get("n", 15)
+    m = argv.get("m", 7)
+    mx = argv.get("mx", m)
+    mz = argv.get("mz", m)
+    d = argv.get("d", 3)
+    code = find_z3(n, mx, mz, d)
+    print(code)
+    print(code.distance())
+    #print(code.longstr())
 
 
 def distance_lower_bound_z3(Hx, Lx, d):
@@ -822,7 +883,7 @@ def distance_lower_bound_z3(Hx, Lx, d):
     add = solver.add
     v = [Bool("v%d"%i) for i in range(n)]
 
-    term = Sum([If(v[i],1,0) for i in range(n)]) == d
+    term = Sum([If(v[i],1,0) for i in range(n)]) <= d
     add(term)
 
     def check(hx):
@@ -855,14 +916,36 @@ def distance_lower_bound_z3(Hx, Lx, d):
     assert u.sum() == 0, "bug bug... try updating z3?"
     u = dot2(Lx, v)
     assert u.sum() != 0, "bug bug... try updating z3?"
-    assert v.sum() == d, "bug bug... try updating z3?"
+    assert v.sum() <= d, ("v.sum()==%d: bug bug... try updating z3?"%v.sum())
     return v
 
 
-def test():
+def distance_z3(code):
+
+    if code.k == 0:
+        return code.n
+
+    d_x = 1
+    while 1:
+        v = distance_lower_bound_z3(code.Hz, code.Lz, d_x)
+        if v is not None:
+            break
+        d_x += 1
+
+    d_z = 1
+    while d_z<d_x:
+        v = distance_lower_bound_z3(code.Hx, code.Lx, d_z)
+        if v is not None:
+            break
+        d_z += 1
+    return min(d_x, d_z)
+
+
+
+def test_distance():
     print("\ntest()")
     n = argv.get("n", 15)
-    d = argv.get("d", 4)
+    d = argv.get("d", 3)
     code = CSSCode.random(n, n//2, n//2, d, check=False)
     print(code)
     #print(code.longstr())
@@ -905,6 +988,7 @@ if __name__ == "__main__":
 
     t = time() - start_time
     print("OK! finished in %.3f seconds\n"%t)
+
 
 
 

@@ -74,7 +74,7 @@ class Expr(object):
 
 class Const(Expr):
     def __init__(self, value):
-        assert value in [0, 1]
+        assert value == 0 or value == 1
         #print("Const", value, type(value), type(value==1))
         self.value = value
     def get(self):
@@ -150,6 +150,9 @@ class UMatrix(object):
         if isinstance(value, numpy.ndarray):
             value = UMatrix(value)
         return value
+
+    def __setitem__(self, idx, value):
+        self.A[idx] = value
 
 #    @classmethod
 #    def promote(self, item):

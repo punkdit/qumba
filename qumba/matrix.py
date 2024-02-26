@@ -253,6 +253,10 @@ class Matrix(object):
         A = pseudo_inverse(self.A)
         return Matrix(A)
 
+    def solve(self, other):
+        A = solve.solve(self.A, other.A)
+        return Matrix(A) if A is not None else None
+
     def where(self):
         return list(zip(*numpy.where(self.A))) # list ?
 
