@@ -608,6 +608,13 @@ class QCode(object):
             self.d = d
         return d
 
+    def distance(self, method=None):
+        if method == "z3":
+            from qumba.distance import distance_z3
+            return distance_z3(self)
+        else:
+            return self.get_distance()
+
     def get_params(self, max_mk=22):
         d = self.d or self.get_distance(max_mk)
         return self.n, self.kk//2, d

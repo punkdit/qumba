@@ -4,6 +4,7 @@ import sys, os
 from math import *
 from random import *
 import time
+from functools import reduce
 
 import numpy
 import numpy.random as ra
@@ -582,8 +583,8 @@ class CSSCode(object):
             dx,dz = C.distance()
             if min(dx,dz) >= distance:
                 break
-            print('.', flush=True, end='')
-        print() 
+            #print('.', flush=True, end='')
+        #print() 
         return C
     
     _dual = None
@@ -788,19 +789,93 @@ class CSSCode(object):
         return found
 
 
+def distance_z3(code):
+
+    if code.k == 0:
+        return code.n
+
+    d_x = 1
+    while 1:
+        v = distance_lower_bound_z3(code.Hz, code.Lz, d_x)
+        if v is not None:
+            break
+        d_x += 1
+
+    d_z = 1
+    while d_z<d_x:
+        v = distance_lower_bound_z3(code.Hx, code.Lx, d_z)
+        if v is not None:
+            break
+        d_z += 1
+    return min(d_x, d_z)
+
+
+def distance_lower_bound_z3(Hx, Lx, d):
+    from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, sat
+
+    assert len(Lx)
+
+    m, n = Hx.shape
+    k, n1 = Lx.shape
+
+    solver = Solver()
+    add = solver.add
+    v = [Bool("v%d"%i) for i in range(n)]
+
+    term = Sum([If(v[i],1,0) for i in range(n)]) == d
+    add(term)
+
+    def check(hx):
+        terms = [v[j] for j in range(n) if hx[j]]
+        if len(terms)>1:
+            return reduce(Xor, terms)
+        elif len(terms)==1:
+            return terms[0]
+        assert 0, "dead check"
+
+    # parity checks
+    for i in range(m):
+        add(Not(check(Hx[i])))
+
+    # non-trivial logical
+    term = reduce(Or, [check(Lx[i]) for i in range(k)])
+    add(term)
+
+    result = solver.check()
+    #print(result)
+    if result != sat:
+        return
+
+    model = solver.model()
+    v = [model.evaluate(v[i]) for i in range(n)]
+    v = [int(eval(str(vi))) for vi in v]
+    v = array2(v)
+
+    u = dot2(Hx, v)
+    assert u.sum() == 0, "bug bug... try updating z3?"
+    u = dot2(Lx, v)
+    assert u.sum() != 0, "bug bug... try updating z3?"
+    assert v.sum() == d, "bug bug... try updating z3?"
+    return v
+
 
 def test():
     print("\ntest()")
     n = argv.get("n", 15)
     d = argv.get("d", 4)
-    code = CSSCode.random(n, n//2, n//2, d)
+    code = CSSCode.random(n, n//2, n//2, d, check=False)
     print(code)
-    print(code.longstr())
+    #print(code.longstr())
+    d0 = distance_z3(code)
+    print("d =", d0)
+    return
     code = code.to_qcode()
-    from qumba.distance import distance_z3
-    distance_z3(code)
+    from qumba import distance 
+    d1 = distance.distance_z3(code)
+    #assert d0==d1
+    print("d1 =", d1)
     print(code)
-    print(code.longstr())
+    #print(code.longstr())
 
 
 if __name__ == "__main__":

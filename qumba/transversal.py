@@ -990,9 +990,99 @@ def search_gate(code, dode, *perms):
         Add(U != M)
 
 
+def test_hexagons():
+    "how do dehn twists act on hexagons?"
+    from qumba.solve import (
+        parse, rank, array2, zeros2, 
+        shortstr, linear_independent, intersect,
+        dot2,
+    )
+    lookup = {}
+    rows = cols = 6
+    n = rows*cols
+    for i in range(rows):
+      for j in range(cols):
+        lookup[i,j] = len(lookup)
+    n = len(lookup)
+    for i in range(rows):
+      for j in range(cols):
+        for di in (-rows, 0, rows):
+          for dj in (-cols, 0, cols):
+            lookup[i+di,j+dj] = lookup[i,j]
+
+    perm = []
+    for i in range(rows):
+        p = list(range(i*cols, (i+1)*cols))
+        p = [p[(idx+i)%cols] for idx in range(cols)]
+        perm += p
+    #print(perm)
+    P = zeros2((n, n))
+    for (i,j) in enumerate(perm):
+        P[i,j] = 1
+
+    # black squares
+    print("H =")
+    H = []
+    for i in range(rows):
+      for j in range(cols):
+        if (i+j)%2:
+            continue
+        op = [0]*n
+        op[lookup[i,j]] = 1
+        op[lookup[i+1,j]] = 1
+        op[lookup[i,j+1]] = 1
+        op[lookup[i+1,j+1]] = 1
+        H.append(op)
+    H = array2(H)
+    print(shortstr(H), H.shape, rank(H))
+    H = linear_independent(H)
+    HP = dot2(H,P)
+    print("H^HP =", rank(intersect(H, HP)))
+    print()
+
+    # right hexagons
+    K = []
+    for i in range(rows):
+      for j in range(cols):
+        if (i+j)%2:
+            continue
+        op = [0]*n
+        op[lookup[i,j]] = 1
+        op[lookup[i+1,j]] = 1
+        op[lookup[i,j+1]] = 1
+        op[lookup[i+1,j+2]] = 1
+        op[lookup[i+2,j+1]] = 1
+        op[lookup[i+2,j+2]] = 1
+        K.append(op)
+    K = array2(K)
+    print("K =")
+    print(shortstr(K), K.shape, rank(K))
+    K = linear_independent(K)
+    HK = intersect(H, K)
+    print("H^K =", rank(HK))
+    print("H^KP =", rank(intersect(H,dot2(K,P))))
+    print("HP^KP =", rank(intersect(HP,dot2(K,P))))
+
+    print()
+
+    m = len(H)
+    J = []
+    for i in range(m):
+      for j in range(m):
+        op = (H[i] + H[j])%2
+        if op.sum() == 6:
+            J.append(op)
+    J = array2(J)
+    J = linear_independent(J)
+    print("J =")
+    print(shortstr(J), J.shape)
+    JK = intersect(J, K)
+    print("J^K =", rank(JK))
+    print()
+
+
 def test_dehn():
     lookup = {}
-#    rows, cols = 4, 4
     rows, cols = 4, 4
     for i in range(rows):
       for j in range(cols):
@@ -1042,6 +1132,7 @@ def test_dehn():
     print(strop(dode.H))
     print(code.is_equiv(dode))
 
+
     hperm = {}
     vperm = {}
     for i in range(rows):
@@ -1063,6 +1154,13 @@ def test_dehn():
     
         H = dode.H.intersect(code.H)
         print(code.H.shape, "-->", H.shape)
+
+        eode = QCode(H)
+        #from distance import distance_z3
+        #distance_z3(eode)
+        #print(eode)
+        #print(eode.longstr())
+        #return
     
         M = dode.get_encoder() * code.get_decoder()
         #print(shortstr(M.A))

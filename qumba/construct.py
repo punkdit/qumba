@@ -366,8 +366,9 @@ def get_xzzx(a, b):
     assert len(rows) == n
     rows = ' '.join(rows)
     H = fromstr(rows)
-    H = linear_independent(H)
-    code = QCode(H)
+    code = QCode(A=H)
+    code.lookup = lookup
+    code.keys = keys
     return code
 
 
@@ -388,8 +389,9 @@ def get_toric(a, b):
     assert len(rows) == n
     rows = ' '.join(rows)
     H = fromstr(rows)
-    H = linear_independent(H)
-    code = QCode(H)
+    code = QCode(A=H)
+    code.lookup = lookup
+    code.keys = keys
     return code
 
 
@@ -414,7 +416,6 @@ def get_surface(rows, cols):
         row[get(i,j)] = op
         row[get(i,j+1)] = op
         ops.append(''.join(row))
-    #for j in range((rows+cols)%2,cols-1,2): # bottom boundary
     for j in range(rows%2,cols-1,2): # bottom boundary
         i = rows-1
         op = parity(i,j)
@@ -441,7 +442,6 @@ def get_surface(rows, cols):
     ops = ' '.join(ops)
     H = fromstr(ops)
     assert rank(H) == n-1
-    #H = linear_independent(H)
     code = QCode(H)
     return code
 
