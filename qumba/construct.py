@@ -393,6 +393,60 @@ def get_toric(a, b):
     return code
 
 
+def get_surface(rows, cols):
+    n = rows*cols
+    parity = lambda i,j:'X' if (i+j)%2 else 'Z'
+    ops = []
+    get = lambda i,j:cols*i + j
+    for i in range(rows-1):
+      for j in range(cols-1):
+        op = parity(i,j)
+        row = ['.']*n
+        row[get(i,j)] = op
+        row[get(i+1,j)] = op
+        row[get(i,j+1)] = op
+        row[get(i+1,j+1)] = op
+        ops.append(''.join(row))
+    for j in range(0,cols-1,2): # top boundary
+        i = 0
+        op = parity(i-1,j)
+        row = ['.']*n
+        row[get(i,j)] = op
+        row[get(i,j+1)] = op
+        ops.append(''.join(row))
+    #for j in range((rows+cols)%2,cols-1,2): # bottom boundary
+    for j in range(rows%2,cols-1,2): # bottom boundary
+        i = rows-1
+        op = parity(i,j)
+        row = ['.']*n
+        row[get(i,j)] = op
+        row[get(i,j+1)] = op
+        ops.append(''.join(row))
+    for i in range(1,rows-1,2): # left boundary
+        j = 0
+        op = parity(i,j-1)
+        row = ['.']*n
+        row[get(i,j)] = op
+        row[get(i+1,j)] = op
+        ops.append(''.join(row))
+    for i in range(1-cols%2,rows-1,2): # right boundary
+        j = cols-1
+        op = parity(i,j)
+        row = ['.']*n
+        row[get(i,j)] = op
+        row[get(i+1,j)] = op
+        ops.append(''.join(row))
+        
+    assert len(ops) == n-1
+    ops = ' '.join(ops)
+    H = fromstr(ops)
+    assert rank(H) == n-1
+    #H = linear_independent(H)
+    code = QCode(H)
+    return code
+
+
+
 def test_xzzx():
 
     code = get_toric(2, 2)

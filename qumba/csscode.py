@@ -18,6 +18,7 @@ from qumba.isomorph import Tanner, search
 from qumba.solve import (
     shortstr, shortstrx, eq2, dot2, compose2, rand2,
     pop2, insert2, append2, array2, zeros2, identity2, rank, linear_independent)
+from qumba.argv import argv
 
 
 
@@ -336,7 +337,7 @@ class CSSCode(object):
 
         #print "build_stab"
         #print shortstr(Gx)
-        #vs = solve.find_kernel(Gx)
+        #vs = solve.kernel(Gx)
         #vs = list(vs)
         #print "kernel Gx:", len(vs)
     
@@ -344,7 +345,7 @@ class CSSCode(object):
     
         if Hz is None:
             A = dot2(Gx, Gz.transpose())
-            vs = solve.find_kernel(A)
+            vs = solve.kernel(A)
             vs = list(vs)
             #print "kernel GxGz^T:", len(vs)
             Hz = zeros2(len(vs), n)
@@ -354,7 +355,7 @@ class CSSCode(object):
     
         if Hx is None:
             A = dot2(Gz, Gx.transpose())
-            vs = solve.find_kernel(A)
+            vs = solve.kernel(A)
             vs = list(vs)
             Hx = zeros2(len(vs), n)
             for i, v in enumerate(vs):
@@ -544,6 +545,47 @@ class CSSCode(object):
                 assert ops.shape[1] == self.n
         #write("done\n")
 
+    @classmethod
+    def random(cls, n, mx, mz, distance=None, **kw):
+        """
+        http://arxiv.org/abs/quant-ph/9512032
+        Quantum error-correcting codes exist
+        with asymptotic rate:
+        k/n = 1 - 2H(2t/n) where
+        H(p) = -p log p - (1-p) log (1-p) and
+        t = floor((d-1)/2).
+        """
+    
+        while 1:
+            k = n-mx-mz
+            assert k>=0
+    
+            #print("rate:", 1.*k//n)
+            #H = lambda p: -p*log(p) - (1-p)*log(1-p)
+            #d = 56
+            #print(1-2*H(1.*d//n)) # works!
+    
+            Hz = rand2(mz, n)
+            #print(shortstr(Hz))
+            if rank(Hz) < mz:
+                continue
+            kern = numpy.array(solve.kernel(Hz))
+    
+            Hx = zeros2(mx, n)
+            for i in range(mx):
+                v = rand2(1, n-mx)
+                Hx[i] = dot2(v, kern)
+            C = cls(Hx=Hx, Hz=Hz, **kw)
+    
+            if distance is None:
+                break
+            dx,dz = C.distance()
+            if min(dx,dz) >= distance:
+                break
+            print('.', flush=True, end='')
+        print() 
+        return C
+    
     _dual = None
     def get_dual(self, build=False, check=False):
         if self._dual:
@@ -698,7 +740,7 @@ class CSSCode(object):
                 d = w.sum()
                 if 0<d<dx:
                     dx = d
-            if dx==min_d:
+            if dx<=min_d:
                 return dx
         return dx
 
@@ -711,7 +753,7 @@ class CSSCode(object):
                 d = w.sum()
                 if 0<d<dz:
                     dz = d
-            if dz==min_d:
+            if dz<=min_d:
                 return dz
         return dz
 
@@ -744,5 +786,51 @@ class CSSCode(object):
             found.append(zx)
 
         return found
+
+
+
+def test():
+    print("\ntest()")
+    n = argv.get("n", 15)
+    d = argv.get("d", 4)
+    code = CSSCode.random(n, n//2, n//2, d)
+    print(code)
+    print(code.longstr())
+    code = code.to_qcode()
+    from qumba.distance import distance_z3
+    distance_z3(code)
+    print(code)
+    print(code.longstr())
+
+
+if __name__ == "__main__":
+
+    from time import time
+    start_time = time()
+    start_time = time()
+
+    profile = argv.profile
+    name = argv.next() or "test"
+    _seed = argv.get("seed")
+    if _seed is not None:
+        print("seed(%s)"%(_seed))
+        seed(_seed)
+
+    if profile:
+        import cProfile as profile
+        profile.run("%s()"%name)
+
+    elif name is not None:
+        fn = eval(name)
+        fn()
+
+    else:
+        test()
+
+
+    t = time() - start_time
+    print("OK! finished in %.3f seconds\n"%t)
+
+
 
 

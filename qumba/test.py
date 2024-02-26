@@ -411,6 +411,13 @@ def test_hgp():
         #print()
 
 
+def test_surface():
+    for rows in [2,3,4]:
+        for cols in [2,3,4]:
+            code = construct.get_surface(rows,cols)
+            d = code.get_distance()
+            assert d == min(rows, cols)
+
 
 def test_biplanar():
     code = construct.biplanar()
