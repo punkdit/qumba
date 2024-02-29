@@ -259,20 +259,7 @@ def test_wrap():
 def test_wrap_toric():
     import transversal
     code = construct.get_toric(2,2)
-    #code = unwrap(construct.get_412())
-    if 0:
-        toric = construct.get_toric(3,1)
-        code = construct.get_513()
-        code = unwrap(code)
-        code.distance("z3")
-        print(code)
-        print(strop(code.H))
-        print(toric)
-        print(strop(toric.H))
-        assert is_iso(code, construct.get_toric(3,1))
-        for perm in get_isos(code, construct.get_toric(3,1)):
-            print(perm)
-        return
+    code = unwrap(construct.get_412())
 
     zxs = get_zx_wrap(code)
     print("zx-dualities:", len(zxs))
