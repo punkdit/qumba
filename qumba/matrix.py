@@ -16,7 +16,7 @@ import numpy
 
 from qumba.default_p import DEFAULT_P
 from qumba.solve import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
-    kernel, span, pseudo_inverse, rank, row_reduce, linear_independent)
+    kernel, span, pseudo_inverse, rank, row_reduce, linear_independent, rand2)
 from qumba.solve import int_scalar as scalar
 from qumba import solve
 from qumba.action import mulclose
@@ -107,6 +107,11 @@ class Matrix(object):
         if name is None:
             name = "P"+str(tuple(items))
         return Matrix(A, p, name=name)
+
+    @classmethod
+    def rand(cls, m, n):
+        A = rand2(m, n)
+        return Matrix(A)
 
     def to_perm(self):
         A = self.A

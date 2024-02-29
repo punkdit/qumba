@@ -156,12 +156,10 @@ def test():
     #code = construct.get_713()
     #code = construct.get_rm()
     #code = construct.get_m24()
+
     code = construct.get_10_2_3()
-    print(code)
-
-
     gen = get_autos(code)
-    print(len(gen))
+    assert len(gen) == 20
 
 
 if __name__ == "__main__":

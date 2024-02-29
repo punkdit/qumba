@@ -13,10 +13,11 @@ import numpy
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum, zeros2, solve2, normal_form)
 from qumba.matrix import Matrix
-from qumba.qcode import QCode, SymplecticSpace
+from qumba.qcode import QCode, SymplecticSpace, strop
 from qumba import construct
 from qumba.distance import distance_z3
-from qumba.autos import get_isos
+from qumba.autos import get_isos, is_iso
+from qumba.action import Perm
 from qumba.argv import argv
 
 @cache
@@ -87,6 +88,21 @@ def unwrap_encoder(code):
     return code2
 
 
+def get_pairs(duality):
+    pairs = []
+    perm = []
+    n = len(duality.items)
+    for i in range(n):
+        j = duality[i]
+        if i==j:
+            return None
+        assert i!=j
+        if i < j:
+            pairs.append((i, j))
+            perm.append(i)
+            perm.append(j)
+    assert len(pairs)*2 == n
+    return pairs
 
 
 def zxcat(code, duality):
@@ -145,6 +161,136 @@ def test_all_codes():
             print("-->")
             print(dode.longstr())
             found.add(desc)
+
+
+def get_zx_dualities(code):
+    space = code.space
+    n = space.n
+    H = space.H
+    g = reduce(mul,[H(i) for i in range(n)])
+    dode = code.apply(g)
+    items = list(range(n))
+    perms = [Perm(perm,items) for perm in get_isos(code,dode)]
+    return perms
+
+def get_zx_wrap(code):
+    "these are the fixed-point-free involutory zx dualities"
+    n = code.n
+    perms = get_zx_dualities(code)
+    items = list(range(n))
+    I = Perm(items,items)
+    assert I*I==I
+    #print(len(perms))
+    zxs = []
+    for g in perms:
+        if g*g!=I:
+            continue
+        for i in range(n):
+            if g[i]==i:
+                break
+        else:
+            zxs.append(g)
+    return zxs
+
+def wrap(code, zx):
+    nn = code.nn
+    pairs = get_pairs(zx)
+    #print(code.H)
+    Hx = code.H[:,0:nn:2]
+    #print(Hx)
+    cols = reduce(add,pairs)
+    H = Hx[:, list(cols)]
+    H = H.linear_independent()
+    code = QCode(H)
+    return code
+
+
+def scramble(code):
+    H = code.H
+    m, nn = H.shape
+    #print(H, H.shape, H.rank(), m)
+    while 1:
+        J = Matrix.rand(m, m)
+        #print(J, J.shape)
+        H1 = J*H
+        if H1.rank() < m:
+            continue
+        #print()
+        #print(H1, H1.shape, H1.rank())
+        break
+    code = QCode(H1)
+    return code
+
+
+def test_wrap():
+    import transversal
+    a_code = construct.get_toric(2,2)
+    b_code = unwrap(construct.get_412())
+    n = a_code.n
+    iso = iter(get_isos(a_code, b_code)).__next__()
+    iso = Perm(iso, list(range(n)))
+    print(iso)
+
+    a_zxs = get_zx_wrap(a_code)
+    b_zxs = get_zx_wrap(b_code)
+    print(a_zxs)
+    print(b_zxs)
+    for g in a_zxs:
+        g = iso*g*(~iso)
+        assert g in b_zxs
+    for g in b_zxs:
+        g = (~iso)*g*iso
+        assert g in a_zxs
+    return
+
+    for zx in zxs:
+        dode = wrap(code, zx)
+        print()
+        print(dode)
+        print(strop(dode.H))
+        gens = []
+        for M in transversal.find_local_clifford(dode, dode):
+            gens.append(M)
+        print("local cliffords:", len(gens))
+        gens = list(get_isos(dode,dode))
+        print("autos:", len(gens))
+    
+
+def test_wrap_toric():
+    import transversal
+    code = construct.get_toric(2,2)
+    #code = unwrap(construct.get_412())
+    if 0:
+        toric = construct.get_toric(3,1)
+        code = construct.get_513()
+        code = unwrap(code)
+        code.distance("z3")
+        print(code)
+        print(strop(code.H))
+        print(toric)
+        print(strop(toric.H))
+        assert is_iso(code, construct.get_toric(3,1))
+        for perm in get_isos(code, construct.get_toric(3,1)):
+            print(perm)
+        return
+
+    zxs = get_zx_wrap(code)
+    print("zx-dualities:", len(zxs))
+
+    for zx in zxs:
+        eode = wrap(code, zx)
+        print()
+        print(eode)
+        #print(eode.longstr())
+        print(strop(eode.H))
+        src = unwrap(eode)
+        assert src.distance("z3") == code.d
+        gens = []
+        for M in transversal.find_local_clifford(eode, eode):
+            gens.append(M)
+        print("local cliffords:", len(gens))
+        gens = list(get_isos(eode,eode))
+        print("autos:", len(gens))
 
 
 def test_zx():
