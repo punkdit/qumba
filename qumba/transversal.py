@@ -952,47 +952,6 @@ def test_412_clifford():
 
 
 
-def search_gate(code, dode, *perms):
-    solver = Solver()
-    Add = solver.add
-
-    n = code.n
-    nn = 2*n
-    space = code.space
-    F = space.F
-
-    U = UMatrix.unknown(nn, nn)
-    Add(U.t*F*U == F) # U symplectic
-
-    for perm in perms:
-        P = space.get_perm(perm)
-        U1 = P.t*U*P
-        Add(U==U1)
-
-    HU = code.H * U.t
-    LU = code.L * U.t
-    R = HU * F * dode.L.t
-    Add(R==0) # linear constraint
-    R = HU * F * dode.H.t
-    Add(R==0) # linear constraint
-
-    while 1:
-        result = solver.check()
-        if result != z3.sat:
-            #print("result:", result)
-            break
-    
-        model = solver.model()
-        M = U.get_interp(model)
-        assert M.t*F*M == F
-    
-        eode = code.apply(M)
-        assert dode.is_equiv(eode)
-        yield M
-
-        Add(U != M)
-
-
 def test_hexagons():
     "how do dehn twists act on hexagons?"
     from qumba.solve import (
@@ -1082,6 +1041,51 @@ def test_hexagons():
     JK = intersect(J, K)
     print("J^K =", rank(JK))
     print()
+
+
+def search_gate(code, dode, *perms, row_weight=None):
+    solver = Solver()
+    Add = solver.add
+
+    n = code.n
+    nn = 2*n
+    space = code.space
+    F = space.F
+
+    U = UMatrix.unknown(nn, nn)
+    Add(U.t*F*U == F) # U symplectic
+
+    for perm in perms:
+        P = space.get_perm(perm)
+        U1 = P.t*U*P
+        Add(U==U1)
+
+    HU = code.H * U.t
+    LU = code.L * U.t
+    R = HU * F * dode.L.t
+    Add(R==0) # linear constraint
+    R = HU * F * dode.H.t
+    Add(R==0) # linear constraint
+
+    if row_weight is not None:
+        for i in range(nn):
+            Add(Sum([If(U[i,j].v,1,0) for j in range(nn)])<=row_weight)
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("result:", result)
+            break
+    
+        model = solver.model()
+        M = U.get_interp(model)
+        assert M.t*F*M == F
+    
+        eode = code.apply(M)
+        assert dode.is_equiv(eode)
+        yield M
+
+        Add(U != M)
 
 
 def test_dehn():
@@ -1182,7 +1186,8 @@ def test_dehn():
     
         return M
 
-    for M in search_gate(code, dode, hperm, vperm):
+    row_weight = argv.row_weight
+    for M in search_gate(code, dode, hperm, vperm, row_weight=row_weight):
         print(M)
         print(code.space.get_name(M))
         #break
