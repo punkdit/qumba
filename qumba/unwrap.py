@@ -18,6 +18,7 @@ from qumba import construct
 from qumba.distance import distance_z3
 from qumba.autos import get_isos, is_iso
 from qumba.action import Perm
+from qumba import csscode 
 from qumba.argv import argv
 
 @cache
@@ -243,28 +244,70 @@ class Cover(object):
         return Cover(base, total, fibers)
         
         
+def find_zxs(code):
+    n = code.n
+    A = strop(code.A).split()
+    Ax = '\n'.join([op for op in A if 'X' in op])
+    Az = '\n'.join([op for op in A if 'Z' in op])
+    Ax = parse(Ax)
+    Az = parse(Az)
+    duality = csscode.find_zx_duality(Ax, Az)
+    items = list(range(n))
+    duality = Perm.promote(duality, items)
+    #print(duality)
+    perms = csscode.find_autos(Ax, Az)
+    G = [Perm.promote(g, items) for g in perms]
+    #print("|G| =", len(G))
+    I = Perm(items, items)
+    zxs = []
+    for g in G:
+        zx = g*duality
+        if zx*zx != I:
+            continue
+        for i in items:
+            if zx[i] == i:
+                break
+        else:
+            zxs.append(zx)
+    return zxs
+
+
+
 def test_wrap():
-    for a in range(1,6):
+    for a in range(1,8):
       for b in range(1,a+1):
-        if (a+b) <= 2 or (a+b)%2:
+      #for b in range(1,8):
+        if (a+b) <= 2:
             continue
-        code = construct.get_toric(a, b)
-        if code.n > 20:
+        if (a+b)%2:
+            code = construct.get_xzzx(a, b)
+        else:
+            code = construct.get_toric(a, b)
+        #if code.n > 20:
+            #continue
+        if (a+b)%2:
             continue
+        code.distance("z3")
         print(a, b, code)
-        zxs = get_zx_wrap(code)
-        print(len(zxs))
+        zxs = find_zxs(code)
+        print("zxs:", len(zxs))
+        for zx in zxs:
+            dode = wrap(code, zx)
+            dode.distance("z3")
+            print(dode)
+        print()
+        print()
 
 
 def test_wrap_toric():
     import transversal
     #code = construct.get_toric(2,2)
     code = unwrap(construct.get_412())
-    #code = unwrap(construct.get_513())
+    code = unwrap(construct.get_513())
     print(code.longstr())
 
     zxs = get_zx_wrap(code)
-    print("zx-dualities:", len(zxs))
+    print("zx _dualities:", len(zxs))
 
     codes = []
     for zx in zxs:

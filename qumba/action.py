@@ -161,6 +161,17 @@ class Perm(object):
         self._hash_cache = None
 
     @classmethod
+    def promote(cls, perm, items=None):
+        if isinstance(perm, Perm):
+            return perm
+        assert type(perm) is list # ?
+        if items is None:
+            n = len(perm)
+            items = list(range(n))
+            assert set(items) == set(perm)
+        return Perm(perm, items)
+
+    @classmethod
     def identity(cls, items, *args, **kw):
         n = len(items)
         perm = dict((item, item) for item in items)
