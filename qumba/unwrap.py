@@ -88,7 +88,7 @@ def unwrap_encoder(code):
     return code2
 
 
-def get_pairs(duality):
+def get_fibers(duality):
     pairs = []
     perm = []
     n = len(duality.items)
@@ -194,7 +194,7 @@ def get_zx_wrap(code):
 
 def wrap(code, zx):
     nn = code.nn
-    pairs = get_pairs(zx)
+    pairs = get_fibers(zx)
     #print(code.H)
     Hx = code.H[:,0:nn:2]
     #print(Hx)
@@ -222,62 +222,71 @@ def scramble(code):
     return code
 
 
+class Cover(object):
+    def __init__(self, base, total, fibers):
+        self.base = base
+        self.total = total
+        self.fibers = fibers
+        assert len(fibers) == base.n
+
+    @classmethod
+    def frombase(cls, base):
+        code = unwrap(base)
+        n = base.n
+        fibers = [(i,i+n) for i in range(n)]
+        return Cover(base, code, fibers)
+
+    @classmethod
+    def fromzx(cls, total, zx):
+        base = wrap(total, zx)
+        fibers = get_fibers(zx)
+        return Cover(base, total, fibers)
+        
+        
 def test_wrap():
-    import transversal
-    a_code = construct.get_toric(2,2)
-    b_code = unwrap(construct.get_412())
-    n = a_code.n
-    iso = iter(get_isos(a_code, b_code)).__next__()
-    iso = Perm(iso, list(range(n)))
-    print(iso)
+    for a in range(1,6):
+      for b in range(1,a+1):
+        if (a+b) <= 2 or (a+b)%2:
+            continue
+        code = construct.get_toric(a, b)
+        if code.n > 20:
+            continue
+        print(a, b, code)
+        zxs = get_zx_wrap(code)
+        print(len(zxs))
 
-    a_zxs = get_zx_wrap(a_code)
-    b_zxs = get_zx_wrap(b_code)
-    print(a_zxs)
-    print(b_zxs)
-    for g in a_zxs:
-        g = iso*g*(~iso)
-        assert g in b_zxs
-    for g in b_zxs:
-        g = (~iso)*g*iso
-        assert g in a_zxs
-    return
-
-    for zx in zxs:
-        dode = wrap(code, zx)
-        print()
-        print(dode)
-        print(strop(dode.H))
-        gens = []
-        for M in transversal.find_local_clifford(dode, dode):
-            gens.append(M)
-        print("local cliffords:", len(gens))
-        gens = list(get_isos(dode,dode))
-        print("autos:", len(gens))
-    
 
 def test_wrap_toric():
     import transversal
-    code = construct.get_toric(2,2)
+    #code = construct.get_toric(2,2)
     code = unwrap(construct.get_412())
+    #code = unwrap(construct.get_513())
+    print(code.longstr())
 
     zxs = get_zx_wrap(code)
     print("zx-dualities:", len(zxs))
 
+    codes = []
     for zx in zxs:
         eode = wrap(code, zx)
+        codes.append(eode)
         print()
+        print(zx)
         print(eode)
         #print(eode.longstr())
         print(strop(eode.H))
-        src = unwrap(eode)
-        assert src.distance("z3") == code.d
+        total = unwrap(eode)
         gens = []
         for M in transversal.find_local_clifford(eode, eode):
             gens.append(M)
         print("local cliffords:", len(gens))
         gens = list(get_isos(eode,eode))
         print("autos:", len(gens))
+
+    for a in codes:
+      for b in codes:
+        print(int(is_iso(a,b)), end=" ")
+      print()
 
 
 def test_zx():
