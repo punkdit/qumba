@@ -164,6 +164,37 @@ def test_all_codes():
             found.add(desc)
 
 
+def test():
+    for code in QCode.load_codetables():
+        if code.n > 8:
+            break
+        if code.k == 0:
+            continue
+        print()
+        code2 = unwrap(code)
+        code2.get_params()
+        print(code, code2)
+        dode = code2.get_dual()
+        #iso = code2.get_iso(dode)
+        for iso in get_isos(code2, dode):
+            break
+        else:
+            continue
+        print(iso)
+
+        code = zxcat(code2, iso)
+        if code is None:
+            continue
+        #print(code)
+        #print(code.longstr())
+        assert code.is_selfdual()
+        #print(code.get_params())
+        print("found:", code)
+        #if code.n > 5:
+        #    break
+
+
+
 def get_zx_dualities(code):
     space = code.space
     n = space.n
@@ -173,6 +204,7 @@ def get_zx_dualities(code):
     items = list(range(n))
     perms = [Perm(perm,items) for perm in get_isos(code,dode)]
     return perms
+
 
 def get_zx_wrap(code):
     "these are the fixed-point-free involutory zx dualities"
@@ -192,6 +224,7 @@ def get_zx_wrap(code):
         else:
             zxs.append(g)
     return zxs
+
 
 def wrap(code, zx):
     nn = code.nn
@@ -229,6 +262,10 @@ class Cover(object):
         self.total = total
         self.fibers = fibers
         assert len(fibers) == base.n
+        for (i,j) in fibers:
+            assert i!=j
+            assert 0<=i<total.n
+            assert 0<=j<total.n
 
     @classmethod
     def frombase(cls, base):
@@ -242,39 +279,54 @@ class Cover(object):
         base = wrap(total, zx)
         fibers = get_fibers(zx)
         return Cover(base, total, fibers)
+
+    def H(self, idx):
+        base, total, fibers = self.base, self.total, self.fibers
+        fiber = fibers[idx]
+        return total.space.SWAP(*fiber)
+
+    def S(self, idx):
+        base, total, fibers = self.base, self.total, self.fibers
+        fiber = fibers[idx]
+        return total.space.CX(*fiber)
+
+    #def CX(self, idx, jdx):
+
+
         
-        
-def find_zxs(code):
-    n = code.n
-    A = strop(code.A).split()
-    Ax = '\n'.join([op for op in A if 'X' in op])
-    Az = '\n'.join([op for op in A if 'Z' in op])
-    Ax = parse(Ax)
-    Az = parse(Az)
-    duality = csscode.find_zx_duality(Ax, Az)
-    items = list(range(n))
-    duality = Perm.promote(duality, items)
-    #print(duality)
-    perms = csscode.find_autos(Ax, Az)
-    G = [Perm.promote(g, items) for g in perms]
-    #print("|G| =", len(G))
-    I = Perm(items, items)
-    zxs = []
-    for g in G:
-        zx = g*duality
-        if zx*zx != I:
-            continue
-        for i in items:
-            if zx[i] == i:
-                break
-        else:
-            zxs.append(zx)
-    return zxs
+#def find_zxs(code):
+#    import csscode
+#    n = code.n
+#    A = strop(code.A).split()
+#    Ax = '\n'.join([op for op in A if 'X' in op])
+#    Az = '\n'.join([op for op in A if 'Z' in op])
+#    Ax = parse(Ax)
+#    Az = parse(Az)
+#    duality = csscode.find_zx_duality(Ax, Az)
+#    items = list(range(n))
+#    duality = Perm.promote(duality, items)
+#    #print(duality)
+#    perms = csscode.find_autos(Ax, Az)
+#    G = [Perm.promote(g, items) for g in perms]
+#    #print("|G| =", len(G))
+#    I = Perm(items, items)
+#    zxs = []
+#    for g in G:
+#        zx = g*duality
+#        if zx*zx != I:
+#            continue
+#        for i in items:
+#            if zx[i] == i:
+#                break
+#        else:
+#            zxs.append(zx)
+#    return zxs
 
 
 
 def test_wrap():
-    for a in range(1,8):
+    N = argv.get("N", 8)
+    for a in range(1,N):
       for b in range(1,a+1):
       #for b in range(1,8):
         if (a+b) <= 2:
@@ -289,7 +341,7 @@ def test_wrap():
             continue
         code.distance("z3")
         print(a, b, code)
-        zxs = find_zxs(code)
+        zxs = code.find_zx_dualities()
         print("zxs:", len(zxs))
         for zx in zxs:
             dode = wrap(code, zx)
@@ -332,37 +384,110 @@ def test_wrap_toric():
       print()
 
 
-def test_zx():
-    for code in QCode.load_codetables():
-        if code.n > 8:
-            break
-        if code.k == 0:
-            continue
-        print()
-        code2 = unwrap(code)
-        code2.get_params()
-        print(code, code2)
-        dode = code2.get_dual()
-        #iso = code2.get_iso(dode)
-        for iso in get_isos(code2, dode):
-            break
+def test_wrap_16():
+    import transversal
+    code = construct.get_toric(4)
+    space = code.space
+    print(code)
+
+    g = Matrix.parse("""
+    1...............................
+    .1..............................
+    ..1.............................
+    ...1............................
+    ....1...........................
+    .....1..........................
+    ......1.........................
+    .......1........................
+    ........1.......................
+    .........1.1...1................
+    ........1.1.1...................
+    ...........1....................
+    ............1...................
+    ...........1.1.1................
+    ........1...1.1.................
+    ...............1................
+    ................1...............
+    .................1..............
+    ..................1.............
+    ...................1............
+    ....................1...........
+    .....................1..........
+    ......................1.........
+    .......................1........
+    ........................1.......
+    .........................1.1...1
+    ........................1.1.1...
+    ...........................1....
+    ............................1...
+    ...........................1.1.1
+    ........................1...1.1.
+    ...............................1
+    """) # 32x32
+
+
+    rows = cols = 4
+    perm = []
+    for i in range(rows):
+        p = list(range(i*cols, (i+1)*cols))
+        p = [p[(idx+i)%cols] for idx in range(cols)]
+        perm += p
+    perm = space.get_perm(perm)
+    g = g*perm
+    print(g)
+    dode = code.apply(g)
+    assert dode.is_equiv(code)
+    print(dode.get_logical(code))
+
+
+    zxs = get_zx_wrap(code)
+    print("zxs:", len(zxs))
+
+    covers = [Cover.fromzx(code, zx) for zx in zxs]
+    for cover in covers:
+        fibers = cover.fibers
+        idxs = []
+        for (i,j) in fibers:
+            idxs.append(2*i)
+            idxs.append(2*i+1)
+        print(idxs)
+        g1 = g[idxs,:]
+        g1 = g1[:,idxs]
+        print(g1)
+        base = cover.base
+        if base.space.is_symplectic(g1):
+            dode = base.apply(g1)
+            if dode.is_equiv(base):
+                print("L =")
+                print(dode.get_logical(base))
         else:
-            continue
-        print(iso)
+            print("not sympl")
+        print()
+    return
 
-        code = zxcat(code2, iso)
-        if code is None:
-            continue
-        #print(code)
-        #print(code.longstr())
-        assert code.is_selfdual()
-        #print(code.get_params())
-        print("found:", code)
-        #if code.n > 5:
-        #    break
+    codes = []
+    for zx in zxs:
+        eode = wrap(code, zx)
+        codes.append(eode)
+        print()
+        print(zx)
+        print(eode)
+        #print(eode.longstr())
+        print(strop(eode.H))
+        total = unwrap(eode)
+        gens = []
+        for M in transversal.find_local_clifford(eode, eode):
+            gens.append(M)
+        print("local cliffords:", len(gens))
+        gens = list(get_isos(eode,eode))
+        print("autos:", len(gens))
+
+    for a in codes:
+      for b in codes:
+        print(int(is_iso(a,b)), end=" ")
+      print()
 
 
-test = test_zx
 
 
 if __name__ == "__main__":

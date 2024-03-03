@@ -312,8 +312,7 @@ def hypergraph_product(A, B, check=False):
     return Hx, Hz
 
 
-def make_torus(a, b):
-    assert a>0 and b>0, str((a,b))
+def make_torus(a, b=0):
     lookup = {}
     c = max(a, b)
     deltas = [(0, 0), (a,b), (-a,-b), (-b,a), (b,-a)]
@@ -351,7 +350,7 @@ def make_torus(a, b):
     assert len(keys) == n == a**2 + b**2, len(keys)
     return lookup, keys
 
-def get_xzzx(a, b):
+def get_xzzx(a, b=0):
     lookup, keys = make_torus(a, b)
     n = len(keys)
     rows = []
@@ -372,14 +371,14 @@ def get_xzzx(a, b):
     return code
 
 
-def get_toric(a, b):
+def get_toric(a, b=0):
     lookup, keys = make_torus(a, b)
     n = len(keys)
     assert n%2 == 0
     rows = []
     for (i,j) in keys:
         row = ['.']*n
-        op = 'X' if (i+j)%2 else 'Z'
+        op = 'Z' if (i+j)%2 else 'X'
         row[lookup[i,j]] = op
         row[lookup[i,j+1]] = op
         row[lookup[i+1,j+1]] = op

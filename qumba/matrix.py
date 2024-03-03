@@ -16,7 +16,7 @@ import numpy
 
 from qumba.default_p import DEFAULT_P
 from qumba.solve import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
-    kernel, span, pseudo_inverse, rank, row_reduce, linear_independent, rand2)
+    kernel, span, pseudo_inverse, rank, row_reduce, linear_independent, rand2, parse)
 from qumba.solve import int_scalar as scalar
 from qumba import solve
 from qumba.action import mulclose
@@ -92,6 +92,11 @@ class Matrix(object):
         if isinstance(item, Matrix):
             return item
         return Matrix(item, p, name=name)
+
+    @classmethod
+    def parse(cls, desc):
+        A = parse(desc)
+        return cls(A)
 
     def reshape(self, *shape):
         A = self.A

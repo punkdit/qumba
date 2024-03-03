@@ -407,6 +407,39 @@ class QCode(object):
     def is_isomorphic(self, other):
         return self.get_isomorphism(other) is not None
 
+    def find_zx_dualities(code):
+        from qumba import csscode
+        from qumba.action import Perm
+        n = code.n
+        A = strop(code.A).split()
+        for op in A:
+            xop = 'X' in op
+            zop = 'Z' in op
+            assert not (xop and zop), "not CSS form"
+        Ax = '\n'.join([op for op in A if 'X' in op])
+        Az = '\n'.join([op for op in A if 'Z' in op])
+        Ax = parse(Ax)
+        Az = parse(Az)
+        duality = csscode.find_zx_duality(Ax, Az)
+        items = list(range(n))
+        duality = Perm.promote(duality, items)
+        #print(duality)
+        perms = csscode.find_autos(Ax, Az)
+        G = [Perm.promote(g, items) for g in perms]
+        #print("|G| =", len(G))
+        I = Perm(items, items)
+        zxs = []
+        for g in G:
+            zx = g*duality
+            if zx*zx != I:
+                continue
+            for i in items:
+                if zx[i] == i:
+                    break
+            else:
+                zxs.append(zx)
+        return zxs
+
     def apply(self, M):
         assert isinstance(M, Matrix)
         self.build()

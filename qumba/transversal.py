@@ -1043,7 +1043,7 @@ def test_hexagons():
     print()
 
 
-def search_gate(code, dode, *perms, row_weight=None):
+def search_gate(code, dode, *perms, row_weight=None, diagonal=False):
     solver = Solver()
     Add = solver.add
 
@@ -1053,6 +1053,10 @@ def search_gate(code, dode, *perms, row_weight=None):
     F = space.F
 
     U = UMatrix.unknown(nn, nn)
+    if diagonal:
+        for i in range(nn):
+            U[i,i] = Const(1)
+
     Add(U.t*F*U == F) # U symplectic
 
     for perm in perms:
@@ -1069,7 +1073,7 @@ def search_gate(code, dode, *perms, row_weight=None):
 
     if row_weight is not None:
         for i in range(nn):
-            Add(Sum([If(U[i,j].v,1,0) for j in range(nn)])<=row_weight)
+            Add(Sum([If(U[i,j].get(),1,0) for j in range(nn)])<=row_weight)
 
     while 1:
         result = solver.check()
@@ -1125,6 +1129,12 @@ def test_dehn():
     code = QCode(A=stabs)
     print(code)
     print(strop(code.H))
+
+    return
+
+    #for zx in code.find_zx_dualities():
+    #    print(zx)
+    #return
 
     perm = []
     for i in range(rows):
@@ -1187,7 +1197,8 @@ def test_dehn():
         return M
 
     row_weight = argv.row_weight
-    for M in search_gate(code, dode, hperm, vperm, row_weight=row_weight):
+    diagonal = argv.diagonal
+    for M in search_gate(code, dode, hperm, vperm, row_weight=row_weight, diagonal=diagonal):
         print(M)
         print(code.space.get_name(M))
         #break
