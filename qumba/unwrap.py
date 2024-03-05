@@ -485,6 +485,7 @@ def test_wrap_16():
     print("zxs:", len(zxs))
 
     covers = [Cover.fromzx(code, zx) for zx in zxs]
+    bases = []
     for cover in covers:
         fibers = cover.fibers
         idxs = []
@@ -494,6 +495,7 @@ def test_wrap_16():
         #print(idxs)
         g1 = g[idxs,:][:,idxs]
         base = cover.base
+        bases.append(base)
         if base.space.is_symplectic(g1):
             dode = base.apply(g1)
             if dode.is_equiv(base):
@@ -506,6 +508,13 @@ def test_wrap_16():
                 print()
         #else:
         #    print("not symplectic")
+
+    print("is_iso")
+    for a in bases:
+      for b in bases:
+        print(int(is_iso(a,b)), end=" ")
+      print()
+
     return
 
 
