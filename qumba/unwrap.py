@@ -498,6 +498,8 @@ def test_wrap_16():
             dode = base.apply(g1)
             if dode.is_equiv(base):
                 print(fibers)
+                dode.distance()
+                print(strop(dode.H), dode)
                 print(g1)
                 print("L =")
                 print(dode.get_logical(base))
