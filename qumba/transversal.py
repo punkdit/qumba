@@ -1203,7 +1203,51 @@ def test_dehn():
         print(code.space.get_name(M))
         #break
     
+
+def test_all_412():
+    "generate all 412 codes & look for local clifford & perm gates"
+    n, k, d = 4, 1, 2
+    G = Group.symmetric(n)
+    perms = [[g[i] for i in range(n)] for g in G]
+    count = 0
+    for code in construct.all_codes(n, k, d):
+        #print(code)
+        found = 0
+        for perm in perms:
+            dode = code.apply_perm(perm)
+            if dode.is_equiv(code):
+                found += 1
+            elif is_local_clifford_equiv(code, dode):
+                found += 1
+        print("%2d"%found, end=' ', flush=True)
+        if count%32==0:
+            print()
+        count += 1
+    print(count)
     
+def find_all_perm_lc_412():
+    n, k, d = 4, 1, 2
+    G = Group.symmetric(n)
+    perms = [[g[i] for i in range(n)] for g in G]
+    codes = []
+    for code in construct.all_codes(n, k, d):
+        codes.append(code)
+        print('.',end='',flush=True)
+        #if len(codes)>30:
+        #    break
+    print()
+    print(len(codes))
+    def lc_perm(code, dode):
+        for perm in perms:
+            eode = dode.apply_perm(perm)
+            if eode.is_equiv(code):
+                return True
+            elif is_local_clifford_equiv(code, eode):
+                return True
+    hom = equ.quotient_rep(codes, lc_perm)
+    found = list(set(hom.values()))
+    print("equs:", len(found))
+
 
 if __name__ == "__main__":
     from time import time

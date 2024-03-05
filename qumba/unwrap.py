@@ -17,7 +17,7 @@ from qumba.qcode import QCode, SymplecticSpace, strop
 from qumba import construct
 from qumba.distance import distance_z3
 from qumba.autos import get_isos, is_iso
-from qumba.action import Perm
+from qumba.action import Perm, mulclose_find
 from qumba import csscode 
 from qumba.argv import argv
 
@@ -324,10 +324,27 @@ class Cover(object):
 
 
 
+def test_gaussian():
+    N = argv.get("N", 8)
+    for a in range(1,N):
+      print(a, end=" ")
+      for b in range(0,a+1):
+      #for b in range(1,8):
+        if (a+b) <= 1:
+            continue
+        if (a+b)%2:
+            code = construct.get_xzzx(a, b)
+        else:
+            code = construct.get_toric(a, b)
+        code.distance("z3")
+        print(code, end=" ", flush=True)
+      print()
+
+
 def test_wrap():
     N = argv.get("N", 8)
     for a in range(1,N):
-      for b in range(1,a+1):
+      for b in range(0,a+1):
       #for b in range(1,8):
         if (a+b) <= 2:
             continue
@@ -369,7 +386,9 @@ def test_wrap_toric():
         print(zx)
         print(eode)
         #print(eode.longstr())
-        print(strop(eode.H))
+        A = eode.H
+        A = A.concatenate(A.sum(0).reshape(1,A.shape[1]))
+        print(strop(A))
         total = unwrap(eode)
         gens = []
         for M in transversal.find_local_clifford(eode, eode):
@@ -437,8 +456,30 @@ def test_wrap_16():
     print(g)
     dode = code.apply(g)
     assert dode.is_equiv(code)
-    print(dode.get_logical(code))
+    l = dode.get_logical(code)
+    print(l)
+    #print(SymplecticSpace(2).get_name(l))
+    #return
 
+    if 0:
+        n = 4
+        CX = SymplecticSpace(n).CX
+        SWAP = SymplecticSpace(n).SWAP
+        gen = [SWAP(i,j) for i in range(n) for j in range(i+1,n)]
+        gen += [CX(i,j) for i in range(n) for j in range(n) if i!=j]
+        h = mulclose_find(gen, Matrix.parse("""
+        ..1.....
+        .1.1.1..
+        ..1.1.1.
+        .....1..
+        ......1.
+        .1...1.1
+        1.1...1.
+        .1......
+        """))
+        print("h =", h.name)
+        
+        return
 
     zxs = get_zx_wrap(code)
     print("zxs:", len(zxs))
@@ -450,20 +491,21 @@ def test_wrap_16():
         for (i,j) in fibers:
             idxs.append(2*i)
             idxs.append(2*i+1)
-        print(idxs)
-        g1 = g[idxs,:]
-        g1 = g1[:,idxs]
-        print(g1)
+        #print(idxs)
+        g1 = g[idxs,:][:,idxs]
         base = cover.base
         if base.space.is_symplectic(g1):
             dode = base.apply(g1)
             if dode.is_equiv(base):
+                print(fibers)
+                print(g1)
                 print("L =")
                 print(dode.get_logical(base))
-        else:
-            print("not sympl")
-        print()
+                print()
+        #else:
+        #    print("not symplectic")
     return
+
 
     codes = []
     for zx in zxs:

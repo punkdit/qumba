@@ -118,7 +118,7 @@ def golay():
 
 
 def get_10_2_3():
-    toric = QCode.fromstr("""
+    return QCode.fromstr("""
     X..X..XX..
     .X..X..XX.
     X.X.....XX
@@ -128,17 +128,15 @@ def get_10_2_3():
     Z...Z.Z.Z.
     ZZ.....Z.Z
     """, d=3)
-    return toric
 
 
 def get_512():
-    toric = QCode.fromstr("""
+    return QCode.fromstr("""
     ZZZ..
     ..ZZZ
     X.XX.
     .XX.X
     """, d=2)
-    return toric
 
 
 def get_11_2_3():
@@ -153,6 +151,33 @@ def get_11_2_3():
     .....XX..XX
     .......X..X
     """)
+
+
+def get_622():
+    return QCode.fromstr("""
+    XXXIXI
+    ZZIZIZ
+    IYZXII
+    IIYYYY
+    """, d=2)
+
+
+def get_14_3_3():
+    "Landahl jaunty code"
+    return QCode.fromstr("""
+    XXXIIXIIIIIIII
+    ZZIIZIIIIZIIII
+    IYZYXIIIIIIIII
+    IIZIIYYIIIXIII
+    IIXXIIXXIIIIII
+    IIIZZIIZZIIIII
+    ZIIIIZIIIIZIIZ
+    IIIIIIZZIIZZII
+    IIIIIIIXXIIXXI
+    IIIIXIIIYYIIZI
+    IIIIIIIIIIXYZY
+    """, d=3)
+    
 
 
 def toric(rows, cols, delta_row=0, delta_col=0):
