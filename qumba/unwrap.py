@@ -17,7 +17,7 @@ from qumba.qcode import QCode, SymplecticSpace, strop
 from qumba import construct
 from qumba.distance import distance_z3
 from qumba.autos import get_isos, is_iso
-from qumba.action import Perm, mulclose_find
+from qumba.action import Perm, mulclose_find, mulclose
 from qumba import csscode 
 from qumba.argv import argv
 
@@ -257,7 +257,9 @@ def scramble(code):
 
 
 class Cover(object):
-    def __init__(self, base, total, fibers):
+    def __init__(self, base, total, fibers=None, zx=None):
+        if fibers is None:
+            fibers = get_fibers(zx)
         self.base = base
         self.total = total
         self.fibers = fibers
@@ -292,36 +294,57 @@ class Cover(object):
 
     #def CX(self, idx, jdx):
 
+    def get_ZX(self):
+        # Transversal HH SWAP
+        base, total, fibers = self.base, self.total, self.fibers
+        space = total.space
+        g = space.get_identity()
+        for (i,j) in fibers:
+            g = space.SWAP(i,j)*g
+        for i in range(total.n):
+            g = space.H(i)*g
+        dode = total.apply(g)
+        assert dode.is_equiv(total)
+        return g
 
-        
-#def find_zxs(code):
-#    import csscode
-#    n = code.n
-#    A = strop(code.A).split()
-#    Ax = '\n'.join([op for op in A if 'X' in op])
-#    Az = '\n'.join([op for op in A if 'Z' in op])
-#    Ax = parse(Ax)
-#    Az = parse(Az)
-#    duality = csscode.find_zx_duality(Ax, Az)
-#    items = list(range(n))
-#    duality = Perm.promote(duality, items)
-#    #print(duality)
-#    perms = csscode.find_autos(Ax, Az)
-#    G = [Perm.promote(g, items) for g in perms]
-#    #print("|G| =", len(G))
-#    I = Perm(items, items)
-#    zxs = []
-#    for g in G:
-#        zx = g*duality
-#        if zx*zx != I:
-#            continue
-#        for i in items:
-#            if zx[i] == i:
-#                break
-#        else:
-#            zxs.append(zx)
-#    return zxs
+    def get_CZ(self):
+        base, total, fibers = self.base, self.total, self.fibers
+        space = total.space
+        assert 'Y' not in strop(base.H)
+        g = space.get_identity()
+        for (i,j) in fibers:
+            g = space.CZ(i,j)*g
+        dode = total.apply(g)
+        assert dode.is_equiv(total)
+        return g
 
+    def lift(self, M):
+        "lift a symplectic on the base code to a symplectic on the total code"
+        base, total, fibers = self.base, self.total, self.fibers
+        nn = base.nn
+        assert M.shape == (nn, nn)
+        assert base.apply(M).is_equiv(base)
+        F = base.space.F
+        I = base.space.get_identity()
+        Mi = F*M*F
+        assert M*Mi.t == I
+        MM = M.direct_sum(Mi) # this is block direct sum
+        perm = []
+        for i in range(nn):
+            perm.append(i)
+            perm.append(i+nn)
+        P = Matrix.get_perm(perm)
+        MM = P.t*MM*P # switch to ziporder
+        assert total.space.is_symplectic(MM)
+        idxs = []
+        for (i,j) in fibers:
+            idxs.append(i)
+            idxs.append(j)
+        P = total.space.get_perm(idxs)
+        PMM = P.t*MM*P # switch to fiber order
+        assert total.space.is_symplectic(PMM)
+        assert total.apply(PMM).is_equiv(total)
+        return PMM
 
 
 def test_gaussian():
@@ -341,10 +364,37 @@ def test_gaussian():
       print()
 
 
+def test_bring():
+    total = construct.get_bring()
+    total.distance()
+    print(total)
+    zxs = total.find_zx_dualities()
+    print(len(zxs))
+
+    total = total.to_qcode()
+
+    codes = []
+    for zx in zxs:
+        cover = Cover.fromzx(total, zx)
+        base = cover.base
+        base.distance("z3")
+        print(base)
+        #print(strop(base.H))
+        codes.append(base)
+
+#    for a in codes:
+#      for b in codes:
+#        print(int(is_iso(a,b)), end=" ", flush=True)
+#      print()
+
+
+
+
 def test_wrap():
     N = argv.get("N", 8)
     for a in range(1,N):
-      for b in range(0,a+1):
+        b = 0
+      #for b in range(0,a+1):
       #for b in range(1,8):
         if (a+b) <= 2:
             continue
@@ -363,43 +413,90 @@ def test_wrap():
         for zx in zxs:
             dode = wrap(code, zx)
             dode.distance("z3")
-            print(dode)
+            print(dode, "Y's:", strop(dode.H).count("Y"))
         print()
         print()
+
+
+def find_perm_local_cliffords(code):
+    from qumba.action import Group
+    import transversal
+    n = code.n
+    space = code.space
+    assert n<6, "um.."
+    G = Group.symmetric(n)
+    for g in G:
+        perm = [g[i] for i in range(n)]
+        dode = code.apply_perm(perm)
+        P = space.get_perm(perm)
+        for Q in transversal.find_local_clifford(code, dode):
+            QP = Q*P
+            assert code.apply(QP).is_equiv(code)
+            #print(space.get_name(QP))
+            yield QP
 
 
 def test_wrap_toric():
     import transversal
-    #code = construct.get_toric(2,2)
-    code = unwrap(construct.get_412())
-    code = unwrap(construct.get_513())
-    print(code.longstr())
+    #total = unwrap(construct.get_412())
+    total = unwrap(construct.get_513()) # [[10,2,3]]
+    #total = construct.get_toric(2,2)
+    #total = construct.get_toric(1,3) # [[10,2,3]]
+    #total = construct.get_toric(4,0) # too big
+    print(total.longstr())
 
-    zxs = get_zx_wrap(code)
+    zxs = get_zx_wrap(total)
     print("zx _dualities:", len(zxs))
 
-    codes = []
+    logops = []
+    covers = []
     for zx in zxs:
-        eode = wrap(code, zx)
-        codes.append(eode)
+        base = wrap(total, zx)
+        cover = Cover(base, total, None, zx)
+        covers.append(cover)
         print()
         print(zx)
-        print(eode)
-        #print(eode.longstr())
-        A = eode.H
+        print(base)
+        #print(base.longstr())
+        A = base.H
         A = A.concatenate(A.sum(0).reshape(1,A.shape[1]))
         print(strop(A))
-        total = unwrap(eode)
         gens = []
-        for M in transversal.find_local_clifford(eode, eode):
+        for M in transversal.find_local_clifford(base, base):
             gens.append(M)
         print("local cliffords:", len(gens))
-        gens = list(get_isos(eode,eode))
+        gens = list(get_isos(base,base))
         print("autos:", len(gens))
+        gens = list(find_perm_local_cliffords(base))
+        print("perm local cliffords:", len(gens))
+        for g in gens:
+            g1 = cover.lift(g)
+            tgt = total.apply(g1)
+            assert tgt.is_equiv(total)
+            l = tgt.get_logical(total)
+            logops.append(l)
+        g = cover.get_ZX()
+        tgt = total.apply(g)
+        assert tgt.is_equiv(total)
+        l = tgt.get_logical(total)
+        logops.append(l)
+        if 'Y' in strop(base.H):
+            continue
+        g = cover.get_CZ()
+        tgt = total.apply(g)
+        assert tgt.is_equiv(total)
+        l = tgt.get_logical(total)
+        logops.append(l)
+        
+    print("found logops:", len(logops))
+    logops = list(set(logops))
+    print("uniq logops:", len(logops))
+    G = mulclose(logops)
+    print("|G| =", len(G))
 
-    for a in codes:
-      for b in codes:
-        print(int(is_iso(a,b)), end=" ")
+    for a in covers:
+      for b in covers:
+        print(int(is_iso(a.base,b.base)), end=" ")
       print()
 
 

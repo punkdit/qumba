@@ -19,6 +19,7 @@ from qumba.isomorph import Tanner, search
 from qumba.solve import (
     shortstr, shortstrx, eq2, dot2, compose2, rand2,
     pop2, insert2, append2, array2, zeros2, identity2, rank, linear_independent)
+from qumba.action import Perm
 from qumba.argv import argv
 
 
@@ -787,6 +788,31 @@ class CSSCode(object):
             found.append(zx)
 
         return found
+
+    def find_zx_dualities(code):
+        n = code.n
+        Ax, Az = code.Ax, code.Az
+        duality = find_zx_duality(Ax, Az)
+        items = list(range(n))
+        duality = Perm.promote(duality, items)
+        #print(duality)
+        perms = find_autos(Ax, Az)
+        G = [Perm.promote(g, items) for g in perms]
+        #print("|G| =", len(G))
+        I = Perm(items, items)
+        zxs = []
+        for g in G:
+            zx = g*duality
+            if zx*zx != I:
+                continue
+            for i in items:
+                if zx[i] == i:
+                    break
+            else:
+                zxs.append(zx)
+        return zxs
+
+
 
 
 def find_z3(n, mx, mz, d=None):

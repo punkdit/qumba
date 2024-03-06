@@ -112,6 +112,7 @@ class Matrix(object):
         if name is None:
             name = "P"+str(tuple(items))
         return Matrix(A, p, name=name)
+    get_perm = perm
 
     @classmethod
     def rand(cls, m, n):
