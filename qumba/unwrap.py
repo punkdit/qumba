@@ -436,7 +436,7 @@ def find_perm_local_cliffords(code):
             yield QP
 
 
-def test_wrap_toric():
+def test_unwrap_cliffords():
     import transversal
     #total = unwrap(construct.get_412())
     total = unwrap(construct.get_513()) # [[10,2,3]]
@@ -448,7 +448,7 @@ def test_wrap_toric():
     zxs = get_zx_wrap(total)
     print("zx _dualities:", len(zxs))
 
-    logops = []
+    logops = set()
     covers = []
     for zx in zxs:
         base = wrap(total, zx)
@@ -457,6 +457,8 @@ def test_wrap_toric():
         print()
         print(zx)
         print(base)
+        #if base.d == 3:
+        #    continue
         #print(base.longstr())
         A = base.H
         A = A.concatenate(A.sum(0).reshape(1,A.shape[1]))
@@ -469,27 +471,36 @@ def test_wrap_toric():
         print("autos:", len(gens))
         gens = list(find_perm_local_cliffords(base))
         print("perm local cliffords:", len(gens))
+        gens = transversal.search_gate(base, base, row_weight=3)
+        #gens = list(transversal.search_gate(base, base, row_weight=2))
+        #print("row_weight 2 cliffords:", len(gens))
         for g in gens:
             g1 = cover.lift(g)
             tgt = total.apply(g1)
             assert tgt.is_equiv(total)
             l = tgt.get_logical(total)
-            logops.append(l)
+            if l not in logops:
+                logops.add(l)
+                print(l)
+                G = mulclose(logops)
+                print("|G| =", len(G))
+                #if len(G) >= 6:
+                #    break
         g = cover.get_ZX()
         tgt = total.apply(g)
         assert tgt.is_equiv(total)
         l = tgt.get_logical(total)
-        logops.append(l)
+        logops.add(l)
         if 'Y' in strop(base.H):
             continue
         g = cover.get_CZ()
         tgt = total.apply(g)
         assert tgt.is_equiv(total)
         l = tgt.get_logical(total)
-        logops.append(l)
+        logops.add(l)
         
-    print("found logops:", len(logops))
-    logops = list(set(logops))
+    #print("found logops:", len(logops))
+    #logops = list(set(logops))
     print("uniq logops:", len(logops))
     G = mulclose(logops)
     print("|G| =", len(G))
