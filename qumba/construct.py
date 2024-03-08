@@ -426,6 +426,7 @@ def get_xzzx(a, b=0):
     code = QCode(A=H)
     code.lookup = lookup
     code.keys = keys
+    code.coords = (a, b)
     return code
 
 
@@ -449,6 +450,7 @@ def get_toric(a, b=0):
     code = QCode(A=H)
     code.lookup = lookup
     code.keys = keys
+    code.coords = (a, b)
     return code
 
 

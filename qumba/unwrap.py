@@ -649,6 +649,92 @@ def test_wrap_16():
       print()
 
 
+def test_dehn():
+    rows = cols = argv.get("rows", 4)
+    code = construct.get_toric(rows)
+    print(code)
+    print(strop(code.H))
+    print()
+
+    space = code.space
+    perm = []
+    for i in range(rows):
+        p = list(range(i*cols, (i+1)*cols))
+        p = [p[(idx+i)%cols] for idx in range(cols)]
+        perm += p
+    perm = space.get_perm(perm)
+
+    CX = space.CX
+
+    g = space.get_identity()
+    #for i in [4,12]:
+    for i in range(rows):
+        if i%2==0:
+            continue
+        idx = i*cols
+        #g *= CX(j+0,j+1)*CX(j+0,j+3)*CX(j+2,j+1)*CX(j+2,j+3)
+        for j in range(cols):
+            src, tgt = (idx+j, idx+(j+1)%cols)
+            if j%2==0:
+                g *= CX(src, tgt)
+            else:
+                g *= CX(tgt, src)
+    #print(g)
+    g = g*perm
+
+    dode = code.apply(g)
+    assert code.is_equiv(dode)
+    l = code.get_logical(dode)
+    #print(SymplecticSpace(2).get_name(l))
+    #print(l*l)
+
+    zxs = get_zx_wrap(code)
+    print("zxs:", len(zxs))
+
+    covers = [Cover.fromzx(code, zx) for zx in zxs]
+    for cover in covers:
+        perm = [None]*code.n
+        for (i,j) in cover.fibers:
+            perm[i] = j
+            perm[j] = i
+        perm = code.space.get_perm(perm)
+        if g*perm == perm*g:
+            print("found cover:", cover.fibers)
+
+    #return
+
+    bases = []
+    for cover in covers:
+        fibers = cover.fibers
+        idxs = []
+        for (i,j) in fibers:
+            idxs.append(2*i)
+            idxs.append(2*i+1)
+        #print(idxs)
+        g1 = g[idxs,:][:,idxs]
+        base = cover.base
+        #bases.append(base)
+        if not base.space.is_symplectic(g1):
+            continue
+        dode = base.apply(g1)
+        if not dode.is_equiv(base):
+            continue
+
+        print("lift:", cover.lift(g1) == g)
+        print(fibers)
+        dode.distance()
+        print(strop(dode.H), dode)
+        print(g1)
+        print("L =")
+        print(dode.get_logical(base))
+        print()
+        bases.append(base)
+
+    print("is_iso")
+    for a in bases:
+      for b in bases:
+        print(int(is_iso(a,b)), end=" ")
+      print()
 
 
 if __name__ == "__main__":
