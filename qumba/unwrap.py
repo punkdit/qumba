@@ -226,13 +226,14 @@ def get_zx_wrap(code):
     return zxs
 
 
-def wrap(code, zx):
+def wrap(code, zx=None, fibers=None):
     nn = code.nn
-    pairs = get_fibers(zx)
+    if fibers is None:
+        fibers = get_fibers(zx)
     #print(code.H)
     Hx = code.H[:,0:nn:2]
     #print(Hx)
-    cols = reduce(add,pairs)
+    cols = reduce(add, fibers)
     H = Hx[:, list(cols)]
     H = H.linear_independent()
     code = QCode(H)
@@ -345,6 +346,29 @@ class Cover(object):
         assert total.space.is_symplectic(PMM)
         assert total.apply(PMM).is_equiv(total)
         return PMM
+
+    def descend(self, g):
+        "descend a symplectic on the total code to the base code"
+        nn = self.total.nn
+        assert g.shape == (nn,nn)
+        fibers = self.fibers
+        idxs = []
+        for (i,j) in fibers:
+            idxs.append(2*i)
+            idxs.append(2*i+1)
+        #print(idxs)
+        g1 = g[idxs,:][:,idxs]
+        base = self.base
+        nn = base.nn
+        assert g1.shape == (nn,nn)
+        #bases.append(base)
+        if not base.space.is_symplectic(g1):
+            return None
+        dode = base.apply(g1)
+        if not dode.is_equiv(base):
+            return None
+        return g1
+
 
 
 def test_gaussian():
@@ -649,12 +673,31 @@ def test_wrap_16():
       print()
 
 
+def toric_wraps(code):
+    keys, lookup = code.keys, code.lookup
+    print(code.keys, len(code.keys))
+    rows = cols = max(key[1] for key in keys)+1
+    assert len(keys) == rows**2
+
+    for dcol in range(1, rows, 2):
+      for drow in range(0, rows, 2):
+        fibers = []
+        for idx,(a,b) in enumerate(keys):
+            c, d = drow-a, dcol-b
+            jdx = lookup[c%rows, d%cols]
+            #print((a,b), "-->", keys[jdx])
+            if idx < jdx:
+                fibers.append((idx, jdx))
+        print(drow, dcol)
+        yield fibers
+
+
 def test_dehn():
     rows = cols = argv.get("rows", 4)
     code = construct.get_toric(rows)
     print(code)
-    print(strop(code.H))
-    print()
+    #print(strop(code.H))
+    #print()
 
     space = code.space
     perm = []
@@ -672,7 +715,6 @@ def test_dehn():
         if i%2==0:
             continue
         idx = i*cols
-        #g *= CX(j+0,j+1)*CX(j+0,j+3)*CX(j+2,j+1)*CX(j+2,j+3)
         for j in range(cols):
             src, tgt = (idx+j, idx+(j+1)%cols)
             if j%2==0:
@@ -688,8 +730,30 @@ def test_dehn():
     #print(SymplecticSpace(2).get_name(l))
     #print(l*l)
 
+    if rows > 4:
+
+        for fibers in toric_wraps(code):
+            base = wrap(code, None, fibers)
+        
+            cover = Cover(base, code, fibers)
+            h = cover.descend(g)
+            if h is None:
+                continue
+            #base.distance("z3")
+            print(base)
+            #print(strop(base.H))
+            dode = base.apply(h)
+            print("L =")
+            print(dode.get_logical(base))
+            print()
+    
+        return
+
     zxs = get_zx_wrap(code)
     print("zxs:", len(zxs))
+    #for zx in zxs:
+    #    print(zx)
+    #return
 
     covers = [Cover.fromzx(code, zx) for zx in zxs]
     for cover in covers:
@@ -706,22 +770,17 @@ def test_dehn():
     bases = []
     for cover in covers:
         fibers = cover.fibers
-        idxs = []
-        for (i,j) in fibers:
-            idxs.append(2*i)
-            idxs.append(2*i+1)
-        #print(idxs)
-        g1 = g[idxs,:][:,idxs]
         base = cover.base
-        #bases.append(base)
-        if not base.space.is_symplectic(g1):
-            continue
-        dode = base.apply(g1)
-        if not dode.is_equiv(base):
+        g1 = cover.descend(g)
+        if g1 is None:
             continue
 
+        dode = base.apply(g1)
         print("lift:", cover.lift(g1) == g)
         print(fibers)
+        keys = cover.total.keys
+        for (i,j) in fibers:
+            print("\t", keys[i], keys[j])
         dode.distance()
         print(strop(dode.H), dode)
         print(g1)
