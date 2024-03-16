@@ -1043,7 +1043,7 @@ def parsevec(s):
 
 
 def test_412_clifford():
-    from qumba.clifford_sage import Clifford, red, green, K, Matrix, r2, ir2, w4, half
+    from qumba.clifford_sage import Clifford, red, green, K, Matrix, r2, ir2, w4, w8, half
     code = QCode.fromstr("XYZI IXYZ ZIXY") # 412 code
     c = Clifford(code.n)
     CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
@@ -1120,16 +1120,11 @@ def test_412_clifford():
     #v0 = 2*P*parsevec("0000") # eigenvector of Ly 
     #v0 = 2*P*parsevec("0000 + 0001") # eigenvector of Lx
     #v0 = 2*P*parsevec("0000 + -1*0001") # eigenvector of Lx
-    v0 = 2*P*parsevec("0000 + i*0001") # +1 eigenvector of Lz, yay!
-    v1 = Lx*v0
-    #print(v0)
-    #print(v1)
-    #return
+    _v0 = 2*P*parsevec("0000 + i*0001") # +1 eigenvector of Lz, yay!
+    _v1 = Lx*_v0
 
-    x = (v0.d * v1)[0][0]
+    x = (_v0.d * _v1)[0][0]
     assert x==0
-
-    basis = [v0, v1]
 
     def getlogop(L):
         M = []
@@ -1141,17 +1136,63 @@ def test_412_clifford():
           M.append(row)
         return Matrix(K, M)
 
-    print("Lx =")
-    print(getlogop(Lx))
-    print("Lz =")
-    print(getlogop(Lz))
+    c1 = Clifford(1)
+    I,X,Y,Z,S,H = c1.get_identity(), c1.X(), c1.Y(), c1.Z(), c1.S(), c1.H()
+
+    phases = [w8**i for i in range(8)]
+#    print(phases)
+#    for a in phases:
+#      for b in phases:
+#        basis = [a*_v0, b*_v1]
+
+    basis = [_v0, _v1]
+    
+    #print("Lx =")
+    lx = (half**4)*getlogop(Lx)
+    assert lx == X
+    #print(lx)
+    #print("Lz =")
+    #print(getlogop(Lz))
 
     L = get_perm(1,2,3,0)
     assert P*L==L*P
     assert L*Lx*L.d == Lz
-    Lh = getlogop((half**3)*L)
-    print("Lh =")
-    print(Lh)
+    l = (half**4)*getlogop(L)
+    print("l =")
+    print(l)
+    print("l^2 =")
+    assert l**2 == Y
+    #print()
+    g = mulclose_find([(w8**i)*I for i in range(8)] + [X, Z, Y, S, S.d, H], l)
+    print("g =")
+    print(g, g.name)
+    return
+    assert g==l
+    assert g**2 == Y
+
+    assert g*X == Z*g
+    assert g*Y == Y*g
+
+    assert (S*H)**3 == w8*I
+    assert S*H*S.d*H*S.d*H == (w8**7)*Z
+    assert g == (w8**7)*Z*H
+    print(H)
+    print(Z*H)
+    print((w8**7)*Z*H)
+    return
+
+    G = mulclose([X, Z, Y, S, S.d, H])
+    print("|Cliff(1)|=", len(G))
+    for g in G:
+        if g*X==X*g and g*Z==Z*g and g*Y==Y*g:
+            print(g.name)
+    
+    return
+
+    c1 = Clifford(1)
+    H, S = c1.H(), c1.S()
+    print(H)
+    print(H*H)
 
 
 def test_422_logical():
