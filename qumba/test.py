@@ -920,7 +920,7 @@ def test_grassl():
         # WORKS
 
     elif 1:
-        code = QCode.fromstr("XYZI IXYZ ZIXY")
+        code = QCode.fromstr("XYZI IXYZ ZIXY") # 412 code
         c = Clifford(code.n)
         CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
         #E = get_encoder(code)
@@ -1012,6 +1012,146 @@ def test_clifford_encoder(code, E):
         rhs[-1] = I
         rhs = reduce(matmul, rhs)
         assert (2**code.m)*lhs == rhs
+
+
+def parsevec(s):
+    from qumba.clifford_sage import red, w4
+    s = s.strip()
+    s = s.replace('\n', '')
+    s = s.replace(' ', '')
+    if '+' in s:
+        vals = [parsevec(item) for item in s.split("+")]
+        return reduce(add, vals)
+    if '*' in s:
+        vals = [parsevec(item) for item in s.split("*")]
+        return reduce(mul, vals)
+    if s=="-1":
+        return -1
+    if s=="i":
+        return w4
+    if s=="-i":
+        return -w4
+    s = s.replace('.', '0')
+    assert len(s) == s.count('0')+s.count('1') # etc
+    lookup = {
+        '0' : red(1,0,0),
+        '1' : red(1,0,2),
+    }
+    items = [lookup[c] for c in s]
+    return reduce(matmul, items)
+        
+
+
+def test_412_clifford():
+    from qumba.clifford_sage import Clifford, red, green, K, Matrix, r2, ir2, w4, half
+    code = QCode.fromstr("XYZI IXYZ ZIXY") # 412 code
+    c = Clifford(code.n)
+    CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+    get_perm = c.get_P
+    #E = get_encoder(code)
+    EE = code.get_clifford_encoder()
+    P = code.get_projector()
+
+    E2 = CZ(2,0)*CY(2,3)*H(2)
+    E1 = CY(1,2)*CZ(1,3)*H(1)
+    E0 = CY(0,1)*CZ(0,2)*H(0)
+    E = E0*E1*E2 # WORKS
+
+    assert  EE == E
+
+    r0 = red(1,0,0)
+    r1 = red(1,0,2)
+    v0 = r0@r0@r0@r0
+    v1 = r0@r0@r0@r1
+    u0 = E*v0
+    u1 = E*v1
+    assert P*u0 == u0
+    assert P*u1 == u1
+    u = (r2*u1)
+    
+    def strvec(u):
+        basis = """
+        0000 0001 0010 0011 0100 0101 0110 0111
+        1000 1001 1010 1011 1100 1101 1110 1111
+        """.strip().split()
+        for i in range(16):
+            x = u[i][0]
+            if x:
+                print(x, basis[i])
+
+    # these are logical zero and logical one
+    v0 = parsevec("""
+        0000
+     +i*0011
+    +-1*0101
+     +i*0110
+     +i*1001
+    +-1*1010
+     +i*1100
+     +  1111
+    """)
+    #v0 = (r2/4)*v0
+    v1 = parsevec("""
+        0001
+    +-i*0010
+    +-1*0100
+    +-i*0111
+     +i*1000
+       +1011
+     +i*1101
+    +-1*1110
+    """)
+    assert P*P == P
+    #print(v0)
+    #print(P*v0)
+    assert P*v0 == v0
+    assert P*v1 == v1
+    x = (v0.d * v1)[0][0]
+    assert x==0
+
+    X, Y, Z = c.X, c.Y, c.Z
+    Lx = Z(0) * X(1)
+    Lz = Z(1) * X(2)
+    assert Lx * Lz == -Lz * Lx
+    assert Lx*P == P*Lx
+    assert Lz*P == P*Lz
+    #print(Lx*basis[0] == basis[1]) # nope
+
+    #v0 = 2*P*parsevec("0000") # eigenvector of Ly 
+    #v0 = 2*P*parsevec("0000 + 0001") # eigenvector of Lx
+    #v0 = 2*P*parsevec("0000 + -1*0001") # eigenvector of Lx
+    v0 = 2*P*parsevec("0000 + i*0001") # +1 eigenvector of Lz, yay!
+    v1 = Lx*v0
+    #print(v0)
+    #print(v1)
+    #return
+
+    x = (v0.d * v1)[0][0]
+    assert x==0
+
+    basis = [v0, v1]
+
+    def getlogop(L):
+        M = []
+        for l in basis:
+          row = []
+          for r in basis:
+            u = l.d * L * r
+            row.append(u[0][0])
+          M.append(row)
+        return Matrix(K, M)
+
+    print("Lx =")
+    print(getlogop(Lx))
+    print("Lz =")
+    print(getlogop(Lz))
+
+    L = get_perm(1,2,3,0)
+    assert P*L==L*P
+    assert L*Lx*L.d == Lz
+    Lh = getlogop((half**3)*L)
+    print("Lh =")
+    print(Lh)
 
 
 def test_422_logical():

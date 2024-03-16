@@ -1158,8 +1158,8 @@ def make_ramified():
     A = A[:, cols]
     B = B[cols, :]
 
-    print(shortstr(A), A.shape)
-    print(shortstr(B), B.shape)
+    #print(shortstr(A), A.shape)
+    #print(shortstr(B), B.shape)
     cx = Complex.frombdy(A, B, check=False)
     print(cx)
 
@@ -1183,7 +1183,7 @@ def make_ramified():
         print("AssertionError")
         raise
     code.d = distance_z3(code)
-    print(code.longstr())
+    #print(code.longstr())
     print("code:", code)
     print()
 

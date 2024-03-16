@@ -136,6 +136,12 @@ class SymplecticSpace(object):
         return Matrix(A, self.p, None, name)
     CX = get_CNOT
 
+    def get_CY(self, idx=0, jdx=1):
+        assert idx != jdx
+        g = self.CX(idx, jdx)
+        s = self.S(jdx)
+        return s*g*s # s==s^-1 here
+
     def get_expr(self, expr):
         if expr == ():
             op = self.get_identity()
