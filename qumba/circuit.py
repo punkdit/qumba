@@ -29,7 +29,7 @@ from qumba.clifford import Clifford, red, green, K, Matrix, r2, ir2, w4, w8, hal
 
 
 
-def send(qasm=None):
+def send(qasm=None, shots=10):
     from qjobs import QPU, Batch
     qpu = QPU("H1-1E", domain="prod", local=True)
     # Setting local=True means that qjobs will use PECOS to run simulations on your device
@@ -55,7 +55,7 @@ def send(qasm=None):
         """
     
     # We can append jobs to the Batch object to run
-    batch.append(qasm, shots=10, options={"simulator": "stabilizer"})
+    batch.append(qasm, shots=shots, options={"simulator": "stabilizer"})
     
     # Submit all previously unsubmitted jobs to the QPU
     batch.submit()
@@ -74,19 +74,16 @@ def send(qasm=None):
     if 0:
         #To get an individual job object you can use indexes from
         #this list of jobs. Or use a job's job id like this:
-        
         j = batch["local60bb85f56c0b4d8ca6bebe49525c9373"]
-        
         print(j.code)
-        
         j.results
-        
         batch["localeb2dbe1147fe49db80ede0a289c6008f"].params
 
 
 class Circuit(object):
     def __init__(self, n):
         self.n = n
+        self.labels = list(range(n)) # mutates !
 
     def header(self):
         n = self.n
@@ -100,18 +97,31 @@ creg m[%d];
 """%(n,n)
         return qasm
 
-    def footer(self):
-        n = self.n
+#    def footer(self):
+#        n = self.n
+#        return "measure q -> m;\n"
+
+    def measure(self):
         return "measure q -> m;\n"
 
+    def barrier(self):
+        return "barrier q;\n"
+
     def op1(self, op, i=0):
+        assert type(op) is str, (op, i)
+        assert type(i) is int, (op, i)
         assert 0<=i<self.n
-        return "%s q[%d];"%(op, i)
+        labels = self.labels
+        return "%s q[%d];"%(op, labels[i])
 
     def op2(self, op, i=0, j=1):
+        assert type(op) is str, (op, i, j)
+        assert type(i) is int, (op, i, j)
+        assert type(j) is int, (op, i, j)
         assert 0<=i<self.n
         assert 0<=j<self.n
-        return "%s q[%d], q[%d];"%(op, i, j)
+        labels = self.labels
+        return "%s q[%d], q[%d];"%(op, labels[i], labels[j])
 
     def op(self, op, *args):
         if len(args) == 1:
@@ -120,12 +130,17 @@ creg m[%d];
             return self.op2(op, *args)
         assert 0, args
 
+    def P(self, *idxs):
+        assert len(idxs) == self.n
+        self.labels = list(idxs)
+        return "// P%s"%str(idxs)
+
     def __getattr__(self, name):
         name = name.lower()
         meth = lambda *args : self.op(name, *args)
         return meth
 
-    def get_expr(self, expr):
+    def run_expr(self, expr):
         lines = []
         for e in reversed(expr): # execute expr right-to-left 
             #print(e)
@@ -140,8 +155,9 @@ creg m[%d];
             lines.append(op+"\n")
         return ''.join(lines)
 
-    def get_qasm(self, expr):
-        qasm = self.header() + self.get_expr(expr) + self.footer()
+    def run_qasm(self, expr):
+        self.labels = list(range(self.n))
+        qasm = self.header() + self.run_expr(expr)
         return qasm
 
 
@@ -359,20 +375,41 @@ def test_412_clifford():
     print(H*H)
 
 
+def get_inverse(name):
+    items = []
+    for item in reversed(name):
+        stem = item[:item.index("(")]
+        if item.endswith(".d"):
+            item = item.replace(".d", "")
+        elif stem == "S":
+            item = item + ".d"
+        else:
+            assert stem in "H X Z Y CX CZ CY".split()
+        items.append(item)
+    return tuple(items)
+
+
 def test_qasm():
     circuit = Circuit(4)
     assert circuit.H(0) == "h q[0];"
     assert circuit.CX(0,2) == "cx q[0], q[2];"
     assert circuit.CY(1,2) == "cy q[1], q[2];"
 
-    name = ('CY(0,1)', 'CZ(0,2)', 'H(0)', 'CY(1,2)', 'CZ(1,3)',
+    encode = ('CY(0,1)', 'CZ(0,2)', 'H(0)', 'CY(1,2)', 'CZ(1,3)',
         'H(1)', 'CZ(2,0)', 'CY(2,3)', 'H(2)', 'S(3)', 'H(3)',
         'S(3).d')
+    decode = get_inverse(encode)
+    barrier = ("barrier()",)
+    measure = ("measure()",)
+    perm = ("P(1,2,3,0)",)
+    #perm = ("P(1,2,0,3)",)
 
-    qasm = circuit.get_qasm(name)
+    c = measure + decode + perm + barrier + encode
+
+    qasm = circuit.run_qasm(c)
     print(qasm)
 
-    send(qasm)
+    send(qasm, shots=100)
 
 
 
