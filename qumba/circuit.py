@@ -65,11 +65,13 @@ def send(qasm=None, shots=10):
     # Retrieve
     batch.retrieve()
     
-    print(batch.jobs)
+    #print(batch.jobs)
+    assert len(batch.jobs) == 1
 
     for job in batch.jobs:
         r = job.results
-        print(r["results"])
+        r = r["results"]
+        return r["m"]
     
     if 0:
         #To get an individual job object you can use indexes from
@@ -132,7 +134,8 @@ creg m[%d];
 
     def P(self, *idxs):
         assert len(idxs) == self.n
-        self.labels = list(idxs)
+        labels = self.labels
+        self.labels = [labels[i] for i in idxs]
         return "// P%s"%str(idxs)
 
     def __getattr__(self, name):
@@ -401,15 +404,24 @@ def test_qasm():
     decode = get_inverse(encode)
     barrier = ("barrier()",)
     measure = ("measure()",)
-    perm = ("P(1,2,3,0)",)
-    #perm = ("P(1,2,0,3)",)
 
-    c = measure + decode + perm + barrier + encode
+    if 0:
+        perm = ("P(1,2,3,0)",)
+        logop = ("Z(3)", "H(3)")
+        #perm = ("P(1,2,0,3)",)
+
+    else:
+        perm = ("P(3,0,1,2)",)
+        logop = ("H(3)", "Z(3)")
+
+    # left <---<---< right 
+    c = measure + logop + decode + perm + barrier + encode
 
     qasm = circuit.run_qasm(c)
     print(qasm)
 
-    send(qasm, shots=100)
+    result = send(qasm, shots=100)
+    print(result)
 
 
 
