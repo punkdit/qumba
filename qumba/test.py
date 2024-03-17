@@ -402,7 +402,7 @@ def test_biplanar():
 
 
 def test_clifford():
-    from qumba.clifford_sage import Clifford, green, red, I, r2, half
+    from qumba.clifford import Clifford, green, red, I, r2, half
 
     n = 2
     space = SymplecticSpace(n)
@@ -462,7 +462,7 @@ def test_encoder():
     space = code.space
     m, n, k = code.m, code.n, code.k
 
-    from qumba.clifford_sage import Clifford, green, red, I, r2, half
+    from qumba.clifford import Clifford, green, red, I, r2, half
 
     k0 = (r2/2)*red(1,0) #   |0>
     k1 = (r2/2)*red(1,0,2) # |1>
@@ -543,7 +543,7 @@ def test_spider():
     CZ = s2.get_CZ()
 
     from qumba.solve import shortstr
-    from qumba.clifford_sage import Clifford, Matrix, K, r2
+    from qumba.clifford import Clifford, Matrix, K, r2
     c2 = Clifford(2)
     c4 = Clifford(4)
 
@@ -868,7 +868,7 @@ def test_normal_form():
 
     code = QCode.fromstr("XXZX IIXZ ZZII") # FAIL
     #E = get_encoder(code)
-    from qumba.clifford_sage import Clifford, red, green, Matrix
+    from qumba.clifford import Clifford, red, green, Matrix
     c = Clifford(code.n)
     CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
     E0 = H(0)*CX(0,1)*CZ(0,2)*CX(0,3)
@@ -900,7 +900,7 @@ def test_normal_form():
 
 def test_grassl():
     # from Grassl 2002 "Algorithmic aspects of quantum error-correcting codes"
-    from qumba.clifford_sage import Clifford, red, green, Matrix
+    from qumba.clifford import Clifford, red, green, Matrix
     if 0:
         code = QCode.fromstr("XIXYY ZIZXX IXYYX IZXXZ")
         c = Clifford(code.n)
@@ -962,7 +962,7 @@ def test_grassl():
 
 
 def test_clifford_encoder(code, E):
-    from qumba.clifford_sage import Clifford, red, green, Matrix
+    from qumba.clifford import Clifford, red, green, Matrix
     c = Clifford(code.n)
     P = code.get_projector()
     assert P.rank() == 2**code.k
@@ -1012,187 +1012,6 @@ def test_clifford_encoder(code, E):
         rhs[-1] = I
         rhs = reduce(matmul, rhs)
         assert (2**code.m)*lhs == rhs
-
-
-def parsevec(s):
-    from qumba.clifford_sage import red, w4
-    s = s.strip()
-    s = s.replace('\n', '')
-    s = s.replace(' ', '')
-    if '+' in s:
-        vals = [parsevec(item) for item in s.split("+")]
-        return reduce(add, vals)
-    if '*' in s:
-        vals = [parsevec(item) for item in s.split("*")]
-        return reduce(mul, vals)
-    if s=="-1":
-        return -1
-    if s=="i":
-        return w4
-    if s=="-i":
-        return -w4
-    s = s.replace('.', '0')
-    assert len(s) == s.count('0')+s.count('1') # etc
-    lookup = {
-        '0' : red(1,0,0),
-        '1' : red(1,0,2),
-    }
-    items = [lookup[c] for c in s]
-    return reduce(matmul, items)
-        
-
-
-def test_412_clifford():
-    from qumba.clifford_sage import Clifford, red, green, K, Matrix, r2, ir2, w4, w8, half
-    code = QCode.fromstr("XYZI IXYZ ZIXY") # 412 code
-    c = Clifford(code.n)
-    CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
-    get_perm = c.get_P
-    #E = get_encoder(code)
-    EE = code.get_clifford_encoder()
-    P = code.get_projector()
-
-    E2 = CZ(2,0)*CY(2,3)*H(2)
-    E1 = CY(1,2)*CZ(1,3)*H(1)
-    E0 = CY(0,1)*CZ(0,2)*H(0)
-    E = E0*E1*E2 # WORKS
-
-    assert  EE == E
-
-    r0 = red(1,0,0)
-    r1 = red(1,0,2)
-    v0 = r0@r0@r0@r0
-    v1 = r0@r0@r0@r1
-    u0 = E*v0
-    u1 = E*v1
-    assert P*u0 == u0
-    assert P*u1 == u1
-    u = (r2*u1)
-    
-    def strvec(u):
-        basis = """
-        0000 0001 0010 0011 0100 0101 0110 0111
-        1000 1001 1010 1011 1100 1101 1110 1111
-        """.strip().split()
-        for i in range(16):
-            x = u[i][0]
-            if x:
-                print(x, basis[i])
-
-    # these are logical zero and logical one
-    v0 = parsevec("""
-        0000
-     +i*0011
-    +-1*0101
-     +i*0110
-     +i*1001
-    +-1*1010
-     +i*1100
-     +  1111
-    """)
-    #v0 = (r2/4)*v0
-    v1 = parsevec("""
-        0001
-    +-i*0010
-    +-1*0100
-    +-i*0111
-     +i*1000
-       +1011
-     +i*1101
-    +-1*1110
-    """)
-    assert P*P == P
-    #print(v0)
-    #print(P*v0)
-    assert P*v0 == v0
-    assert P*v1 == v1
-    x = (v0.d * v1)[0][0]
-    assert x==0
-
-    X, Y, Z = c.X, c.Y, c.Z
-    Lx = Z(0) * X(1)
-    Lz = Z(1) * X(2)
-    assert Lx * Lz == -Lz * Lx
-    assert Lx*P == P*Lx
-    assert Lz*P == P*Lz
-    #print(Lx*basis[0] == basis[1]) # nope
-
-    #v0 = 2*P*parsevec("0000") # eigenvector of Ly 
-    #v0 = 2*P*parsevec("0000 + 0001") # eigenvector of Lx
-    #v0 = 2*P*parsevec("0000 + -1*0001") # eigenvector of Lx
-    _v0 = 2*P*parsevec("0000 + i*0001") # +1 eigenvector of Lz, yay!
-    _v1 = Lx*_v0
-
-    x = (_v0.d * _v1)[0][0]
-    assert x==0
-
-    def getlogop(L):
-        M = []
-        for l in basis:
-          row = []
-          for r in basis:
-            u = l.d * L * r
-            row.append(u[0][0])
-          M.append(row)
-        return Matrix(K, M)
-
-    c1 = Clifford(1)
-    I,X,Y,Z,S,H = c1.get_identity(), c1.X(), c1.Y(), c1.Z(), c1.S(), c1.H()
-
-    phases = [w8**i for i in range(8)]
-#    print(phases)
-#    for a in phases:
-#      for b in phases:
-#        basis = [a*_v0, b*_v1]
-
-    basis = [_v0, _v1]
-    
-    #print("Lx =")
-    lx = (half**4)*getlogop(Lx)
-    assert lx == X
-    #print(lx)
-    #print("Lz =")
-    #print(getlogop(Lz))
-
-    L = get_perm(1,2,3,0)
-    assert P*L==L*P
-    assert L*Lx*L.d == Lz
-    l = (half**4)*getlogop(L)
-    print("l =")
-    print(l)
-    print("l^2 =")
-    assert l**2 == Y
-    #print()
-    g = mulclose_find([(w8**i)*I for i in range(8)] + [X, Z, Y, S, S.d, H], l)
-    print("g =")
-    print(g, g.name)
-    return
-    assert g==l
-    assert g**2 == Y
-
-    assert g*X == Z*g
-    assert g*Y == Y*g
-
-    assert (S*H)**3 == w8*I
-    assert S*H*S.d*H*S.d*H == (w8**7)*Z
-    assert g == (w8**7)*Z*H
-    print(H)
-    print(Z*H)
-    print((w8**7)*Z*H)
-    return
-
-    G = mulclose([X, Z, Y, S, S.d, H])
-    print("|Cliff(1)|=", len(G))
-    for g in G:
-        if g*X==X*g and g*Z==Z*g and g*Y==Y*g:
-            print(g.name)
-    
-    return
-
-    c1 = Clifford(1)
-    H, S = c1.H(), c1.S()
-    print(H)
-    print(H*H)
 
 
 def test_422_logical():
@@ -1290,7 +1109,7 @@ def test_422_encode():
     # --------------------------------------------
     # Clifford
 
-    from qumba.clifford_sage import Clifford, red, green, Matrix
+    from qumba.clifford import Clifford, red, green, Matrix
     P = code.get_projector()
     c = Clifford(code.n)
     CX, CY, CZ, H, S, SWAP = c.CX, c.CY, c.CZ, c.H, c.S, c.SWAP
@@ -1509,7 +1328,7 @@ def test_822():
 
     # --- Clifford -----
 
-    from qumba.clifford_sage import Clifford, red, green, Matrix
+    from qumba.clifford import Clifford, red, green, Matrix
     c = Clifford(code.n)
     CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
     SWAP = c.SWAP
@@ -1556,7 +1375,7 @@ def test_822_clifford():
 
     # --- Clifford -----
 
-    from qumba.clifford_sage import Clifford, red, green, Matrix
+    from qumba.clifford import Clifford, red, green, Matrix
     c = Clifford(code.n)
     CX, CY, CZ, H, S, SWAP = c.CX, c.CY, c.CZ, c.H, c.S, c.SWAP
     I = c.get_identity()
@@ -1643,7 +1462,7 @@ def test_10_2_3_clifford():
     code = unwrap(src)
     fibers = [(i, i+src.n) for i in range(src.n)]
 
-    from qumba.clifford_sage import Clifford, red, green, Matrix
+    from qumba.clifford import Clifford, red, green, Matrix
     c = Clifford(code.n)
     CX, CY, CZ, H, S, SWAP = c.CX, c.CY, c.CZ, c.H, c.S, c.SWAP
     I = c.get_identity()
@@ -1719,7 +1538,7 @@ def test_422():
 
     code = QCode.fromstr(Hs="XXXX ZZZZ", Ls="ZIZI YYII ZZII YIYI")
 
-    from qumba.clifford_sage import Clifford, red, green, Matrix
+    from qumba.clifford import Clifford, red, green, Matrix
     #E = code.get_clifford_encoder()
     E = code.get_encoder()
     E = code.space.translate_clifford(E)
@@ -1872,7 +1691,7 @@ def test_20_2_6():
     print(l == SymplecticSpace(2).CX())
 
     if 0: # too big !
-        from qumba.clifford_sage import Clifford, red, green, Matrix
+        from qumba.clifford import Clifford, red, green, Matrix
         c = Clifford(code.n)
         CX, CY, CZ, H, S, SWAP = c.CX, c.CY, c.CZ, c.H, c.S, c.SWAP
         I = c.get_identity()
@@ -1899,8 +1718,6 @@ if __name__ == "__main__":
 
     from time import time
     start_time = time()
-    start_time = time()
-
 
     profile = argv.profile
     name = argv.next() or "test"

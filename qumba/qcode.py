@@ -687,7 +687,7 @@ class QCode(object):
     get_symplectic = get_encoder
 
     def get_clifford_encoder(code):
-        from qumba.clifford_sage import Clifford, red, green, Matrix
+        from qumba.clifford import Clifford, red, green, Matrix
         code = code.normal_form()
         n = code.n
         c = Clifford(n)
@@ -821,7 +821,7 @@ class QCode(object):
     #@cache
     def get_projector(self):
         "get Clifford projector onto codepsace"
-        from qumba.clifford_sage import Clifford, half
+        from qumba.clifford import Clifford, half
         H = self.H
         n = self.n
         assert n < 16, "wup.. too big ?"

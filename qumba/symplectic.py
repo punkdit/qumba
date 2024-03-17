@@ -270,7 +270,7 @@ class SymplecticSpace(object):
             print("\t", w.name)
             print("\t", r.name)
     
-        from qumba.clifford_sage import Clifford
+        from qumba.clifford import Clifford
         cliff = Clifford(self.n)
         l = cliff.get_expr(l.name)
         r = cliff.get_expr(r.name)

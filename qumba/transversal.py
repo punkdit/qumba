@@ -796,7 +796,7 @@ def test_412():
 def find_perm_gate(code, perm):
     print("find_perm_gate", perm)
     n = code.n
-    from qumba.clifford_sage import Clifford, mulclose_names
+    from qumba.clifford import Clifford, mulclose_names
     dode = code.apply_perm(perm)
     #print(dode.longstr())
 
@@ -853,7 +853,7 @@ def find_perm_gate(code, perm):
 
 
 def test_412_clifford():
-    from qumba.clifford_sage import Clifford, green, red, half
+    from qumba.clifford import Clifford, green, red, half
     from huygens.zx import Circuit, Canvas
     code = QCode.fromstr("XYZI IXYZ ZIXY")
 #    E = code.get_encoder()
