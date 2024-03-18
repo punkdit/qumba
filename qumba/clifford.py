@@ -359,6 +359,7 @@ class Clifford(object):
         CY = S*CX*Si
         CY.name = ("CY(%d,%d)"%(idx,jdx),)
         return CY
+    get_CY = CY
 
     @cache
     def CNOT(self, idx=0, jdx=1):

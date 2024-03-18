@@ -4,7 +4,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-from random import shuffle, randint
+from random import shuffle, randint, choice
 from operator import add, matmul, mul
 from functools import reduce
 
@@ -253,7 +253,7 @@ def find_state(tgt, src, gen, verbose=False, maxsize=None):
                 #assert isinstance(u, Matrix)
                 if u in paths:
                     continue
-                paths[u] = (A.name,) + paths[v]
+                paths[u] = A.name + paths[v]
                 _bdy.append(u)
                 if u == tgt:
                     if verbose:
@@ -270,7 +270,7 @@ def find_state(tgt, src, gen, verbose=False, maxsize=None):
 
 
 def test_412_clifford():
-    code = QCode.fromstr("XYZI IXYZ ZIXY") # 412 code
+    code = construct.get_412()
     n = code.n
     c = Clifford(n)
     CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
@@ -355,20 +355,24 @@ def test_412_clifford():
     assert dot(v0,v1)==0
     assert v0 == u0
 
-    print(strvec(v0))
-    print(strvec(v1))
+    #print(strvec(v0))
+    #print(strvec(v1))
 
-    gen = [op(i) for i in range(n) for op in [X,Y,Z,S,H]]
-    gen += [CZ(i,j) for i in range(n) for j in range(i)]
-    gen += [op(i,j) for i in range(n) for j in range(n) for op in [CX,CY] if i!=j]
-    name = find_state(v0, parsevec("0000"), 
-        gen, maxsize = 100000, verbose = True)
-    print(name)
+    if 0:
+        # search for logical |0> state prep 
+        gen = [op(i) for i in range(n) for op in [X,Y,Z,S,H]]
+        gen += [CZ(i,j) for i in range(n) for j in range(i)]
+        gen += [op(i,j) for i in range(n) for j in range(n) for op in [CX,CY] if i!=j]
+        name = find_state(v0, parsevec("0000"), gen, maxsize = 100000, verbose = True)
+        print(name)
+
+    # logical |0> state prep 
+    prep = ('Z(0)', 'X(0)', 'H(0)', 'CX(0,3)', 'CY(1,2)', 'H(2)', 'CY(0,1)', 'H(0)', 'H(1)')
+    U = c.get_expr(prep)
+    assert U*parsevec("0000") == v0
 
     #M = (half**4)*Matrix(K,[[dot(u0,v0),dot(u0,v1)],[dot(u1,v0),dot(u1,v1)]])
     #print(M)
-
-    return
 
     if 0:
         # logical H
@@ -484,37 +488,71 @@ def test_qasm():
     barrier = ("barrier()",)
     measure = ("measure()",)
 
-    if 0:
-        physical = ("P(1,2,3,0)",)
-        logical = ("Z(3)", "H(3)") # inverse logical
+    # state prep for logical |0>
+    prep = ('Z(0)', 'X(0)', 'H(0)', 'CX(0,3)', 'CY(1,2)', 'H(2)', 'CY(0,1)', 'H(0)', 'H(1)')
 
-    elif 0:
-        physical = (
-            'S(0)', 'H(0)', 'S(0)', 
-            'S(1)', 'H(1)', 
-            'H(2)', 'S(2)', 
-            'S(3)', 
-            'P(0, 2, 1, 3)', 'X(0)', 'X(2)')
-        logical = ("S(0).d",)
+    protocol = []
+    #physical = ("P(1,2,3,0)",)
+    #logical = ("Z(3)", "H(3)") # inverse logical
+    #protocol.append((physical, logical))
 
-    else:
-        physical = ("Z(1)", "X(2)", "P(3,0,1,2)")
-        logical = ("H(3)",)
+    # logical S gate
+    physical = (
+        'S(0)', 'H(0)', 'S(0)', 
+        'S(1)', 'H(1)', 
+        'H(2)', 'S(2)', 
+        'S(3)', 
+        'P(0, 2, 1, 3)', 'X(0)', 'X(2)')
+    logical = ("S(3).d",)
+    protocol.append((physical, logical))
+
+    # logical X
+    physical = ('Z(0)', 'X(1)',)
+    logical = ("X(3)",)
+    protocol.append((physical, logical))
+
+    # logical Z
+    physical = ('Z(1)', 'X(2)',)
+    logical = ("Z(3)",)
+    protocol.append((physical, logical))
+
+    # logical H gate
+    physical = ("Z(1)", "X(2)", "P(3,0,1,2)")
+    logical = ("H(3)",)
+    protocol.append((physical, logical))
+    del physical, logical
+
+    N = argv.get("N", 4)
+    physical = ()
+    logical = ()
+    print("protocol:")
+    for i in range(N):
+        p,l = choice(protocol)
+        print(p, l)
+        physical = barrier + p + physical
+        logical = logical + l
 
     # left <---<---< right 
-    c = measure + logical + decode + barrier + physical + barrier + encode
+    if argv.encode:
+        print("encode")
+        c = measure + logical + decode + physical + barrier + encode
+
+    else:
+        print("prep")
+        c = measure + logical + decode + physical + barrier + prep
 
     qasm = circuit.run_qasm(c)
     #print(qasm)
 
-    result = send(qasm, shots=1000)
+    shots = argv.get("shots", 1000)
+    result = send(qasm, shots=shots)
     print("shots:", len(result))
     succ=result.count('0000')
     fail=result.count('0001')
-    print("err:  ", len(result)-succ-fail)
     print("succ: ", succ)
+    print("err:  ", len(result)-succ-fail)
     print("fail: ", fail)
-    print("p = %.6f" % (1 - fail / succ))
+    print("p = %.6f" % (1 - fail / (fail+succ)))
 
 
 
