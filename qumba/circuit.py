@@ -165,7 +165,6 @@ creg m[%d];
 
 
 def parsevec(s):
-    from qumba.clifford import red, w4
     s = s.strip()
     s = s.replace('\n', '')
     s = s.replace(' ', '')
@@ -181,11 +180,15 @@ def parsevec(s):
         return w4
     if s=="-i":
         return -w4
+    if s=="0":
+        return 0
     s = s.replace('.', '0')
     assert len(s) == s.count('0')+s.count('1') # etc
     lookup = {
         '0' : red(1,0,0),
         '1' : red(1,0,2),
+        '+' : green(1,0,0),
+        '-' : green(1,0,2),
     }
     items = [lookup[c] for c in s]
     return reduce(matmul, items)
@@ -215,10 +218,65 @@ def strvec(u, sep=" "):
     return s
 
 
+def find_state(tgt, src, gen, verbose=False, maxsize=None):
+    assert isinstance(tgt, Matrix)
+    assert isinstance(src, Matrix)
+
+    # choose a canonical vector up to phase
+    def canonical(u):
+        m,n = u.shape
+        for i in range(m):
+            if u[i][0]:
+                break
+        x = u[i][0]
+        if x == 1:
+            return u
+        u = (1/x)*u
+        return u
+        
+    src = canonical(src)
+    tgt = canonical(tgt)
+
+    bdy = [src] # new states to explore
+    paths = {src : ()} # states and how we got there
+    if tgt in paths:
+        return paths[tgt]
+    while bdy:
+        if verbose:
+            print(len(paths), end=" ", flush=True)
+        _bdy = []
+        for A in gen:
+            #assert isinstance(A, Matrix)
+            for v in bdy:
+                u = A*v
+                u = canonical(u)
+                #assert isinstance(u, Matrix)
+                if u in paths:
+                    continue
+                paths[u] = (A.name,) + paths[v]
+                _bdy.append(u)
+                if u == tgt:
+                    if verbose:
+                        print(len(paths))
+                    return paths[u]
+                if maxsize and len(paths)>=maxsize:
+                    if verbose:
+                        print(len(paths))
+                    return
+        bdy = _bdy
+    if verbose:
+        print()
+    return
+
+
 def test_412_clifford():
     code = QCode.fromstr("XYZI IXYZ ZIXY") # 412 code
-    c = Clifford(code.n)
+    n = code.n
+    c = Clifford(n)
     CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+    SHS = lambda i:S(i)*H(i)*S(i)
+    SH = lambda i:S(i)*H(i)
+    HS = lambda i:H(i)*S(i)
     X, Y, Z = c.X, c.Y, c.Z
     get_perm = c.get_P
     #E = get_encoder(code)
@@ -291,20 +349,40 @@ def test_412_clifford():
     #v0 = 2*P*parsevec("0000 + -1*0001") # eigenvector of Lx
     _v0 = 2*P*parsevec("0000 + i*0001") # +1 eigenvector of Lz, yay!
     _v1 = Lx*_v0
-
-    x = (_v0.d * _v1)[0][0]
-    assert x==0
-
-    print(strvec(_v0))
-    print(strvec(_v1))
+    v0, v1 = _v0, _v1
 
     dot = lambda l,r : (l.d*r)[0][0]
-
-    v0, v1 = _v0, _v1
-    #M = (half**4)*Matrix(K,[[dot(u0,v0),dot(u0,v1)],[dot(u1,v0),dot(u1,v1)]])
-    #print(M)
+    assert dot(v0,v1)==0
     assert v0 == u0
 
+    print(strvec(v0))
+    print(strvec(v1))
+
+    gen = [op(i) for i in range(n) for op in [X,Y,Z,S,H]]
+    gen += [CZ(i,j) for i in range(n) for j in range(i)]
+    gen += [op(i,j) for i in range(n) for j in range(n) for op in [CX,CY] if i!=j]
+    name = find_state(v0, parsevec("0000"), 
+        gen, maxsize = 100000, verbose = True)
+    print(name)
+
+    #M = (half**4)*Matrix(K,[[dot(u0,v0),dot(u0,v1)],[dot(u1,v0),dot(u1,v1)]])
+    #print(M)
+
+    return
+
+    if 0:
+        # logical H
+        L = get_perm(1,2,3,0)
+        assert L*Lx*L.d == Lz # H action
+    elif 0:
+        # logical X*Z
+        L = get_perm(1,0,3,2)*H(0)*H(1)*H(2)*H(3)*X(0)*X(2)
+    else:
+        # logical S
+        L = SHS(0)*SH(1)*HS(2)*S(3)
+        L = L*get_perm(0,2,1,3)
+        L = L*X(0)*X(2)
+        print(L.name)
 
     c1 = Clifford(1)
     I,X,Y,Z,S,H = c1.get_identity(), c1.X(), c1.Y(), c1.Z(), c1.S(), c1.H()
@@ -317,6 +395,9 @@ def test_412_clifford():
     #g = mulclose_find(gen, M)
     #print(g.name)
     #return
+
+    G = mulclose([S, H])
+    assert len(G) == 192
 
     def getlogop(L):
         basis = [v0, v1]
@@ -336,20 +417,18 @@ def test_412_clifford():
     #print("Lz =")
     #print(getlogop(Lz))
 
-    L = get_perm(1,2,3,0)
     assert P*L==L*P
-    assert L*Lx*L.d == Lz
     l = (half**4)*getlogop(L)
     print("l =")
     print(l)
-    print("l^2 =")
-    assert l**2 == Y
-    #print()
-    gen = [(w8**i)*I for i in range(8)] + [X, Z, Y, S, S.d, H]
+    #print("l^2 =")
+    #gen = [(w8**i)*I for i in range(8)] + [X, Z, Y, S, S.d, H]
     g = mulclose_find(gen, l)
     print("g =")
-    print(g, g.name)
+    print(g, "name =", g.name)
+
     return
+
     assert g==l
     assert g**2 == Y
 
@@ -406,22 +485,36 @@ def test_qasm():
     measure = ("measure()",)
 
     if 0:
-        perm = ("P(1,2,3,0)",)
-        logop = ("Z(3)", "H(3)")
-        #perm = ("P(1,2,0,3)",)
+        physical = ("P(1,2,3,0)",)
+        logical = ("Z(3)", "H(3)") # inverse logical
+
+    elif 0:
+        physical = (
+            'S(0)', 'H(0)', 'S(0)', 
+            'S(1)', 'H(1)', 
+            'H(2)', 'S(2)', 
+            'S(3)', 
+            'P(0, 2, 1, 3)', 'X(0)', 'X(2)')
+        logical = ("S(0).d",)
 
     else:
-        perm = ("P(3,0,1,2)",)
-        logop = ("H(3)", "Z(3)")
+        physical = ("Z(1)", "X(2)", "P(3,0,1,2)")
+        logical = ("H(3)",)
 
     # left <---<---< right 
-    c = measure + logop + decode + perm + barrier + encode
+    c = measure + logical + decode + barrier + physical + barrier + encode
 
     qasm = circuit.run_qasm(c)
-    print(qasm)
+    #print(qasm)
 
-    result = send(qasm, shots=100)
-    print(result)
+    result = send(qasm, shots=1000)
+    print("shots:", len(result))
+    succ=result.count('0000')
+    fail=result.count('0001')
+    print("err:  ", len(result)-succ-fail)
+    print("succ: ", succ)
+    print("fail: ", fail)
+    print("p = %.6f" % (1 - fail / succ))
 
 
 
