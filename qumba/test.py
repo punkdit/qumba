@@ -1380,7 +1380,10 @@ def test_822_clifford():
     CX, CY, CZ, H, S, SWAP = c.CX, c.CY, c.CZ, c.H, c.S, c.SWAP
     I = c.get_identity()
 
-    P = code.get_projector() # slow...
+    #P = code.get_projector() # slow...
+    E = code.get_clifford_encoder()
+    #test_clifford_encoder(code, E) # fail...
+    #return
     
     g = I
     for (i,j) in fibers:

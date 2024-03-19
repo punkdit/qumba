@@ -686,7 +686,7 @@ class QCode(object):
             return M.t
     get_symplectic = get_encoder
 
-    def get_clifford_encoder(code):
+    def get_clifford_encoder(code, verbose=False):
         from qumba.clifford import Clifford, red, green, Matrix
         code = code.normal_form()
         n = code.n
@@ -697,12 +697,14 @@ class QCode(object):
         for src,h in enumerate(code.H):
             op = strop(h).replace('.', 'I')
             ctrl = op[src]
-            print(src, op, ctrl, end=":  ")
+            if verbose:
+                print(src, op, ctrl, end=":  ")
             if ctrl=='I':
                 E0 = I
             elif ctrl in 'XZY':
                 E0 = H(src)
-                print("H(%d)"%src, end=" ")
+                if verbose:
+                    print("H(%d)"%src, end=" ")
             else:
                 assert 0, ctrl
     
@@ -713,13 +715,16 @@ class QCode(object):
                     pass
                 elif opi=='X':
                     E0 = CX(src,tgt)*E0
-                    print("CX(%d,%d)"%(src,tgt), end=" ")
+                    if verbose:
+                        print("CX(%d,%d)"%(src,tgt), end=" ")
                 elif opi=='Z':
                     E0 = CZ(src,tgt)*E0
-                    print("CZ(%d,%d)"%(src,tgt), end=" ")
+                    if verbose:
+                        print("CZ(%d,%d)"%(src,tgt), end=" ")
                 elif opi=='Y':
                     E0 = CY(src,tgt)*E0
-                    print("CY(%d,%d)"%(src,tgt), end=" ")
+                    if verbose:
+                        print("CY(%d,%d)"%(src,tgt), end=" ")
                 else:
                     assert 0, opi
     
@@ -727,13 +732,16 @@ class QCode(object):
                 pass
             elif ctrl == 'Z':
                 E0 = H(src)*E0
-                print("H(%d)"%src, end=" ")
+                if verbose:
+                    print("H(%d)"%src, end=" ")
             elif ctrl == 'Y':
                 E0 = S(src)*E0
-                print("S(%d)"%src, end=" ")
+                if verbose:
+                    print("S(%d)"%src, end=" ")
             else:
                 assert 0, ctrl
-            print()
+            if verbose:
+                print()
             E = E * E0
         return E
 

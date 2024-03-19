@@ -29,7 +29,7 @@ from qumba.clifford import Clifford, red, green, K, Matrix, r2, ir2, w4, w8, hal
 
 
 
-def send(qasm=None, shots=10):
+def send(qasms=None, shots=1):
     from qjobs import QPU, Batch
     qpu = QPU("H1-1E", domain="prod", local=True)
     # Setting local=True means that qjobs will use PECOS to run simulations on your device
@@ -38,9 +38,9 @@ def send(qasm=None, shots=10):
     batch = Batch(qpu)
     
     
-    if qasm is None:
+    if qasms is None:
         # create & measure Bell state
-        qasm = """
+        qasms = """
         OPENQASM 2.0;
         include "hqslib1.inc";
         
@@ -53,34 +53,35 @@ def send(qasm=None, shots=10):
         
         measure q -> m;
         """
+
+    if type(qasms) is str:
+        qasms = [qasms]
     
     # We can append jobs to the Batch object to run
-    batch.append(qasm, shots=shots, options={"simulator": "stabilizer"})
+    for qasm in qasms:
+#        batch.append(qasm, shots=shots, options={"simulator": "stabilizer"})
+        batch.append(qasm, shots=shots, options={"simulator": "state-vector"})
     
     # Submit all previously unsubmitted jobs to the QPU
     batch.submit()
-    # Note: Each time you submit or retriece jobs, 
+    # Note: Each time you submit or retrieve jobs, 
     # the Batch object will save itself as a pickle
     
     # Retrieve
     batch.retrieve()
     
     #print(batch.jobs)
-    assert len(batch.jobs) == 1
+    #assert len(batch.jobs) == 1
 
+    values = []
     for job in batch.jobs:
-        r = job.results
-        r = r["results"]
-        return r["m"]
+        results = job.results
+        assert results['status'] == 'completed', results['error']
+        values += results["results"]["m"]
+        #return r["m"]
+    #print(values)
+    return values
     
-    if 0:
-        #To get an individual job object you can use indexes from
-        #this list of jobs. Or use a job's job id like this:
-        j = batch["local60bb85f56c0b4d8ca6bebe49525c9373"]
-        print(j.code)
-        j.results
-        batch["localeb2dbe1147fe49db80ede0a289c6008f"].params
-
 
 class Circuit(object):
     def __init__(self, n):
@@ -218,7 +219,34 @@ def strvec(u, sep=" "):
     return s
 
 
+def test_parsevec():
+    v0 = parsevec("""
+        0000
+     +i*0011
+    +-1*0101
+     +i*0110
+     +i*1001
+    +-1*1010
+     +i*1100
+     +  1111
+    """)
+    #v0 = (r2/4)*v0
+    v1 = parsevec("""
+        0001
+    +-i*0010
+    +-1*0100
+    +-i*0111
+     +i*1000
+       +1011
+     +i*1101
+    +-1*1110
+    """)
+    x = (v0.d * v1)[0][0]
+    assert x==0
+
+
 def find_state(tgt, src, gen, verbose=False, maxsize=None):
+    "find sequence of gen's that produces tgt state from src state (up to phase)"
     assert isinstance(tgt, Matrix)
     assert isinstance(src, Matrix)
 
@@ -257,19 +285,19 @@ def find_state(tgt, src, gen, verbose=False, maxsize=None):
                 _bdy.append(u)
                 if u == tgt:
                     if verbose:
-                        print(len(paths))
+                        print(len(paths), "found!")
                     return paths[u]
                 if maxsize and len(paths)>=maxsize:
                     if verbose:
-                        print(len(paths))
+                        print(len(paths), "maxsize!")
                     return
         bdy = _bdy
     if verbose:
-        print()
+        print("exhausted search")
     return
 
 
-def test_412_clifford():
+def test_412():
     code = construct.get_412()
     n = code.n
     c = Clifford(n)
@@ -307,58 +335,50 @@ def test_412_clifford():
     
     # look for logical zero and logical one
 
-    if 0: # nope..
-        v0 = parsevec("""
-            0000
-         +i*0011
-        +-1*0101
-         +i*0110
-         +i*1001
-        +-1*1010
-         +i*1100
-         +  1111
-        """)
-        #v0 = (r2/4)*v0
-        v1 = parsevec("""
-            0001
-        +-i*0010
-        +-1*0100
-        +-i*0111
-         +i*1000
-           +1011
-         +i*1101
-        +-1*1110
-        """)
-        assert P*P == P
-        #print(v0)
-        #print(P*v0)
-        assert P*v0 == v0
-        assert P*v1 == v1
-        x = (v0.d * v1)[0][0]
-        assert x==0
-
     X, Y, Z = c.X, c.Y, c.Z
     Lx = Z(0) * X(1)
     Lz = Z(1) * X(2)
+    Ly = w4 * Lx * Lz
     assert Lx * Lz == -Lz * Lx
+    assert Lx * Ly == -Ly * Lx
+    assert Lz * Ly == -Ly * Lz
     assert Lx*P == P*Lx
     assert Lz*P == P*Lz
-
-    #v0 = 2*P*parsevec("0000") # eigenvector of Ly 
-    #v0 = 2*P*parsevec("0000 + 0001") # eigenvector of Lx
-    #v0 = 2*P*parsevec("0000 + -1*0001") # eigenvector of Lx
-    _v0 = 2*P*parsevec("0000 + i*0001") # +1 eigenvector of Lz, yay!
-    _v1 = Lx*_v0
-    v0, v1 = _v0, _v1
+    assert Ly*P == P*Ly
 
     dot = lambda l,r : (l.d*r)[0][0]
+
+    # Use codespace projector to generate vectors in the codespace:
+
+    states = []
+
+    # logical |+>,|->
+    v0 = 2*P*parsevec("0000 + -1*0001") # +1 eigenvector of Lx
+    v1 = Lz*v0 # -1 eigenvector of Lx
+    assert Lx*v0 == v0
+    assert Lx*v1 == -v1
+    assert dot(v0,v1) == 0
+    states.append([v0,v1])
+
+    # logical |+i>,|-i>
+    v0 = 2*P*parsevec("0000") # +1 eigenvector of Ly 
+    v1 = Lx*v0 # -1 eigenvector of Ly
+    assert Ly*v0 == v0
+    assert Ly*v1 == -v1
+    assert dot(v0,v1) == 0
+    states.append([v0,v1])
+
+    # logical |0>,|1>
+    v0 = 2*P*parsevec("0000 + i*0001") # +1 eigenvector of Lz
+    v1 = Lx*v0 # -1 eigenvector of Lz
+    assert Lz*v0 == v0
+    assert Lz*v1 == -v1
     assert dot(v0,v1)==0
     assert v0 == u0
+    states.append([v0,v1])
 
-    #print(strvec(v0))
-    #print(strvec(v1))
-
-    if 0:
+    if argv.find_state:
+        v0 = states[argv.i][argv.j]
         # search for logical |0> state prep 
         gen = [op(i) for i in range(n) for op in [X,Y,Z,S,H]]
         gen += [CZ(i,j) for i in range(n) for j in range(i)]
@@ -367,9 +387,11 @@ def test_412_clifford():
         print(name)
 
     # logical |0> state prep 
+    v0, v1 = states[2] # |0>,|1>
     prep = ('Z(0)', 'X(0)', 'H(0)', 'CX(0,3)', 'CY(1,2)', 'H(2)', 'CY(0,1)', 'H(0)', 'H(1)')
     U = c.get_expr(prep)
-    assert U*parsevec("0000") == v0
+    u = U*parsevec("0000")
+    assert u == v0
 
     #M = (half**4)*Matrix(K,[[dot(u0,v0),dot(u0,v1)],[dot(u1,v0),dot(u1,v1)]])
     #print(M)
@@ -522,35 +544,40 @@ def test_qasm():
     protocol.append((physical, logical))
     del physical, logical
 
-    N = argv.get("N", 4)
-    physical = ()
-    logical = ()
-    print("protocol:")
-    for i in range(N):
-        p,l = choice(protocol)
-        print(p, l)
-        physical = barrier + p + physical
-        logical = logical + l
+    N = argv.get("N", 4) # circuit depth
+    trials = argv.get("trials", 100)
 
-    # left <---<---< right 
-    if argv.encode:
-        print("encode")
-        c = measure + logical + decode + physical + barrier + encode
+    qasms = []
+    for trial in range(trials):
+        physical = ()
+        logical = ()
+        print("protocol:")
+        for i in range(N):
+            p,l = choice(protocol)
+            print(p, l)
+            physical = barrier + p + physical
+            logical = logical + l
+    
+        # left <---<---< right 
+        if argv.encode:
+            print("encode")
+            c = measure + logical + decode + physical + barrier + encode
+    
+        else:
+            print("prep")
+            c = measure + logical + decode + physical + barrier + prep
+    
+        qasm = circuit.run_qasm(c)
+        #print(qasm)
+        qasms.append(qasm)
 
-    else:
-        print("prep")
-        c = measure + logical + decode + physical + barrier + prep
-
-    qasm = circuit.run_qasm(c)
-    #print(qasm)
-
-    shots = argv.get("shots", 1000)
-    result = send(qasm, shots=shots)
-    print("shots:", len(result))
-    succ=result.count('0000')
-    fail=result.count('0001')
+    shots = argv.get("shots", 1)
+    samps = send(qasms, shots=shots)
+    print("samps:", len(samps))
+    succ=samps.count('0000')
+    fail=samps.count('0001')
     print("succ: ", succ)
-    print("err:  ", len(result)-succ-fail)
+    print("err:  ", len(samps)-succ-fail)
     print("fail: ", fail)
     print("p = %.6f" % (1 - fail / (fail+succ)))
 
