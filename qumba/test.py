@@ -1202,7 +1202,23 @@ def test_822():
     src = QCode.fromstr("XYZI IXYZ ZIXY")
     print(src)
 
-    code = unwrap(src)
+    tgt = unwrap(src)
+
+    # fix the logicals:
+    code = QCode.fromstr("""
+    XX...XX.
+    .XX...XX
+    ..XXX..X
+    .ZZ.ZZ..
+    ..ZZ.ZZ.
+    Z..Z..ZZ
+    """, Ls="""
+    X......X
+    Z....Z..
+    .X..X...
+    ...ZZ...
+    """)
+    assert code.is_equiv(tgt)
     print(code)
 
     # note: code.get_autos does not get anything more than below ->
@@ -1367,7 +1383,23 @@ def test_822_clifford():
     src = QCode.fromstr("XYZI IXYZ ZIXY")
     print(src)
 
-    code = unwrap(src)
+    tgt = unwrap(src)
+
+    # fix the logicals:
+    code = QCode.fromstr("""
+    XX...XX.
+    .XX...XX
+    ..XXX..X
+    .ZZ.ZZ..
+    ..ZZ.ZZ.
+    Z..Z..ZZ
+    """, Ls="""
+    X......X
+    Z....Z..
+    .X..X...
+    ...ZZ...
+    """)
+    assert code.is_equiv(tgt)
     print(code)
 
     fibers = [(i, i+src.n) for i in range(src.n)]
@@ -1380,8 +1412,9 @@ def test_822_clifford():
     CX, CY, CZ, H, S, SWAP = c.CX, c.CY, c.CZ, c.H, c.S, c.SWAP
     I = c.get_identity()
 
-    #P = code.get_projector() # slow...
-    E = code.get_clifford_encoder()
+    P = code.get_projector() # slow...
+
+    #E = code.get_clifford_encoder()
     #test_clifford_encoder(code, E) # fail...
     #return
     

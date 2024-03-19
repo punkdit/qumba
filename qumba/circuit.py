@@ -23,7 +23,7 @@ from qumba.symplectic import Building
 from qumba.unwrap import unwrap, unwrap_encoder
 from qumba.smap import SMap
 from qumba.argv import argv
-
+from qumba.unwrap import Cover
 from qumba.clifford import Clifford, red, green, K, Matrix, r2, ir2, w4, w8, half, latex
 
 
@@ -97,6 +97,8 @@ include "hqslib1.inc";
 qreg q[%d];
 creg m[%d];
 
+reset q;
+
 """%(n,n)
         return qasm
 
@@ -132,6 +134,9 @@ creg m[%d];
         elif len(args) == 2:
             return self.op2(op, *args)
         assert 0, args
+
+    def CNOT(self, *args):
+        return self.CX(*args)
 
     def P(self, *idxs):
         assert len(idxs) == self.n
@@ -497,18 +502,22 @@ def get_inverse(name):
     return tuple(items)
 
 
-def test_qasm():
+def test_circuit():
     circuit = Circuit(4)
     assert circuit.H(0) == "h q[0];"
     assert circuit.CX(0,2) == "cx q[0], q[2];"
     assert circuit.CY(1,2) == "cy q[1], q[2];"
 
+barrier = ("barrier()",)
+measure = ("measure()",)
+
+
+def test_412_qasm():
+    circuit = Circuit(4)
     encode = ('CY(0,1)', 'CZ(0,2)', 'H(0)', 'CY(1,2)', 'CZ(1,3)',
         'H(1)', 'CZ(2,0)', 'CY(2,3)', 'H(2)', 'S(3)', 'H(3)',
         'S(3).d')
     decode = get_inverse(encode)
-    barrier = ("barrier()",)
-    measure = ("measure()",)
 
     # state prep for logical |0>
     prep = ('Z(0)', 'X(0)', 'H(0)', 'CX(0,3)', 'CY(1,2)', 'H(2)', 'CY(0,1)', 'H(0)', 'H(1)')
@@ -547,13 +556,20 @@ def test_qasm():
     N = argv.get("N", 4) # circuit depth
     trials = argv.get("trials", 100)
 
+    if argv.nobarrier:
+        global barrier
+        barrier = ()
+
     qasms = []
     for trial in range(trials):
         physical = ()
         logical = ()
         print("protocol:")
         for i in range(N):
-            p,l = choice(protocol)
+            if N==1:
+                p,l = protocol[0] # logical S
+            else:
+                p,l = choice(protocol)
             print(p, l)
             physical = barrier + p + physical
             logical = logical + l
@@ -583,6 +599,130 @@ def test_qasm():
 
 
 
+def test_822_clifford():
+    base = QCode.fromstr("XYZI IXYZ ZIXY")
+    print(base)
+
+    tgt = unwrap(base)
+
+    # fix the logicals:
+    code = QCode.fromstr("""
+    XX...XX.
+    .XX...XX
+    ..XXX..X
+    .ZZ.ZZ..
+    ..ZZ.ZZ.
+    Z..Z..ZZ
+    """, Ls="""
+    X......X
+    Z....Z..
+    .X..X...
+    ...ZZ...
+    """)
+    assert code.is_equiv(tgt)
+    print(code)
+    n = code.n
+
+    fibers = [(i, i+base.n) for i in range(base.n)]
+    print("fibers:", fibers)
+
+    # 412 state prep for logical |0>
+    prep = ('Z(0)', 'X(0)', 'H(0)', 'CX(0,3)', 'CY(1,2)', 'H(2)', 'CY(0,1)', 'H(0)', 'H(1)')
+
+    cover = Cover(base, code, fibers)
+
+    # unwrap 412 state prep... ?
+    E = cover.get_expr(prep)
+    prep = E.name
+    for (i,j) in fibers:
+        prep = prep + ("H(%d)"%(j,),)
+    print("prep:", prep)
+    #return
+
+    c = Clifford(n)
+    CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+    SHS = lambda i:S(i)*H(i)*S(i)
+    SH = lambda i:S(i)*H(i)
+    HS = lambda i:H(i)*S(i)
+    X, Y, Z = c.X, c.Y, c.Z
+    get_perm = c.get_P
+    
+    v0 = parsevec("0"*n)
+    #E = c.get_expr(prep)
+    for g in reversed(prep):
+        g = c.get_expr(g)
+        v0 = g*v0
+    #print(v0)
+
+    P = code.get_projector()
+    assert P*v0 == v0
+
+
+
+def test_822_qasm():
+    base = QCode.fromstr("XYZI IXYZ ZIXY")
+    print(base)
+
+    tgt = unwrap(base)
+
+    # fix the logicals:
+    code = QCode.fromstr("""
+    XX...XX.
+    .XX...XX
+    ..XXX..X
+    .ZZ.ZZ..
+    ..ZZ.ZZ.
+    Z..Z..ZZ
+    """, Ls="""
+    X......X
+    Z....Z..
+    .X..X...
+    ...ZZ...
+    """)
+    assert code.is_equiv(tgt)
+    print(code)
+
+    fibers = [(i, i+base.n) for i in range(base.n)]
+    print("fibers:", fibers)
+
+    # 412 state prep for logical |0>
+    prep = ('Z(0)', 'X(0)', 'H(0)', 'CX(0,3)', 'CY(1,2)', 'H(2)', 'CY(0,1)', 'H(0)', 'H(1)')
+
+    cover = Cover(base, code, fibers)
+
+    # unwrap 412 state prep... ?
+    E = cover.get_expr(prep)
+    prep = E.name
+    for (i,j) in fibers:
+        prep = prep + ("H(%d)"%(j,),)
+    print(prep)
+    #return
+
+    n = code.n
+    circuit = Circuit(n)
+
+    #c = measure + logical + decode + physical + barrier + prep
+    c = measure + prep
+    
+    qasm = circuit.run_qasm(c)
+    print(qasm)
+    #return
+
+    shots = argv.get("shots", 10)
+    samps = send(qasm, shots=shots)
+    print(samps)
+    print("samps:", len(samps))
+
+    succ=samps.count('0000')
+    fail=samps.count('0001')
+    print("succ: ", succ)
+    print("err:  ", len(samps)-succ-fail)
+    print("fail: ", fail)
+    print("p = %.6f" % (1 - fail / (fail+succ)))
+
+
+
+
 if __name__ == "__main__":
 
     from time import time
@@ -592,6 +732,7 @@ if __name__ == "__main__":
     name = argv.next() or "test"
     _seed = argv.get("seed")
     if _seed is not None:
+        from random import seed
         print("seed(%s)"%(_seed))
         seed(_seed)
 

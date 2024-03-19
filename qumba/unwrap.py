@@ -283,6 +283,36 @@ class Cover(object):
         fibers = get_fibers(zx)
         return Cover(base, total, fibers)
 
+    # protocol methods ---------------------------------------
+    def X(self, idx):
+        return self.total.space.get_identity()
+    Y = X
+    Z = X
+
+    def CX(self, idx, jdx):
+        assert idx != jdx
+        CX = self.total.space.CX
+        fibers = self.fibers
+        i, j = fibers[idx], fibers[jdx]
+        op = CX(i[0], j[0]) * CX(j[1], i[1])
+        return op
+
+    def CZ(self, idx, jdx):
+        assert idx != jdx
+        CX = self.total.space.CX
+        fibers = self.fibers
+        i, j = fibers[idx], fibers[jdx]
+        op = CX(i[0], j[1]) * CX(j[1], i[0])
+        return op
+
+    def CY(self, idx, jdx):
+        assert idx != jdx
+        CX = self.total.space.CX
+        fibers = self.fibers
+        i, j = fibers[idx], fibers[jdx]
+        op = CX(j[0], j[1]) * CX(i[0], j[0]) * CX(j[1], i[1]) * CX(j[0], j[1])
+        return op
+
     def H(self, idx):
         base, total, fibers = self.base, self.total, self.fibers
         fiber = fibers[idx]
@@ -293,7 +323,18 @@ class Cover(object):
         fiber = fibers[idx]
         return total.space.CX(*fiber)
 
-    #def CX(self, idx, jdx):
+    def get_expr(self, name):
+        print("Cover.get_expr", name)
+        op = self.total.space.get_identity()
+        for item in name:
+            if item.endswith(".d"):
+                assert item[0] == "S"
+                item = item.replace(".d", "")
+            e = "self."+item
+            op = op * eval(e, {"self":self})
+        return op
+
+    # end protocol methods -------------------------------------
 
     def get_ZX(self):
         # Transversal HH SWAP
