@@ -29,7 +29,7 @@ from qumba.clifford import Clifford, red, green, K, Matrix, r2, ir2, w4, w8, hal
 
 
 
-def send(qasms=None, shots=1):
+def send(qasms=None, shots=1, error_model=True):
     from qjobs import QPU, Batch
     qpu = QPU("H1-1E", domain="prod", local=True)
     # Setting local=True means that qjobs will use PECOS to run simulations on your device
@@ -56,11 +56,14 @@ def send(qasms=None, shots=1):
 
     if type(qasms) is str:
         qasms = [qasms]
+
+    options={"simulator": "state-vector", "error-model":error_model}
+    print("options:", options)
     
     # We can append jobs to the Batch object to run
     for qasm in qasms:
 #        batch.append(qasm, shots=shots, options={"simulator": "stabilizer"})
-        batch.append(qasm, shots=shots, options={"simulator": "state-vector"})
+        batch.append(qasm, shots=shots, options=options)
     
     # Submit all previously unsubmitted jobs to the QPU
     batch.submit()
@@ -708,19 +711,62 @@ def test_822_qasm():
     print(qasm)
     #return
 
-    shots = argv.get("shots", 10)
-    samps = send(qasm, shots=shots)
+    shots = argv.get("shots", 20)
+    samps = send(qasm, shots=shots, error_model=False)
     print(samps)
     print("samps:", len(samps))
 
-    succ=samps.count('0000')
-    fail=samps.count('0001')
-    print("succ: ", succ)
-    print("err:  ", len(samps)-succ-fail)
-    print("fail: ", fail)
-    print("p = %.6f" % (1 - fail / (fail+succ)))
+    Hz = parse("""
+    .ZZ.ZZ..
+    ..ZZ.ZZ.
+    Z..Z..ZZ
+    ZZ..Z..Z
+    """)
+    print(Hz)
+    for v in samps:
+        v = parse(v)
+        u = dot2(Hz, v.transpose())
+        print(u)
+    get_syndrome(samps)
 
 
+def get_syndrome(S):
+    from pecos import BinArray #This is just a cute function is PECOS that reverses results so you look at them in a more human readable direction
+    
+    #Simple processing code
+    #Calculate logical operator, calculate syndromes
+    #Post-select on non-trivial syndromes
+    #Calculate logical fidelity
+    suc1 = 0
+    suc2 = 0
+    suc3 = 0
+    suc_count = 0
+    for j in range(len(S)):
+        raw_out = numpy.array([int(i) for i in BinArray(S[j])])
+        S1 = raw_out[1]^raw_out[2]^raw_out[4]^raw_out[5]
+        S2 = raw_out[2]^raw_out[3]^raw_out[5]^raw_out[6]
+        S3 = raw_out[0]^raw_out[3]^raw_out[7]^raw_out[6]
+        S4 = raw_out[0]^raw_out[1]^raw_out[7]^raw_out[4]
+    
+    
+        log_1 = raw_out[3]^raw_out[4]
+        log_2 = raw_out[0]^raw_out[5]
+        log_3 = raw_out[2]^raw_out[7]
+        if S1 == 0 & S2 == 0 & S3 == 0 & S4==0:
+            #print('succes!')
+            suc_count +=1
+            if log_1 == 0:
+                suc1 += 1
+    
+            if log_2 == 0:
+                suc2 += 1
+            if log_3 == 0:
+                suc3 += 1
+    
+    print(suc1/suc_count)
+    print(suc2/suc_count)
+    print(suc3/suc_count)
+    
 
 
 if __name__ == "__main__":

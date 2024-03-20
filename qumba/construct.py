@@ -314,6 +314,31 @@ def classical_codes(n, m, distance=3):
             yield H
 
 
+
+def all_css(n, k, distance=3):
+    from bruhat.algebraic import qchoose_2
+    m = (n-k)
+    assert m%2 == 0
+    m = m//2
+
+    for Hx in qchoose_2(n, m):
+        K = kernel(Hx)
+        #print(Hx, Hx.shape)
+        #print(K, K.shape)
+        for Mz in qchoose_2(K.shape[0], m):
+            #print(Mz)
+            Hz = dot2(Mz, K)
+            #print(Hz)
+            assert dot2(Hx, Hz.transpose()).sum() == 0
+            code = QCode.build_css(Hx, Hz)
+            if code.d >= distance:
+                yield code
+        #print()
+        #return
+
+
+
+
 def all_codes(n=4, k=1, d=2):
     from bruhat.sp_pascal import i_grassmannian
 
