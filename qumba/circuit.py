@@ -548,7 +548,7 @@ def test_412_qasm():
     protocol.append((physical, logical))
 
     # logical H gate
-    physical = ("Z(1)", "X(2)", "P(3,0,1,2)")
+    physical = ("Z(1)", "X(2)", "P(3,0,1,2)") # XXX the paper uses P(0321)
     logical = ("H(3)",)
     protocol.append((physical, logical))
     del physical, logical
