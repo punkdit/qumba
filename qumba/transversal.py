@@ -951,6 +951,71 @@ def test_412_clifford():
     cvs.writePDFfile("circuit.pdf")
 
 
+def test_822_state_prep():
+    # FAIL FAIL FAIL
+    row_weight = argv.get("row_weight", 3)
+    diagonal = argv.get("diagonal", False)
+
+    code = QCode.fromstr("""
+    XX...XX.
+    .XX...XX
+    ..XXX..X
+    .ZZ.ZZ..
+    ..ZZ.ZZ.
+    Z..Z..ZZ
+    """, Ls="""
+    X......X
+    Z....Z..
+    .X..X...
+    ...ZZ...
+    """)
+
+    print(code)
+
+    n = code.n
+    nn = 2*n
+    space = code.space
+    F = space.F
+
+    solver = Solver()
+    Add = solver.add
+    U = UMatrix.unknown(nn, nn)
+    if diagonal:
+        for i in range(nn):
+            U[i,i] = Const(1)
+
+    Add(U.t*F*U == F) # U symplectic
+
+    #for perm in perms:
+    #    P = space.get_perm(perm)
+    #    U1 = P.t*U*P
+    #    Add(U==U1)
+
+    U0 = U[:, :2]
+
+    R = code.H * F * U0
+    Add(R==0) # linear constraint
+
+    if row_weight is not None:
+        for i in range(nn):
+            Add(Sum([If(U[i,j].get(),1,0) for j in range(nn)])<=row_weight)
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("result:", result)
+            break
+    
+        model = solver.model()
+        M = U.get_interp(model)
+        assert M.t*F*M == F
+    
+        print(M)
+        return
+
+        Add(U != M)
+
+
 
 def test_hexagons():
     "how do dehn twists act on hexagons?"

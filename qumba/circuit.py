@@ -602,7 +602,7 @@ def test_412_qasm():
 
 
 
-def test_822_clifford():
+def test_822_clifford_unwrap_encoder():
     base = QCode.fromstr("XYZI IXYZ ZIXY")
     print(base)
 
@@ -638,7 +638,8 @@ def test_822_clifford():
     E = cover.get_expr(prep)
     prep = E.name
     for (i,j) in fibers:
-        prep = prep + ("H(%d)"%(j,),)
+        Hj = ("H(%d)"%(j,),)
+        prep = prep + Hj
     print("prep:", prep)
     #return
 
@@ -657,9 +658,93 @@ def test_822_clifford():
         v0 = g*v0
     #print(v0)
 
+    for op in """
+    X......X
+    Z....Z..
+    .X..X...
+    ...ZZ...
+    """.strip().split():
+        print(op)
+        g = c.get_pauli(op)
+        v1 = g*v0
+        #u0 = v0+v1
+        #u1 = v0-v1
+        print(g*v0 == v0)
+
+    # we have prepared the |+0> state doh !
+
     P = code.get_projector()
     assert P*v0 == v0
 
+
+def test_822_clifford():
+    base = QCode.fromstr("XYZI IXYZ ZIXY")
+    print(base)
+
+    tgt = unwrap(base)
+
+    # fix the logicals:
+    code = QCode.fromstr("""
+    XX...XX.
+    .XX...XX
+    ..XXX..X
+    .ZZ.ZZ..
+    ..ZZ.ZZ.
+    Z..Z..ZZ
+    """, Ls="""
+    X......X
+    Z....Z..
+    .X..X...
+    ...ZZ...
+    """)
+    assert code.is_equiv(tgt)
+    print(code)
+    n = code.n
+
+    c = Clifford(n)
+    CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+    SHS = lambda i:S(i)*H(i)*S(i)
+    SH = lambda i:S(i)*H(i)
+    HS = lambda i:H(i)*S(i)
+    X, Y, Z = c.X, c.Y, c.Z
+    get_perm = c.get_P
+
+    cx = CX
+    Hs = """
+    01234567
+    Z....Z..
+    .ZZ.ZZ..
+    ..ZZ.ZZ.
+    ...ZZ...
+    ....ZZZZ
+    """
+    # prepare |00> state
+    g = cx(5,0) # src,tgt
+    g = g*cx(2,1)*cx(4,1)*cx(5,1)
+    g = g*cx(3,2)*cx(5,2)*cx(6,2)
+    g = g*cx(4,3)
+    g = g*cx(5,4)*cx(6,4)*cx(7,4)
+    g = g*H(5)*H(6)*H(7)
+    print(g.name)
+    return
+    v0 = parsevec("0"*n)
+    v0 = g*v0
+
+    for op in """
+    X......X
+    Z....Z..
+    .X..X...
+    ...ZZ...
+    """.strip().split():
+        print(op)
+        g = c.get_pauli(op)
+        v1 = g*v0
+        #u0 = v0+v1
+        #u1 = v0-v1
+        print(g*v0 == v0)
+
+    P = code.get_projector()
+    assert P*v0 == v0
 
 
 def test_822_qasm():
@@ -688,18 +773,23 @@ def test_822_qasm():
     fibers = [(i, i+base.n) for i in range(base.n)]
     print("fibers:", fibers)
 
-    # 412 state prep for logical |0>
-    prep = ('Z(0)', 'X(0)', 'H(0)', 'CX(0,3)', 'CY(1,2)', 'H(2)', 'CY(0,1)', 'H(0)', 'H(1)')
+#    # 412 state prep for logical |0>
+#    prep = ('Z(0)', 'X(0)', 'H(0)', 'CX(0,3)', 'CY(1,2)', 'H(2)', 'CY(0,1)', 'H(0)', 'H(1)')
+#
+#    cover = Cover(base, code, fibers)
+#
+#    # unwrap 412 state prep... ?
+#    E = cover.get_expr(prep)
+#    prep = E.name
+#    for (i,j) in fibers:
+#        prep = prep + ("H(%d)"%(j,),)
+#    print(prep)
+#    #return
 
-    cover = Cover(base, code, fibers)
-
-    # unwrap 412 state prep... ?
-    E = cover.get_expr(prep)
-    prep = E.name
-    for (i,j) in fibers:
-        prep = prep + ("H(%d)"%(j,),)
-    print(prep)
-    #return
+    # from test_822_clifford:
+    prep = ('CX(5,0)', 'CX(2,1)', 'CX(4,1)', 'CX(5,1)', 'CX(3,2)',
+        'CX(5,2)', 'CX(6,2)', 'CX(4,3)', 'CX(5,4)', 'CX(6,4)',
+        'CX(7,4)', 'H(5)', 'H(6)', 'H(7)')
 
     n = code.n
     circuit = Circuit(n)
@@ -711,23 +801,38 @@ def test_822_qasm():
     print(qasm)
     #return
 
-    shots = argv.get("shots", 20)
-    samps = send(qasm, shots=shots, error_model=False)
-    print(samps)
-    print("samps:", len(samps))
+    shots = argv.get("shots", 100000)
+    samps = send(qasm, shots=shots, error_model=True)
+    #print(samps)
 
     Hz = parse("""
     .ZZ.ZZ..
     ..ZZ.ZZ.
     Z..Z..ZZ
-    ZZ..Z..Z
+    Z....Z..
+    ...ZZ...
     """)
-    print(Hz)
+    #print(Hz)
+    succ = 0
+    fail = 0
     for v in samps:
         v = parse(v)
         u = dot2(Hz, v.transpose())
-        print(u)
-    get_syndrome(samps)
+        if u.sum() == 0:
+            succ += 1
+        elif u[:3].sum() == 0:
+            fail += 1
+        #print(shortstr(u.transpose()), end=" ")
+    #print()
+    #get_syndrome(samps)
+
+    print("samps:", len(samps))
+    #succ=samps.count('0000')
+    #fail=samps.count('0001')
+    print("succ: ", succ)
+    print("err:  ", len(samps)-succ-fail)
+    print("fail: ", fail)
+    print("p = %.6f" % (1 - fail / (fail+succ)))
 
 
 def get_syndrome(S):
