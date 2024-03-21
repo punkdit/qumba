@@ -323,6 +323,13 @@ class Cover(object):
         fiber = fibers[idx]
         return total.space.CX(*fiber)
 
+    def P(self, *perm):
+        base, total, fibers = self.base, self.total, self.fibers
+        assert len(perm) == len(fibers)
+        fibers = [fibers[i] for i in perm]
+        perm = reduce(add, fibers)
+        return total.space.P(*perm)
+
     def get_expr(self, name):
         print("Cover.get_expr", name)
         op = self.total.space.get_identity()

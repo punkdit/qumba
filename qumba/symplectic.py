@@ -71,6 +71,7 @@ class SymplecticSpace(object):
 
     def get_P(self, *args):
         return self.get_perm(args)
+    P = get_P
 
     def get_SWAP(self, i, j):
         assert i!=j

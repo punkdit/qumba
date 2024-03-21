@@ -1272,16 +1272,22 @@ def test_822():
     assert I != L
 
     def lift_S(code, fiber):
+        #print("CX(%d, %d)"%(fiber))
         return code.apply_CX(*fiber)
     def lift_SH(code, fiber):
+        #print("SWAP(%d, %d)"%(fiber))
+        #print("CX(%d, %d)"%(fiber))
         code = code.apply_swap(*fiber) # lift H
         code = code.apply_CX(*fiber) # lift S
         return code
     def lift_HS(code, fiber):
+        #print("CX(%d, %d)"%(fiber))
+        #print("SWAP(%d, %d)"%(fiber))
         code = code.apply_CX(*fiber) # lift S
         code = code.apply_swap(*fiber) # lift H
         return code
     def lift_SHS(code, fiber): # == HSH
+        #print("CX(%d, %d)"%(fiber[1],fiber[0]))
         return code.apply_CX(fiber[1], fiber[0])
     lift_HSH = lift_SHS
 
@@ -1309,7 +1315,7 @@ def test_822():
         ([0,2,1,3], "SHS SH HS S"),
         ([0,2,3,1], "HS S SHS SH"),
         ([0,3,1,2], "SH HS S SHS"),
-        #([1,0,2,3], "SH HS S SHS"), # above
+        ([1,0,2,3], "SH HS S SHS"), # above
         ([1,2,0,3], "S SHS SH HS"),
         ([1,3,0,2], "HS S SHS SH"),
         ([1,3,2,0], "SHS SH HS S"),
@@ -1334,7 +1340,9 @@ def test_822():
         gen.append(logop)
         print(SymplecticSpace(2).get_name(logop))
 
-    return
+        #break
+
+    #return
 
     #for L in gen:
     #    print(L)
@@ -1349,6 +1357,7 @@ def test_822():
     CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
     SWAP = c.SWAP
     P = c.get_P
+    I = c.get_identity()
 
     def lift_S(fiber):
         E = CX(*fiber)
@@ -1366,12 +1375,28 @@ def test_822():
         return E
     lift_HSH = lift_SHS
 
-    perm = lift_perm([1,0,2,3])
-    g = P(*perm)
-    g = lift_SH(fibers[0])*g
-    g = lift_HS(fibers[1])*g
-    g = lift_S(fibers[2])*g
-    g = lift_SHS(fibers[3])*g
+    if 0:
+        perm = lift_perm([1,0,2,3])
+        g = P(*perm)
+        g = lift_SH(fibers[0])*g
+        g = lift_HS(fibers[1])*g
+        g = lift_S(fibers[2])*g
+        g = lift_SHS(fibers[3])*g
+
+    else:
+        #([0,2,1,3], "SHS SH HS S"),
+        perm = lift_perm([0,2,1,3])
+        g = P(*perm)
+        g = lift_SHS(fibers[0])*g
+        g = lift_SH(fibers[1])*g
+        g = lift_HS(fibers[2])*g
+        g = lift_S(fibers[3])*g
+
+    print(g.name)
+
+    print(g*g*g == I)
+    print(g*g == I)
+    return
 
     P = code.get_projector() # slow...
     #print(P.shape)

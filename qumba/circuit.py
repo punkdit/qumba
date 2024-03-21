@@ -29,7 +29,8 @@ from qumba.clifford import Clifford, red, green, K, Matrix, r2, ir2, w4, w8, hal
 
 
 
-def send(qasms=None, shots=1, error_model=True):
+#def send(qasms=None, shots=1, error_model=True, simulator="state-vector"):
+def send(qasms=None, shots=1, error_model=True, simulator="stabilizer"):
     from qjobs import QPU, Batch
     qpu = QPU("H1-1E", domain="prod", local=True)
     # Setting local=True means that qjobs will use PECOS to run simulations on your device
@@ -57,7 +58,7 @@ def send(qasms=None, shots=1, error_model=True):
     if type(qasms) is str:
         qasms = [qasms]
 
-    options={"simulator": "state-vector", "error-model":error_model}
+    options={"simulator": simulator, "error-model":error_model}
     print("options:", options)
     
     # We can append jobs to the Batch object to run
@@ -170,6 +171,7 @@ reset q;
     def run_qasm(self, expr):
         self.labels = list(range(self.n))
         qasm = self.header() + self.run_expr(expr)
+        qasm += "// final qubit order: %s\n\n"%(self.labels,)
         return qasm
 
 
@@ -718,6 +720,43 @@ def test_822_clifford():
     ...ZZ...
     ....ZZZZ
     """
+    
+    gate = """
+    P(0,4,2,6,1,5,3,7)
+    CX(4,0)
+    SWAP(1,5)
+    CX(1,5)
+    CX(2,6)
+    SWAP(2,6)
+    CX(3,7)
+    """.strip().split()
+    gate = tuple(reversed(gate))
+
+    # See test.test_822
+    if 0:
+        # lifted 1,0,2,3
+        gate = ('CX(7,3)', 'CX(2,6)', 'P(0,5,2,3,4,1,6,7)', 'CX(1,5)',
+            'CX(0,4)', 'P(4,1,2,3,0,5,6,7)', 'P(1,0,2,3,5,4,6,7)')
+    else:
+        # lifted 0,2,1,3
+        gate = ('CX(3,7)', 'P(0, 1, 6, 3, 4, 5, 2, 7)', 'CX(2,6)', 'CX(1,5)', 'P(0, 5, 2, 3, 4, 1, 6, 7)', 'CX(4,0)', 'P(0, 2, 1, 3, 4, 6, 5, 7)')
+    print("gate:", gate)
+    E = c.get_expr(gate)
+
+    if 0:
+        fibers = [(i, i+base.n) for i in range(base.n)]
+        print("fibers:", fibers)
+        cover = Cover(base, code, fibers)
+        expr = tuple("S(0) H(0) S(0) S(1) H(1) H(2) S(2) S(3) P(0,2,1,3) X(0) X(2)".split())
+        gate = cover.get_expr(expr).name
+        print("gate:", gate)
+        E = c.get_expr(gate)
+    
+        print(E1 == E)
+
+    P = code.get_projector()
+    assert P*E == E*P
+
     # prepare |00> state
     g = cx(5,0) # src,tgt
     g = g*cx(2,1)*cx(4,1)*cx(5,1)
@@ -725,10 +764,13 @@ def test_822_clifford():
     g = g*cx(4,3)
     g = g*cx(5,4)*cx(6,4)*cx(7,4)
     g = g*H(5)*H(6)*H(7)
-    print(g.name)
-    return
+    print("prep:", g.name)
+    #return
+
     v0 = parsevec("0"*n)
     v0 = g*v0
+    u0 = E*v0
+    assert u0==v0
 
     for op in """
     X......X
@@ -743,7 +785,6 @@ def test_822_clifford():
         #u1 = v0-v1
         print(g*v0 == v0)
 
-    P = code.get_projector()
     assert P*v0 == v0
 
 
@@ -791,19 +832,24 @@ def test_822_qasm():
         'CX(5,2)', 'CX(6,2)', 'CX(4,3)', 'CX(5,4)', 'CX(6,4)',
         'CX(7,4)', 'H(5)', 'H(6)', 'H(7)')
 
+    gate = ('CX(3,7)', 'P(0,1,6,3,4,5,2,7)', 'CX(2,6)', 'CX(1,5)',
+        'P(0,5,2,3,4,1,6,7)', 'CX(4,0)','P(0,2,1,3,4,6,5,7)')
+
     n = code.n
     circuit = Circuit(n)
 
     #c = measure + logical + decode + physical + barrier + prep
-    c = measure + prep
+    c = measure + 3*(gate + barrier) + prep
     
     qasm = circuit.run_qasm(c)
     print(qasm)
     #return
 
-    shots = argv.get("shots", 100000)
+    shots = argv.get("shots", 10000)
     samps = send(qasm, shots=shots, error_model=True)
     #print(samps)
+
+    idxs = circuit.labels # final qubit permutation
 
     Hz = parse("""
     .ZZ.ZZ..
@@ -812,6 +858,8 @@ def test_822_qasm():
     Z....Z..
     ...ZZ...
     """)
+    Hz = Hz[:, idxs] # shuffle
+
     #print(Hz)
     succ = 0
     fail = 0

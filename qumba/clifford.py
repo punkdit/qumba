@@ -376,9 +376,15 @@ class Clifford(object):
     @cache
     def SWAP(self, idx=0, jdx=1):
         assert idx != jdx
-        HH = self.H(idx) * self.H(jdx)
-        CZ = self.CZ(idx, jdx)
-        return HH*CZ*HH*CZ*HH*CZ
+        #HH = self.H(idx) * self.H(jdx)
+        #CZ = self.CZ(idx, jdx)
+        #g = HH*CZ*HH*CZ*HH*CZ
+        idxs = list(range(self.n))
+        idxs[idx],idxs[jdx] = idxs[jdx],idxs[idx]
+        return self.get_P(*idxs)
+        #assert g==self.get_P(*idxs)
+        #return g
+    get_SWAP = SWAP
 
     def get_P(self, *perm):
         #print("get_P", perm)
