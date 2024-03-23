@@ -705,6 +705,7 @@ def test_822_clifford():
 
     c = Clifford(n)
     CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+    I = c.get_identity()
     SHS = lambda i:S(i)*H(i)*S(i)
     SH = lambda i:S(i)*H(i)
     HS = lambda i:H(i)*S(i)
@@ -712,15 +713,6 @@ def test_822_clifford():
     get_perm = c.get_P
 
     cx = CX
-    Hs = """
-    01234567
-    Z....Z..
-    .ZZ.ZZ..
-    ..ZZ.ZZ.
-    ...ZZ...
-    ....ZZZZ
-    """
-    
     gate = """
     P(0,4,2,6,1,5,3,7)
     CX(4,0)
@@ -738,7 +730,7 @@ def test_822_clifford():
         gate = ('CX(7,3)', 'CX(2,6)', 'P(0,5,2,3,4,1,6,7)', 'CX(1,5)',
             'CX(0,4)', 'P(4,1,2,3,0,5,6,7)', 'P(1,0,2,3,5,4,6,7)')
     else:
-        # lifted 0,2,1,3
+        # lifted 0,2,1,3 is Dehn twist
         gate = ('CX(3,7)', 'P(0, 1, 6, 3, 4, 5, 2, 7)', 'CX(2,6)', 'CX(1,5)', 'P(0, 5, 2, 3, 4, 1, 6, 7)', 'CX(4,0)', 'P(0, 2, 1, 3, 4, 6, 5, 7)')
     print("gate:", gate)
     E = c.get_expr(gate)
@@ -754,8 +746,15 @@ def test_822_clifford():
     
         print(E1 == E)
 
-    P = code.get_projector()
-    assert P*E == E*P
+    # row reduced Z stabilizer/logops
+    Hs = """
+    01234567
+    Z....Z..
+    .ZZ.ZZ..
+    ..ZZ.ZZ.
+    ...ZZ...
+    ....ZZZZ
+    """
 
     # prepare |00> state
     g = cx(5,0) # src,tgt
@@ -767,24 +766,30 @@ def test_822_clifford():
     print("prep:", g.name)
     #return
 
-    v0 = parsevec("0"*n)
-    v0 = g*v0
-    u0 = E*v0
-    assert u0==v0
+    # logical's
+    LX0 = X(0)*X(7)
+    LX1 = X(1)*X(4)
+    LZ0 = Z(0)*Z(5)
+    LZ1 = Z(3)*Z(4)
 
-    for op in """
-    X......X
-    Z....Z..
-    .X..X...
-    ...ZZ...
-    """.strip().split():
-        print(op)
-        g = c.get_pauli(op)
-        v1 = g*v0
-        #u0 = v0+v1
-        #u1 = v0-v1
-        print(g*v0 == v0)
+    v0 = parsevec("00000000")
+    v0 = g*v0 # |00>
 
+    if argv.tom:
+        #v0 = LX0 * v0 # |10>
+        v0 = LX1 * v0 # |01>
+        u0 = E*v0
+        print( u0==v0 )
+    
+        for l in [I, LX0, LZ0]:
+          for r in [I, LX1, LZ1]:
+            op = l*r
+            v1 = op*v0
+            print(int(v1==v0), int(v1==-v0), op.name)
+
+    # still in groundspace
+    P = code.get_projector()
+    assert P*E == E*P
     assert P*v0 == v0
 
 
@@ -832,21 +837,70 @@ def test_822_qasm():
         'CX(5,2)', 'CX(6,2)', 'CX(4,3)', 'CX(5,4)', 'CX(6,4)',
         'CX(7,4)', 'H(5)', 'H(6)', 'H(7)')
 
+    # lifted 0,2,1,3 from test_822_clifford is Dehn twist
     gate = ('CX(3,7)', 'P(0,1,6,3,4,5,2,7)', 'CX(2,6)', 'CX(1,5)',
         'P(0,5,2,3,4,1,6,7)', 'CX(4,0)','P(0,2,1,3,4,6,5,7)')
+
+    """
+    01234567
+    X......X
+    Z....Z..
+    .X..X...
+    ...ZZ...
+    """
+    I = ()
+    X0 = ("X(0)", "X(7)")
+    X1 = ("X(1)", "X(4)")
+    Z0 = ("Z(0)", "Z(5)")
+    Z1 = ("Z(3)", "Z(4)")
 
     n = code.n
     circuit = Circuit(n)
 
     #c = measure + logical + decode + physical + barrier + prep
-    c = measure + 3*(gate + barrier) + prep
-    
-    qasm = circuit.run_qasm(c)
-    print(qasm)
-    #return
+    #c = measure + X1 + barrier + (gate + barrier) + barrier + X1 + prep
+    #c = measure + Z0 + barrier + (gate + barrier) + barrier + Z0 + prep
 
-    shots = argv.get("shots", 10000)
-    samps = send(qasm, shots=shots, error_model=True)
+    qasms = []
+    if 0:
+        for op in [
+            I,   
+            X0    ,
+            Z0    ,
+                X1,
+                Z1,
+            X0+Z0,
+            X0+X1,
+            X0+Z1,
+            Z0+X1,
+            Z0+Z1,
+            X1+Z1,
+        ]:
+            #c = measure + op + barrier + (gate + barrier) + barrier + Z0 + prep
+            c = measure + op + prep
+            qasm = circuit.run_qasm(c)
+            #print(qasm)
+            qasms.append(qasm)
+        #return
+
+    else:
+        #c = measure + X0 + X1 + barrier + (gate + barrier) + barrier + X1 + prep
+        #c = measure + X0+Z1 + barrier + (gate + barrier) + barrier + Z0 + prep
+        #c = measure + X0+Z0 + barrier + (gate + barrier) + barrier + Z0 + prep
+        #c = measure + X0+Z1 + barrier + (gate + barrier) + barrier + Z1 + prep
+        #c = measure + X0+Z0 + barrier + (gate + barrier) + barrier + Z1 + prep
+        #c = measure + X1 + barrier + (gate + barrier) + barrier + X0 + X1 + prep
+
+        # works:
+        c = measure + X0 + barrier + (gate + barrier) + barrier + X0 + prep
+        c = measure + X0+X1 + barrier + (gate + barrier) + barrier + X1 + prep
+        c = measure + Z0+Z1 + barrier + (gate + barrier) + barrier + Z0 + prep
+        c = measure + Z1 + barrier + (gate + barrier) + barrier + Z1 + prep
+        c = measure + X0+X1+Z1 + barrier + (gate + barrier) + barrier + X1+Z1 + prep
+        qasms.append(circuit.run_qasm(c))
+
+    shots = argv.get("shots", 10)
+    samps = send(qasms, shots=shots, error_model=True)
     #print(samps)
 
     idxs = circuit.labels # final qubit permutation
@@ -863,14 +917,16 @@ def test_822_qasm():
     #print(Hz)
     succ = 0
     fail = 0
-    for v in samps:
+    for i,v in enumerate(samps):
         v = parse(v)
         u = dot2(Hz, v.transpose())
         if u.sum() == 0:
             succ += 1
         elif u[:3].sum() == 0:
             fail += 1
-        #print(shortstr(u.transpose()), end=" ")
+        print(shortstr(u.transpose()), end=" ")
+        if (i+1)%10==0:
+            print()
     #print()
     #get_syndrome(samps)
 
@@ -880,7 +936,8 @@ def test_822_qasm():
     print("succ: ", succ)
     print("err:  ", len(samps)-succ-fail)
     print("fail: ", fail)
-    print("p = %.6f" % (1 - fail / (fail+succ)))
+    if fail+succ:
+        print("p = %.6f" % (1 - fail / (fail+succ)))
 
 
 def get_syndrome(S):

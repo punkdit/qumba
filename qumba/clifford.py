@@ -307,6 +307,15 @@ class Clifford(object):
     get_S = S
         
     @cache
+    def T(self, i=0):
+        K = self.K
+        w = self.w
+        T = Matrix(K, [[1, 0], [0, w]])
+        Ti = self.mkop(i, T, "T")
+        return Ti
+    get_T = T
+        
+    @cache
     def X(self, i=0):
         K = self.K
         X = Matrix(K, [[0, 1], [1,  0]])
