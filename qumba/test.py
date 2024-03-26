@@ -1547,6 +1547,10 @@ def test_10_2_3_clifford():
         g = H(i)*g
     assert g*P == P*g
 
+    # this breaks the CX SWAP:
+    #i,j = fibers[0]
+    #fibers[0] = (j,i)
+
     # Transversal CX SWAP
     print("CX SWAP...")
     def lift_SH(fiber):

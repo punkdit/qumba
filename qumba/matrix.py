@@ -151,6 +151,18 @@ class Matrix(object):
         rows = r"\begin{bmatrix}%s\end{bmatrix}"%rows
         return rows
 
+    def gap(self):
+        m, n = self.shape
+        matrix = []
+        for row in self.A:
+            line = []
+            for x in row:
+                line.append('Z(2)' if x else '0*Z(2)')
+            line = "[%s]"%(','.join(line))
+            matrix.append(line)
+        matrix = "[%s]"%(','.join(matrix))
+        return str(matrix)
+
     def __repr__(self):
         return "Matrix(%s)"%str(self.A)
 

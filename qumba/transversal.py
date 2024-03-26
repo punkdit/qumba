@@ -503,6 +503,81 @@ def main():
         print()
 
 
+def get_412_transversal_4():
+
+    N = 4
+
+    # N*[[4,1,2]] cliffords
+    code = construct.get_412()
+    arg = tuple([code]*N)
+    logical = []
+    #physical = []
+    for M,L in find_transversal(*arg, constant=argv.constant):
+        print(L)
+        logical.append(L)
+        #physical.append(M)
+    print("logical:", len(logical))
+    G = mulclose(logical)
+    print("|G| =", len(G))
+
+    # single [[4,1,2]] cliffords
+    single = [] 
+    n = code.n
+    space = code.space
+    src = code
+    G = Group.symmetric(src.n)
+    gen = set()
+    for g in G:
+        perm = [g[i] for i in range(n)]
+        P = space.get_perm(perm)
+        tgt = src.apply_perm(perm)
+        for M in find_local_clifford(src, tgt):
+            code = tgt.apply(M)
+            assert code.is_equiv(src)
+            dode = src.apply(M*P)
+            assert code.is_equiv(dode)
+            L = code.get_logical(src)
+            if L not in gen:
+                #print(P)
+                print(M, g)
+                print(L)
+                gen.add(L)
+                #single.append(M*P)
+                single.append(L)
+    G = mulclose(gen)
+    print(len(G))
+
+    I = SymplecticSpace(1).get_identity()
+    for M in single:
+        for i in range(N):
+            op = [I]*N
+            op[i] = M
+            op = reduce(Matrix.direct_sum, op)
+            #physical.append(op)
+            print(op)
+            logical.append(op)
+
+    if 0:
+        G = mulclose(logical, verbose=True)
+        print(len(G))
+        return
+
+
+    f = open("generate.gap", "w")
+    names = []
+    for i,M in enumerate(logical):
+        name = "M%d"%i
+        print("%s := %s;"%(name,M.gap()), file=f)
+        names.append(name)
+    print("G := Group([%s]);"%(','.join(names)), file=f)
+    print("Order(G);", file=f)
+    f.close()
+
+    #G = mulclose(physical, verbose=True)
+    #print("|G| =", len(G))
+
+
+
 #def get_codes(n, k, d):
 #    from bruhat.sp_pascal import i_grassmannian
 #    perm = []
