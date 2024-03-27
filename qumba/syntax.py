@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+from qumba.symplectic import SymplecticSpace
+from qumba.clifford import Clifford
+
 
 class Term(object):
     def __init__(self, atoms):
@@ -15,8 +18,11 @@ class Term(object):
             atoms = atoms + other.atoms
             return Term(atoms)
 
+        op = other.get_identity()
         for (name, arg) in reversed(atoms):
             meth = getattr(other, name)
+            op = meth(*arg) * op
+        return op
 
 
 class Atom(object):
@@ -36,7 +42,18 @@ class Syntax(object):
 def test():
     s = Syntax()
     X, Z, Y = s.X, s.Z, s.Y
-    print( X(0)*Z(2) )
+    S, H, CX = s.S, s.H, s.CX
+    prog = X(0)*Z(2)
+    assert str(prog) == "X(0)*Z(2)"
+
+    n = 3
+    space = Clifford(n)
+    M = prog*space
+
+    prog = CX(0, 1)
+    print(prog*space)
+    print(prog*SymplecticSpace(n))
+
 
 
 
