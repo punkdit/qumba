@@ -80,8 +80,12 @@ def send(qasms=None, shots=1, error_model=True, simulator="stabilizer"):
     values = []
     for job in batch.jobs:
         results = job.results
-        assert results['status'] == 'completed', results['error']
-        values += results["results"]["m"]
+        if results['status'] == 'completed':
+            values += results["results"]["m"]
+        else:
+            print(results['error'])
+            #print(job.code)
+            #assert 0
         #return r["m"]
     #print(values)
     return values
@@ -410,6 +414,16 @@ def test_412():
         # logical H
         L = get_perm(1,2,3,0)
         assert L*Lx*L.d == Lz # H action
+    elif 1:
+        L = get_perm(0,3,2,1)
+        L = H(0)*H(1)*H(2)*H(3)*X(0)*X(2)*L
+        lz = L*Lx*L.d
+        lx = L*Lz*L.d
+        assert lz*Lx == -Lx*lz
+        assert lz*Lz == Lz*lz
+        assert lx*Lx == Lx*lx
+        assert lx*Lz == -Lz*lx
+        #assert L*Lx*L.d == Lz # H action
     elif 0:
         # logical X*Z
         L = get_perm(1,0,3,2)*H(0)*H(1)*H(2)*H(3)*X(0)*X(2)
@@ -454,11 +468,14 @@ def test_412():
     #print(getlogop(Lz))
 
     assert P*L==L*P
+
+    # this is the encoded logical
     l = (half**4)*getlogop(L)
     print("l =")
     print(l)
     #print("l^2 =")
     #gen = [(w8**i)*I for i in range(8)] + [X, Z, Y, S, S.d, H]
+    # now we find a name for the encoded logical
     g = mulclose_find(gen, l)
     print("g =")
     print(g, "name =", g.name)
@@ -517,6 +534,18 @@ barrier = ("barrier()",)
 measure = ("measure()",)
 
 
+def gen_412():
+    c = Clifford(1)
+    gen = [c.X(), c.Z(), c.S(), c.H()]
+    G = mulclose(gen)
+    assert len(G) == 192
+    #print(len(G))
+    names = [g.name for g in G]
+    #for g in G:
+    #    print(g.name)
+    return names
+
+
 def test_412_qasm():
     circuit = Circuit(4)
     encode = ('CY(0,1)', 'CZ(0,2)', 'H(0)', 'CY(1,2)', 'CZ(1,3)',
@@ -527,7 +556,7 @@ def test_412_qasm():
     # state prep for logical |0>
     prep = ('Z(0)', 'X(0)', 'H(0)', 'CX(0,3)', 'CY(1,2)', 'H(2)', 'CY(0,1)', 'H(0)', 'H(1)')
 
-    protocol = []
+    protocol = {}
     #physical = ("P(1,2,3,0)",)
     #logical = ("Z(3)", "H(3)") # inverse logical
     #protocol.append((physical, logical))
@@ -539,24 +568,35 @@ def test_412_qasm():
         'H(2)', 'S(2)', 
         'S(3)', 
         'P(0, 2, 1, 3)', 'X(0)', 'X(2)')
-    logical = ("S(3).d",)
-    protocol.append((physical, logical))
+    logical = ("S(3).d",) # inverse logical 
+    #protocol.append((physical, logical))
+    protocol["S(0)"] = (physical, logical)
 
     # logical X
     physical = ('Z(0)', 'X(1)',)
-    logical = ("X(3)",)
-    protocol.append((physical, logical))
+    logical = ("X(3)",) # inverse logical 
+    protocol["X(0)"] = (physical, logical)
+    #protocol.append((physical, logical))
 
     # logical Z
     physical = ('Z(1)', 'X(2)',)
-    logical = ("Z(3)",)
-    protocol.append((physical, logical))
+    logical = ("Z(3)",) # inverse logical 
+    protocol["Z(0)"] = (physical, logical)
+    #protocol.append((physical, logical))
 
     # logical H gate
-    physical = ("Z(1)", "X(2)", "P(3,0,1,2)") # XXX the paper uses P(0321)
-    logical = ("H(3)",)
-    protocol.append((physical, logical))
+    #physical = ("Z(1)", "X(2)", "P(3,0,1,2)") # XXX the paper uses P(0321)
+    #logical = ("H(3)" ) # inverse logical 
+    #physical = ("H(0)", "H(1)", "H(2)", "H(3)", "X(0)", "X(2)", "P(0,3,2,1)")
+    #logical = ("H(3)", "Z(3)", ) # inverse logical 
+    physical = ("Z(1)", "X(2)", "H(0)", "H(1)", "H(2)", "H(3)", "X(0)", "X(2)", "P(0,3,2,1)")
+    logical = ("H(3)",) # inverse logical 
+    protocol["H(0)"] = (physical, logical)
+    #protocol.append((physical, logical))
     del physical, logical
+
+    names = gen_412()
+    #names = [nam for nam in names if len(nam)==1]
 
     N = argv.get("N", 4) # circuit depth
     trials = argv.get("trials", 100)
@@ -571,11 +611,19 @@ def test_412_qasm():
         logical = ()
         print("protocol:")
         for i in range(N):
-            if N==1:
-                p,l = protocol[0] # logical S
-            else:
-                p,l = choice(protocol)
-            print(p, l)
+            #if N==1:
+            #    p,l = protocol[0] # logical S
+            #else:
+            #    p,l = choice(protocol)
+            #print(p, l)
+            name = choice(names)
+            print("name:", name)
+            p, l = (), ()
+            for nami in name:
+                p = p + protocol[nami][0]
+                l = protocol[nami][1] + l
+            print(p)
+            
             physical = barrier + p + physical
             logical = logical + l
     
@@ -593,7 +641,7 @@ def test_412_qasm():
         qasms.append(qasm)
 
     shots = argv.get("shots", 1)
-    samps = send(qasms, shots=shots)
+    samps = send(qasms, shots=shots, simulator="state-vector")
     print("samps:", len(samps))
     succ=samps.count('0000')
     fail=samps.count('0001')
