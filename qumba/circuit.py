@@ -7,6 +7,7 @@ warnings.filterwarnings('ignore')
 from random import shuffle, randint, choice
 from operator import add, matmul, mul
 from functools import reduce
+import pickle
 
 import numpy
 
@@ -30,9 +31,12 @@ from qumba.clifford import Clifford, red, green, K, Matrix, r2, ir2, w4, w8, hal
 
 
 #def send(qasms=None, shots=1, error_model=True, simulator="state-vector"):
-def send(qasms=None, shots=1, error_model=True, simulator="stabilizer"):
+def send(qasms=None, shots=1, error_model=True, simulator="stabilizer", **kw):
     from qjobs import QPU, Batch
-    qpu = QPU("H1-1E", domain="prod", local=True)
+    local = not argv.live
+    machine = argv.get("machine", "H1-1E")
+    print("machine:", machine)
+    qpu = QPU(machine, domain="prod", local=local)
     # Setting local=True means that qjobs will use PECOS to run simulations on your device
     # Otherwise, it will attempt to connect to a device in the cloud
     
@@ -63,8 +67,7 @@ def send(qasms=None, shots=1, error_model=True, simulator="stabilizer"):
     
     # We can append jobs to the Batch object to run
     for qasm in qasms:
-#        batch.append(qasm, shots=shots, options={"simulator": "stabilizer"})
-        batch.append(qasm, shots=shots, options=options)
+        batch.append(qasm, shots=shots, options=options, params=kw)
     
     # Submit all previously unsubmitted jobs to the QPU
     batch.submit()
@@ -77,18 +80,39 @@ def send(qasms=None, shots=1, error_model=True, simulator="stabilizer"):
     #print(batch.jobs)
     #assert len(batch.jobs) == 1
 
-    values = []
+    samps = []
     for job in batch.jobs:
         results = job.results
         if results['status'] == 'completed':
-            values += results["results"]["m"]
+            samps += results["results"]["m"]
         else:
-            print(results['error'])
+            print(results['status'])
             #print(job.code)
             #assert 0
         #return r["m"]
-    #print(values)
-    return values
+    #print(samps)
+    return samps
+
+
+def load():
+    name = argv.next()
+    assert name.endswith(".p"), name
+    f = open(name, "rb")
+    batch = pickle.load(f)
+    f.close()
+    samps = []
+    for job in batch.jobs:
+        results = job.retrieve()
+        #results = job.results
+        status = results["status"]
+        print("status:", status)
+        #print("params:", results["params"])
+        #print(' '.join(results.keys()))
+        print(job.params)
+        if status == "completed":
+            samps += results["results"]["m"]
+    return samps
+
     
 
 class Circuit(object):
@@ -546,7 +570,7 @@ def gen_412():
     return names
 
 
-def test_412_qasm():
+def run_412_qasm():
     circuit = Circuit(4)
     encode = ('CY(0,1)', 'CZ(0,2)', 'H(0)', 'CY(1,2)', 'CZ(1,3)',
         'H(1)', 'CZ(2,0)', 'CY(2,3)', 'H(2)', 'S(3)', 'H(3)',
@@ -600,6 +624,8 @@ def test_412_qasm():
 
     N = argv.get("N", 4) # circuit depth
     trials = argv.get("trials", 100)
+    print("circuit depth:", N)
+    print("trials:", trials)
 
     if argv.nobarrier:
         global barrier
@@ -609,47 +635,63 @@ def test_412_qasm():
     for trial in range(trials):
         physical = ()
         logical = ()
-        print("protocol:")
+        #print("protocol:")
         for i in range(N):
-            #if N==1:
-            #    p,l = protocol[0] # logical S
-            #else:
-            #    p,l = choice(protocol)
-            #print(p, l)
             name = choice(names)
-            print("name:", name)
+            #print("name:", name)
             p, l = (), ()
             for nami in name:
                 p = p + protocol[nami][0]
                 l = protocol[nami][1] + l
-            print(p)
+            #print(p)
             
             physical = barrier + p + physical
             logical = logical + l
     
         # left <---<---< right 
         if argv.encode:
-            print("encode")
+            #print("encode")
             c = measure + logical + decode + physical + barrier + encode
     
         else:
-            print("prep")
+            #print("prep")
             c = measure + logical + decode + physical + barrier + prep
     
         qasm = circuit.run_qasm(c)
         #print(qasm)
         qasms.append(qasm)
 
-    shots = argv.get("shots", 1)
-    samps = send(qasms, shots=shots, simulator="state-vector")
+    if argv.dump:
+        for qasm in qasms:
+            print("\n// qasm job")
+            print(qasm)
+            print("// end qasm\n")
+
+    else:
+    
+        shots = argv.get("shots", 100)
+        samps = send(qasms, shots=shots, simulator="state-vector", N=N)
+        process_412(samps)
+
+
+def process_412(samps):
     print("samps:", len(samps))
+    if not samps:
+        return
     succ=samps.count('0000')
     fail=samps.count('0001')
     print("succ: ", succ)
     print("err:  ", len(samps)-succ-fail)
     print("fail: ", fail)
-    print("p = %.6f" % (1 - fail / (fail+succ)))
+    if fail+succ:
+        print("p = %.6f" % (1 - fail / (fail+succ)))
+    else:
+        print("p = %.6f" % 1.)
 
+
+def load_412():
+    samps = load()
+    process_412(samps)
 
 
 def test_822_clifford_unwrap_encoder():
@@ -841,7 +883,7 @@ def test_822_clifford():
     assert P*v0 == v0
 
 
-def test_822_qasm():
+def run_822_qasm():
     base = QCode.fromstr("XYZI IXYZ ZIXY")
     print(base)
 
@@ -910,7 +952,7 @@ def test_822_qasm():
     #c = measure + Z0 + barrier + (gate + barrier) + barrier + Z0 + prep
 
     qasms = []
-    if 0:
+    def tomography():
         for op in [
             I,   
             X0    ,
@@ -931,21 +973,18 @@ def test_822_qasm():
             qasms.append(qasm)
         #return
 
+    # works:
+    c = measure + X0 + barrier + (gate + barrier) + barrier + X0 + prep
+    c = measure + X0+X1 + barrier + (gate + barrier) + barrier + X1 + prep
+    c = measure + Z0+Z1 + barrier + (gate + barrier) + barrier + Z0 + prep
+    c = measure + Z1 + barrier + (gate + barrier) + barrier + Z1 + prep
+    c = measure + X0+X1+Z1 + barrier + (gate + barrier) + barrier + X1+Z1 + prep
+    if argv.spam:
+        c = measure + barrier + prep # SPAM
     else:
-        #c = measure + X0 + X1 + barrier + (gate + barrier) + barrier + X1 + prep
-        #c = measure + X0+Z1 + barrier + (gate + barrier) + barrier + Z0 + prep
-        #c = measure + X0+Z0 + barrier + (gate + barrier) + barrier + Z0 + prep
-        #c = measure + X0+Z1 + barrier + (gate + barrier) + barrier + Z1 + prep
-        #c = measure + X0+Z0 + barrier + (gate + barrier) + barrier + Z1 + prep
-        #c = measure + X1 + barrier + (gate + barrier) + barrier + X0 + X1 + prep
+        return
 
-        # works:
-        c = measure + X0 + barrier + (gate + barrier) + barrier + X0 + prep
-        c = measure + X0+X1 + barrier + (gate + barrier) + barrier + X1 + prep
-        c = measure + Z0+Z1 + barrier + (gate + barrier) + barrier + Z0 + prep
-        c = measure + Z1 + barrier + (gate + barrier) + barrier + Z1 + prep
-        c = measure + X0+X1+Z1 + barrier + (gate + barrier) + barrier + X1+Z1 + prep
-        qasms.append(circuit.run_qasm(c))
+    qasms.append(circuit.run_qasm(c))
 
     shots = argv.get("shots", 10)
     samps = send(qasms, shots=shots, error_model=True)
@@ -972,9 +1011,10 @@ def test_822_qasm():
             succ += 1
         elif u[:3].sum() == 0:
             fail += 1
-        print(shortstr(u.transpose()), end=" ")
-        if (i+1)%10==0:
-            print()
+        if argv.show:
+            print(shortstr(u.transpose()), end=" ")
+            if (i+1)%20==0:
+                print()
     #print()
     #get_syndrome(samps)
 
