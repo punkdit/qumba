@@ -12,7 +12,7 @@ import pickle
 import numpy
 
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
-    rank, rand2, pseudo_inverse, kernel, direct_sum)
+    rank, rand2, pseudo_inverse, kernel, direct_sum, row_reduce)
 from qumba.qcode import QCode, SymplecticSpace, strop, Matrix, fromstr
 from qumba.csscode import CSSCode, find_logicals
 from qumba.autos import get_autos
@@ -29,18 +29,24 @@ from qumba.clifford import Clifford, red, green, K, Matrix, r2, ir2, w4, w8, hal
 
 
 
-
-#def send(qasms=None, shots=1, error_model=True, simulator="state-vector"):
-def send(qasms=None, shots=1, error_model=True, simulator="stabilizer", **kw):
+def send(qasms=None, shots=1, 
+        error_model=True, 
+        simulator="stabilizer",  # "state-vector" is slower
+        p1_errors=True,  # bool
+        p2_errors=True, # bool
+        init_errors=True, # bool
+        meas_errors=True, # bool
+        memory_errors=True, # bool
+        **kw):
     from qjobs import QPU, Batch
     local = not argv.live
     machine = argv.get("machine", "H1-1E")
-    print("machine:", machine)
+    print("machine:", machine, ("local" if local else ""))
     qpu = QPU(machine, domain="prod", local=local)
     # Setting local=True means that qjobs will use PECOS to run simulations on your device
     # Otherwise, it will attempt to connect to a device in the cloud
     
-    batch = Batch(qpu)
+    batch = Batch(qpu, save=not local)
     
     
     if qasms is None:
@@ -62,7 +68,25 @@ def send(qasms=None, shots=1, error_model=True, simulator="stabilizer", **kw):
     if type(qasms) is str:
         qasms = [qasms]
 
-    options={"simulator": simulator, "error-model":error_model}
+    options = {
+    'simulator': simulator,
+    'error-model': error_model, # bool
+    'p1_errors': p1_errors,  # bool
+    'p2_errors': p2_errors, # bool
+    'init_errors': init_errors, # bool
+    'meas_errors': meas_errors, # bool
+    'memory_errors': memory_errors, # bool
+#    'error-params': 
+#        {
+#        'p1_errors': p1_errors,  # bool
+#        'p2_errors': p2_errors, # bool
+#        'init_errors': init_errors, # bool
+#        'meas_errors': meas_errors, # bool
+#        'memory_errors': memory_errors, # bool
+#        }
+    }
+    options.update(kw)
+    #options={"simulator": simulator, "error-model":error_model}
     print("options:", options)
     
     # We can append jobs to the Batch object to run
@@ -87,6 +111,7 @@ def send(qasms=None, shots=1, error_model=True, simulator="stabilizer", **kw):
             samps += results["results"]["m"]
         else:
             print(results['status'])
+            print(results)
             #print(job.code)
             #assert 0
         #return r["m"]
@@ -670,9 +695,15 @@ def run_412_qasm():
     else:
     
         shots = argv.get("shots", 100)
-        samps = send(qasms, shots=shots, simulator="state-vector", N=N)
+        samps = send(qasms, shots=shots, N=N, 
+            simulator="state-vector", 
+            memory_errors=argv.get("memory_errors", True),
+            leak2depolar = argv.get("leak2depolar", False),
+        )
         process_412(samps)
 
+def variance(p, n):
+    return ((p*(1-p))/n)**0.5
 
 def process_412(samps):
     print("samps:", len(samps))
@@ -683,8 +714,11 @@ def process_412(samps):
     print("succ: ", succ)
     print("err:  ", len(samps)-succ-fail)
     print("fail: ", fail)
-    if fail+succ:
-        print("p = %.6f" % (1 - fail / (fail+succ)))
+    n = fail+succ
+    if n:
+        p = (1 - fail / n)
+        print("p   = %.6f" % p) 
+        print("var = %.6f" % variance(p, n))
     else:
         print("p = %.6f" % 1.)
 
@@ -793,6 +827,25 @@ def test_822_clifford():
     print(code)
     n = code.n
 
+    # row reduced X stabilizer/logops
+    S0 = parse("""
+    X......X
+    .X..X...
+    XX...XX.
+    .XX...XX
+    ..XXX..X
+    """)
+    SX = parse("""
+    X......X
+    .X..X...
+    ..X.X.XX
+    ...X..X.
+    ....XXXX
+    """)
+
+    assert shortstr(SX) == shortstr(row_reduce(S0))
+    
+
     c = Clifford(n)
     CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
     I = c.get_identity()
@@ -801,8 +854,65 @@ def test_822_clifford():
     HS = lambda i:H(i)*S(i)
     X, Y, Z = c.X, c.Y, c.Z
     get_perm = c.get_P
+    cx, cz = CX, CZ
 
-    cx = CX
+    if 0:
+        fibers = [(i, i+base.n) for i in range(base.n)]
+        print("fibers:", fibers)
+        cover = Cover(base, code, fibers)
+        expr = tuple("S(0) H(0) S(0) S(1) H(1) H(2) S(2) S(3) P(0,2,1,3) X(0) X(2)".split())
+        gate = cover.get_expr(expr).name
+        print("gate:", gate)
+        E = c.get_expr(gate)
+        print(E1 == E)
+
+    if argv.prep_00:
+        # row reduced Z stabilizer/logops
+        SZ = """
+        01234567
+        Z....Z..
+        .ZZ.ZZ..
+        ..ZZ.ZZ.
+        ...ZZ...
+        ....ZZZZ
+        """
+
+        # prepare |00> state
+        g =   cx(5,0) # src,tgt
+        g = g*cx(2,1)*cx(4,1)*cx(5,1)
+        g = g*cx(3,2)*cx(5,2)*cx(6,2)
+        g = g*cx(4,3)
+        g = g*cx(5,4)*cx(6,4)*cx(7,4)
+        g = g*H(5)*H(6)*H(7)
+
+    elif argv.prep_pp:
+        ("""
+        01234567
+        X......X
+        .X..X...
+        ..X.X.XX
+        ...X..X.
+        ....XXXX
+        """)
+        g =   cx(0,7)
+        g = g*cx(1,4)
+        g = g*cx(2,4)*cx(2,6)*cx(2,7)
+        g = g*cx(3,6)
+        g = g*cx(4,5)*cx(4,6)*cx(4,7)
+        g = g*H(0)*H(1)*H(2)*H(3)*H(4)
+
+    else:
+        return
+
+    print("prep:", g.name)
+    #return
+
+    # logical's
+    LX0 = X(0)*X(7)
+    LX1 = X(1)*X(4)
+    LZ0 = Z(0)*Z(5)
+    LZ1 = Z(3)*Z(4)
+
     gate = """
     P(0,4,2,6,1,5,3,7)
     CX(4,0)
@@ -825,43 +935,6 @@ def test_822_clifford():
     print("gate:", gate)
     E = c.get_expr(gate)
 
-    if 0:
-        fibers = [(i, i+base.n) for i in range(base.n)]
-        print("fibers:", fibers)
-        cover = Cover(base, code, fibers)
-        expr = tuple("S(0) H(0) S(0) S(1) H(1) H(2) S(2) S(3) P(0,2,1,3) X(0) X(2)".split())
-        gate = cover.get_expr(expr).name
-        print("gate:", gate)
-        E = c.get_expr(gate)
-    
-        print(E1 == E)
-
-    # row reduced Z stabilizer/logops
-    Hs = """
-    01234567
-    Z....Z..
-    .ZZ.ZZ..
-    ..ZZ.ZZ.
-    ...ZZ...
-    ....ZZZZ
-    """
-
-    # prepare |00> state
-    g = cx(5,0) # src,tgt
-    g = g*cx(2,1)*cx(4,1)*cx(5,1)
-    g = g*cx(3,2)*cx(5,2)*cx(6,2)
-    g = g*cx(4,3)
-    g = g*cx(5,4)*cx(6,4)*cx(7,4)
-    g = g*H(5)*H(6)*H(7)
-    print("prep:", g.name)
-    #return
-
-    # logical's
-    LX0 = X(0)*X(7)
-    LX1 = X(1)*X(4)
-    LZ0 = Z(0)*Z(5)
-    LZ1 = Z(3)*Z(4)
-
     v0 = parsevec("00000000")
     v0 = g*v0 # |00>
 
@@ -883,9 +956,55 @@ def test_822_clifford():
     assert P*v0 == v0
 
 
+def opt_822_prep():
+    # from test_822_clifford:
+    prep = (
+        'CX(5,0)', 'CX(2,1)', 'CX(4,1)', 'CX(5,1)', 'CX(3,2)',
+        'CX(5,2)', 'CX(6,2)', 'CX(4,3)', 'CX(5,4)', 'CX(6,4)', 'CX(7,4)', )
+        #'H(5)', 'H(6)', 'H(7)')
+
+    n = 8
+    s = SymplecticSpace(n)
+    H, CX = s.H, s.CX
+    ops = [eval(name, {"CX":CX, "H":H}) for name in prep]
+    tgt = reduce(mul, ops)
+    print(tgt)
+
+    gen = [CX(i,j) for i in range(n) for j in range(n) if i!=j]
+    print(len(gen))
+
+    metric = lambda g : str(g+tgt).count('1')
+
+    best_count = 20
+    while 1:
+        g = s.get_identity()
+        d = metric(g)
+        while 1:
+            done = True
+            best = None
+            best_d = d
+            hgs = [h*g for h in gen]
+            ds = [metric(hg) for hg in hgs]
+            d0 = min(ds)
+            if d0 >= d:
+                break
+            hgs = [hg for hg in hgs if metric(hg)==d0]
+            g = choice(hgs)
+            d = d0
+    
+        if d!=0:
+            continue
+
+        count = len(g.name)
+        if count < best_count:
+            print(g.name, count)
+            best_count = count
+
+
+
 def run_822_qasm():
     base = QCode.fromstr("XYZI IXYZ ZIXY")
-    print(base)
+    #print(base)
 
     tgt = unwrap(base)
 
@@ -904,28 +1023,26 @@ def run_822_qasm():
     ...ZZ...
     """)
     assert code.is_equiv(tgt)
-    print(code)
+    #print(code)
 
     fibers = [(i, i+base.n) for i in range(base.n)]
-    print("fibers:", fibers)
-
-#    # 412 state prep for logical |0>
-#    prep = ('Z(0)', 'X(0)', 'H(0)', 'CX(0,3)', 'CY(1,2)', 'H(2)', 'CY(0,1)', 'H(0)', 'H(1)')
-#
-#    cover = Cover(base, code, fibers)
-#
-#    # unwrap 412 state prep... ?
-#    E = cover.get_expr(prep)
-#    prep = E.name
-#    for (i,j) in fibers:
-#        prep = prep + ("H(%d)"%(j,),)
-#    print(prep)
-#    #return
+    #print("fibers:", fibers)
 
     # from test_822_clifford:
-    prep = ('CX(5,0)', 'CX(2,1)', 'CX(4,1)', 'CX(5,1)', 'CX(3,2)',
+    # prep |00> state
+    prep_00 = ('CX(5,0)', 'CX(2,1)', 'CX(4,1)', 'CX(5,1)', 'CX(3,2)',
         'CX(5,2)', 'CX(6,2)', 'CX(4,3)', 'CX(5,4)', 'CX(6,4)',
         'CX(7,4)', 'H(5)', 'H(6)', 'H(7)')
+
+    if argv.opt:
+        # from opt_822_prep, not as good 
+        prep_00 = ('CNOT(5,3)', 'CNOT(5,4)', 'CNOT(4,1)', 'CNOT(2,1)', 'CNOT(6,4)', 'CNOT(6,3)', 'CNOT(3,2)', 'CNOT(4,3)', 'CNOT(7,4)', 'CNOT(5,0)')
+        prep_00 += ('H(5)', 'H(6)', 'H(7)')
+
+    # from test_822_clifford
+    # prepare |++> state
+    prep_pp = ('CX(0,7)', 'CX(1,4)', 'CX(2,4)', 'CX(2,6)', 'CX(2,7)', 'CX(3,6)', 'CX(4,5)', 'CX(4,6)', 'CX(4,7)', 
+        'H(0)', 'H(1)', 'H(2)', 'H(3)', 'H(4)')
 
     # lifted 0,2,1,3 from test_822_clifford is Dehn twist
     gate = ('CX(3,7)', 'P(0,1,6,3,4,5,2,7)', 'CX(2,6)', 'CX(1,5)',
@@ -947,9 +1064,9 @@ def run_822_qasm():
     n = code.n
     circuit = Circuit(n)
 
-    #c = measure + logical + decode + physical + barrier + prep
-    #c = measure + X1 + barrier + (gate + barrier) + barrier + X1 + prep
-    #c = measure + Z0 + barrier + (gate + barrier) + barrier + Z0 + prep
+    #c = measure + logical + decode + physical + barrier + prep_00
+    #c = measure + X1 + barrier + (gate + barrier) + barrier + X1 + prep_00
+    #c = measure + Z0 + barrier + (gate + barrier) + barrier + Z0 + prep_00
 
     qasms = []
     def tomography():
@@ -966,47 +1083,90 @@ def run_822_qasm():
             Z0+Z1,
             X1+Z1,
         ]:
-            #c = measure + op + barrier + (gate + barrier) + barrier + Z0 + prep
-            c = measure + op + prep
+            #c = measure + op + barrier + (gate + barrier) + barrier + Z0 + prep_00
+            c = measure + op + prep_00
             qasm = circuit.run_qasm(c)
             #print(qasm)
             qasms.append(qasm)
         #return
 
-    # works:
-    c = measure + X0 + barrier + (gate + barrier) + barrier + X0 + prep
-    c = measure + X0+X1 + barrier + (gate + barrier) + barrier + X1 + prep
-    c = measure + Z0+Z1 + barrier + (gate + barrier) + barrier + Z0 + prep
-    c = measure + Z1 + barrier + (gate + barrier) + barrier + Z1 + prep
-    c = measure + X0+X1+Z1 + barrier + (gate + barrier) + barrier + X1+Z1 + prep
+    if 0:
+        # these work:
+        c = measure + X0 + barrier + (gate + barrier) + barrier + X0 + prep_00
+        c = measure + X0+X1 + barrier + (gate + barrier) + barrier + X1 + prep_00
+        c = measure + Z0+Z1 + barrier + (gate + barrier) + barrier + Z0 + prep_00
+        c = measure + Z1 + barrier + (gate + barrier) + barrier + Z1 + prep_00
+        c = measure + X0+X1+Z1 + barrier + (gate + barrier) + barrier + X1+Z1 + prep_00
+
+    h8 = tuple("H(%d)"%i for i in range(n))
+
     if argv.spam:
-        c = measure + barrier + prep # SPAM
+        if argv.prep_00:
+            c = measure + barrier + prep_00 # SPAM
+        elif argv.prep_pp:
+            c = measure + h8 + barrier + prep_pp # SPAM
+        else:
+            return
+    elif argv.state == (0,0):
+        c = measure + barrier + gate + barrier + prep_00
+    elif argv.state == (1,0):
+        c = measure + X0 + barrier + gate + barrier + X0 + prep_00
+    elif argv.state == (0,1):
+        c = measure + X0+X1 + barrier + gate + barrier + X1 + prep_00
+    elif argv.state == (1,1):
+        c = measure + X1 + barrier + gate + barrier + X0+X1 + prep_00
+    elif argv.state == "pp":
+        c = measure + h8 + barrier + gate + barrier + prep_pp
+    elif argv.state == "mp":
+        c = measure + h8 + Z0+Z1 + barrier + gate + barrier + Z0 + prep_pp
+    elif argv.state == "pm":
+        c = measure + h8 + Z1 + barrier + gate + barrier + Z1 + prep_pp
+    elif argv.state == "mm":
+        c = measure + h8 + Z0 + barrier + gate + barrier + Z0 + Z1 + prep_pp
     else:
         return
 
+    print(c)
+
     qasms.append(circuit.run_qasm(c))
 
-    shots = argv.get("shots", 10)
-    samps = send(qasms, shots=shots, error_model=True)
-    #print(samps)
+    if argv.load:
+        samps = load()
+
+    else:
+        shots = argv.get("shots", 10)
+        samps = send(qasms, shots=shots, error_model=True)
+        #print(samps)
 
     idxs = circuit.labels # final qubit permutation
 
-    Hz = parse("""
-    .ZZ.ZZ..
-    ..ZZ.ZZ.
-    Z..Z..ZZ
-    Z....Z..
-    ...ZZ...
-    """)
-    Hz = Hz[:, idxs] # shuffle
+    if type(argv.state) is str or argv.prep_pp:
+        #print("measure X syndromes")
+        H = parse("""
+        XX...XX.
+        .XX...XX
+        ..XXX..X
+        X......X
+        .X..X...
+        """)
+    else:
+        #print("measure Z syndromes")
+        assert type(argv.state) is tuple 
+        H = parse("""
+        .ZZ.ZZ..
+        ..ZZ.ZZ.
+        Z..Z..ZZ
+        Z....Z..
+        ...ZZ...
+        """)
+    H = H[:, idxs] # shuffle
 
-    #print(Hz)
+    #print(H)
     succ = 0
     fail = 0
     for i,v in enumerate(samps):
         v = parse(v)
-        u = dot2(Hz, v.transpose())
+        u = dot2(H, v.transpose())
         if u.sum() == 0:
             succ += 1
         elif u[:3].sum() == 0:
@@ -1019,13 +1179,17 @@ def run_822_qasm():
     #get_syndrome(samps)
 
     print("samps:", len(samps))
-    #succ=samps.count('0000')
-    #fail=samps.count('0001')
+    if not samps:
+        return
+
     print("succ: ", succ)
     print("err:  ", len(samps)-succ-fail)
     print("fail: ", fail)
-    if fail+succ:
-        print("p = %.6f" % (1 - fail / (fail+succ)))
+    shots = fail+succ
+    if shots:
+        p = (1 - fail / (fail+succ))
+        print("p   = %.6f" % p)
+        print("var = %.6f" % variance(p, shots))
 
 
 def get_syndrome(S):
