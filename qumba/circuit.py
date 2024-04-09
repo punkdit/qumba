@@ -32,22 +32,21 @@ from qumba.clifford import Clifford, red, green, K, Matrix, r2, ir2, w4, w8, hal
 def send(qasms=None, shots=1, 
         error_model=True, 
         simulator="stabilizer",  # "state-vector" is slower
+        name = argv.get("name", "job"),
         p1_errors=True,  # bool
         p2_errors=True, # bool
         init_errors=True, # bool
         meas_errors=True, # bool
         memory_errors=True, # bool
-        **kw):
+        leak2depolar=False,
+        **kw): # kw goes into params
     from qjobs import QPU, Batch
     local = not argv.live
     machine = argv.get("machine", "H1-1E")
     print("machine:", machine, ("local" if local else ""))
     qpu = QPU(machine, domain="prod", local=local)
-    # Setting local=True means that qjobs will use PECOS to run simulations on your device
-    # Otherwise, it will attempt to connect to a device in the cloud
     
     batch = Batch(qpu, save=not local)
-    
     
     if qasms is None:
         # create & measure Bell state
@@ -69,41 +68,28 @@ def send(qasms=None, shots=1,
         qasms = [qasms]
 
     options = {
-    'simulator': simulator,
-    'error-model': error_model, # bool
-    'p1_errors': p1_errors,  # bool
-    'p2_errors': p2_errors, # bool
-    'init_errors': init_errors, # bool
-    'meas_errors': meas_errors, # bool
-    'memory_errors': memory_errors, # bool
-#    'error-params': 
-#        {
-#        'p1_errors': p1_errors,  # bool
-#        'p2_errors': p2_errors, # bool
-#        'init_errors': init_errors, # bool
-#        'meas_errors': meas_errors, # bool
-#        'memory_errors': memory_errors, # bool
-#        }
+        'simulator': simulator,
+        'error-model': error_model, # bool
+        'error-params': 
+        {
+            'leak2depolar': leak2depolar, # bool
+            # these all give "Unexpected error_params key!" error:
+            #'p1_errors': p1_errors,  # bool
+            #'p2_errors': p2_errors, # bool
+            #'init_errors': init_errors, # bool
+            #'meas_errors': meas_errors, # bool
+            #'memory_errors': memory_errors, # bool
+        }
     }
-    options.update(kw)
-    #options={"simulator": simulator, "error-model":error_model}
     print("options:", options)
     
     # We can append jobs to the Batch object to run
-    for qasm in qasms:
-        batch.append(qasm, shots=shots, options=options, params=kw)
+    for i,qasm in enumerate(qasms):
+        batch.append(qasm, shots=shots, options=options, name="%s_%d"%(name,i), params=kw)
     
-    # Submit all previously unsubmitted jobs to the QPU
     batch.submit()
-    # Note: Each time you submit or retrieve jobs, 
-    # the Batch object will save itself as a pickle
+    batch.retrieve(wait=argv.wait)
     
-    # Retrieve
-    batch.retrieve()
-    
-    #print(batch.jobs)
-    #assert len(batch.jobs) == 1
-
     samps = []
     for job in batch.jobs:
         results = job.results
@@ -113,9 +99,6 @@ def send(qasms=None, shots=1,
             print(results['status'])
             print(results)
             #print(job.code)
-            #assert 0
-        #return r["m"]
-    #print(samps)
     return samps
 
 
@@ -648,7 +631,7 @@ def run_412_qasm():
     #names = [nam for nam in names if len(nam)==1]
 
     N = argv.get("N", 4) # circuit depth
-    trials = argv.get("trials", 100)
+    trials = argv.get("trials", 4)
     print("circuit depth:", N)
     print("trials:", trials)
 
@@ -693,12 +676,18 @@ def run_412_qasm():
             print("// end qasm\n")
 
     else:
+
+        kw = {}
+        if not argv.get("leakage", False):
+            kw['p1_emission_ratio'] = 0
+            kw['p2_emission_ratio'] = 0
     
         shots = argv.get("shots", 100)
         samps = send(qasms, shots=shots, N=N, 
             simulator="state-vector", 
-            memory_errors=argv.get("memory_errors", True),
+            memory_errors=argv.get("memory_errors", False),
             leak2depolar = argv.get("leak2depolar", False),
+            **kw,
         )
         process_412(samps)
 
@@ -1151,7 +1140,7 @@ def run_822_qasm():
         """)
     else:
         #print("measure Z syndromes")
-        assert type(argv.state) is tuple 
+        assert type(argv.state) is tuple or argv.prep_00
         H = parse("""
         .ZZ.ZZ..
         ..ZZ.ZZ.
