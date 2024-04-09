@@ -757,7 +757,8 @@ def test_dehn():
 
     CX = space.CX
 
-    g = space.get_identity()
+    g0 = space.get_identity()
+    g1 = space.get_identity()
     #for i in [4,12]:
     for i in range(rows):
         if i%2==0:
@@ -766,17 +767,26 @@ def test_dehn():
         for j in range(cols):
             src, tgt = (idx+j, idx+(j+1)%cols)
             if j%2==0:
-                g *= CX(src, tgt)
+                g0 *= CX(src, tgt)
             else:
-                g *= CX(tgt, src)
+                g1 *= CX(tgt, src)
     #print(g)
-    g = g*perm
+    assert g0*g1 == g1*g0
+    g = g0*g1*perm
 
     dode = code.apply(g)
     assert code.is_equiv(dode)
     l = code.get_logical(dode)
     #print(SymplecticSpace(2).get_name(l))
     #print(l*l)
+
+    if 0:
+        c1 = code.apply(g1*perm)
+        print(c1.longstr())
+        print("dist:", c1.distance("z3")) # ouch it's only distance rows/2 here... 
+        c2 = c1.apply(g0)
+        assert c2.is_equiv(code)
+        return
 
     if rows > 4:
 

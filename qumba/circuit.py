@@ -85,7 +85,11 @@ def send(qasms=None, shots=1,
     
     # We can append jobs to the Batch object to run
     for i,qasm in enumerate(qasms):
-        batch.append(qasm, shots=shots, options=options, name="%s_%d"%(name,i), params=kw)
+        if len(qasms)>1:
+            the_name = "%s_%d"%(name,i)
+        else:
+            the_name = name
+        batch.append(qasm, shots=shots, options=options, name=the_name, params=kw)
     
     batch.submit()
     batch.retrieve(wait=argv.wait)
@@ -1224,6 +1228,8 @@ if __name__ == "__main__":
 
     from time import time
     start_time = time()
+
+    print(argv)
 
     profile = argv.profile
     name = argv.next() or "test"
