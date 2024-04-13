@@ -1223,6 +1223,105 @@ def get_syndrome(S):
     print(suc3/suc_count)
     
 
+def test_513():
+    base = construct.get_513()
+    n = base.n
+    print(base)
+    print(base.longstr())
+
+    s = base.space
+    c = Clifford(n)
+    E = reduce(mul, [c.get_CZ(i, (i+1)%n) for i in range(n)])
+    v0 = E*red(n, 0, 0)
+    v1 = E*red(n, 0, 2)
+    assert (v0.d*v1)[0][0] == 0 # orthogonal
+
+    P = base.get_projector()
+    assert P*P == P
+    assert P*v0 == v0
+    assert P*v1 == v1
+
+    lx = -c.get_pauli("XXXXX") # arf, what is this minus sign ??
+    lz = c.get_pauli("ZZZZZ")
+    #ly = c.get_pauli("YYYYY")
+    ly = lz*lx
+    assert lz*v0 == v0
+    assert lz*v1 == -v1
+    assert lx*v0 == v1
+    assert lx*v1 == v0
+
+    S, H = c.S, c.H
+    g = reduce(mul, [S(i)*H(i) for i in range(n)])
+    assert g*P == P*g
+    u = g*v0
+    print(lz*u==u, lz*u==-u)
+    print(lx*u==u, lx*u==-u)
+    print(ly*u==u, ly*u==-u)
+
+
+def symplectic_10_2_3():
+    base = construct.get_513()
+    code = unwrap(base)
+    print(code.longstr())
+    #css = code.to_css()
+    perms = get_autos(code)
+    print(perms)
+    swap = SymplecticSpace(2).get_SWAP()
+    for perm in perms:
+        dode = code.apply_perm(perm)
+        assert dode.is_equiv(code)
+        if dode.get_logical(code) == swap:
+            print(perm)
+
+
+def clifford_10_2_3():
+    base = construct.get_513()
+    code = unwrap(base)
+    n = base.n
+    nn = code.n
+    #print(code.longstr())
+    print(base)
+    print(code)
+
+    if 0:
+        lhs = red(n, 0)
+        rhs = reduce(matmul, [red(1,0)]*n)
+        print(lhs == rhs)
+        print(lhs)
+        print(rhs)
+    
+        return
+
+    P = code.get_projector()
+    #assert P*P == P # SLOOOW
+
+    cc = Clifford(nn)
+    CX = cc.CX
+    H = code.H
+    H = strop(H).split()
+    #for h in H:
+    #    print(h)
+    #    op = cc.get_pauli(h) # SLOOOW
+
+    def unwrap_CZ(src, tgt, v):
+        #return CX(2*src, 2*tgt+1) * (CX(2*src+1, 2*tgt) * v)
+        return CX(src, tgt+n) * (CX(tgt, src+n) * v)
+
+    #v = red(nn, 0)
+    v = red(n, 0) @ green(n, 0)
+    print("v", v.shape)
+    for i in range(n):
+        v = unwrap_CZ(i, (i+1)%n, v)
+        print("i =", i)
+    print(P*v == v)
+
+    Z0 = cc.get_pauli("ZZZZZ.....")
+    assert Z0*v == v
+    
+    X1 = cc.get_pauli("..XX.X....")
+    assert X1*v == v
+
+
 
 if __name__ == "__main__":
 

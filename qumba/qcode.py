@@ -330,8 +330,8 @@ class QCode(object):
         from qumba.csscode import CSSCode
         H = self.H
         m, nn = H.shape
-        Hx = H[:, 0:nn:2]
-        Hz = H[:, 1:nn:2]
+        Hx = H[:, 0:nn:2].A
+        Hz = H[:, 1:nn:2].A
         idxs = numpy.where(Hx.sum(1))[0]
         jdxs = numpy.where(Hz.sum(1))[0]
         assert Hx[jdxs, :].sum() == 0, "not in css form"
