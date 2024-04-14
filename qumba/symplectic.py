@@ -133,7 +133,7 @@ class SymplecticSpace(object):
         A[2*jdx+1, 2*idx+1] = 1
         A[2*idx, 2*jdx] = 1
         A = A.transpose()
-        name="CNOT(%d,%d)"%(idx,jdx)
+        name="CX(%d,%d)"%(idx,jdx)
         return Matrix(A, self.p, None, name)
     CX = get_CNOT
 
@@ -161,7 +161,7 @@ class SymplecticSpace(object):
         for i in range(n):
             gen.append(self.get_S(i))
             for j in range(i+1, n):
-                gen.append(self.get_CNOT(i, j))
+                gen.append(self.get_CX(i, j))
                 gen.append(self.get_CZ(i, j))
     
         G = mulclose(gen, verbose=verbose)
@@ -364,11 +364,11 @@ class Building(object):
         #else:
             #W = None
         ops = [space.get_S(i) for i in range(n)]
-        ops += [space.get_CNOT(i, j) for i in range(n) for j in range(i+1,n)]
+        ops += [space.get_CX(i, j) for i in range(n) for j in range(i+1,n)]
         ops += [space.get_CZ(i, j) #*space.get_H(i)*space.get_H(j)
             for i in range(n) for j in range(i+1,n)]
     
-        # send "E(i,j)" names --> S, CNOT, CZ in symplectic ziporder
+        # send "E(i,j)" names --> S, CX, CZ in symplectic ziporder
         rename = {"I":I}
         lookup = uturn.get_borel().lookup # these are the "E(i,j)" borel's
         for key in lookup.keys():
@@ -470,7 +470,7 @@ def test():
     space = space + space
     gen = [g.direct_sum(I) for g in G]+[I.direct_sum(g) for g in G]
     gen.append(space.get_perm([2,3,0,1]))
-    gen.append(space.get_CNOT(0, 2) * space.get_CNOT(1, 3))
+    gen.append(space.get_CX(0, 2) * space.get_CX(1, 3))
     #gen.append(space.get_CZ(0, 2) * space.get_CZ(1, 3))
     G = mulclose(gen)
     assert len(G) == 46080

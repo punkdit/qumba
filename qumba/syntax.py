@@ -10,7 +10,12 @@ class Term(object):
 
     def __str__(self):
         atoms = self.atoms
-        return "*".join("%s(%s)"%((name,)+arg) for (name,arg) in atoms)
+        return "*".join("%s%s"%((name,)+(arg,)) for (name,arg) in atoms)
+
+    @property
+    def name(self):
+        atoms = self.atoms
+        return tuple("%s%s"%((name,)+(arg,)) for (name,arg) in atoms)
 
     def __mul__(self, other):
         atoms = self.atoms
@@ -37,6 +42,9 @@ class Atom(object):
 class Syntax(object):
     def __getattr__(self, name):
         return Atom(name)
+
+    def get_identity(self):
+        return Term([])
 
 
 def test():

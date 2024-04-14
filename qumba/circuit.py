@@ -11,9 +11,11 @@ import pickle
 
 import numpy
 
+from qumba import solve
+solve.int_scalar = numpy.int32 # qupy.solve
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum, row_reduce)
-from qumba.qcode import QCode, SymplecticSpace, strop, Matrix, fromstr
+from qumba.qcode import QCode, SymplecticSpace, strop, fromstr
 from qumba.csscode import CSSCode, find_logicals
 from qumba.autos import get_autos
 from qumba import csscode, construct
@@ -25,7 +27,9 @@ from qumba.unwrap import unwrap, unwrap_encoder
 from qumba.smap import SMap
 from qumba.argv import argv
 from qumba.unwrap import Cover
-from qumba.clifford import Clifford, red, green, K, Matrix, r2, ir2, w4, w8, half, latex
+from qumba import clifford, matrix
+from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
+from qumba.syntax import Syntax
 
 
 
@@ -297,8 +301,8 @@ def test_parsevec():
 
 def find_state(tgt, src, gen, verbose=False, maxsize=None):
     "find sequence of gen's that produces tgt state from src state (up to phase)"
-    assert isinstance(tgt, Matrix)
-    assert isinstance(src, Matrix)
+    assert isinstance(tgt, clifford.Matrix)
+    assert isinstance(src, clifford.Matrix)
 
     # choose a canonical vector up to phase
     def canonical(u):
@@ -443,7 +447,7 @@ def test_412():
     u = U*parsevec("0000")
     assert u == v0
 
-    #M = (half**4)*Matrix(K,[[dot(u0,v0),dot(u0,v1)],[dot(u1,v0),dot(u1,v1)]])
+    #M = (half**4)*clifford.Matrix(K,[[dot(u0,v0),dot(u0,v1)],[dot(u1,v0),dot(u1,v1)]])
     #print(M)
 
     if 0:
@@ -494,7 +498,7 @@ def test_412():
             u = l.d * L * r
             row.append(u[0][0])
           M.append(row)
-        return Matrix(K, M)
+        return clifford.Matrix(K, M)
     
     #print("Lx =")
     lx = (half**4)*getlogop(Lx)
@@ -794,6 +798,85 @@ def test_822_clifford_unwrap_encoder():
 
     P = code.get_projector()
     assert P*v0 == v0
+
+
+def sbin(i, n):
+    c = str(bin(i))[2:]
+    c = '0'*(n-len(c))+c
+    return c
+
+def vdump(v):
+    print("[", end=" ")
+    N = len(v)
+    n = 0
+    while 2**n < N:
+        n += 1
+    assert 2**n == N
+    for i in range(N):
+        #if abs(v[i]) > 1e-4:
+        r = v[i]
+        if abs(r.imag) < 1e-4:
+            r = r.real
+        if r != 0:
+            print("%s:%.4f"%(sbin(i, n),r), end=" ")
+    print("]")
+
+def qupy_822():
+    # from test_822_clifford_unwrap_encoder
+
+    code = QCode.fromstr("""
+    XX...XX.
+    .XX...XX
+    ..XXX..X
+    .ZZ.ZZ..
+    ..ZZ.ZZ.
+    Z..Z..ZZ
+    """, Ls="""
+    X......X
+    Z....Z..
+    .X..X...
+    ...ZZ...
+    """)
+    n = code.n
+
+    prep = ('P(4,1,2,3,0,5,6,7)', 'CX(0,3)', 'CX(7,4)', 'CX(2,6)',
+    'CX(1,2)', 'CX(6,5)', 'CX(2,6)', 'P(0,1,6,3,4,5,2,7)',
+    'CX(1,5)', 'CX(0,1)', 'CX(5,4)', 'CX(1,5)', 'P(4,1,2,3,0,5,6,7)',
+    'P(0,5,2,3,4,1,6,7)', 'H(4)', 'H(5)', 'H(6)', 'H(7)')
+
+    from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar
+    space = Space(n)
+    E = space.get_expr(prep)
+    print(E)
+
+    X, Z, CX, CZ, H, SWAP = space.X, space.Z, space.CX, space.CZ, space.H, space.make_swap
+    I = space.I
+    assert CX(0,1)*CX(1,0)*CX(0,1) == SWAP(0,1)
+    assert H(3)*H(3) == I
+    assert H(3)*Z(3)*H(3) == X(3)
+
+    #Hs = strop(code.H).replace('.', 'I')
+    #_code = Code(Hs)
+    #_code.check()
+    #P = _code.P
+
+    css = code.to_css()
+    css = CSSCode(css.Hz, css.Hx)
+    P = ((1/2)**len(css.stabs))*css.P
+    assert P*P == P
+    v = css.get_encoded(0)
+    vdump(v)
+    assert eq(P*v, v)
+
+    v0 = numpy.zeros((2**n,), dtype=scalar)
+    v0[0] = 1 # ket |00...0>
+    v0 = E*v0
+    u = P*v0
+    vdump(v0)
+    vdump(u)
+
+    print(eq(v0, u))
+
 
 
 def test_822_clifford():
@@ -1259,6 +1342,130 @@ def test_513():
     print(ly*u==u, ly*u==-u)
 
 
+def qupy_513():
+    base = construct.get_513()
+    n = base.n
+    P = base.get_projector()
+    E = base.get_clifford_encoder()
+    ops = [red(1,0)]*n
+    v0 = reduce(matmul, ops)
+    ops[-1] = red(1,0,2)
+    v1 = reduce(matmul, ops)
+    v0 = E*v0
+    assert P*v0 == v0
+    v1 = E*v1
+    assert P*v1 == v1
+
+    c = Clifford(n)
+    lx = -c.get_pauli("XXXXX")
+    lz = c.get_pauli("ZZZZZ")
+
+    #v1 = lx*v0
+
+    assert lz*v0 == v0
+    assert lz*v1 == -v1
+    assert lx*v0 == v1
+    assert lx*v1 == v0
+    #print(lx*v0 == v1, lx*v0 == -v1)
+    #print(lx*v1 == v0, lx*v1 == -v0)
+
+    #print(E.name)
+    cover = Cover.frombase(base)
+    code = cover.total
+    nn = code.n
+    E1 = cover.get_expr(E.name)
+    prep = E1.name
+    for i in range(n):
+        prep += ("H(%d)"%(i+n),)
+    #print(prep) # FAIL
+
+    if 0:
+        E = code.get_encoder_name()
+        prep = E.name # FAIL
+
+    #c = Clifford(nn)
+    #E = c.get_expr(prep)
+
+    from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar
+    space = Space(nn)
+    #E = space.get_expr(prep)
+    #print(E)
+
+    if 0:
+        prep = ('CX(4,5)', 'CX(0,9)', 'CX(3,9)', 'CX(4,8)', 'CX(2,8)',
+            'CX(3,7)', 'CX(1,7)', 'CX(2,6)', 'CX(0,6)', 'CX(1,5)') # FAIL
+        v0 = numpy.zeros((2**n,), dtype=scalar)
+        v0[0] = 1
+        v0[-1] = 1
+        H = Space(n).H
+        g = reduce(mul, [H(i) for i in range(n)])
+        v1 = g*v0
+        vdump(v0)
+        vdump(v1)
+        v = numpy.kron(v1, v0)
+        vdump(v)
+        print(v.shape)
+    
+        g = space.get_expr(prep)
+        v0 = g*v
+
+    g = space.get_expr(prep)
+    v0 = numpy.zeros((2**nn,), dtype=scalar)
+    v0[0] = 1
+    for i in range(8):
+        v0 = space.H(i)*v0
+    v0 = g*v0
+
+    #Hs = strop(code.H).replace('.', 'I')
+    #_code = Code(Hs)
+    #_code.check()
+    #P = _code.P
+
+    css = code.to_css()
+    css = CSSCode(css.Hz, css.Hx)
+    P = ((1/2)**len(css.stabs))*css.P
+    assert P*P == P
+
+    print(eq(P*v0, v0))
+
+    return
+
+    v = css.get_encoded(0)
+    vdump(v)
+    assert eq(P*v, v)
+
+    v0 = numpy.zeros((2**nn,), dtype=scalar)
+    v0[0] = 1 # ket |00...0>
+    v0 = E*v0
+    u = P*v0
+    vdump(v0)
+    vdump(u)
+
+    return
+
+    #print(code.longstr())
+    css = code.to_css()
+    Hz = css.Hz
+    #print(Hz)
+
+    circuit = Circuit(nn)
+    c = measure + prep
+    qasm = circuit.run_qasm(c)
+    idxs = circuit.labels # final qubit permutation
+
+    Hz = Hz[:, idxs]
+
+    shots = argv.get("shots", 10)
+    samps = send([qasm], shots=shots)
+    print(samps)
+    for v in samps:
+        v = parse(v)
+        print(v)
+        syndrome = dot2(Hz, v.transpose())
+        print(syndrome)
+
+
+
 def symplectic_10_2_3():
     base = construct.get_513()
     code = unwrap(base)
@@ -1320,6 +1527,247 @@ def clifford_10_2_3():
     
     X1 = cc.get_pauli("..XX.X....")
     assert X1*v == v
+
+
+def test_qupy():
+    from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar
+    n = 3
+    space = Space(n)
+    CX, X, Z = space.CX, space.X, space.Z
+    for i in range(n):
+      for j in range(n):
+        if i==j:
+            continue
+        assert CX(i,j)*X(i) == X(i)*X(j)*CX(i,j)
+        assert CX(i,j)*X(j) == X(j)*CX(i,j)
+        assert CX(i,j)*Z(i) == Z(i)*CX(i,j)
+        assert CX(i,j)*Z(j) == Z(i)*Z(j)*CX(i,j)
+
+    code = construct.get_713()
+    qupy_code(code)
+
+
+#def get_dual(name):
+    
+
+class GL(object):
+    def __init__(self, n):
+        self.n = n
+    def CX(self, i, j):
+        n = self.n
+        A = numpy.identity(n, dtype=int)
+        A[i,j] = 1
+        return matrix.Matrix(A, name="CX(%d,%d)"%(i,j))
+    def I(self, i=0):
+        n = self.n
+        A = numpy.identity(n, dtype=int)
+        return matrix.Matrix(A, name=())
+    H = I # gobble this
+    def get_expr(self, expr, rev=False):
+        if expr == ():
+            op = self.I
+        elif type(expr) is tuple:
+            if rev:
+                expr = reversed(expr)
+            op = reduce(mul, [self.get_expr(e) for e in expr]) # recurse
+        else:
+            expr = "self."+expr
+            op = eval(expr, {"self":self})
+        return op
+
+
+def qasm_10_2_3():
+    base = construct.get_513()
+    code = unwrap(base)
+    n, nn = base.n, code.n
+
+    # prepare |0+> state
+
+    s = Syntax()
+    CX, H = s.CX, s.H
+    def unwrap_CZ(src, tgt):
+        return CX(src, tgt+n) * CX(tgt, src+n)
+
+    g = s.get_identity()
+    for i in range(n):
+        g = unwrap_CZ(i, (i+1)%n)*g
+
+    # uses a couple of GHZ states ... bad
+    for i in range(1, n):
+        g = g * CX(i, 0)
+    for i in range(n+1, nn):
+        g = g * CX(n, i)
+    for i in range(1, n):
+        g = g * H(i)
+    g = g * H(n)
+
+    g = reduce(mul, [H(i) for i in range(nn)])*g
+
+    prep = g.name
+    print(prep)
+
+    if 0:
+        gl = GL(nn)
+        A = gl.get_expr(prep)
+        print(A)
+        print(A.name, len(A.name))
+    
+        best = len(A.name)
+    
+        CX = gl.CX
+        gen = [CX(i,j) for i in range(nn) for j in range(nn) if i!=j]
+    
+        for trial in range(1000):
+            B = A
+            I = gl.I()
+            count = str(B+I).count('1')
+            tgt = I
+            while B != I:
+                shuffle(gen)
+                for g in gen:
+                    h = g*B
+                    a = str(h + I).count('1')
+                    if a < count:
+                        #print(count)
+                        count = a
+                        B = h
+                        tgt = tgt*g
+                        break
+                else:
+                    assert 0
+            if len(tgt.name) < best:
+                print(tgt.name, len(tgt.name))
+                best = len(tgt.name)
+    
+        found = ('CX(1,5)', 'CX(5,9)', 'CX(4,0)', 'CX(3,9)', 'CX(2,8)',
+        'CX(1,7)', 'CX(5,6)', 'CX(2,0)', 'CX(5,8)', 'CX(4,5)',
+        'CX(0,9)', 'CX(0,6)', 'CX(3,0)', 'CX(2,9)', 'CX(5,7)', 'CX(3,7)', 'CX(1,0)')
+        return
+
+
+    css = code.to_css()
+    Hz = numpy.concatenate((css.Hz, css.Lz))
+    n = code.n
+
+    circuit = Circuit(n)
+    c = measure + prep
+    qasm = circuit.run_qasm(c)
+    #print(qasm)
+    idxs = circuit.labels # final qubit permutation
+
+#    idxs = list(reversed(range(n))) # <--------- XXX  This is Hx 
+#    Hz = Hz[:, idxs]
+#    #print(Hz)
+
+    shots = argv.get("shots", 10)
+    samps = send([qasm], shots=shots, error_model=False)
+    print(samps)
+    for v in samps:
+        v = parse(v)
+        syndrome = dot2(Hz, v.transpose())
+        print(v, syndrome.transpose())
+
+
+def qupy_10_2_3():
+    base = construct.get_513()
+    code = unwrap(base)
+    n = code.n
+
+    Hx = code.to_css().Hx
+    Hx = row_reduce(Hx)
+    #print(shortstr(Hx))
+    """
+    0123456789
+    1..1..11..
+    .1..1..11.
+    ..11..1111
+    ...111.111
+    """
+
+    # shave off 2 CX gates:
+    Hx[2] += Hx[3]
+    Hx %= 2
+    qupy_code(code)
+
+
+
+
+def qupy_code(code):
+    print(code.longstr())
+    n = code.n
+    Hx = code.to_css().Hx
+    Hx = row_reduce(Hx)
+
+    s = Syntax()
+    CX, H, I = s.CX, s.H, s.get_identity()
+    g = I
+    for i in range(len(Hx)):
+        assert Hx[i, i]
+        for j in range(i+1, n):
+            if Hx[i,j]:
+                g = g*CX(i,j)
+    for i in range(len(Hx)):
+        g = g*H(i)
+    print(g.name, len(g.name))
+
+    #g = g*reduce(mul, [H(i) for i in range(n)])
+    prep = g.name
+
+    from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar
+
+    space = Space(n)
+    
+    g = space.get_expr(prep)
+    v0 = numpy.zeros((2**n,), dtype=scalar)
+    v0[0] = 1
+    #v0[-1] = 1
+    v0 = g*v0
+    #vdump(v0)
+
+    css = code.to_css()
+    css = CSSCode(css.Hz, css.Hx)
+    P = ((1/2)**len(css.stabs))*css.P
+    assert P*P == P
+
+    assert eq(P*v0, v0)
+
+    u0 = numpy.zeros((2**n,), dtype=scalar)
+    u0[0] = 4
+    u0 = P*u0
+    #assert eq(v0, u0)
+
+    vdump(v0)
+
+    Hs = strop(code.H).split()
+    for h in Hs:
+        #print(h)
+        h = space.make_op(h)
+        #vdump(h*v0)
+        assert eq(h*v0, v0)
+
+    #print(code.longstr())
+    css = code.to_css()
+    Hz = css.Hz
+    print(Hz)
+
+    circuit = Circuit(n)
+    c = measure + prep
+    qasm = circuit.run_qasm(c)
+    #print(qasm)
+    idxs = circuit.labels # final qubit permutation
+
+    idxs = list(reversed(range(n))) # <--------- AAAAAAAAARRRRRRRRGGGGGG 
+    Hz = Hz[:, idxs]
+    #print(Hz)
+
+    shots = argv.get("shots", 10)
+    samps = send([qasm], shots=shots, error_model=False)
+    print(samps)
+    for v in samps:
+        v = parse(v)
+        syndrome = dot2(Hz, v.transpose())
+        print(v, syndrome.sum())
+
 
 
 

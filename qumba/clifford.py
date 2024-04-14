@@ -482,6 +482,7 @@ def red(m, n, phase=0):
     return R
 
 
+
 def ket(i):
     v = [0]*dim
     v[i] = 1
@@ -494,6 +495,20 @@ def bra(i):
     return v
 
 
+#def green(m, n, phase=0):
+#    # m legs <--- n legs
+#    assert phase in [0, 1, 2, 3]
+#    r = w4**phase
+#    ket_0 = [0]*(dim**m)
+#    ket_0[0] = 1
+#    ket_0 = matrix([[w] for w in ket_0])
+#    
+#    ket_1 = [0]*(dim**m)
+#    ket_1[-1] = 1
+#    ket_1 = matrix([[w] for w in ket_1])
+#
+#    return ket_0 + ket_1
+    
 
 def test_spider():
 
@@ -501,6 +516,11 @@ def test_spider():
     v1 = ket(1) #    |1>
     u0 = bra(0) # <0|
     u1 = bra(1) #    <1|
+
+#    print(green(1,0))
+#    print(green(2,0))
+#    print(green(3,0))
+#    return
 
     I = v0*u0 + v1*u1
     assert green(1, 1) == I
@@ -517,6 +537,10 @@ def test_spider():
 
     assert green(1, 1, 2) == Z
     assert red(1, 1, 2) == X
+
+    assert green(2,0) == v0@v0 + v1@v1
+    lhs, rhs = green(3,0) , v0@v0@v0 + v1@v1@v1
+    assert lhs == rhs
 
     # green frobenius algebra
     mul = green(1, 2)

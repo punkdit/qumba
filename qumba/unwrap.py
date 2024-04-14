@@ -331,7 +331,7 @@ class Cover(object):
         return total.space.P(*perm)
 
     def get_expr(self, name):
-        print("Cover.get_expr", name)
+        #print("Cover.get_expr", name)
         op = self.total.space.get_identity()
         for item in name:
             if item.endswith(".d"):

@@ -20,6 +20,7 @@ from qumba.solve import (
     span, intersect, rank, enum2, shortstrx, identity2, eq2, pseudo_inverse)
 from qumba.matrix import Matrix, flatten
 from qumba.symplectic import SymplecticSpace, symplectic_form
+from qumba.syntax import Syntax
 from qumba.argv import argv
 from qumba.smap import SMap
 
@@ -694,6 +695,64 @@ class QCode(object):
         CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
     
         E = I = c.get_identity()
+        for src,h in enumerate(code.H):
+            op = strop(h).replace('.', 'I')
+            ctrl = op[src]
+            if verbose:
+                print(src, op, ctrl, end=":  ")
+            if ctrl=='I':
+                E0 = I
+            elif ctrl in 'XZY':
+                E0 = H(src)
+                if verbose:
+                    print("H(%d)"%src, end=" ")
+            else:
+                assert 0, ctrl
+    
+            for tgt,opi in enumerate(op):
+                if tgt==src:
+                    continue
+                if opi=='I':
+                    pass
+                elif opi=='X':
+                    E0 = CX(src,tgt)*E0
+                    if verbose:
+                        print("CX(%d,%d)"%(src,tgt), end=" ")
+                elif opi=='Z':
+                    E0 = CZ(src,tgt)*E0
+                    if verbose:
+                        print("CZ(%d,%d)"%(src,tgt), end=" ")
+                elif opi=='Y':
+                    E0 = CY(src,tgt)*E0
+                    if verbose:
+                        print("CY(%d,%d)"%(src,tgt), end=" ")
+                else:
+                    assert 0, opi
+    
+            if ctrl in 'XI':
+                pass
+            elif ctrl == 'Z':
+                E0 = H(src)*E0
+                if verbose:
+                    print("H(%d)"%src, end=" ")
+            elif ctrl == 'Y':
+                E0 = S(src)*E0
+                if verbose:
+                    print("S(%d)"%src, end=" ")
+            else:
+                assert 0, ctrl
+            if verbose:
+                print()
+            E = E * E0
+        return E
+
+    def get_encoder_name(code, verbose=False):
+        s = Syntax()
+        code = code.normal_form()
+        n = code.n
+        CX, CY, CZ, H, S = s.CX, s.CY, s.CZ, s.H, s.S
+    
+        E = I = s.get_identity()
         for src,h in enumerate(code.H):
             op = strop(h).replace('.', 'I')
             ctrl = op[src]
