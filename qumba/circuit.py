@@ -1528,6 +1528,8 @@ def clifford_10_2_3():
     X1 = cc.get_pauli("..XX.X....")
     assert X1*v == v
 
+    # we have the |0+> state
+
 
 def test_qupy():
     from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar
@@ -1690,65 +1692,82 @@ def qupy_10_2_3():
     qupy_code(code)
 
 
+def qupy_713():
+    #code = construct.get_713()
+    #code = construct.get_toric(3, 3)
+    #code = construct.reed_muller() # [[16,6,4]]
+    code = construct.get_toric(4,0) # [[16,2,4]]
+    qupy_code(code)
 
 
 def qupy_code(code):
-    print(code.longstr())
+    print(code)
+    #print(code.longstr())
     n = code.n
+    k = code.k
     Hx = code.to_css().Hx
     Hx = row_reduce(Hx)
+    #print(shortstr(Hx))
 
     s = Syntax()
     CX, H, I = s.CX, s.H, s.get_identity()
     g = I
-    for i in range(len(Hx)):
-        assert Hx[i, i]
-        for j in range(i+1, n):
-            if Hx[i,j]:
-                g = g*CX(i,j)
-    for i in range(len(Hx)):
+    
+    idxs = []
+    for row in range(len(Hx)):
+        j0 = row
+        while Hx[row, j0] == 0:
+            j0 += 1
+        assert Hx[row, j0]
+        idxs.append(j0)
+        for j in range(j0+1, n):
+            if Hx[row, j]:
+                g = g*CX(j0,j)
+    #print(idxs)
+    for i in idxs:
         g = g*H(i)
     print(g.name, len(g.name))
 
     #g = g*reduce(mul, [H(i) for i in range(n)])
     prep = g.name
 
-    from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar
-
-    space = Space(n)
+    if n <= 10:
+        from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar
     
-    g = space.get_expr(prep)
-    v0 = numpy.zeros((2**n,), dtype=scalar)
-    v0[0] = 1
-    #v0[-1] = 1
-    v0 = g*v0
-    #vdump(v0)
-
-    css = code.to_css()
-    css = CSSCode(css.Hz, css.Hx)
-    P = ((1/2)**len(css.stabs))*css.P
-    assert P*P == P
-
-    assert eq(P*v0, v0)
-
-    u0 = numpy.zeros((2**n,), dtype=scalar)
-    u0[0] = 4
-    u0 = P*u0
-    #assert eq(v0, u0)
-
-    vdump(v0)
-
-    Hs = strop(code.H).split()
-    for h in Hs:
-        #print(h)
-        h = space.make_op(h)
-        #vdump(h*v0)
-        assert eq(h*v0, v0)
+        space = Space(n)
+        
+        g = space.get_expr(prep)
+        v0 = numpy.zeros((2**n,), dtype=scalar)
+        v0[0] = 1
+        #v0[-1] = 1
+        v0 = g*v0
+        #vdump(v0)
+    
+        css = code.to_css()
+        css = CSSCode(css.Hz, css.Hx)
+        P = ((1/2)**len(css.stabs))*css.P
+        assert P*P == P
+    
+        assert eq(P*v0, v0)
+    
+        u0 = numpy.zeros((2**n,), dtype=scalar)
+        u0[0] = 4
+        u0 = P*u0
+        #assert eq(v0, u0)
+    
+        vdump(v0)
+    
+        Hs = strop(code.H).split()
+        for h in Hs:
+            #print(h)
+            h = space.make_op(h)
+            #vdump(h*v0)
+            assert eq(h*v0, v0)
 
     #print(code.longstr())
     css = code.to_css()
-    Hz = css.Hz
-    print(Hz)
+    Hz = numpy.concatenate((css.Hz, css.Lz))
+    #print(Hz)
 
     circuit = Circuit(n)
     c = measure + prep
@@ -1760,13 +1779,23 @@ def qupy_code(code):
     Hz = Hz[:, idxs]
     #print(Hz)
 
-    shots = argv.get("shots", 10)
-    samps = send([qasm], shots=shots, error_model=False)
-    print(samps)
+    shots = argv.get("shots", 1000)
+    samps = send([qasm], shots=shots, error_model=True)
+    #print(samps)
+    fail = 0
+    count = 0
     for v in samps:
         v = parse(v)
-        syndrome = dot2(Hz, v.transpose())
-        print(v, syndrome.sum())
+        check = dot2(v, Hz.transpose())
+        syndrome = check[:,:-k]
+        err = check[:, -k:]
+        #print(v, syndrome, err)
+        if syndrome.sum():
+            count += 1
+        if err.sum() and not syndrome.sum():
+            fail += 1
+    print("syndrome:", count)
+    print("fail:", fail)
 
 
 
