@@ -30,7 +30,8 @@ from qumba.unwrap import Cover
 from qumba import clifford, matrix
 from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
 from qumba.syntax import Syntax
-from qumba.circuit import Circuit, measure, barrier, send, vdump, variance
+from qumba.circuit import (Circuit, measure, barrier, send, vdump, variance,
+    parsevec, strvec, find_state, get_inverse)
 
 
 
@@ -592,12 +593,118 @@ def test_css():
     #code = construct.get_toric(3, 3)
     #code = construct.reed_muller() # [[16,6,4]]
     #code = construct.get_toric(4,0) # [[16,2,4]]
-    qupy_code(code)
+    qasm_code(code)
 
 
-def qupy_code(code):
-    print(code)
+def clifford_512():
+    code = construct.get_512()
+    n = code.n
+    c = Clifford(n)
+    s = Syntax()
+    css = code.to_css()
+    Hx, Hz = css.Hx, css.Hz
+
+    prep_0 = css_encoder(Hx)
+
+    #prep_0 = css_encoder(Hz)
+    #prep_0 = s.P(3,0,2,4,1).name + prep_0
+
+    #prep_0 = css_encoder(Hz)
+    #prep_0 = s.P(0,3,2,1,4).name + prep_0
+
+    print(prep_0)
+
+    v0 = parsevec("0"*n)
+    E = c.get_expr(prep_0)
+    v0 = E*v0
+
+    P = code.get_projector()
+    assert P*v0 == v0
+
     print(code.longstr())
+
+    lz = c.get_pauli("Z..Z.")
+    lx = c.get_pauli("XX...")
+    v1 = lx*v0
+    assert lz*v0 == v0
+    assert lz*v1 == -v1
+
+    u0 = (1/r2)*(v0 + v1) # plus state
+    assert lx*u0 == u0
+
+    if 0:
+        # find the |+> state
+        H, CX = c.H, c.CX
+        #src = H(0)*H(1)*parsevec("0"*n)
+        src = parsevec("0"*n)
+        gen = [CX(i,j) for i in range(n) for j in range(n) if i!=j]
+        gen += [H(i) for i in range(n)]
+        name = find_state(u0, src, gen, verbose=True)
+        print(name)
+
+    H = s.H
+    prep_p = (s.P(3,0,2,4,1)*H(0)*H(1)*H(2)*H(3)*H(4)).name + prep_0 # also works
+    dec_p = get_inverse(prep_0) + (H(0)*H(1)*H(2)*H(3)*H(4)*s.P(1,4,2,0,3)).name 
+    #prep_p = ('CX(0,1)', 'CX(1,2)', 'CX(1,3)', 'CX(3,4)', 'H(0)', 'H(1)', 'H(3)')
+    #dec_p = get_inverse(prep_p)
+
+    E = c.get_expr(prep_p)
+    u0 = E*parsevec("0"*n)
+    assert P*u0 == u0
+    assert lx*u0 == u0
+    print("plus state", prep_p)
+
+    perm = [i+n for i in range(n)]+[i for i in range(n)]
+    prep = prep_p + s.P(*perm).name + prep_0
+    print(prep)
+
+    # double
+    code = code + code.apply_H()
+    n = code.n
+    print(code.longstr())
+
+    c = measure + barrier + dec_p + barrier + prep
+
+    circuit = Circuit(n)
+    qasm = circuit.run_qasm(c)
+    #print(qasm)
+
+    shots = argv.get("shots", 10000)
+    samps = send([qasm], shots=shots, error_model=True)
+    process(code, samps, circuit)
+
+
+
+def test_512():
+    c0 = construct.get_512()
+    code = c0 + c0.apply_H()
+    #print(code.longstr())
+    dode = unwrap(c0)
+    assert dode.is_equiv(code)
+    #print(dode.longstr())
+    #qasm_code(code)
+
+    total = unwrap(construct.get_513())
+
+    c0 = QCode.fromstr("""
+    ZYX..
+    XX.Y.
+    X.Y.X
+    Z..XY
+    """)
+    print(c0)
+    print(c0.longstr())
+    code = unwrap(c0) # unwrapped non-CSS [[5,1,2]]
+    perm = code.get_isomorphism(total)
+    print(perm) # iso to [[10,2,3]] above
+    assert total.apply_perm(perm).is_equiv(code)
+
+    print(code.longstr())
+
+
+def qasm_code(code):
+    #print(code)
+    #print(code.longstr())
     n = code.n
     k = code.k
     Hx = code.to_css().Hx
@@ -621,7 +728,9 @@ def process(code, samps, circuit):
     shots = len(samps)
     #print(code.longstr())
     css = code.to_css()
+    #print(css.longstr())
     Hz = numpy.concatenate((css.Hz, css.Lz))
+    #print("Hz:")
     #print(Hz)
 
     idxs = circuit.labels # final qubit permutation

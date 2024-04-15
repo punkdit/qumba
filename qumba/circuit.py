@@ -187,6 +187,9 @@ reset q;
         return self.CX(*args)
 
     def P(self, *idxs):
+        #assert len(idxs) == self.n
+        assert set(idxs) == set(range(len(idxs)))
+        idxs = idxs + tuple(range(len(idxs), self.n))
         assert len(idxs) == self.n
         labels = self.labels
         self.labels = [labels[i] for i in idxs]
@@ -399,7 +402,7 @@ def get_inverse(name):
         elif stem == "S":
             item = item + ".d"
         else:
-            assert stem in "H X Z Y CX CZ CY".split()
+            assert stem in "H X Z Y CX CZ CY".split(), stem
         items.append(item)
     return tuple(items)
 
