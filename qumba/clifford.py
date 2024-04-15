@@ -88,6 +88,9 @@ class Matrix(object):
         return '\n'.join(lines)
     __repr__ = __str__
 
+    def __len__(self):
+        return self.shape[0]
+
     def __mul__(self, other):
         assert isinstance(other, Matrix), type(other)
         assert self.ring == other.ring

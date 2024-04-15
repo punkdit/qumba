@@ -818,7 +818,21 @@ def vdump(v):
         if abs(r.imag) < 1e-4:
             r = r.real
         if r != 0:
-            print("%s:%.4f"%(sbin(i, n),r), end=" ")
+            print("%s:%s"%(sbin(i, n),r), end=" ")
+    print("]")
+
+def cdump(v):
+    print("[", end=" ")
+    N = len(v)
+    n = 0
+    while 2**n < N:
+        n += 1
+    assert 2**n == N
+    for i in range(N):
+        #if abs(v[i]) > 1e-4:
+        r = v[i]
+        if r != 0:
+            print("%s:%s"%(sbin(i, n),r), end=" ")
     print("]")
 
 def qupy_822():
@@ -844,7 +858,7 @@ def qupy_822():
     'CX(1,5)', 'CX(0,1)', 'CX(5,4)', 'CX(1,5)', 'P(4,1,2,3,0,5,6,7)',
     'P(0,5,2,3,4,1,6,7)', 'H(4)', 'H(5)', 'H(6)', 'H(7)')
 
-    from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar
+    from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar # uses reversed bit order XXX
     space = Space(n)
     E = space.get_expr(prep)
     print(E)
@@ -1345,18 +1359,20 @@ def test_513():
 def qupy_513():
     base = construct.get_513()
     n = base.n
+    c = Clifford(n)
     P = base.get_projector()
     E = base.get_clifford_encoder()
     ops = [red(1,0)]*n
     v0 = reduce(matmul, ops)
+    #cdump(c.get_expr(E.name[-4:])*v0)
     ops[-1] = red(1,0,2)
     v1 = reduce(matmul, ops)
     v0 = E*v0
+    #cdump(v0)
     assert P*v0 == v0
     v1 = E*v1
     assert P*v1 == v1
 
-    c = Clifford(n)
     lx = -c.get_pauli("XXXXX")
     lz = c.get_pauli("ZZZZZ")
 
@@ -1368,6 +1384,21 @@ def qupy_513():
     assert lx*v1 == v0
     #print(lx*v0 == v1, lx*v0 == -v1)
     #print(lx*v1 == v0, lx*v1 == -v0)
+
+    # ----------- qupy -------------------------------------------- #
+    from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar # uses reversed bit order XXX
+    space = Space(n)
+    H = base.H
+    _code = Code(strop(H).replace(".", "I"))
+    _code.check()
+    v0 = numpy.zeros((2**n,), dtype=scalar)
+    v0[0] = 4*(2**0.5)
+    g = space.get_expr(E.name)
+    v0 = g*v0
+    #vdump(v0)
+    P = _code.P
+    assert eq(P*v0, v0)
+    #return
 
     #print(E.name)
     cover = Cover.frombase(base)
@@ -1386,7 +1417,6 @@ def qupy_513():
     #c = Clifford(nn)
     #E = c.get_expr(prep)
 
-    from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar
     space = Space(nn)
     #E = space.get_expr(prep)
     #print(E)
@@ -1409,11 +1439,12 @@ def qupy_513():
         g = space.get_expr(prep)
         v0 = g*v
 
+    print(prep)
     g = space.get_expr(prep)
     v0 = numpy.zeros((2**nn,), dtype=scalar)
     v0[0] = 1
-    for i in range(8):
-        v0 = space.H(i)*v0
+    #for i in range(8):
+    #    v0 = space.H(i)*v0
     v0 = g*v0
 
     #Hs = strop(code.H).replace('.', 'I')
@@ -1426,7 +1457,12 @@ def qupy_513():
     P = ((1/2)**len(css.stabs))*css.P
     assert P*P == P
 
-    print(eq(P*v0, v0))
+    print(eq(P*v0, v0)) # FAIL 
+
+    H = code.H
+    _code = Code(strop(H).replace(".", "I"))
+    P = _code.P
+    print(eq(P*v0, v0)) # FAIL
 
     return
 
@@ -1463,6 +1499,58 @@ def qupy_513():
         print(v)
         syndrome = dot2(Hz, v.transpose())
         print(syndrome)
+
+
+def clifford_513_unwrap():
+    base = construct.get_513()
+    n = base.n
+    c = Clifford(n)
+    P = base.get_projector()
+    E = base.get_clifford_encoder()
+    ops = [red(1,0)]*n
+    v0 = reduce(matmul, ops)
+    #cdump(c.get_expr(E.name[-4:])*v0)
+    ops[-1] = red(1,0,2)
+    v1 = reduce(matmul, ops)
+    v0 = E*v0
+    #cdump(v0)
+    assert P*v0 == v0
+    v1 = E*v1
+    assert P*v1 == v1
+
+    lx = -c.get_pauli("XXXXX")
+    lz = c.get_pauli("ZZZZZ")
+
+    #v1 = lx*v0
+
+    assert lz*v0 == v0
+    assert lz*v1 == -v1
+    assert lx*v0 == v1
+    assert lx*v1 == v0
+    #print(lx*v0 == v1, lx*v0 == -v1)
+    #print(lx*v1 == v0, lx*v1 == -v0)
+
+    #print(E.name)
+    cover = Cover.frombase(base)
+    code = cover.total
+    nn = code.n
+    E1 = cover.get_expr(E.name)
+    prep = E1.name
+    for i in range(n):
+        prep += ("H(%d)"%(i+n),)
+    print(prep)
+
+    c = Clifford(nn)
+    ops = [red(1,0)]*nn
+    v0 = reduce(matmul, ops)
+    cdump(v0)
+
+    for g in reversed(prep):
+        print(g)
+        g = c.get_expr(g)
+        v0 = g*v0
+    P = code.get_projector()
+    print(P*v0==v0) # FAIL
 
 
 
@@ -1532,7 +1620,7 @@ def clifford_10_2_3():
 
 
 def test_qupy():
-    from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar
+    from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar # uses reversed bit order XXX
     n = 3
     space = Space(n)
     CX, X, Z = space.CX, space.X, space.Z
@@ -1692,7 +1780,7 @@ def qupy_10_2_3():
     qupy_code(code)
 
 
-def qupy_713():
+def test_css():
     #code = construct.get_713()
     #code = construct.get_toric(3, 3)
     #code = construct.reed_muller() # [[16,6,4]]
@@ -1732,7 +1820,7 @@ def qupy_code(code):
     prep = g.name
 
     if n <= 10:
-        from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar
+        from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar # uses reversed bit order XXX
     
         space = Space(n)
         
