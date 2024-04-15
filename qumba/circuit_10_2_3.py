@@ -30,7 +30,7 @@ from qumba.unwrap import Cover
 from qumba import clifford, matrix
 from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
 from qumba.syntax import Syntax
-from qumba.circuit import Circuit, measure, barrier, send
+from qumba.circuit import Circuit, measure, barrier, send, vdump, variance
 
 
 
@@ -472,47 +472,10 @@ def qasm_10_2_3():
         print(v, syndrome.transpose())
 
 
-def qupy_10_2_3():
-    base = construct.get_513()
-    code = unwrap(base)
-    n = code.n
-
-    Hx = code.to_css().Hx
-    Hx = row_reduce(Hx)
-    #print(shortstr(Hx))
-    """
-    0123456789
-    1..1..11..
-    .1..1..11.
-    ..11..1111
-    ...111.111
-    """
-
-    # shave off 2 CX gates:
-    Hx[2] += Hx[3]
-    Hx %= 2
-    qupy_code(code)
-
-
-def test_css():
-    #code = construct.get_713()
-    #code = construct.get_toric(3, 3)
-    #code = construct.reed_muller() # [[16,6,4]]
-    code = construct.get_toric(4,0) # [[16,2,4]]
-    qupy_code(code)
-
-
-def qupy_code(code):
-    print(code)
-    #print(code.longstr())
-    n = code.n
-    k = code.k
-    Hx = code.to_css().Hx
-    Hx = row_reduce(Hx)
-    #print(shortstr(Hx))
-
+def css_encoder(Hx):
+    _, n = Hx.shape
     s = Syntax()
-    CX, H, I = s.CX, s.H, s.get_identity()
+    CX, CZ, H, X, Z, I = s.CX, s.CZ, s.H, s.X, s.Z, s.get_identity()
     g = I
     
     idxs = []
@@ -528,12 +491,37 @@ def qupy_code(code):
     #print(idxs)
     for i in idxs:
         g = g*H(i)
-    print(g.name, len(g.name))
+    return g.name
 
-    #g = g*reduce(mul, [H(i) for i in range(n)])
-    prep = g.name
 
-    if n <= 10:
+def qasm_10_2_3():
+    base = construct.get_513()
+    code = unwrap(base)
+    n = code.n
+
+    Hx = code.to_css().Hx
+    Hx = row_reduce(Hx)
+    #print(shortstr(Hx))
+    """
+    0123456789
+    1..1..11..
+    .1..1..11.
+    ..11..1111
+    ...111.111
+    """
+
+    if argv.shave:
+        # shave off 2 CX gates:
+        Hx[2] += Hx[3]
+        Hx %= 2
+
+    prep = css_encoder(Hx)
+
+    s = Syntax()
+    CX, CZ, H, X, Z, I = s.CX, s.CZ, s.H, s.X, s.Z, s.get_identity()
+    g = I
+
+    if argv.qupy:
         from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar # uses reversed bit order XXX
     
         space = Space(n)
@@ -566,38 +554,116 @@ def qupy_code(code):
             #vdump(h*v0)
             assert eq(h*v0, v0)
 
+    if argv.gate:
+        L = """
+        0123456789
+        XXXXX.....
+        ZZZZZ.....
+        ..XX.X....
+        .Z..ZZ....
+        """
+        X0 = X(0)*X(1)*X(2)*X(3)*X(4)
+        Z0 = Z(0)*Z(1)*Z(2)*Z(3)*Z(4)
+        X1 = X(2)*X(3)*X(5)
+        Z1 = Z(1)*Z(4)*Z(5)
+        X0, Z0, X1, Z1 = X0.name, Z0.name, X1.name, Z1.name
+    
+        gate = reduce(mul, [CZ(i, i+5) for i in range(5)]).name
+        c = measure + barrier + X0+Z1 + barrier + gate + barrier + X0 + barrier + prep
+
+    else:
+        c = measure + barrier + prep
+
+    print(c)
+
+    circuit = Circuit(n)
+    qasm = circuit.run_qasm(c)
+    #print(qasm)
+
+    shots = argv.get("shots", 1000)
+    samps = send([qasm], shots=shots, error_model=True)
+    process(code, samps, circuit)
+
+
+
+def test_css():
+    #code = unwrap(construct.get_513())
+    code = construct.get_713()
+    #code = construct.get_toric(3, 3)
+    #code = construct.reed_muller() # [[16,6,4]]
+    #code = construct.get_toric(4,0) # [[16,2,4]]
+    qupy_code(code)
+
+
+def qupy_code(code):
+    print(code)
+    print(code.longstr())
+    n = code.n
+    k = code.k
+    Hx = code.to_css().Hx
+    Hx = row_reduce(Hx)
+    #print(shortstr(Hx))
+    prep = css_encoder(Hx)
+
+    c = measure + barrier + prep
+
+    circuit = Circuit(n)
+    qasm = circuit.run_qasm(c)
+    #print(qasm)
+
+    shots = argv.get("shots", 1000)
+    samps = send([qasm], shots=shots, error_model=True)
+    process(code, samps, circuit)
+
+
+def process(code, samps, circuit):
+    n,k = code.n, code.k
+    shots = len(samps)
     #print(code.longstr())
     css = code.to_css()
     Hz = numpy.concatenate((css.Hz, css.Lz))
     #print(Hz)
 
-    circuit = Circuit(n)
-    c = measure + prep
-    qasm = circuit.run_qasm(c)
-    #print(qasm)
     idxs = circuit.labels # final qubit permutation
-
     idxs = list(reversed(range(n))) # <--------- AAAAAAAAARRRRRRRRGGGGGG 
     Hz = Hz[:, idxs]
     #print(Hz)
 
-    shots = argv.get("shots", 1000)
-    samps = send([qasm], shots=shots, error_model=True)
     #print(samps)
     fail = 0
     count = 0
+    lookup = {}
     for v in samps:
         v = parse(v)
         check = dot2(v, Hz.transpose())
         syndrome = check[:,:-k]
         err = check[:, -k:]
         #print(v, syndrome, err)
+        key = "%s %s"%(syndrome, err)
+        key = str(syndrome), str(err)
+        lookup[key] = lookup.get(key, 0) + 1
         if syndrome.sum():
             count += 1
         if err.sum() and not syndrome.sum():
             fail += 1
-    print("syndrome:", count)
-    print("fail:", fail)
+    keys = list(lookup.keys())
+    keys.sort()
+    bags = {s:[] for (s,e) in keys}
+    for (s,e) in keys:
+        count = lookup[s,e]
+        bags[s].append(count)
+        #print('\t', s,e, count)
+    miss = 0
+    for counts in bags.values():
+        counts.remove(max(counts))
+        for c in counts:
+            miss += c
+    print(bags)
+    print("syndrome:", count/shots)
+    print("fail:", fail/shots)
+    p = miss/shots
+    print("error:    %.6f" % (p))
+    print("variance: %.6f" %variance(p, shots))
 
 
 
