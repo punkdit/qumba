@@ -1957,7 +1957,7 @@ def test_reductor():
 
 
 
-if __name__=="__main__":
+def test():
 
     test_solve()
     test_solve_rand()
@@ -1974,5 +1974,36 @@ if __name__=="__main__":
     test_reductor()
 
     print("OK")
+
+
+if __name__ == "__main__":
+
+    from time import time
+    start_time = time()
+
+    profile = argv.profile
+    name = argv.next() or "test"
+    _seed = argv.get("seed")
+    if _seed is not None:
+        print("seed(%s)"%(_seed))
+        seed(_seed)
+
+    if profile:
+        import cProfile as profile
+        profile.run("%s()"%name)
+
+    elif name is not None:
+        fn = eval(name)
+        fn()
+
+    else:
+        test()
+
+
+    t = time() - start_time
+    print("OK! finished in %.3f seconds\n"%t)
+
+
+
 
 
