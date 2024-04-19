@@ -215,7 +215,6 @@ def test_cz():
         print("%s:%s"%(count,found), end=" ", flush=True)
       print()
 
-def test_cz_css():
 
 
 def main_cz():
@@ -267,6 +266,45 @@ def main_unwrap():
         print(count, end=" ", flush=True)
       print()
             
+
+def all_hypergraph_product():
+    from qumba.csscode import CSSCode
+    from qumba import construct
+    d = argv.get("d", 3)
+    #m, n = 4, 5 # --> [[41,1,4]] ...
+    #m, n = 3,5 # --> [[34,4,3]] with weight 4,5 stabilizers
+    #m, n = 3,4 # --> [[25,1,4]] with weight 3,5 stabilizers
+    #m, n = 2,4
+    #m, n = 2,3 # --> [[13,1,3]] with weight 3,4 stabilizers
+    #m0, n0, m1, n1 = 3,4, 2,3 # --> [[18,1,3]] wt 2,3,4
+    #m0, n0, m1, n1 = 2,4, 2,3 # --> None
+    #m0, n0, m1, n1 = 3,4, 2,4 # --> None
+    #m0, n0, m1, n1 = 3,4, 3,5 # --> [[29,2,3]] wt 3,4
+    #m0, n0, m1, n1 = 2,3, 3,5 # --> [[21,2,3]] wt 3,4,5
+    m0, n0, m1, n1 = 4,5, 4,6 # --> 
+    codes0 = list(qchoose_2(n0, m0))
+    codes0 = [H for H in codes0 if H.sum(0).min()>0]
+    codes1 = list(qchoose_2(n1, m1))
+    codes1 = [H for H in codes1 if H.sum(0).min()>0]
+    print(len(codes0))
+    print(len(codes1))
+    for H0 in codes0:
+      #print(H0)
+      #print(H0.sum(0))
+      for H1 in codes1:
+        Hx, Hz = construct.hypergraph_product(H0, H1.transpose())
+        code = CSSCode(Hx=Hx, Hz=Hz)
+        print('.', end='', flush=True)
+        #dx, dz = code.distance()
+        dx = code.x_distance(d-1)
+        if dx <= d-1:
+            continue
+        dz = code.z_distance(d-1)
+        if dz <= d-1:
+            continue
+        print()
+        print(code, dx, dz)
+        print(code.longstr())
 
 
 if __name__ == "__main__":

@@ -195,6 +195,11 @@ reset q;
         self.labels = [labels[i] for i in idxs]
         return "// P%s"%str(idxs)
 
+    def SWAP(self, i, j):
+        idxs = list(range(self.n))
+        idxs[i], idxs[j] = idxs[j], idxs[i]
+        return self.P(*idxs)
+
     def __getattr__(self, name):
         name = name.lower()
         meth = lambda *args : self.op(name, *args)
@@ -216,6 +221,7 @@ reset q;
         return ''.join(lines)
 
     def run_qasm(self, expr):
+        assert expr[0] == measure[0]
         self.labels = list(range(self.n))
         qasm = self.header() + self.run_expr(expr)
         qasm += "// final qubit order: %s\n\n"%(self.labels,)

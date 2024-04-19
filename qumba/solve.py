@@ -1956,6 +1956,26 @@ def test_reductor():
         assert eq2(vP, rrv)
 
 
+def test_pseudoinverse():
+    #for n in [2,3,4]:
+    # for m in range(1,n+2):
+    for (m,n) in [(2,3)]:
+      for bits in numpy.ndindex((2,)*m*n):
+        A = array2(bits)
+        A.shape = m,n
+        B = pseudo_inverse(A)
+        AB = dot2(A, B)
+        BA = dot2(B, A)
+        ABA = dot2(A, B, A)
+        BAB = dot2(B, A, B)
+        assert eq2(A, ABA)
+        assert eq2(B, BAB)
+        i = int( eq2(AB.transpose(), AB) )
+        j = int( eq2(BA.transpose(), BA) )
+        print(i,j,end=" ")
+    print()
+
+
 
 def test():
 
@@ -1972,8 +1992,6 @@ def test():
     test_pushout()
     test_fromkernel()
     test_reductor()
-
-    print("OK")
 
 
 if __name__ == "__main__":

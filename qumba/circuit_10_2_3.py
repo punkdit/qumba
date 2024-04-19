@@ -352,6 +352,7 @@ def test_qupy():
     qupy_code(code)
 
 
+
 #def get_dual(name):
     
 
@@ -381,12 +382,11 @@ class GL(object):
         return op
 
 
-def qasm_10_2_3():
+def get_p0_prep():
+    # prepare |0+> state
     base = construct.get_513()
     code = unwrap(base)
     n, nn = base.n, code.n
-
-    # prepare |0+> state
 
     s = Syntax()
     CX, H = s.CX, s.H
@@ -407,8 +407,46 @@ def qasm_10_2_3():
     g = g * H(n)
 
     g = reduce(mul, [H(i) for i in range(nn)])*g
-
     prep = g.name
+    return prep
+
+
+def qasm_find_p0():
+    base = construct.get_513()
+    code = unwrap(base)
+    n, nn = base.n, code.n
+
+    # prepare |0+> state
+    prep = get_p0_prep()
+    print(prep)
+
+    #c = Clifford(nn)
+    #v = parsevec("0"*nn)
+    #for e in reversed(prep):
+    #    v = c.get_expr(prep) * v
+    #print(strvec(v))
+
+    sp = SymplecticSpace(nn)
+    Ep0 = sp.get_expr(prep)
+    print(Ep0)
+    print()
+
+    E = code.get_encoder(Ep0)
+    Ei = sp.invert(E)
+
+    EE = Ep0 * Ei # |0+> <--- |00>
+    print(EE)
+    print(sp.get_name(EE))
+
+
+
+def qasm_10_2_3_p0():
+    base = construct.get_513()
+    code = unwrap(base)
+    n, nn = base.n, code.n
+
+    # prepare |0+> state
+    prep = get_p0_prep()
     print(prep)
 
     if 0:
@@ -495,105 +533,56 @@ def css_encoder(Hx):
     return g.name
 
 
-def qasm_10_2_3():
-    base = construct.get_513()
-    code = unwrap(base)
-    n = code.n
+def clifford_512_unwrap():
 
-    Hx = code.to_css().Hx
-    Hx = row_reduce(Hx)
-    #print(shortstr(Hx))
     """
-    0123456789
-    1..1..11..
-    .1..1..11.
-    ..11..1111
-    ...111.111
+    0Z   Z1
+    |  Z  |
+    .--2--.
+    |  Z  |
+    3Z   Z4
     """
 
-    if argv.shave:
-        # shave off 2 CX gates:
-        Hx[2] += Hx[3]
-        Hx %= 2
+    n = 5
+    sp = SymplecticSpace(n)
+    S, H, P = sp.S, sp.H, sp.P
+    src = construct.get_512()
+    #print(src.longstr())
+    """
+    ZZZ..
+    ..ZZZ
+    X.XX.
+    .XX.X
+    """
 
-    prep = css_encoder(Hx)
+    # logical hadamard on the 512 surface code
+    hadamard = P(3,0,2,4,1)*H(0)*H(1)*H(2)*H(3)*H(4)
+    hsrc = src.apply(hadamard)
+    assert hsrc.is_equiv(src)
+    assert hsrc.get_logical(src) == SymplecticSpace(1).H()
 
-    s = Syntax()
-    CX, CZ, H, X, Z, I = s.CX, s.CZ, s.H, s.X, s.Z, s.get_identity()
-    g = I
+    return
 
-    if argv.qupy:
-        from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar # uses reversed bit order XXX
-    
-        space = Space(n)
-        
-        g = space.get_expr(prep)
-        v0 = numpy.zeros((2**n,), dtype=scalar)
-        v0[0] = 1
-        #v0[-1] = 1
-        v0 = g*v0
-        #vdump(v0)
-    
-        css = code.to_css()
-        css = CSSCode(css.Hz, css.Hx)
-        P = ((1/2)**len(css.stabs))*css.P
-        assert P*P == P
-    
-        assert eq(P*v0, v0)
-    
-        u0 = numpy.zeros((2**n,), dtype=scalar)
-        u0[0] = 4
-        u0 = P*u0
-        #assert eq(v0, u0)
-    
-        vdump(v0)
-    
-        Hs = strop(code.H).split()
-        for h in Hs:
-            #print(h)
-            h = space.make_op(h)
-            #vdump(h*v0)
-            assert eq(h*v0, v0)
+    M = H(0)*S(0)
+    M = H(1)*S(1)*H(1) * M
+    M = H(3)*S(3)*H(3) * M
+    M = H(4)*S(4) * M
 
-    if argv.gate:
-        L = """
-        0123456789
-        XXXXX.....
-        ZZZZZ.....
-        ..XX.X....
-        .Z..ZZ....
-        """
-        X0 = X(0)*X(1)*X(2)*X(3)*X(4)
-        Z0 = Z(0)*Z(1)*Z(2)*Z(3)*Z(4)
-        X1 = X(2)*X(3)*X(5)
-        Z1 = Z(1)*Z(4)*Z(5)
-        X0, Z0, X1, Z1 = X0.name, Z0.name, X1.name, Z1.name
-    
-        gate = reduce(mul, [CZ(i, i+5) for i in range(5)]).name
-        c = measure + barrier + X0+Z1 + barrier + gate + barrier + X0 + barrier + prep
+    tgt = QCode.fromstr("""
+    XYZ..
+    ..ZYX
+    Y.XX.
+    .XX.Y
+    """)
+    assert src.apply(M).is_equiv(tgt)
 
-    else:
-        c = measure + barrier + prep
+    cover = Cover.frombase(tgt)
+    print(cover.get_expr(M.name).name)
 
-    print(c)
+    code = unwrap(construct.get_513())
+    iso = code.get_isomorphism(cover.total)
+    print(iso)
 
-    circuit = Circuit(n)
-    qasm = circuit.run_qasm(c)
-    #print(qasm)
-
-    shots = argv.get("shots", 1000)
-    samps = send([qasm], shots=shots, error_model=True)
-    process(code, samps, circuit)
-
-
-
-def test_css():
-    #code = unwrap(construct.get_513())
-    code = construct.get_713()
-    #code = construct.get_toric(3, 3)
-    #code = construct.reed_muller() # [[16,6,4]]
-    #code = construct.get_toric(4,0) # [[16,2,4]]
-    qasm_code(code)
 
 
 def clifford_512():
@@ -621,8 +610,7 @@ def clifford_512():
     P = code.get_projector()
     assert P*v0 == v0
 
-    print(code.longstr())
-
+    #print(code.longstr())
     lz = c.get_pauli("Z..Z.")
     lx = c.get_pauli("XX...")
     v1 = lx*v0
@@ -661,6 +649,14 @@ def clifford_512():
     # double
     code = code + code.apply_H()
     n = code.n
+
+    print(strop(code.H))
+    print()
+
+    tgt = unwrap(construct.get_513())
+    print(strop(tgt.H))
+    return
+
     print(code.longstr())
 
     c = measure + barrier + dec_p + barrier + prep
@@ -702,6 +698,117 @@ def test_512():
     print(code.longstr())
 
 
+def qasm_10_2_3():
+    base = construct.get_513()
+    code = unwrap(base)
+    n = code.n
+
+    Hx = code.to_css().Hx
+    Hx = row_reduce(Hx)
+    #print(shortstr(Hx))
+    """
+    0123456789
+    1..1..11..
+    .1..1..11.
+    ..11..1111
+    ...111.111
+    """
+
+    # shave off 2 CX gates:
+    Hx[2] += Hx[3]
+    Hx %= 2
+
+    if argv.dual:
+        prep = css_encoder(Hz)
+    else:
+        prep = css_encoder(Hx)
+        print(prep)
+        exit()
+
+    s = Syntax()
+    CX, CZ, SWAP, H, X, Z, I = s.CX, s.CZ, s.SWAP, s.H, s.X, s.Z, s.get_identity()
+    g = I
+
+    if argv.qupy:
+        from qupy.qumba import Space, Operator, Code, CSSCode, eq, scalar # uses reversed bit order XXX
+    
+        space = Space(n)
+        
+        g = space.get_expr(prep)
+        v0 = numpy.zeros((2**n,), dtype=scalar)
+        v0[0] = 1
+        #v0[-1] = 1
+        v0 = g*v0
+        #vdump(v0)
+    
+        css = code.to_css()
+        css = CSSCode(css.Hz, css.Hx)
+        P = ((1/2)**len(css.stabs))*css.P
+        assert P*P == P
+    
+        assert eq(P*v0, v0)
+    
+        u0 = numpy.zeros((2**n,), dtype=scalar)
+        u0[0] = 4
+        u0 = P*u0
+        #assert eq(v0, u0)
+    
+        vdump(v0)
+    
+        Hs = strop(code.H).split()
+        for h in Hs:
+            #print(h)
+            h = space.make_op(h)
+            #vdump(h*v0)
+            assert eq(h*v0, v0)
+
+    L = """
+    0123456789
+    XXXXX.....
+    ZZZZZ.....
+    ..XX.X....
+    .Z..ZZ....
+    """
+    X0 = X(0)*X(1)*X(2)*X(3)*X(4)
+    Z0 = Z(0)*Z(1)*Z(2)*Z(3)*Z(4)
+    X1 = X(2)*X(3)*X(5)
+    Z1 = Z(1)*Z(4)*Z(5)
+    X0, Z0, X1, Z1 = X0.name, Z0.name, X1.name, Z1.name
+    
+    if argv.gate == "CZ":
+        gate = reduce(mul, [CZ(i, i+5) for i in range(5)]).name
+        c = measure + barrier + X0+Z1 + barrier + gate + barrier + X0 + barrier + prep
+
+    elif argv.gate == "CX":
+        #gate = reduce(mul, [CX(i, i+5)*SWAP(i, i+5) for i in range(5)]).name
+        gate = reduce(mul, [CX(i, i+5)*SWAP(i, i+5) for i in range(5)]).name
+        #c = measure + barrier + X1 + barrier + gate + barrier + X0 + barrier + prep # 0.97 
+        #c = measure + barrier + X0+X1 + barrier + gate + barrier + X1 + barrier + prep # 0.97
+        c = measure + barrier + X0 + barrier + gate + barrier + X0+X1 + barrier + prep # 0.98
+
+    else:
+        c = measure + barrier + prep
+
+    print(c)
+
+    circuit = Circuit(n)
+    qasm = circuit.run_qasm(c)
+    #print(qasm)
+
+    shots = argv.get("shots", 1000)
+    samps = send([qasm], shots=shots, error_model=True)
+    process(code, samps, circuit)
+
+
+def test_css():
+    code = unwrap(construct.get_513())
+    #code = construct.get_713()
+    #code = construct.get_toric(3, 3)
+    #code = construct.reed_muller() # [[16,6,4]]
+    #code = construct.get_toric(4,0) # [[16,2,4]]
+    qasm_code(code)
+
+
 def qasm_code(code):
     #print(code)
     #print(code.longstr())
@@ -718,7 +825,7 @@ def qasm_code(code):
     qasm = circuit.run_qasm(c)
     #print(qasm)
 
-    shots = argv.get("shots", 1000)
+    shots = argv.get("shots", 10000)
     samps = send([qasm], shots=shots, error_model=True)
     process(code, samps, circuit)
 
@@ -729,13 +836,17 @@ def process(code, samps, circuit):
     #print(code.longstr())
     css = code.to_css()
     #print(css.longstr())
-    Hz = numpy.concatenate((css.Hz, css.Lz))
+    #Hz = numpy.concatenate((css.Hz, css.Lz))
+    Hz, Lz, Tx = css.Hz, css.Lz, css.Tx
     #print("Hz:")
     #print(Hz)
 
     idxs = circuit.labels # final qubit permutation
-    idxs = list(reversed(range(n))) # <--------- AAAAAAAAARRRRRRRRGGGGGG 
+    idxs = list(reversed(idxs)) # Um..... check this....
+
     Hz = Hz[:, idxs]
+    Lz = Lz[:, idxs]
+    Tx = Tx[:, idxs]
     #print(Hz)
 
     #print(samps)
@@ -744,9 +855,13 @@ def process(code, samps, circuit):
     lookup = {}
     for v in samps:
         v = parse(v)
-        check = dot2(v, Hz.transpose())
-        syndrome = check[:,:-k]
-        err = check[:, -k:]
+        #check = dot2(v, Hz.transpose())
+        #syndrome = check[:,:-k]
+        #err = check[:, -k:]
+        syndrome = dot2(v, Hz.transpose())
+        #print(v, syndrome)
+        v = (v + dot2(syndrome, Tx)) % 2 # base error correction
+        err = dot2(v, Lz.transpose()) # logical operator
         #print(v, syndrome, err)
         key = "%s %s"%(syndrome, err)
         key = str(syndrome), str(err)
@@ -757,21 +872,67 @@ def process(code, samps, circuit):
             fail += 1
     keys = list(lookup.keys())
     keys.sort()
-    bags = {s:[] for (s,e) in keys}
-    for (s,e) in keys:
-        count = lookup[s,e]
-        bags[s].append(count)
-        #print('\t', s,e, count)
-    miss = 0
-    for counts in bags.values():
-        counts.remove(max(counts))
-        for c in counts:
-            miss += c
-    print(bags)
-    print("syndrome:", count/shots)
-    print("fail:", fail/shots)
+
+    if argv.train:
+        errs = list(set(e for (s,e) in keys))
+        errs.sort()
+        print(errs)
+        syns = list(set(s for (s,e) in keys))
+        syns.sort()
+        print(syns)
+        table = {s:[0]*len(errs) for s in syns}
+        for (s,e) in keys:
+            count = lookup[s,e]
+            table[s][errs.index(e)] += count
+            print('\t', s,e, count)
+        print(table)
+        decode = {}
+        for s in syns:
+            row = table[s]
+            idx = row.index(max(row))
+            decode[s] = errs[idx]
+        print(decode)
+        f = open(argv.train, 'w')
+        print(decode, file=f)
+        f.close()
+        print("decode saved as %s"%argv.train) 
+        return # <------------------------------------- return
+
+    elif argv.load:
+        print("loading decode at %s"%(argv.load,))
+        decode = open(argv.load).read()
+        decode = eval(decode)
+        #print(decode)
+        #print(lookup)
+        miss = 0
+        fail = 0
+        for (s,e) in keys:
+            count = lookup[s, e]
+            if decode.get(s) is None:
+                fail += 1
+            elif decode.get(s) != e:
+                miss += count
+        
+    else:
+        print("WARNING: training decoder on test data")
+        fail = 0
+        bags = {s:[] for (s,e) in keys}
+        for (s,e) in keys:
+            count = lookup[s,e]
+            bags[s].append(count)
+            #print('\t', s,e, count)
+        miss = 0
+        for counts in bags.values():
+            counts.remove(max(counts))
+            for c in counts:
+                miss += c
+        print(bags)
+
+    print("shots:", shots)
+    if fail:
+        print("decoder fail:", fail) 
     p = miss/shots
-    print("error:    %.6f" % (p))
+    print("success:  %.6f" % (1-p))
     print("variance: %.6f" %variance(p, shots))
 
 
