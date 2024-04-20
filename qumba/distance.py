@@ -78,6 +78,8 @@ def search_distance_z3(code, d):
 
 def distance_z3(code):
 
+    # XXX this leaks memory XXX
+
     if code.k == 0:
         return code.n
 

@@ -503,9 +503,9 @@ def main():
         print()
 
 
-def get_412_transversal_4():
+def get_412_transversal():
 
-    N = 4
+    N = argv.get("N", 4)
 
     # N*[[4,1,2]] cliffords
     code = construct.get_412()
@@ -563,7 +563,7 @@ def get_412_transversal_4():
         return
 
 
-    f = open("generate.gap", "w")
+    f = open("generate_%d.gap"%N, "w")
     names = []
     for i,M in enumerate(logical):
         name = "M%d"%i
