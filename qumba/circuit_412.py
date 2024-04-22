@@ -33,6 +33,191 @@ from qumba.syntax import Syntax
 from qumba.circuit import parsevec, Circuit, send, get_inverse, measure, barrier, variance
 
 
+def get_protocol():
+    protocol = {}
+    # logical S gate
+    physical = (
+        'S(0)', 'H(0)', 'S(0)', 
+        'S(1)', 'H(1)', 
+        'H(2)', 'S(2)', 
+        'S(3)', 
+        'P(0, 2, 1, 3)', 'X(0)', 'X(2)')
+    logical = ("S(3).d",) # inverse logical 
+    #protocol.append((physical, logical))
+    protocol["S(0)"] = (physical, logical)
+
+    # logical X
+    physical = ('Z(0)', 'X(1)',)
+    logical = ("X(3)",) # inverse logical 
+    protocol["X(0)"] = (physical, logical)
+    #protocol.append((physical, logical))
+
+    # logical Z
+    physical = ('Z(1)', 'X(2)',)
+    logical = ("Z(3)",) # inverse logical 
+    protocol["Z(0)"] = (physical, logical)
+    #protocol.append((physical, logical))
+
+    # logical H gate
+    #physical = ("Z(1)", "X(2)", "P(3,0,1,2)") # XXX the paper uses P(0321)
+    #logical = ("H(3)" ) # inverse logical 
+    #physical = ("H(0)", "H(1)", "H(2)", "H(3)", "X(0)", "X(2)", "P(0,3,2,1)")
+    #logical = ("H(3)", "Z(3)", ) # inverse logical 
+    physical = ("Z(1)", "X(2)", "H(0)", "H(1)", "H(2)", "H(3)", "X(0)", "X(2)", "P(0,3,2,1)")
+    logical = ("H(3)",) # inverse logical 
+    protocol["H(0)"] = (physical, logical)
+    #protocol.append((physical, logical))
+    return protocol
+
+
+def magic_412():
+    "Can we do magic state prep on the [[4,1,2]] ?"
+
+    def get_eig(u, g):
+        "return eigenval if u is eigvec of g, None otherwise"
+        r = (u.d*u)[0][0]
+        val = (u.d * g * u)[0][0]
+        val = val / r
+        if g*u == val*u:
+            return val
+        return None
+
+    c = Clifford(1)
+    H, S, Z, X, Y = c.H(), c.S(), c.Z(), c.X(), c.Y()
+    pauli = mulclose([X, Z, Y])
+    assert len(pauli) == 16
+
+    g = S*H*X
+    h = H*S
+    assert g*h == h*g
+    #for val, vec, dim in g.eigenvectors():
+    #    print(vec)
+    #    print(val, ",", get_eig(vec, h))
+
+    for val, vec, dim in S.eigenvectors():
+        print(vec, val)
+
+    
+    return
+
+    #ops = [g, h, S*H*S*X, S]
+    ops = [Z*H, H]
+    for g in ops:
+      for h in ops:
+        print(g*h==h*g, end=' ')
+      print()
+    return
+
+    if 0:
+        # the ZH magic state is not magic, it's a Y state
+        g = Z*H
+        evs = g.eigenvectors()
+        for val, vec, dim in evs:
+            print(val)
+        #assert Z*H*vec==vec
+        print(vec)
+        vec.d * g*vec
+        print(get_eig(vec, g))
+        for g in pauli:
+            if g*vec == vec:
+                print("found +1")
+                print(g.name)
+                print(g)
+        return
+
+    cliff = mulclose([H, S])
+    assert len(cliff) == 192
+    #for g in cliff:
+    #    if g.order() == 4:
+    #        print(g.name)
+    #return
+
+    #evs = H.eigenvectors() # this gives a ZH state, which is not magic
+    #evs = S.eigenvectors() # this gives a ZH state, which is not magic
+    #evs = (S*H*S).eigenvectors()
+    #evs = (S*H).eigenvectors() # needs argv.degree=24
+    vs = []
+    for g in cliff:
+        evs = g.eigenvectors()
+        for val, vec, dim in evs:
+            if dim != 1:
+                continue
+            vs.append(vec)
+    print("vs:", len(vs))
+    #assert H*vec==vec
+    #assert S*vec==vec
+    #v = vec@vec@vec@vec
+    #vs = [vec@vec@vec@vec for vec in vs]
+    SS = S*S
+    SSS = SS*S
+    vs = [vec@(S*vec)@(SS*vec)@(SSS*vec) for vec in vs]
+    
+    code = construct.get_412()
+    n = code.n
+    c = Clifford(n)
+
+    P = code.get_projector()
+    #u = P*v
+    #print(u)
+    us = [P*v for v in vs]
+
+    protocol = get_protocol()
+    lh = c.get_expr(protocol["H(0)"][0])
+    lh.name = ("H(0)",)
+    assert P*lh == lh*P
+    ls = c.get_expr(protocol["S(0)"][0])
+    ls.name = ("S(0)",)
+    assert P*ls == ls*P
+    lx = c.get_expr(protocol["X(0)"][0])
+    assert P*lx == lx*P
+    lz = c.get_expr(protocol["Z(0)"][0])
+    assert P*lz == lz*P
+
+    #print(u.d * lh * u) == 0
+    
+    lhs = -w4*lz*P
+    rhs = ls*ls*P
+    assert lhs == rhs
+
+    if 0:
+        g = lz*lh
+        assert g*u == w4*u
+        val = get_eig(u, g)
+        assert val == w4
+    
+        g = ls*ls*lh
+        assert g*u == u
+
+    #return
+
+    G = mulclose([lh, ls])
+    assert lx in G
+    #G = [lh, ls, lh*ls, ls*lh, lh*ls*lh, ls*lh*ls]
+    print("|G| =", len(G))
+
+    for u in us:
+        for idx,g in enumerate(G):
+            val = get_eig(u, g)
+            if val is None:
+                continue
+            #if val is not None:
+                #print(idx, end=" ")
+            #if val==1:
+            #    continue
+            lg = Clifford(1).get_expr(g.name)
+            print(g.name)
+            print(lg, val)
+            if g.name == ('S(0)', 'S(0)', 'H(0)'):
+                #print(".", end='', flush=True)
+                break
+        else:
+            print("found!\n")
+            break
+
+    print("done")
+
+
+
 def test_412():
     code = construct.get_412()
     n = code.n

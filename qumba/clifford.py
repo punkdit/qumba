@@ -24,8 +24,11 @@ from qumba.solve import zeros2, identity2
 from qumba.action import mulclose, mulclose_names, mulclose_find
 from qumba.argv import argv
 
-K = CyclotomicField(8)
-w8 = K.gen() # primitive eighth root of unity
+degree = argv.get("degree", 8)
+assert degree % 8 == 0
+K = CyclotomicField(degree)
+root = K.gen() # primitive eighth root of unity
+w8 = root ** (degree // 8)
 half = K.one()/2
 w4 = w8**2
 r2 = w8 + w8**7
@@ -162,6 +165,15 @@ class Matrix(object):
             rows.append(row)
         return Matrix(ring, rows)
 
+    def order(self):
+        I = self.identity(self.ring, len(self))
+        count = 1
+        A = self
+        while A != I:
+            count += 1
+            A = self*A
+        return count
+
     def inverse(self):
         M = self.M.inverse()
         return Matrix(self.ring, M)
@@ -192,6 +204,19 @@ class Matrix(object):
 
     def rank(self):
         return self.M.rank()
+
+    def eigenvectors(self):
+        evs = self.M.eigenvectors_right()
+        vecs = []
+        for val,vec,dim in evs:
+            #print(val, dim)
+            #print(type(vec[0]))
+            vec = all_cmdline.Matrix(self.ring, vec[0])
+            vec = vec.transpose() 
+            vec = Matrix(self.ring, vec)
+            vecs.append((val, vec, dim))
+        #print(type(self.M))
+        return vecs
 
 
 matrix = lambda rows : Matrix(K, rows)
@@ -258,9 +283,8 @@ class Clifford(object):
 
     def __init__(self, n):
         self.n = n
-        K = CyclotomicField(8)
         self.K = K
-        self.w = K.gen()
+        self.w = w8
         self.I = Matrix.identity(K, 2**n)
 
     def wI(self):
@@ -779,7 +803,7 @@ def test_perm():
 
 def test_bruhat():
     K = CyclotomicField(8)
-    w = K.gen()
+    w = w8
     one = K.one()
     w2 = w*w
     r2 = w+w.conjugate()
@@ -908,7 +932,7 @@ def test_bruhat():
 
 def test_cocycle():
     K = CyclotomicField(8)
-    w = K.gen()
+    w = w8
     one = K.one()
     w2 = w*w
     r2 = w+w.conjugate()
