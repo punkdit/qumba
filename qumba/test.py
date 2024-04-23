@@ -576,8 +576,14 @@ def test_spider():
     e = code.get_encoder()
     E = e.to_spider(verbose=True)
     print(type(E), E.shape)
-    E = Matrix(K, list(E))
-    E = E*IH
+    #E = Matrix(K, list(E))
+    E = Matrix(K, E)
+    #print(E.M, E.M.shape, E.shape)
+    #return 
+    E = E*IH # WAH
+
+    return
+
     E = 4*r2*E
     print(E.shape)
     #for i in range(1024):
