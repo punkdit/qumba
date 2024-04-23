@@ -581,7 +581,6 @@ def test_spider():
     #print(E.M, E.M.shape, E.shape)
     #return 
     E = E*IH # WAH
-
     return
 
     E = 4*r2*E

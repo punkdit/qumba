@@ -13,48 +13,7 @@ cache = lru_cache(maxsize=None)
 
 import numpy
 
-#from sage.all_cmdline import (FiniteField, CyclotomicField, latex, block_diagonal_matrix,
-#    PolynomialRing)
 from sage import all_cmdline 
-
-#from qumba.argv import argv
-#from qumba.clifford_ring import degree
-#K = CyclotomicField(degree)
-#root = K.gen() # primitive eighth root of unity
-#w8 = root ** (degree // 8)
-#half = K.one()/2
-#w4 = w8**2
-#r2 = w8 + w8**7
-#ir2 = r2 / 2
-#assert r2**2 == 2
-#
-#def simplify_latex(self):
-#    M = self.M
-#    m, n = self.shape
-#    idxs = [(i,j) for i in range(m) for j in range(n)]
-#    for idx in idxs:
-#        if M[idx] != 0:
-#            break
-#    else:
-#        assert 0
-#    scale = M[idx]
-#    if scale != 1 and scale != -1:
-#        M = (1/scale) * M
-#        s = {
-#            r2 : r"\sqrt{2}",
-#            1/r2 : r"\frac{1}{\sqrt{2}}",
-#            #2/r2 : r"\frac{2}{\sqrt{2}}",
-#            2/r2 : r"\sqrt{2}",
-#            #r2/2 : r"\sqrt{2}/2",
-#        }.get(scale, latex(scale))
-#        if "+" in s:
-#            s = "("+s+")"
-#        s = "%s %s"%(s, latex(M))
-#    else:
-#        s = latex(M)
-#    s = s.replace(r"\zeta_{8}^{2}", "i")
-#    return s
-
 
 class Matrix(object):
     def __init__(self, ring, rows, name=()):
@@ -83,11 +42,15 @@ class Matrix(object):
         #return hash(self.M)
 
     def __str__(self):
-        lines = str(self.M).split("\n")
-        lines[0] = "[" + lines[0]
-        lines[-1] = lines[-1] + "]"
-        lines[1:] = [" "+l for l in lines[1:]]
-        return '\n'.join(lines)
+        s = str(self.M)
+        s = s.replace(" + ", "+")
+        s = s.replace(" - ", "-")
+        return s
+        #lines = str(self.M).split("\n")
+        #lines[0] = "[" + lines[0]
+        #lines[-1] = lines[-1] + "]"
+        #lines[1:] = [" "+l for l in lines[1:]]
+        #return '\n'.join(lines)
     __repr__ = __str__
 
     def __len__(self):
@@ -202,6 +165,15 @@ class Matrix(object):
         if type(idx) is int:
             return self.M[idx]
         M = self.M[idx]
+        #print(type(M), type(self.M))
+        if isinstance(M, numpy.ndarray):
+            M = Matrix(self.ring, M)
+        return M
+
+    def __call__(self, value):
+        M = numpy.empty(self.shape, dtype=object)
+        for idx in numpy.ndindex(self.shape):
+            M[idx] = self.M[idx](value)
         return Matrix(self.ring, M)
 
     def _latex_(self):
