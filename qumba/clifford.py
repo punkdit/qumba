@@ -17,15 +17,15 @@ cache = lru_cache(maxsize=None)
 
 import numpy
 
-from sage.all_cmdline import FiniteField, CyclotomicField, latex, block_diagonal_matrix
+from sage.all_cmdline import (FiniteField, CyclotomicField, latex, block_diagonal_matrix,
+    PolynomialRing)
 from sage import all_cmdline 
 
 from qumba.solve import zeros2, identity2
 from qumba.action import mulclose, mulclose_names, mulclose_find
 from qumba.argv import argv
 
-degree = argv.get("degree", 8)
-assert degree % 8 == 0
+from qumba.clifford_ring import degree
 K = CyclotomicField(degree)
 root = K.gen() # primitive eighth root of unity
 w8 = root ** (degree // 8)
@@ -181,6 +181,9 @@ class Matrix(object):
     def transpose(self):
         M = self.M.transpose()
         return Matrix(self.ring, M)
+
+    def trace(self):
+        return self.M.trace()
 
     @property
     def t(self):
@@ -1214,6 +1217,7 @@ def test():
     test_perm()
     #test_cocycle() # sloooow
     test_higher()
+    test_CY()
 
 
 
