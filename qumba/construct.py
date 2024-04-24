@@ -19,7 +19,7 @@ def get_422():
     return QCode.fromstr("XXXX ZZZZ", None, "XXII ZIZI XIXI ZZII")
 
 def get_832():
-    """ Build the [[8,3,2]] code.
+    r""" Build the [[8,3,2]] code.
 
     We _number the qubits like this:
     0 ----------- 1
@@ -41,6 +41,16 @@ def get_832():
         None,
         "XXIIXXII IZIZIIII IXIXIXIX ZZIIIIII XXXXIIII IZIIIZII"
     )
+
+
+def get_833():
+    "[[8,3,3]] non-css code from https://arxiv.org/abs/quant-ph/9702029"
+    code = QCode.fromstr(
+        "XXXXXXXX ZZZZZZZZ XIXIZYZY XIYZXIYZ XZIYIYXZ",
+        None,
+        "XXIIIZIZ IZIZIZIZ XIXZIIZI IIZZIIZZ XIIZXZII IIIIZZZZ"
+    )
+    return code
 
 
 def get_513(idx=None):

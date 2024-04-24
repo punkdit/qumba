@@ -323,6 +323,50 @@ def test_822_clifford():
     assert P*v0 == v0
 
 
+def get_822():
+    code = QCode.fromstr("""
+    XX...XX.
+    .XX...XX
+    ..XXX..X
+    .ZZ.ZZ..
+    ..ZZ.ZZ.
+    Z..Z..ZZ
+    """, Ls="""
+    X......X
+    Z....Z..
+    .X..X...
+    ...ZZ...
+    """)
+    return code
+
+
+def HH_822():
+    "logical HH gate "
+    code = get_822()
+    n = code.n
+
+    lspace = SymplecticSpace(code.k)
+    lHH = lspace.H(0) * lspace.H(1)
+
+    dual = code.get_dual()
+    perm = dual.get_isomorphism(code)
+    dode = dual.apply_perm(perm)
+    assert dode.is_equiv(code)
+    assert dode.get_logical(code) == lHH
+
+    n = code.n
+    space = code.space
+    HH = space.get_perm(perm) * reduce(mul, [space.H(i) for i in range(n)])
+    dode = code.apply(HH)
+    assert dode.is_equiv(code)
+    assert dode.get_logical(code) == lHH
+
+    assert HH.name == ('P(0,1,2,3,6,7,4,5)', 'H(0)', 'H(1)',
+        'H(2)', 'H(3)', 'H(4)', 'H(5)', 'H(6)', 'H(7)')
+
+
+
+
 def opt_822_prep():
     # from test_822_clifford:
     prep = (
@@ -392,6 +436,22 @@ def run_822_qasm():
     assert code.is_equiv(tgt)
     #print(code)
 
+    HLx = parse("""
+    XX...XX.
+    .XX...XX
+    ..XXX..X
+    X......X
+    .X..X...
+    """)
+
+    HLz = parse("""
+    .ZZ.ZZ..
+    ..ZZ.ZZ.
+    Z..Z..ZZ
+    Z....Z..
+    ...ZZ...
+    """)
+
     fibers = [(i, i+base.n) for i in range(base.n)]
     #print("fibers:", fibers)
 
@@ -435,73 +495,55 @@ def run_822_qasm():
     #c = measure + X1 + barrier + (gate + barrier) + barrier + X1 + prep_00
     #c = measure + Z0 + barrier + (gate + barrier) + barrier + Z0 + prep_00
 
-    qasms = []
-    def tomography():
-        for op in [
-            I,   
-            X0    ,
-            Z0    ,
-                X1,
-                Z1,
-            X0+Z0,
-            X0+X1,
-            X0+Z1,
-            Z0+X1,
-            Z0+Z1,
-            X1+Z1,
-        ]:
-            #c = measure + op + barrier + (gate + barrier) + barrier + Z0 + prep_00
-            c = measure + op + prep_00
-            qasm = circuit.run_qasm(c)
-            #print(qasm)
-            qasms.append(qasm)
-        #return
-
-    if 0:
-        # these work:
-        c = measure + X0 + barrier + (gate + barrier) + barrier + X0 + prep_00
-        c = measure + X0+X1 + barrier + (gate + barrier) + barrier + X1 + prep_00
-        c = measure + Z0+Z1 + barrier + (gate + barrier) + barrier + Z0 + prep_00
-        c = measure + Z1 + barrier + (gate + barrier) + barrier + Z1 + prep_00
-        c = measure + X0+X1+Z1 + barrier + (gate + barrier) + barrier + X1+Z1 + prep_00
+    # logical HH, see HH_822 above:
+    HH = ('P(0,1,2,3,6,7,4,5)', 'H(0)', 'H(1)',
+        'H(2)', 'H(3)', 'H(4)', 'H(5)', 'H(6)', 'H(7)')
 
     h8 = tuple("H(%d)"%i for i in range(n))
 
+    fini_00 = measure
+    fini_pp = measure + h8 
+
+    if argv.HH:
+        fini_00, fini_pp = fini_pp + HH, fini_00 + HH
+        HLx, HLz = HLz, HLx
+
     if argv.spam:
         if argv.prep_00:
-            c = measure + barrier + prep_00 # SPAM
+            c = fini_00 + barrier + prep_00 # SPAM
         elif argv.prep_pp:
-            c = measure + h8 + barrier + prep_pp # SPAM
+            c = fini_pp + barrier + prep_pp # SPAM
         else:
             return
     elif argv.state == (0,0):
-        c = measure + barrier + gate + barrier + prep_00
+        c = fini_00 + barrier + gate + barrier + prep_00
     elif argv.state == (1,0):
-        c = measure + X0 + barrier + gate + barrier + X0 + prep_00
+        c = fini_00 + X0 + barrier + gate + barrier + X0 + prep_00
     elif argv.state == (0,1):
-        c = measure + X0+X1 + barrier + gate + barrier + X1 + prep_00
+        c = fini_00 + X0+X1 + barrier + gate + barrier + X1 + prep_00
     elif argv.state == (1,1):
-        c = measure + X1 + barrier + gate + barrier + X0+X1 + prep_00
+        c = fini_00 + X1 + barrier + gate + barrier + X0+X1 + prep_00
     elif argv.state == "pp":
-        c = measure + h8 + barrier + gate + barrier + prep_pp
+        c = fini_pp + barrier + gate + barrier + prep_pp
     elif argv.state == "mp":
-        c = measure + h8 + Z0+Z1 + barrier + gate + barrier + Z0 + prep_pp
+        c = fini_pp + Z0+Z1 + barrier + gate + barrier + Z0 + prep_pp
     elif argv.state == "pm":
-        c = measure + h8 + Z1 + barrier + gate + barrier + Z1 + prep_pp
+        c = fini_pp + Z1 + barrier + gate + barrier + Z1 + prep_pp
     elif argv.state == "mm":
-        c = measure + h8 + Z0 + barrier + gate + barrier + Z0 + Z1 + prep_pp
+        c = fini_pp + Z0 + barrier + gate + barrier + Z0 + Z1 + prep_pp
     else:
         return
 
     print(c)
 
+    qasms = []
     qasms.append(circuit.run_qasm(c))
 
     if argv.load:
         samps = load()
 
     else:
-        shots = argv.get("shots", 10)
+        shots = argv.get("shots", 1000)
         samps = send(qasms, shots=shots, error_model=True)
         #print(samps)
 
@@ -509,23 +551,12 @@ def run_822_qasm():
 
     if type(argv.state) is str or argv.prep_pp:
         #print("measure X syndromes")
-        H = parse("""
-        XX...XX.
-        .XX...XX
-        ..XXX..X
-        X......X
-        .X..X...
-        """)
+        H = HLx
     else:
         #print("measure Z syndromes")
         assert type(argv.state) is tuple or argv.prep_00
-        H = parse("""
-        .ZZ.ZZ..
-        ..ZZ.ZZ.
-        Z..Z..ZZ
-        Z....Z..
-        ...ZZ...
-        """)
+        H = HLz
+
     H = H[:, idxs] # shuffle
 
     #print(H)

@@ -30,7 +30,7 @@ from qumba.unwrap import Cover
 from qumba import clifford, matrix
 from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
 from qumba.syntax import Syntax
-from qumba.circuit import parsevec, Circuit, send, get_inverse, measure, barrier, variance
+from qumba.circuit import parsevec, Circuit, send, get_inverse, measure, barrier, variance, load
 
 
 def get_protocol():
@@ -528,9 +528,9 @@ def run_412_qasm():
     else:
 
         kw = {}
-        if not argv.get("leakage", False):
-            kw['p1_emission_ratio'] = 0
-            kw['p2_emission_ratio'] = 0
+        #if not argv.get("leakage", False):
+        #    kw['p1_emission_ratio'] = 0
+        #    kw['p2_emission_ratio'] = 0
     
         shots = argv.get("shots", 100)
         samps = send(qasms, shots=shots, N=N, 

@@ -37,6 +37,7 @@ def send(qasms=None, shots=1,
         error_model=True, 
         simulator="stabilizer",  # "state-vector" is slower
         name = argv.get("name", "job"),
+        flatten=True, # return flat list of samps
         p1_errors=True,  # bool
         p2_errors=True, # bool
         init_errors=True, # bool
@@ -98,25 +99,29 @@ def send(qasms=None, shots=1,
     batch.submit()
     batch.retrieve(wait=argv.wait)
     
-    samps = []
+    sampss = []
     for job in batch.jobs:
         results = job.results
         if results['status'] == 'completed':
-            samps += results["results"]["m"]
+            samps = results["results"]["m"]
+            sampss.append(samps)
         else:
+            samps = []
             print(results['status'])
             print(results)
             #print(job.code)
-    return samps
+    if flatten:
+        return reduce(add, sampss, [])
+    return sampss
 
 
-def load():
+def load(flatten=True):
     name = argv.next()
     assert name.endswith(".p"), name
     f = open(name, "rb")
     batch = pickle.load(f)
     f.close()
-    samps = []
+    sampss = []
     for job in batch.jobs:
         results = job.retrieve()
         #results = job.results
@@ -125,9 +130,15 @@ def load():
         #print("params:", results["params"])
         #print(' '.join(results.keys()))
         print(job.params)
+        samps = []
         if status == "completed":
-            samps += results["results"]["m"]
-    return samps
+            samps = results["results"]["m"]
+        sampss.append(samps)
+    if flatten:
+        return reduce(add, sampss, [])
+    return sampss
+
+load_batch = load
 
     
 

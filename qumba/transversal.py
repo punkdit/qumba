@@ -4,7 +4,7 @@ _looking for transversal logical clifford operations
 """
 
 from functools import reduce
-from operator import add, matmul
+from operator import add, matmul, mul
 
 import numpy
 
@@ -13,6 +13,7 @@ from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver
 
 from qumba.qcode import QCode, SymplecticSpace, Matrix, fromstr, shortstr, strop
 from qumba.action import mulclose, Group, mulclose_find
+from qumba.util import allperms
 from qumba import equ
 from qumba import construct 
 from qumba import autos
@@ -501,6 +502,132 @@ def main():
         G = mulclose(gen)
         print("|G| =", len(G))
         print()
+
+
+def test_833():
+    # See:
+    # https://arxiv.org/abs/quant-ph/9702029"
+    code = construct.get_833()
+    space = code.space
+    I = space.get_identity()
+    n = code.n
+    N, perms = code.get_autos()
+    dode = code.apply_perm(perms[0])
+    assert dode.is_equiv(code)
+    #print(dode.get_logical(code))
+
+    Sn = Group.symmetric(n)
+    G, gen = set(), []
+    for g in Sn:
+        perm = [g[i] for i in range(n)]
+        P = space.get_perm(perm)
+        #print(P, perm)
+        dode = code.apply(P)
+        if code.is_equiv(dode):
+            h = I
+        else:
+            for h in find_local_clifford(code, dode):
+                break
+            else:
+                continue
+        eode = dode.apply(h)
+        assert eode.is_equiv(code)
+        l = eode.get_logical(code)
+        if l not in G:
+            gen.append(l)
+            G = mulclose(gen)
+        #print(l, len(G), len(gen))
+        #print()
+    # takes about 30 minutes to get here
+    assert len(G) == 168
+
+        
+def test_412_gottesman():
+    # See:
+    # https://arxiv.org/abs/quant-ph/9702029
+
+    s = SymplecticSpace(4)
+    CX = s.CX
+    ops = [CX(int(i),int(j)) for (i,j) in "20 10 01 02 21 31 23 12".split()]
+    g = reduce(mul, ops)
+    print(g)
+
+    for perm in allperms(range(4)):
+        P = s.get_perm(perm)
+        #print(P.t * g * P == g, perm)
+
+    c = construct.get_412()
+    code = c+c+c+c
+    perm = [j*4 + i for i in range(4) for j in range(4)]
+    code = code.apply_perm(perm)
+
+    g4 = reduce(Matrix.direct_sum, [g]*4)
+    dode = code.apply(g4)
+    assert code.is_equiv(dode)
+    assert code.get_logical(dode) == g # nice
+
+    gen = [CX(i,j) for i in range(4) for j in range(4) if i!=j]
+    h = mulclose_find(gen, g)
+    assert len(h.name) == 6
+    assert h==g
+
+    name = ('CX(0,1)', 'CX(3,0)', 'CX(0,2)', 'CX(1,3)', 'CX(2,1)', 'CX(1,0)')
+
+    dode = code
+    for name in reversed(name):
+        g1 = s.get_expr(name)
+        g4 = reduce(Matrix.direct_sum, [g1]*4)
+        dode = dode.apply(g4)
+        assert dode.distance() >= 2
+    assert dode.is_equiv(code)
+
+
+def test_513_gottesman():
+    # See Fig. 1.
+    # https://arxiv.org/abs/quant-ph/9702029
+
+    s = SymplecticSpace(3)
+    S, H, CX, CZ = s.S, s.H, s.CX, s.CZ
+    SHS = lambda i :S(i)*H(i)*S(i)
+    HS = lambda i :H(i)*S(i)
+    SH = lambda i :S(i)*H(i)
+
+    # T_3 gate
+    g = CX(2,0)*CX(2,1)*CX(1,2)*CX(0,2)*SHS(0)*SHS(1)*CZ(0,1)*CX(0,1)*CX(1,0)*CX(0,1)
+
+    c = construct.get_513()
+    code = c+c+c
+
+    perm = [j*5 + i for i in range(5) for j in range(3)]
+    #print(perm)
+    code = code.apply_perm(perm)
+
+    g5 = reduce(Matrix.direct_sum, [g]*5)
+    dode = code.apply(g5)
+    assert code.is_equiv(dode)
+    assert code.get_logical(dode) == g # nice
+
+    gen  = [S(0),S(1),S(2)]
+    gen += [H(0),H(1),H(2)]
+    #gen += [SH(0),SH(1),SH(2)]
+    #gen += [HS(0),HS(1),HS(2)]
+    #gen += [SHS(0),SHS(1),SHS(2)]
+    gen += [CX(i,j) for i in range(3) for j in range(3) if i!=j]
+    gen += [CZ(i,j) for i in range(3) for j in range(i+1,3)]
+    h = mulclose_find(gen, g)
+    print(h)
+    print(h.name)
+
+    name = ('CX(0,1)', 'H(0)', 'S(0)', 'CZ(0,2)', 'CX(1,0)', 'CX(1,2)', 'H(1)', 'CX(1,0)')
+    dode = code
+    for name in reversed(name):
+        g1 = s.get_expr(name)
+        g5 = reduce(Matrix.direct_sum, [g1]*5)
+        dode = dode.apply(g5)
+        assert dode.distance() == 3
+    assert dode.is_equiv(code)
+
+
 
 
 def get_412_transversal():
