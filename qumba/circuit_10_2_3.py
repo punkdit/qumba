@@ -29,6 +29,7 @@ from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
 from qumba.syntax import Syntax
 from qumba.circuit import (Circuit, measure, barrier, send, vdump, variance,
     parsevec, strvec, find_state, get_inverse, load_batch, send_idxs)
+from qumba.circuit_css import css_encoder, process
 
 
 
@@ -507,36 +508,6 @@ def qasm_10_2_3_p0():
         syndrome = dot2(Hz, v.transpose())
         print(v, syndrome.transpose())
 
-
-def css_encoder(Hx, dual=False):
-    _, n = Hx.shape
-    s = Syntax()
-    CX, CZ, H, X, Z, I = s.CX, s.CZ, s.H, s.X, s.Z, s.get_identity()
-    g = I
-    if dual:
-        #print("dual encoder")
-        CX = lambda i,j : s.CX(j,i) # swap this
-    #else:
-        #print("primal encoder")
-    
-    idxs = []
-    for row in range(len(Hx)):
-        j0 = row
-        while Hx[row, j0] == 0:
-            j0 += 1
-        assert Hx[row, j0]
-        idxs.append(j0)
-        for j in range(j0+1, n):
-            if Hx[row, j]:
-                g = g*CX(j0,j)
-    if dual:
-        for i in range(n):
-            if i not in idxs:
-                g = g*H(i)
-    else:
-        for i in idxs:
-            g = g*H(i)
-    return g.name
 
 
 def clifford_512_unwrap():
@@ -1043,17 +1014,11 @@ def qasm_10_2_3():
 
     HI, IH = build_10_2_3_HI_IH()
     HI, IH = HI.name, IH.name
-    #name = (IH + prep_00)
-    #return
 
     cx = reduce(mul, [CX(i, i+5)*SWAP(i, i+5) for i in range(5)]).name
     cz = reduce(mul, [CZ(i, i+5) for i in range(5)]).name
 
-    if argv.gate == "CZ":
-        assert 0, "TODO"
-        c = measure + barrier + X0+Z1 + barrier + cz + barrier + X0 + barrier + prep
-
-    elif argv.spam_00:
+    if argv.spam_00:
         c = fini_00 + barrier + prep_00                     # 0.996   success rate
     elif argv.state == (0,0): # X0,X1 
         c = fini_00 + barrier + cx + barrier + prep_00
@@ -1117,146 +1082,6 @@ def qasm_10_2_3():
         samps = send([qasm], shots=shots, error_model=True)
 
     process(code, samps, circuit)
-
-
-def test_css():
-    code = unwrap(construct.get_513())
-    #code = construct.get_713()
-    #code = construct.get_toric(3, 3)
-    #code = construct.reed_muller() # [[16,6,4]]
-    #code = construct.get_toric(4,0) # [[16,2,4]]
-    qasm_code(code)
-
-
-def qasm_code(code):
-    #print(code)
-    #print(code.longstr())
-    n = code.n
-    k = code.k
-    Hx = code.to_css().Hx
-    Hx = row_reduce(Hx)
-    #print(shortstr(Hx))
-    prep = css_encoder(Hx)
-
-    c = measure + barrier + prep
-
-    circuit = Circuit(n)
-    qasm = circuit.run_qasm(c)
-    #print(qasm)
-
-    shots = argv.get("shots", 10000)
-    samps = send([qasm], shots=shots, error_model=True)
-    process(code, samps, circuit)
-
-
-def process(code, samps, circuit):
-    n,k = code.n, code.k
-    shots = len(samps)
-    if not shots:
-        return
-
-    #print(code.longstr())
-    css = code.to_css()
-    #print(css.longstr())
-    #Hz = numpy.concatenate((css.Hz, css.Lz))
-    Hz, Lz, Tx = css.Hz, css.Lz, css.Tx
-    #print("Hz:")
-    #print(Hz)
-
-    idxs = circuit.labels # final qubit permutation
-    idxs = list(reversed(idxs)) # Um..... check this....
-
-    Hz = Hz[:, idxs]
-    Lz = Lz[:, idxs]
-    Tx = Tx[:, idxs]
-    #print(Hz)
-
-    #print(samps)
-    fail = 0
-    count = 0
-    lookup = {}
-    for v in samps:
-        v = parse(v)
-        #check = dot2(v, Hz.transpose())
-        #syndrome = check[:,:-k]
-        #err = check[:, -k:]
-        syndrome = dot2(v, Hz.transpose())
-        #print(v, syndrome)
-        v = (v + dot2(syndrome, Tx)) % 2 # base error correction
-        err = dot2(v, Lz.transpose()) # logical operator
-        #print(v, syndrome, err)
-        key = "%s %s"%(syndrome, err)
-        key = str(syndrome), str(err)
-        lookup[key] = lookup.get(key, 0) + 1
-        if syndrome.sum():
-            count += 1
-        if err.sum() and not syndrome.sum():
-            fail += 1
-    keys = list(lookup.keys())
-    keys.sort()
-
-    if argv.train:
-        errs = list(set(e for (s,e) in keys))
-        errs.sort()
-        print(errs)
-        syns = list(set(s for (s,e) in keys))
-        syns.sort()
-        print(syns)
-        table = {s:[0]*len(errs) for s in syns}
-        for (s,e) in keys:
-            count = lookup[s,e]
-            table[s][errs.index(e)] += count
-            print('\t', s,e, count)
-        print(table)
-        decode = {}
-        for s in syns:
-            row = table[s]
-            idx = row.index(max(row))
-            decode[s] = errs[idx]
-        print(decode)
-        f = open(argv.train, 'w')
-        print(decode, file=f)
-        f.close()
-        print("decode saved as %s"%argv.train) 
-        return # <------------------------------------- return
-
-    elif argv.load:
-        print("loading decode at %s"%(argv.load,))
-        decode = open(argv.load).read()
-        decode = eval(decode)
-        #print(decode)
-        #print(lookup)
-        miss = 0
-        fail = 0
-        for (s,e) in keys:
-            count = lookup[s, e]
-            if decode.get(s) is None:
-                fail += 1
-            elif decode.get(s) != e:
-                miss += count
-        
-    else:
-        print("WARNING: training decoder on test data")
-        fail = 0
-        bags = {s:[] for (s,e) in keys}
-        for (s,e) in keys:
-            count = lookup[s,e]
-            bags[s].append(count)
-            #print('\t', s,e, count)
-        miss = 0
-        for counts in bags.values():
-            counts.remove(max(counts))
-            for c in counts:
-                miss += c
-        print(bags)
-
-    print("shots:", shots)
-    if fail:
-        print("decoder fail:", fail) 
-    p = miss/shots
-    print("success:  %.6f" % (1-p))
-    print("variance: %.6f" %variance(p, shots))
-
 
 
 
