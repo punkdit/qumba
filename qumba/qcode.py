@@ -318,6 +318,7 @@ class QCode(object):
         return T
 
     def is_equiv(self, other):
+        assert isinstance(other, QCode)
         H1, H2 = self.H.t, other.H.t
         U = solve2(H1.A, H2.A)
         if U is None:
@@ -870,7 +871,9 @@ class QCode(object):
         tgt = self.apply_H()
         return self.is_equiv(tgt)
 
-    def get_logical(self, other):
+    def get_logical(self, other, check=False):
+        if check:
+            assert self.is_equiv(other)
         L = self.get_decoder() * other.get_encoder()
         L = L[-self.kk:, -self.kk:]
         return L

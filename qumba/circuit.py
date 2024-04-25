@@ -20,7 +20,7 @@ from qumba.csscode import CSSCode, find_logicals
 from qumba.autos import get_autos
 from qumba import csscode, construct
 from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
-from qumba.action import mulclose, mulclose_hom, mulclose_find
+from qumba.action import mulclose, mulclose_hom, mulclose_find, Perm
 from qumba.util import cross
 from qumba.symplectic import Building
 from qumba.unwrap import unwrap, unwrap_encoder
@@ -409,6 +409,18 @@ def find_state(tgt, src, gen, verbose=False, maxsize=None):
     return
 
 
+def inverse_P(item):
+    perm = eval(item[1:])
+    assert type(perm) is tuple
+    n = len(perm)
+    perm = Perm(list(perm), list(range(n)))
+    #print("inverse_P", perm)
+    perm = ~perm
+    perm = tuple(perm[i] for i in range(n))
+    #print("inverse_P", perm)
+    name = "P"+str(perm)
+    name = name.replace(" ", "")
+    return name
 
 def get_inverse(name):
     items = []
@@ -418,10 +430,40 @@ def get_inverse(name):
             item = item.replace(".d", "")
         elif stem == "S":
             item = item + ".d"
+        elif stem == "P":
+            #item = item + ".t"
+            item = inverse_P(item)
         else:
             assert stem in "H X Z Y CX CZ CY".split(), stem
         items.append(item)
     return tuple(items)
+
+
+def send_idxs(name, send, n): # UGH
+    #print("send_idxs", name, send)
+    items = []
+    for item in name:
+        if item == "?":
+            return ("?",)
+        i = item.index("(")
+        stem, idxs = item[:i], item[i:]
+        #print(item, stem, idxs)
+        idxs = eval(idxs)
+        idxs = (idxs,) if type(idxs) is int else idxs
+        if stem == "P":
+            _idxs = list(range(n))
+            for i,ii in enumerate(idxs):
+                _idxs[send[i]] = send[ii]
+            idxs = _idxs
+            assert len(idxs) == len(list(set(idxs))), idxs
+        else:
+            idxs = [send[idx] for idx in idxs]
+        idxs = "(%s)"%idxs[0] if len(idxs)==1 else tuple(idxs)
+        item = "%s%s"%(stem, idxs)
+        items.append(item)
+    items = tuple(items)
+    #print("\t", items)
+    return items
 
 
 def test_circuit():

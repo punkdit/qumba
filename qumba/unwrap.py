@@ -372,7 +372,7 @@ class Cover(object):
         base, total, fibers = self.base, self.total, self.fibers
         nn = base.nn
         assert M.shape == (nn, nn)
-        assert base.apply(M).is_equiv(base)
+        #assert base.apply(M).is_equiv(base)
         F = base.space.F
         I = base.space.get_identity()
         Mi = F*M*F
@@ -392,7 +392,7 @@ class Cover(object):
         P = total.space.get_perm(idxs)
         PMM = P.t*MM*P # switch to fiber order
         assert total.space.is_symplectic(PMM)
-        assert total.apply(PMM).is_equiv(total)
+        #assert total.apply(PMM).is_equiv(total)
         return PMM
 
     def descend(self, g):

@@ -37,6 +37,7 @@ class SymplecticSpace(object):
         self.nn = 2*n
         self.p = p
         self.F = symplectic_form(n, p)
+        #self.I = self.get_identity()
 
     def __lshift__(self, other):
         assert isinstance(other, SymplecticSpace)
@@ -55,10 +56,11 @@ class SymplecticSpace(object):
         A = identity2(self.nn)
         M = Matrix(A, self.p, name=())
         return M
+    I = get_identity # ??
 
     def get_perm(self, f):
         n, nn = self.n, 2*self.n
-        assert len(f) == n
+        assert len(f) == n, "len(%s) != %s"%(f, n)
         assert set([f[i] for i in range(n)]) == set(range(n))
         name = "P(%s)"%(",".join(str(i) for i in f))
         A = zeros2(nn, nn)
@@ -86,6 +88,7 @@ class SymplecticSpace(object):
         n = self.n
         A = identity2(2*n)
         idxs = list(range(n)) if idx is None else [idx]
+        name = tuple("%s(%d)"%(name,i) for i in idxs)
         for i in idxs:
             A[2*i:2*i+2, 2*i:2*i+2] = M.A
         A = A.transpose()
@@ -98,22 +101,20 @@ class SymplecticSpace(object):
     def get_H(self, idx=None):
         # swap X<-->Z on bit idx
         H = Matrix([[0,1],[1,0]], name="H")
-        name = "H(%s)"%idx
-        return self.get(H, idx, name)
+        #name = "H(%s)"%idx
+        return self.get(H, idx, "H")
     H = get_H
 
     def get_S(self, idx=None):
         # swap X<-->Y
         S = Matrix([[1,1],[0,1]], name="S")
-        name = "S(%s)"%idx
-        return self.get(S, idx, name)
+        #name = "S(%s)"%idx
+        return self.get(S, idx, "S")
     S = get_S
 
     def get_SH(self, idx=None):
         # X-->Z-->Y-->X 
-        SH = Matrix([[0,1],[1,1]], name="SH")
-        name = "SH(%s)"%idx
-        return self.get(SH, idx, name)
+        return self.S(idx)*self.H(idx)
 
     def get_CZ(self, idx=0, jdx=1):
         assert idx != jdx

@@ -388,7 +388,7 @@ def find_transversal(*codes, constant=False, verbose=True):
             print("gen:", len(gen), "fgen:", len(fgen))
 
 
-def find_local_clifford(tgt, src, constant=False, verbose=True):
+def find_local_cliffords(tgt, src, constant=False, verbose=True):
     #print("find_local_clifford")
     solver = Solver()
     Add = solver.add
@@ -440,8 +440,13 @@ def find_local_clifford(tgt, src, constant=False, verbose=True):
 
         Add(U != M)
 
+def get_local_clifford(tgt, src, constant=False, verbose=False):
+    for M in find_local_cliffords(tgt, src, constant, verbose):
+        return M
+
+
 def is_local_clifford_equiv(tgt, src, constant=False, verbose=False):
-    for M in find_local_clifford(tgt, src, constant, verbose):
+    for M in find_local_cliffords(tgt, src, constant, verbose):
         return True
     return False
 
@@ -526,7 +531,7 @@ def test_833():
         if code.is_equiv(dode):
             h = I
         else:
-            for h in find_local_clifford(code, dode):
+            for h in find_local_cliffords(code, dode):
                 break
             else:
                 continue
@@ -658,7 +663,7 @@ def get_412_transversal():
         perm = [g[i] for i in range(n)]
         P = space.get_perm(perm)
         tgt = src.apply_perm(perm)
-        for M in find_local_clifford(src, tgt):
+        for M in find_local_cliffords(src, tgt):
             code = tgt.apply(M)
             assert code.is_equiv(src)
             dode = src.apply(M*P)
@@ -840,7 +845,7 @@ def test_local_clifford():
         #    continue
         perm = [g[i] for i in range(n)]
         tgt = src.apply_perm(perm)
-        for M in find_local_clifford(src, tgt):
+        for M in find_local_cliffords(src, tgt):
             code = tgt.apply(M)
             assert code.is_equiv(src)
             L = code.get_logical(src)
@@ -917,7 +922,7 @@ def main_unwrap():
     
         count = 0
         gen = []
-        for M in find_clifford(dode, pairs):
+        for M in find_cliffords(dode, pairs):
             count += 1
             #print(M)
             eode = dode.apply(M)
@@ -977,7 +982,7 @@ def test_412():
             U = space.get_identity()
         else:
             U = None
-            found = list(find_local_clifford(code, dode))
+            found = list(find_local_cliffords(code, dode))
             assert len(found) == 1
             U = found[0]
             eode = dode.apply(U)
@@ -1410,7 +1415,7 @@ def test_dehn():
         perm += p
     dode = code.apply_perm(perm)
     #print(dode.is_equiv(code))
-    #for M in find_local_clifford(dode, code):
+    #for M in find_local_cliffords(dode, code):
     #    print(M)
     print(dode)
     print(strop(dode.H))

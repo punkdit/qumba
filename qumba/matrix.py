@@ -55,8 +55,6 @@ def complement(H):
     return W
 
 
-
-
 class Matrix(object):
     def __init__(self, A, p=DEFAULT_P, shape=None, name="?"):
         if type(A) == list or type(A) == tuple:
@@ -224,7 +222,7 @@ class Matrix(object):
 
     def __matmul__(self, other):
         A = numpy.kron(self.A, other.A)
-        return Matrix(A)
+        return Matrix(A, self.p)
 
     def direct_sum(self, other):
         "direct_sum"

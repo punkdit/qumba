@@ -17,21 +17,18 @@ from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identit
     rank, rand2, pseudo_inverse, kernel, direct_sum, row_reduce)
 from qumba.qcode import QCode, SymplecticSpace, strop, fromstr
 from qumba.csscode import CSSCode, find_logicals
-from qumba.autos import get_autos
 from qumba import csscode, construct
-from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
 from qumba.action import mulclose, mulclose_hom, mulclose_find
-from qumba.util import cross
-from qumba.symplectic import Building
 from qumba.unwrap import unwrap, unwrap_encoder
 from qumba.smap import SMap
 from qumba.argv import argv
 from qumba.unwrap import Cover
+from qumba import transversal 
 from qumba import clifford, matrix
 from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
 from qumba.syntax import Syntax
 from qumba.circuit import (Circuit, measure, barrier, send, vdump, variance,
-    parsevec, strvec, find_state, get_inverse, load_batch)
+    parsevec, strvec, find_state, get_inverse, load_batch, send_idxs)
 
 
 
@@ -679,35 +676,106 @@ def clifford_512():
     process(code, samps, circuit)
 
 
+def build_10_2_3_HI_IH():
+    """
+                                                                  
+      code       P                  M1
+    [[10,2,3]]  --->  [[10,2,3]]  -----> [[5,1,2]]CSS+[[5,1,2]]CSS*
+        |                 |                      |
+        |                 |                      |
+  cov_0 |           cov_1 |                cov_2 |
+        v                 v                      v
+        v                 v                      v
+    [[5,1,3]]         [[5,1,2]]   ----->     [[5,1,2]]CSS  
+                         c_512       M         c_surf                       
+    """
 
-def test_512():
-    c0 = construct.get_512()
-    code = c0 + c0.apply_H()
-    #print(code.longstr())
-    dode = unwrap(c0)
-    assert dode.is_equiv(code)
-    #print(dode.longstr())
-    #qasm_code(code)
+    # this is our canonical [[10,2,3]] code
+    cov_0 = Cover.frombase(construct.get_513())
 
-    total = unwrap(construct.get_513())
+    c_surf = construct.get_512() # CSS surface code
+    d_surf = c_surf.get_dual()
+    c_surf2 = c_surf + d_surf # CSS double cover
+    cov_2 = Cover.frombase(c_surf)
+    assert cov_2.total.is_equiv(c_surf2)
 
-    c0 = QCode.fromstr("""
-    ZYX..
-    XX.Y.
-    X.Y.X
-    Z..XY
+    # a non-CSS [[5,1,2]] code
+    c_512 = QCode.fromstr("""
+    YXZ..
+    X.XY.
+    .YX.X
+    ..ZXY
     """)
-    print(c0)
-    print(c0.longstr())
-    code = unwrap(c0) # unwrapped non-CSS [[5,1,2]]
-    perm = code.get_isomorphism(total)
-    print(perm) # iso to [[10,2,3]] above
-    assert total.apply_perm(perm).is_equiv(code)
+    cov_1 = Cover.frombase(c_512) # unwrapped non-CSS [[5,1,2]]
+    perm = cov_1.total.get_isomorphism(cov_0.total)
+    assert cov_0.total.apply_perm(perm).is_equiv(cov_1.total)
+    P = cov_0.total.space.get_perm(perm)
+    assert cov_0.total.apply(P).is_equiv(cov_1.total)
 
-    print(code.longstr())
+    perm = cov_0.total.get_isomorphism(cov_1.total)
+    Pi = cov_0.total.space.get_perm(perm)
+
+    space = c_512.space
+    M = transversal.get_local_clifford(c_surf, c_512)
+    M.name = space.get_name(M)
+
+    M1 = cov_1.get_expr(M.name)
+    assert M1 == cov_1.lift(M) # lift has no name
+
+    assert cov_1.total.apply(M1).is_equiv(cov_2.total)
+    assert cov_0.total.apply(M1*P).is_equiv(cov_2.total)
+
+    # construct logical H on c_surf, also works on d_surf
+    space = c_surf.space
+    H = space.H()
+    assert H.name == ('H(0)', 'H(1)', 'H(2)', 'H(3)', 'H(4)')
+    I = space.I()
+    assert I.name == ()
+    perm = c_surf.get_isomorphism(c_surf.get_dual())
+    H = space.get_perm(perm) * H
+    assert c_surf.apply(H).get_logical(c_surf, True) == SymplecticSpace(1).H()
+    assert d_surf.apply(H).get_logical(d_surf, True) == SymplecticSpace(1).H()
+
+    HI = H.direct_sum(I)
+    HI.name = send_idxs(H.name, [i for i in range(space.n)], 2*space.n)
+
+    IH = I.direct_sum(H)
+    IH.name = send_idxs(H.name, [i+space.n for i in range(space.n)], 2*space.n)
+
+    assert cov_2.total.apply(HI).is_equiv(cov_2.total)
+    assert cov_2.total.apply(IH).is_equiv(cov_2.total)
+
+    code = cov_0.total
+    space = code.space
+    invert = space.invert
+
+    M1i = invert(M1)
+    M1i.name = get_inverse(M1.name)
+    assert M1i == space.get_expr(M1i.name)
+
+    HI = Pi*M1i*HI*M1*P
+    assert HI == space.get_expr(HI.name)
+
+    IH = Pi*M1i*IH*M1*P
+    assert IH == space.get_expr(IH.name)
+
+    HI, IH = IH, HI # swapped
+    s2 = SymplecticSpace(2)
+    assert code.apply(HI).get_logical(code, True) == SymplecticSpace(2).H(0)
+    assert code.apply(IH).get_logical(code, True) == SymplecticSpace(2).H(1)
+
+    if 0:
+        print(HI.name)
+        c = measure + HI.name
+        circuit = Circuit(space.n)
+        qasm = circuit.run_qasm(c)
+        print(qasm)
+
+    return HI, IH
 
 
-def HH_10_2_3():
+
+def build_10_2_3_HH():
     "logical HH gate "
     base = construct.get_513()
     code = unwrap(base)
@@ -729,7 +797,7 @@ def HH_10_2_3():
     assert dode.is_equiv(code)
     assert dode.get_logical(code) == lHH
 
-    print(HH.name)
+    return HH
     
 
 
@@ -801,6 +869,121 @@ def qupy_10_2_3():
         #vdump(h*v0)
         assert eq(h*v0, v0)
 
+    return
+
+    HI, IH = build_10_2_3_HI_IH()
+    HI = space.get_expr(HI.name) # FAIL
+    v1 = HI*v0
+    assert eq2(P*v1, v1)
+
+
+def optimize_prep_0p():
+    name = ('P(0,6,7,8,4,9,3,2,1,5)', 'CX(0,5)', 'CX(4,9)', 'P(5,1,2,3,4,0,6,7,8,9)',
+    'P(0,6,2,3,4,5,1,7,8,9)', 'P(0,1,2,8,4,5,6,7,3,9)', 'P(0,1,2,3,9,5,6,7,8,4)',
+    'CX(4,9)', 'CX(3,8)', 'CX(1,6)', 'CX(0,5)', 'P(0,3,2,1,4,5,6,7,8,9)',
+    'H(0)', 'H(1)', 'H(2)', 'H(3)', 'H(4)', 'CX(0,5)', 'CX(1,6)',
+    'CX(3,8)', 'CX(4,9)', 'P(0,1,2,3,9,5,6,7,8,4)', 'P(0,1,2,8,4,5,6,7,3,9)',
+    'P(0,6,2,3,4,5,1,7,8,9)', 'P(5,1,2,3,4,0,6,7,8,9)', 'CX(4,9)',
+    'CX(0,5)', 'P(0,8,7,6,4,9,1,2,3,5)', 'CX(0,3)', 'CX(0,6)',
+    'CX(0,7)', 'CX(1,4)', 'CX(1,7)', 'CX(1,8)', 'CX(2,4)',
+    'CX(2,5)', 'CX(2,6)', 'CX(3,4)', 'CX(3,5)', 'CX(3,7)',
+    'CX(3,8)', 'CX(3,9)', 'H(0,)', 'H(1,)', 'H(2,)', 'H(3,)')
+    cost = lambda name : (len([gate for gate in name if gate.startswith("C")]))
+    print(cost(name))
+    
+    n = 10
+    space = SymplecticSpace(n)
+    CX = space.CX
+    CZ = space.CZ
+    SWAP = space.SWAP
+    H = space.H
+
+    E0 = space.get_expr(name)
+    print(E0)
+
+    #name = space.get_name(E0)
+    #print(cost(name)) # 51 
+
+    I = space.I()
+    gates = [CX(i,j) for i in range(n) for j in range(n) if i!=j]
+    gates += [CZ(i,j) for i in range(n) for j in range(i+1,n)]
+    gates += [SWAP(i,j) for i in range(n) for j in range(i+1,n)]
+    gates += [H(i) for i in range(n)]
+    for g in gates:
+        g.cost = cost(g.name)
+    #    print(g.name, g.cost)
+    #return
+
+    done = False
+    best = 18
+    while not done:
+    #for trial in range(10):
+        E = E0
+        weight = str(E+I).count('1')
+        name = ()
+        while 1:
+            shuffle(gates)
+            for g in gates:
+                E1 = g*E
+                w = str(E1+I).count('1')
+                #if w < weight:
+                if w < weight or w==weight and g.cost==0:
+                    E = E1
+                    name = g.name + name
+                    weight = w
+                    break
+            else:
+                break
+        #print()
+        #print(E, name, cost(name))
+        print('.', end='', flush=True)
+        if E==I and cost(name) < best:
+            print()
+            print(name)
+            best = cost(name)
+            print("cost =", best)
+
+    # cost 25
+    ('CX(3,1)', 'CZ(1,8)', 'CX(1,3)', 'H(1)', 'CX(1,8)',
+    'CX(8,6)', 'CX(1,0)', 'CX(8,9)', 'H(2)', 'CX(2,5)', 'H(7)',
+    'CX(8,4)', 'H(4)', 'CZ(2,4)', 'CZ(4,5)', 'CX(4,3)', 'CX(8,5)',
+    'H(8)', 'CX(9,0)', 'CX(5,4)', 'CX(7,3)', 'CX(3,8)', 'CX(1,8)',
+    'CX(7,0)', 'CZ(0,9)', 'CX(8,0)', 'CX(3,6)', 'CX(8,1)', 'CZ(8,9)', 'CX(2,6)')
+
+    # cost 20
+    ('H(7)', 'H(3)', 'H(2)', 'CX(3,9)', 'CZ(0,9)', 'P(0,1,7,3,4,5,6,2,8,9)',
+    'P(0,1,3,2,4,5,6,7,8,9)', 'P(0,1,2,7,4,5,6,3,8,9)', 'CX(2,8)',
+    'P(0,1,2,7,4,5,6,3,8,9)', 'CX(2,6)', 'P(0,1,7,3,4,5,6,2,8,9)',
+    'CZ(3,9)', 'P(0,1,7,3,4,5,6,2,8,9)', 'CX(5,4)', 'CX(3,1)',
+    'H(4)', 'P(0,1,2,3,7,5,6,4,8,9)', 'H(4)', 'CX(2,5)',
+    'P(0,1,7,3,4,5,6,2,8,9)', 'CX(2,1)', 'H(4)', 'P(0,1,7,3,4,5,6,2,8,9)',
+    'CX(4,5)', 'CX(3,0)', 'H(2)', 'P(0,1,2,7,4,5,6,3,8,9)',
+    'CX(1,6)', 'CX(7,8)', 'P(0,1,2,7,4,5,6,3,8,9)', 'P(0,3,2,1,4,5,6,7,8,9)',
+    'CX(9,0)', 'P(0,1,4,3,2,5,6,7,8,9)', 'P(0,4,2,3,1,5,6,7,8,9)',
+    'CX(1,8)', 'CX(4,1)', 'CX(5,7)', 'CX(1,0)', 'CZ(1,9)',
+    'CX(2,6)', 'P(0,1,2,3,7,5,6,4,8,9)')
+
+def get_prep_0p():
+    # cost 18
+    name = ('H(3)', 'P(0,1,2,7,4,5,6,3,8,9)', 'H(3)', 'H(3)', 'H(3)',
+    'H(7)', 'CX(5,4)', 'CX(3,1)', 'H(7)', 'P(0,1,2,7,4,5,6,3,8,9)',
+    'P(0,1,7,3,4,5,6,2,8,9)', 'CZ(0,3)', 'H(7)', 'P(0,1,2,3,7,5,6,4,8,9)',
+    'CX(9,8)', 'P(0,1,3,2,4,5,6,7,8,9)', 'H(2)', 'H(7)',
+    'P(0,1,2,7,4,5,6,3,8,9)', 'P(0,1,2,7,4,5,6,3,8,9)', 'CX(4,5)',
+    'CX(3,0)', 'H(2)', 'P(0,1,7,3,4,5,6,2,8,9)', 'CX(9,6)',
+    'P(0,1,7,3,4,5,6,2,8,9)', 'P(0,1,9,3,4,5,6,7,8,2)', 'CX(9,5)',
+    'CX(2,9)', 'H(2)', 'P(3,1,2,0,4,5,6,7,8,9)', 'P(2,1,0,3,4,5,6,7,8,9)',
+    'CX(7,1)', 'CX(5,7)', 'CX(4,6)', 'H(1)', 'CX(9,8)', 'P(0,1,2,3,7,5,6,4,8,9)',
+    'P(7,1,2,3,4,5,6,0,8,9)', 'CX(7,3)', 'P(0,1,2,7,4,5,6,3,8,9)',
+    'CX(9,3)', 'P(0,1,7,3,4,5,6,2,8,9)', 'CX(9,6)', 'P(1,0,2,3,4,5,6,7,8,9)',
+    'CX(2,8)', 'P(0,2,1,3,4,5,6,7,8,9)', 'P(3,1,2,0,4,5,6,7,8,9)',
+    'H(3)', 'CX(3,6)')
+    name = get_inverse(name)
+    return name
+
+
+
+
 
 
 def qasm_10_2_3():
@@ -858,6 +1041,11 @@ def qasm_10_2_3():
         fini_00, fini_pp = fini_pp + HH, fini_00 + HH
         code = code.get_dual()
 
+    HI, IH = build_10_2_3_HI_IH()
+    HI, IH = HI.name, IH.name
+    #name = (IH + prep_00)
+    #return
+
     cx = reduce(mul, [CX(i, i+5)*SWAP(i, i+5) for i in range(5)]).name
     cz = reduce(mul, [CZ(i, i+5) for i in range(5)]).name
 
@@ -866,7 +1054,7 @@ def qasm_10_2_3():
         c = measure + barrier + X0+Z1 + barrier + cz + barrier + X0 + barrier + prep
 
     elif argv.spam_00:
-        c = fini_00 + barrier + prep_00
+        c = fini_00 + barrier + prep_00                     # 0.996   success rate
     elif argv.state == (0,0): # X0,X1 
         c = fini_00 + barrier + cx + barrier + prep_00
     elif argv.state == (0,1):
@@ -878,17 +1066,43 @@ def qasm_10_2_3():
 
     elif argv.spam_pp:
         c = fini_pp + barrier + prep_pp
+        code = code.get_dual() # switch code for decode below
     elif argv.state == "pp":  # Z0,Z1
         c = fini_pp + barrier + cx + barrier + prep_pp
+        code = code.get_dual()
     elif argv.state == "pm": 
         c = fini_pp + barrier + Z0 + barrier + cx + barrier + Z1 + barrier + prep_pp
+        code = code.get_dual()
     elif argv.state == "mp": 
         c = fini_pp + barrier + Z0+Z1 + barrier + cx + barrier + Z0 + barrier + prep_pp
+        code = code.get_dual()
     elif argv.state == "mm": 
         c = fini_pp + barrier + Z1 + cx + barrier + Z0+Z1 + barrier + prep_pp
+        code = code.get_dual()
 
+    elif argv.spam_0p:
+        #c = fini_00 + barrier + IH + barrier + get_prep_0p() # 0.95    success rate  ARGGHH!!
+        #c = fini_00 + IH + barrier + IH + prep_00 # 0.97(0) success rate
+        #c = fini_pp + barrier + HI + barrier + IH + prep_00 # 0.96(8)
+        #code = code.get_dual()
+        c = fini_00 + barrier + IH + barrier + IH + prep_00 # 0.974 success rate
+    elif argv.state == "0p": # X0,Z1
+        c = fini_00 + barrier + IH + barrier + cz + barrier + IH + prep_00 # 0.96(7)
+    elif argv.state == "1p":
+        c = (fini_00 + barrier + IH + barrier 
+            + Z1+X0 + barrier + cz + barrier + X0 + 
+            barrier + IH + prep_00) # 0.965
+    elif argv.state == "0m":
+        c = (fini_00 + barrier + IH + barrier 
+            + Z1 + barrier + cz + barrier + Z1 + 
+            barrier + IH + prep_00) 
+    elif argv.state == "1m":
+        c = (fini_00 + barrier + IH + barrier 
+            + X0 + barrier + cz + barrier + X0+Z1 + 
+            barrier + IH + prep_00) 
     else:
         assert 0
+
     print(c)
 
     circuit = Circuit(n)
@@ -902,8 +1116,6 @@ def qasm_10_2_3():
         shots = argv.get("shots", 1000)
         samps = send([qasm], shots=shots, error_model=True)
 
-    if argv.spam_pp or type(argv.state) is str:
-        code = code.get_dual()
     process(code, samps, circuit)
 
 
