@@ -32,6 +32,27 @@ from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
 from qumba.syntax import Syntax
 
 
+def fix_qubit_order(job, samps):
+    code = job.code
+    start = "// final qubit order: "
+    assert start in code
+    lines = code.split("\n")
+    idxs = None
+    for line in lines:
+        if line.startswith(start):
+            assert idxs is None
+            line = line[len(start):]
+            idxs = eval(line)
+    assert idxs is not None, "%r not found"%start
+    print("fix_order", idxs)
+    #print(samps)
+    samps = [''.join(reversed(samp)) for samp in samps]
+    #print(samps)
+    samps = [''.join(samp[idx] for idx in idxs) for samp in samps]
+    #print(samps)
+    return samps
+
+
 
 def send(qasms=None, shots=1, 
         error_model=True, 
@@ -44,6 +65,7 @@ def send(qasms=None, shots=1,
         meas_errors=True, # bool
         memory_errors=True, # bool
         leak2depolar=False,
+        reorder=False,
         **kw): # kw goes into params
     from qjobs import QPU, Batch
     local = not argv.live
@@ -104,6 +126,8 @@ def send(qasms=None, shots=1,
         results = job.results
         if results['status'] == 'completed':
             samps = results["results"]["m"]
+            if reorder:
+                samps = fix_qubit_order(job, samps)
             sampss.append(samps)
         else:
             samps = []
@@ -115,7 +139,7 @@ def send(qasms=None, shots=1,
     return sampss
 
 
-def load(flatten=True):
+def load(flatten=True, reorder=False):
     name = argv.next()
     assert name.endswith(".p"), name
     f = open(name, "rb")
@@ -133,6 +157,8 @@ def load(flatten=True):
         samps = []
         if status == "completed":
             samps = results["results"]["m"]
+        if reorder:
+            samps = fix_qubit_order(job, samps)
         sampss.append(samps)
     if flatten:
         return reduce(add, sampss, [])
@@ -204,7 +230,10 @@ reset q;
         assert len(idxs) == self.n
         labels = self.labels
         self.labels = [labels[i] for i in idxs]
-        return "// P%s"%str(idxs)
+        return "// P%s\n// labels = %s"%(str(idxs), self.labels)
+
+    def COMMENT(self, comment):
+        return "// %s"%comment
 
     def SWAP(self, i, j):
         idxs = list(range(self.n))

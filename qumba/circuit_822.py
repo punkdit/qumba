@@ -557,6 +557,15 @@ def run_822_qasm():
         assert type(argv.state) is tuple or argv.prep_00
         H = HLz
 
+    if argv.reversed:
+        # For the 8,2,2 code H is symmetric in qubit reversal
+        # Ie., this does not make any difference, even though
+        # the qasm measurements are little-endian 
+        H = H[:, list(reversed(range(n)))]
+
+    #print("H =")
+    #print(H)
+
     H = H[:, idxs] # shuffle
 
     #print(H)

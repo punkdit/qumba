@@ -489,18 +489,23 @@ def run_412_qasm():
         global barrier
         barrier = ()
 
+    lx = protocol["X(0)"][1] + ("COMMENT('X(0)')",)
+
     qasms = []
     for trial in range(trials):
         physical = ()
         logical = ()
+        if argv.lx:
+            logical = lx
         #print("protocol:")
         for i in range(N):
             name = choice(names)
-            #print("name:", name)
             p, l = (), ()
             for nami in name:
                 p = p + protocol[nami][0]
                 l = protocol[nami][1] + l
+            #print("name:", name)
+            #print("\tl:", l)
             #print(p)
             
             physical = barrier + p + physical
@@ -516,8 +521,9 @@ def run_412_qasm():
             c = measure + logical + decode + physical + barrier + prep
     
         qasm = circuit.run_qasm(c)
-        #print(qasm)
+        #print(qasm[-60:])
         qasms.append(qasm)
+    #return
 
     if argv.dump:
         for qasm in qasms:
@@ -537,9 +543,12 @@ def run_412_qasm():
             simulator="state-vector", 
             memory_errors=argv.get("memory_errors", False),
             leak2depolar = argv.get("leak2depolar", False),
+            error_model=argv.get("error_model", True),
+            reorder=True, # uses fix_qubit_order
             **kw,
         )
-        process_412(samps)
+        #print(samps)
+        process_412(samps) #, circuit.labels)
 
 def process_412(samps):
     print("samps:", len(samps))
@@ -547,6 +556,11 @@ def process_412(samps):
         return
     succ=samps.count('0000')
     fail=samps.count('0001')
+    #print("labels:", labels)
+    #for c in "0001 0010 0100 1000".split():
+    for c in "1000 0100 0010 0001".split():
+        print(samps.count(c), end=' ')
+    print()
     print("succ: ", succ)
     print("err:  ", len(samps)-succ-fail)
     print("fail: ", fail)
@@ -560,7 +574,7 @@ def process_412(samps):
 
 
 def load_412():
-    samps = load()
+    samps = load(reorder=True)
     process_412(samps)
 
 
