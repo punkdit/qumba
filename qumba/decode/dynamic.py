@@ -27,8 +27,7 @@ class Op(object):
     def __init__(self, T):
         self.T = T
         self.w = T.sum()
-        self.hash = hash(T.tostring())
-        #self.hash = hash(tuple(T))
+        self.hash = hash(T.tobytes())
 
     def __hash__(self):
         return self.hash

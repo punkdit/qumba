@@ -30,7 +30,7 @@ class Decoder(object):
         self.code = code
 
     def get_T(self, err_op):
-        # bitflip, x-type errors, hit Hz ops, produce Tx
+        # bitflip X-type errors, frustrate Hz checks, and produce Tx
         code = self.code
         n = code.n
         T = zeros2(n)
@@ -47,7 +47,10 @@ class Decoder(object):
         return None
 
 
-class SimpleDecoder(Decoder): # XXX broken XXX
+class SimpleDecoder(Decoder):
+    """
+    Simple (&slow) optimal decoder that sums probabilities over cosets.
+    """
     def __init__(self, code):
         Decoder.__init__(self, code)
         self.all_Lx = rowspan(code.Lx)
@@ -61,34 +64,104 @@ class SimpleDecoder(Decoder): # XXX broken XXX
         sr = 0.
         n = code.n
         for l_op in self.all_Lx:
-            #print "l_op:", shortstr(l_op)
             r = 0.
             T1 = l_op + T
             for s_op in self.all_Hx:
                 T2 = (s_op + T1)%2
                 d = T2.sum()
-                #print shortstr(T2), d
-                #print d,
                 r += (1-p)**(n-d)*p**d
-            #print
             sr += r
             dist.append(r)
-        dist = [r//sr for r in dist]
+        dist = [r/sr for r in dist]
         return dist
 
     def decode(self, p, err_op, verbose=False, **kw):
-        #print "decode:"
-        #print shortstr(err_op)
         T = self.get_T(err_op)
-        #print shortstr(T)
         dist = self.get_dist(p, T)
-        #print dist
         p1 = max(dist)
         idx = dist.index(p1)
         l_op = self.all_Lx[idx]
-        #op = (l_op+T+err_op)%2
         op = (l_op+T)%2
         return op
+
+
+class LookupDecoder(Decoder):
+    def __init__(self, code):
+        Decoder.__init__(self, code)
+        code = self.code
+        Hz = code.Hz
+        m, n = Hz.shape
+        lookup = {}
+
+        # weight 0
+        u = zeros2(n)
+        v = dot2(Hz, u)
+        lookup[str(v)] = u
+
+        # weight 1
+        for i in range(n):
+            u = zeros2(n)
+            u[i] = 1
+            v = dot2(Hz, u)
+            lookup[str(v)] = u
+
+        # weight 2
+        for i in range(n):
+          for j in range(i+1, n):
+            u = zeros2(n)
+            u[i] = 1
+            u[j] = 1
+            v = dot2(Hz, u)
+            key = str(v)
+            if key not in lookup:
+                lookup[key] = u
+
+        # weight 3
+        for i in range(n):
+          for j in range(i+1, n):
+           for k in range(j+1, n):
+            u = zeros2(n)
+            u[i] = 1
+            u[j] = 1
+            u[k] = 1
+            v = dot2(Hz, u)
+            key = str(v)
+            if key not in lookup:
+                lookup[key] = u
+
+        self.lookup = lookup
+        print("LookupDecoder: size=%d"%len(lookup))
+
+    def decode(self, p, err_op, verbose=False, **kw):
+        code = self.code
+        Hz = code.Hz
+        lookup = self.lookup
+        v = dot2(Hz, err_op)
+        #key = v.tobytes()
+        key = str(v)
+        if key in lookup:
+            u = lookup[key]
+        else:
+            u = None
+
+        #print()
+        #print("decode", v, u)
+
+        return u
+
+
+class ChainDecoder(Decoder):
+    def __init__(self, code, decoders):
+        Decoder.__init__(self, code)
+        self.decoders = decoders
+
+    def decode(self, p, err_op, verbose=False, **kw):
+        for decoder in self.decoders:
+            u = decoder.decode(p, err_op, verbose)
+            if u is not None:
+                return u
+
+
 
 
 
