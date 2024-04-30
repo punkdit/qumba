@@ -951,7 +951,7 @@ def distance_lower_bound_z3(Hx, Lx, d):
     return v
 
 
-def distance_z3(code):
+def distance_z3_css(code):
 
     if code.k == 0:
         return code.n
@@ -969,6 +969,11 @@ def distance_z3(code):
         if v is not None:
             break
         d_z += 1
+    return d_x, d_z
+
+
+def distance_z3(code):
+    d_x, d_z = distance_z3_css(code)
     return min(d_x, d_z)
 
 
