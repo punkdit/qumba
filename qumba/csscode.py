@@ -302,6 +302,9 @@ class CSSCode(object):
             Hz=Hz, Tx=Tx, check=self.check)
         return code
 
+    def to_css(self):
+        return self
+
     def __add__(self, other):
         "perform direct sum"
         Gx, Gz = direct_sum(self.Gx, other.Gx), direct_sum(self.Gz, other.Gz)

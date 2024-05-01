@@ -11,7 +11,8 @@ cache = lru_cache(maxsize=None)
 from operator import add
 import json
 
-import numpy
+import numpy, sys
+numpy.set_printoptions(threshold=sys.maxsize)
 from numpy import alltrue, zeros, dot, concatenate
 
 from qumba import solve 
