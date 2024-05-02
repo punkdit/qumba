@@ -1020,6 +1020,8 @@ def qasm_10_2_3():
 
     if argv.spam_00:
         c = fini_00 + barrier + prep_00                     # 0.996   success rate
+    elif argv.spam_11:
+        c = fini_00 + barrier + X0+X1+prep_00               
     elif argv.state == (0,0): # X0,X1 
         c = fini_00 + barrier + cx + barrier + prep_00
     elif argv.state == (0,1):
@@ -1032,6 +1034,9 @@ def qasm_10_2_3():
     elif argv.spam_pp:
         c = fini_pp + barrier + prep_pp
         code = code.get_dual() # switch code for decode below
+    elif argv.spam_mm:
+        c = fini_pp + barrier + Z0+Z1+prep_pp
+        code = code.get_dual() 
     elif argv.state == "pp":  # Z0,Z1
         c = fini_pp + barrier + cx + barrier + prep_pp
         code = code.get_dual()

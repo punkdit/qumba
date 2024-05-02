@@ -511,8 +511,12 @@ def run_822_qasm():
     if argv.spam:
         if argv.prep_00:
             c = fini_00 + barrier + prep_00 # SPAM
+        elif argv.prep_11:
+            c = fini_00 + barrier + X0+X1+prep_00 # SPAM
         elif argv.prep_pp:
             c = fini_pp + barrier + prep_pp # SPAM
+        elif argv.prep_mm:
+            c = fini_pp + barrier + Z0+Z1+prep_pp # SPAM
         else:
             return
     elif argv.state == (0,0):
