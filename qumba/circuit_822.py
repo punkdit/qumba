@@ -452,6 +452,9 @@ def run_822_qasm():
     ...ZZ...
     """)
 
+    logical = numpy.array([0] * len(HLx))
+    logical.shape = (len(HLx), 1)
+
     fibers = [(i, i+base.n) for i in range(base.n)]
     #print("fibers:", fibers)
 
@@ -513,10 +516,12 @@ def run_822_qasm():
             c = fini_00 + barrier + prep_00 # SPAM
         elif argv.prep_11:
             c = fini_00 + barrier + X0+X1+prep_00 # SPAM
+            logical[-2:] = 1
         elif argv.prep_pp:
             c = fini_pp + barrier + prep_pp # SPAM
         elif argv.prep_mm:
             c = fini_pp + barrier + Z0+Z1+prep_pp # SPAM
+            logical[-2:] = 1
         else:
             return
     elif argv.state == (0,0):
@@ -539,6 +544,7 @@ def run_822_qasm():
         return
 
     print(c)
+    print("logical:", logical.transpose())
 
     qasms = []
     qasms.append(circuit.run_qasm(c))
@@ -551,14 +557,13 @@ def run_822_qasm():
         samps = send(qasms, shots=shots, error_model=True)
         #print(samps)
 
-    idxs = circuit.labels # final qubit permutation
 
-    if type(argv.state) is str or argv.prep_pp:
+    if type(argv.state) is str or argv.prep_pp or argv.prep_mm:
         #print("measure X syndromes")
         H = HLx
     else:
         #print("measure Z syndromes")
-        assert type(argv.state) is tuple or argv.prep_00
+        assert type(argv.state) is tuple or argv.prep_00 or argv.prep_11
         H = HLz
 
     if argv.reversed:
@@ -570,7 +575,8 @@ def run_822_qasm():
     #print("H =")
     #print(H)
 
-    H = H[:, idxs] # shuffle
+    idxs = circuit.labels # final qubit permutation
+    H = H[:, idxs] 
 
     #print(H)
     succ = 0
@@ -578,6 +584,10 @@ def run_822_qasm():
     for i,v in enumerate(samps):
         v = parse(v)
         u = dot2(H, v.transpose())
+        #print(u)
+        u = (u + logical) % 2
+        #print(u)
+        #print()
         if u.sum() == 0:
             succ += 1
         elif u[:3].sum() == 0:
