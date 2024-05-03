@@ -140,26 +140,53 @@ def send(qasms=None, shots=1,
 
 
 def load(flatten=True, reorder=False):
-    name = argv.next()
-    assert name.endswith(".p"), name
-    f = open(name, "rb")
-    batch = pickle.load(f)
-    f.close()
     sampss = []
-    for job in batch.jobs:
-        results = job.retrieve()
-        #results = job.results
-        status = results["status"]
-        print("status:", status)
-        #print("params:", results["params"])
-        #print(' '.join(results.keys()))
-        print(job.params)
-        samps = []
-        if status == "completed":
-            samps = results["results"]["m"]
-        if reorder:
-            samps = fix_qubit_order(job, samps)
-        sampss.append(samps)
+    code = None
+    while 1:
+        name = argv.next()
+        if name is None:
+            break
+        assert name.endswith(".p"), "not a batch file: %r"%name
+        print("batch:", name)
+        f = open(name, "rb")
+        batch = pickle.load(f)
+        f.close()
+        for job in batch.jobs:
+            results = job.retrieve()
+            #results = job.results
+            status = results["status"]
+            print("\tstatus:", status)
+            #print("params:", results["params"])
+            #print(' '.join(results.keys()))
+            if job.params:
+                print("\t%s"%(job.params,))
+            if code is not None:
+                # check we are using the same circuit in each batch
+                lhs, rhs = code, job.code
+                lhs, rhs = lhs.split("\n"), rhs.split("\n")
+                #print(lhs)
+                #print(rhs)
+                lhs = [line for line in lhs if not line.startswith("//")]
+                rhs = [line for line in rhs if not line.startswith("//")]
+                if lhs == rhs:
+                    print("\tcode == job.code")
+                else:
+                    print("="*79)
+                    print("job.code missmatch!")
+                    print("="*79)
+                    print('\n'.join(lhs))
+                    print("="*79)
+                    print('\n'.join(rhs))
+                    print("="*79)
+                    assert 0
+            else:
+                code = job.code
+            samps = []
+            if status == "completed":
+                samps = results["results"]["m"]
+            if reorder:
+                samps = fix_qubit_order(job, samps)
+            sampss.append(samps)
     if flatten:
         return reduce(add, sampss, [])
     return sampss
