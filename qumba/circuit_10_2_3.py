@@ -983,6 +983,9 @@ def qasm_10_2_3():
     prep_pp = css_encoder(Hz, True)
     prep_00 = css_encoder(Hx)
 
+    #print("prep_00 = ", prep_00)
+    #print("prep_pp = ", prep_pp)
+
     s = Syntax()
     CX, CZ, SWAP, H, X, Z, I = s.CX, s.CZ, s.SWAP, s.H, s.X, s.Z, s.get_identity()
     g = I
@@ -1017,6 +1020,9 @@ def qasm_10_2_3():
 
     cx = reduce(mul, [CX(i, i+5)*SWAP(i, i+5) for i in range(5)]).name
     cz = reduce(mul, [CZ(i, i+5) for i in range(5)]).name
+
+    print("CX =", cx)
+    print("CZ =", cz)
 
     if argv.spam_00:
         c = fini_00 + barrier + prep_00                     # 0.996   success rate

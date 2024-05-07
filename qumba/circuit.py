@@ -139,7 +139,7 @@ def send(qasms=None, shots=1,
     return sampss
 
 
-def load(flatten=True, reorder=False):
+def load(flatten=True, reorder=False, match_jobs=False):
     sampss = []
     code = None
     while 1:
@@ -158,6 +158,7 @@ def load(flatten=True, reorder=False):
             print("\tstatus:", status)
             #print("params:", results["params"])
             #print(' '.join(results.keys()))
+            print("job:", job.id)
             if job.params:
                 print("\t%s"%(job.params,))
             if code is not None:
@@ -168,7 +169,9 @@ def load(flatten=True, reorder=False):
                 #print(rhs)
                 lhs = [line for line in lhs if not line.startswith("//")]
                 rhs = [line for line in rhs if not line.startswith("//")]
-                if lhs == rhs:
+                if not match_jobs:
+                    pass
+                elif lhs == rhs:
                     print("\tcode == job.code")
                 else:
                     print("="*79)
