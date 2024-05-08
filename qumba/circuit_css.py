@@ -66,6 +66,8 @@ def test():
         code = unwrap(construct.get_513())
     elif argv.code == (7,1,3):
         code = construct.get_713()
+    elif argv.code == (9,1,3):
+        code = construct.get_surface(3, 3)
     elif argv.code == (18,2,3):
         code = construct.get_toric(3, 3)
     elif argv.code == (20,2,4):
@@ -77,26 +79,53 @@ def test():
     else:
         return
 
+    dual = argv.dual
     #code.distance()
-    print(code)
-    qasm_code(code)
+    qasm_code(code, dual)
 
 
-def qasm_code(code):
+def qasm_code(code, dual=False):
+    print(code, "dual =", dual)
     #print(code)
     #print(code.longstr())
     n = code.n
     k = code.k
-    Hx = code.to_css().Hx
-    Hx = row_reduce(Hx)
-    #print(shortstr(Hx))
-    prep = css_encoder(Hx)
 
-    c = measure + barrier + prep
+    css = code.to_css()
+    Hx = css.Hx
+    Hx = row_reduce(Hx)
+    Hz = css.Hz
+    Hz = row_reduce(Hz)
+
+    print("Hx =")
+    print(shortstr(Hx))
+    print("Hz =")
+    print(shortstr(Hz))
+
+    prep_0 = css_encoder(Hx)
+    prep_p = css_encoder(Hz, True)
+
+    if argv.code == (10,2,3):
+        print("using HH")
+        HH = ('P(0,3,1,4,2,5,8,6,9,7)', 'H(0)', 'H(1)', 'H(2)',
+            'H(3)', 'H(4)', 'H(5)', 'H(6)', 'H(7)', 'H(8)', 'H(9)')
+        prep_0 = HH + prep_p
+
+
+    Hn = tuple("H(%d)"%i for i in range(n))
+    fini_0 = measure
+    fini_p = measure + Hn
+
+    if dual:
+        c = fini_p + barrier + prep_p
+        code = code.get_dual()
+    else:
+        c = fini_0 + barrier + prep_0
 
     circuit = Circuit(n)
     qasm = circuit.run_qasm(c)
-    #print(qasm)
+    print(qasm)
+    print("// %d CX's" % qasm.count("cx "))
 
     shots = argv.get("shots", 10000)
     samps = send([qasm], shots=shots, error_model=True)
@@ -118,7 +147,7 @@ def process(code, samps, circuit):
     #print(Hz)
 
     idxs = circuit.labels # final qubit permutation
-    idxs = list(reversed(idxs)) # Um..... check this....
+    idxs = list(reversed(idxs))
 
     Hz = Hz[:, idxs]
     Lz = Lz[:, idxs]

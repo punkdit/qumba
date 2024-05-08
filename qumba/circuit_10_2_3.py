@@ -955,8 +955,6 @@ def get_prep_0p():
 
 
 
-
-
 def qasm_10_2_3():
     base = construct.get_513()
     code = unwrap(base)
@@ -980,15 +978,39 @@ def qasm_10_2_3():
     Hz = code.to_css().Hz
     Hz = row_reduce(Hz)
 
-    prep_pp = css_encoder(Hz, True)
-    prep_00 = css_encoder(Hx)
-
-    #print("prep_00 = ", prep_00)
-    #print("prep_pp = ", prep_pp)
+    # see HH_10_2_3 above:
+    HH = ('P(0,3,1,4,2,5,8,6,9,7)', 'H(0)', 'H(1)', 'H(2)',
+        'H(3)', 'H(4)', 'H(5)', 'H(6)', 'H(7)', 'H(8)', 'H(9)')
 
     s = Syntax()
     CX, CZ, SWAP, H, X, Z, I = s.CX, s.CZ, s.SWAP, s.H, s.X, s.Z, s.get_identity()
     g = I
+
+    get_CX = lambda i,j:("CX(%d,%d)"%(j,i))
+    get_H = lambda i:("H(%d)"%(i,))
+    get_expr = lambda name : tuple(eval(item, {"CX":get_CX, "H":get_H}) for item in name)
+
+    prep_00 = css_encoder(Hx)
+    prep_pp = css_encoder(Hz, True)
+
+    prep_00 = HH + prep_pp
+
+    cx_count = lambda gate : len([g for g in gate if 'CX' in g])
+    #print("prep_00 = ", prep_00, cx_count(prep_00))
+
+    assert prep_pp == ('CX(4, 0)', 'CX(6, 0)', 'CX(8, 0)',
+        'CX(2, 1)', 'CX(5, 1)', 'CX(8, 1)', 'CX(3, 2)', 
+        'CX(6, 2)', 'CX(9, 2)', 'CX(4, 3)', 'CX(5, 3)', 'CX(7, 3)', 
+        'H(4,)', 'H(5,)', 'H(6,)', 'H(7,)', 'H(8,)', 'H(9,)')
+    front = prep_pp[:-6]
+    prep_00 = HH[:1] + get_expr(front) + tuple(get_H(i) for i in range(4))
+    #print("prep_00 = ", prep_00, cx_count(prep_00))
+    #print("prep_pp = ", prep_pp, cx_count(prep_pp))
+
+    assert prep_00 == ('P(0,3,1,4,2,5,8,6,9,7)', 'CX(0,4)',
+        'CX(0,6)', 'CX(0,8)', 'CX(1,2)', 'CX(1,5)', 'CX(1,8)',
+        'CX(2,3)', 'CX(2,6)', 'CX(2,9)', 'CX(3,4)', 'CX(3,5)',
+        'CX(3,7)', 'H(0)', 'H(1)', 'H(2)', 'H(3)')
 
     L = """
     0123456789
@@ -1007,10 +1029,6 @@ def qasm_10_2_3():
     fini_pp = measure+Hn
     fini_00 = measure
 
-    # see HH_10_2_3 above:
-    HH = ('P(0,3,1,4,2,5,8,6,9,7)', 'H(0)', 'H(1)', 'H(2)',
-        'H(3)', 'H(4)', 'H(5)', 'H(6)', 'H(7)', 'H(8)', 'H(9)')
-
     if argv.HH:
         fini_00, fini_pp = fini_pp + HH, fini_00 + HH
         code = code.get_dual()
@@ -1021,8 +1039,8 @@ def qasm_10_2_3():
     cx = reduce(mul, [CX(i, i+5)*SWAP(i, i+5) for i in range(5)]).name
     cz = reduce(mul, [CZ(i, i+5) for i in range(5)]).name
 
-    print("CX =", cx)
-    print("CZ =", cz)
+    #print("CX =", cx)
+    #print("CZ =", cz)
 
     if argv.spam_00:
         c = fini_00 + barrier + prep_00                     # 0.996   success rate
