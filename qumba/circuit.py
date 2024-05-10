@@ -133,7 +133,8 @@ def send(qasms=None, shots=1,
             samps = []
             print(results['status'])
             print(results)
-            #print(job.code)
+            if argv.showcode:
+                print(job.code)
     if flatten:
         return reduce(add, sampss, [])
     return sampss
@@ -184,6 +185,8 @@ def load(flatten=True, reorder=False, match_jobs=False):
                     assert 0
             else:
                 code = job.code
+            if argv.showcode:
+                print(code)
             samps = []
             if status == "completed":
                 samps = results["results"]["m"]
