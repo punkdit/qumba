@@ -522,6 +522,8 @@ def run_412_qasm():
     
         qasm = circuit.run_qasm(c)
         #print(qasm[-60:])
+        if argv.show:
+            print(qasm)
         qasms.append(qasm)
     #return
 

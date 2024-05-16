@@ -549,6 +549,10 @@ def run_822_qasm():
     qasms = []
     qasms.append(circuit.run_qasm(c))
 
+    if argv.showqasm:
+        print(qasms[-1])
+        return
+
     if argv.load:
         samps = load()
 

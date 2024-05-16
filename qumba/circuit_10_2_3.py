@@ -68,6 +68,14 @@ def test_513():
     print(lx*u==u, lx*u==-u)
     print(ly*u==u, ly*u==-u)
 
+    I = c.I
+    gg = g*g
+    ggg = g*gg
+    assert g != I
+    assert gg != I
+    assert ggg != I
+    print(ggg)
+
 
 def qupy_513():
     base = construct.get_513()
@@ -1101,7 +1109,9 @@ def qasm_10_2_3():
 
     circuit = Circuit(n)
     qasm = circuit.run_qasm(c)
-    #print(qasm)
+    if argv.showqasm:
+        print(qasm)
+        return
 
     if argv.batch:
         samps = load_batch()
