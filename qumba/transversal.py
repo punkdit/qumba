@@ -155,6 +155,9 @@ class UMatrix(object):
     def __setitem__(self, idx, value):
         self.A[idx] = value
 
+    def __len__(self):
+        return len(self.A)
+
 #    @classmethod
 #    def promote(self, item):
 #        if isinstance(item, UMatrix):
