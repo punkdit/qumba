@@ -52,6 +52,22 @@ class SymplecticSpace(object):
         assert M.shape == (nn, nn)
         return F == M*F*M.transpose()
 
+    def parse(self, s, name="?"):
+        assert type(s) is str, repr(s)
+        rows = s.strip().split()
+        m = len(rows)
+        n = len(rows[0])
+        assert n==self.n, "do we care?"
+        A = zeros2(m, 2*n)
+        for i,row in enumerate(rows):
+            assert len(row) == n
+            for j,c in enumerate(row):
+                if c=='X' or c=='Y':
+                    A[i, 2*j] = 1
+                if c=='Z' or c=='Y':
+                    A[i, 2*j+1] = 1
+        return Matrix(A, self.p, name=name)
+
     def get_identity(self):
         A = identity2(self.nn)
         M = Matrix(A, self.p, name=())

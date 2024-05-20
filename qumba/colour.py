@@ -7,10 +7,11 @@ import numpy
 from bruhat.qcode import Geometry, get_adj, Group
 
 from qumba.argv import argv
-from qumba.qcode import QCode
+from qumba.qcode import QCode, strop
 from qumba.csscode import distance_z3
-from qumba.solve import shortstr, linear_independent, dot2
-
+from qumba.symplectic import SymplecticSpace
+from qumba.solve import shortstr, linear_independent, dot2, solve
+from qumba.action import mulclose_find
 from qumba.transversal import Solver, UMatrix, And, Or, one, Sum, If
 
 
@@ -68,13 +69,32 @@ def make_colour():
 
     colours = G.left_cosets(H)
     B = get_adj(faces, colours)
-    print(shortstr(B), B.shape)
-    print("colour:", B.sum(0), B.sum(1))
+    #print(shortstr(B), B.shape)
+    #print("colour:", B.sum(0), B.sum(1))
 
-    # -------------------------------------------------
+    # every edge is related to two colours
+    CE = get_adj(colours, edges)
+    #print("CE:")
+    #print(shortstr(CE), CE.shape)
+    #print(CE.sum(0), CE.sum(1))
 
-    solver = Solver()
-    add = solver.add
+    # inverse gives every edge a unique colour
+    CE = 1 - CE
+    print("CE:")
+    print(shortstr(CE), CE.shape)
+
+    RED, BLUE, GREEN = 0, 1, 2
+    red_edges = [idx for idx in range(len(edges)) if CE[RED, idx]]
+    blue_edges = [idx for idx in range(len(edges)) if CE[BLUE, idx]]
+    print("red_edges:", red_edges)
+    print("blue_edges:", blue_edges)
+
+    r_faces = [idx for idx in range(len(faces)) if B[idx, RED]]
+    bg_faces = [idx for idx in range(len(faces)) if not B[idx, RED]]
+
+    b_faces = [idx for idx in range(len(faces)) if B[idx, BLUE]]
+    rg_faces = [idx for idx in range(len(faces)) if not B[idx, BLUE]]
+    return
 
     F = len(faces)
     greens = [i for i in range(F) if B[i,0]]
@@ -82,6 +102,13 @@ def make_colour():
 
     R = A[greens, :]
     print(shortstr(R))
+
+    return
+
+    # -------------------------------------------------
+
+    solver = Solver()
+    add = solver.add
 
 #    items = []
 #    for idx in greens:
@@ -175,10 +202,149 @@ def make_colour():
 
 
 
+def find_encoder():
+    n = 6
+    nn = 2*n
 
+    space = SymplecticSpace(n)
+    lhs = space.parse("""
+    ZZ....
+    .ZZ...
+    ..ZZ..
+    ...ZZ.
+    ....ZZ
+    XX....
+    .XX...
+    ..XX..
+    ...XX.
+    ....XX
+    """)
+    #print(lhs, lhs.shape)
 
+    rhs = space.parse("""
+    .Z....
+    ..Z...
+    ...Z..
+    ....Z.
+    .....Z
+    X.X...
+    .X.X..
+    ..X.X.
+    ...X.X
+    X...X.
+    """)
+    #print(rhs, rhs.shape)
+    N = 9
+    lhs = lhs[:N]
+    rhs = rhs[:N]
 
+    U = lhs.solve(rhs)
+    assert U is not None
+    #print(U, U.shape)
+    assert (lhs*U == rhs)
 
+    # -----------------------------------
+
+    code = QCode.fromstr("""
+    ZZZZZZ
+    XX....
+    .XX...
+    ..XX..
+    ...XX.
+    ....XX
+    """)
+
+    U = code.get_encoder()
+
+    r = (lhs * U)
+    #print(r, r.shape)
+    #dode = QCode(H = r[5:])
+    #print(dode.longstr())
+    #return
+
+    # -----------------------------------
+
+    solver = Solver()
+    add = solver.add
+
+    F = UMatrix(space.F)
+    L = UMatrix(lhs)
+    R = UMatrix(rhs)
+    U = UMatrix.unknown(nn, nn)
+
+    add(U.t * F * U == F)
+    #add(U*L.t == R.t)
+    add(L*U == R)
+
+    found = set()
+    while 1:
+        result = solver.check()
+        #assert str(result) == "sat"
+        if str(result) != "sat":
+            break
+        model = solver.model()
+
+        U0 = U.get_interp(model)
+        found.add(U0)
+        add(U != U0)
+        #print(U0)
+        code = QCode.from_encoder(U0, k=0)
+        s = code.longstr()
+        #print()
+
+        h = strop(code.H)
+        if 'Z' in h or 'Y' in h:
+            continue
+        #print(s)
+        #print()
+
+    print(len(found))
+
+    # Jordan-Wigner ?!??!
+    """
+    H =
+    X.....
+    XX....
+    .XX...
+    ..XX..
+    ...XX.
+    ....XX
+    T =
+    ZZZZZZ
+    .ZZZZZ
+    ..ZZZZ
+    ...ZZZ
+    ....ZZ
+    .....Z
+    """
+
+    code = QCode.fromstr(
+    """
+    X.....
+    XX....
+    .XX...
+    ..XX..
+    ...XX.
+    ....XX
+    """,
+    """
+    ZZZZZZ
+    .ZZZZZ
+    ..ZZZZ
+    ...ZZZ
+    ....ZZ
+    .....Z
+    """)
+    print(code.longstr())
+    E = code.get_encoder()
+    print(E)
+
+    CX = space.CX
+    gen = [CX(i,j) for i in range(n) for j in range(n) if i!=j]
+    print(len(gen))
+
+    g = mulclose_find(gen, E, verbose=True)
+    print(g.name)
 
 
 
