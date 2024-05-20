@@ -954,7 +954,7 @@ def distance_lower_bound_z3(Hx, Lx, d):
     return v
 
 
-def distance_z3_css(code):
+def distance_z3_css(code, verbose=False):
 
     if code.k == 0:
         return code.n
@@ -964,14 +964,23 @@ def distance_z3_css(code):
         v = distance_lower_bound_z3(code.Hz, code.Lz, d_x)
         if v is not None:
             break
+        if verbose:
+            print("(d_x>%d)"%d_x, end="", flush=True)
         d_x += 1
 
+    if verbose:
+        print()
+
     d_z = 1
-    while d_z<d_x:
+    while 1:
         v = distance_lower_bound_z3(code.Hx, code.Lx, d_z)
         if v is not None:
             break
+        if verbose:
+            print("(d_z>%d)"%d_z, end="", flush=True)
         d_z += 1
+    if verbose:
+        print()
     return d_x, d_z
 
 
