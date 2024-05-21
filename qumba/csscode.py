@@ -957,7 +957,7 @@ def distance_lower_bound_z3(Hx, Lx, d):
 def distance_z3_css(code, verbose=False):
 
     if code.k == 0:
-        return code.n
+        return (code.n, code.n)
 
     d_x = 1
     while 1:
