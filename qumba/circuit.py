@@ -153,6 +153,7 @@ def load(flatten=True, reorder=False, match_jobs=False):
         batch = pickle.load(f)
         f.close()
         for job in batch.jobs:
+            print("job:", job.id)
             results = job.retrieve()
             #results = job.results
             status = results["status"]

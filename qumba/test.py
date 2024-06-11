@@ -16,7 +16,7 @@ from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
 from qumba.action import mulclose, mulclose_hom, mulclose_find
 from qumba.util import cross
 from qumba.symplectic import Building
-from qumba.unwrap import unwrap, unwrap_encoder
+from qumba.unwrap import unwrap, unwrap_encoder, Cover
 from qumba.smap import SMap
 from qumba.argv import argv
 
@@ -1769,6 +1769,133 @@ def test_20_2_6():
         print("P...")
         P = code.get_projector() # slow...
     
+
+def test_small():
+    from qumba.clifford import Clifford, red, green, Matrix
+
+#    n, k, d_lb = 2, 1, 1
+#    for code in construct.all_codes(n, k, d_lb):
+#        print(code)
+#        print(code.longstr())
+
+    c1 = Clifford(1)
+    H, S = c1.H, c1.S
+    I = c1.I
+    gen = [H(), S()]
+    C1 = mulclose(gen)
+    assert len(C1) == 192
+
+    n = 2
+    s = SymplecticSpace(n)
+    c = Clifford(n)
+    CX, CY, CZ, H, S = c.CX, c.CY, c.CZ, c.H, c.S
+
+    v0 = red(1,0) 
+    v0I = v0@I
+
+    src = [H(0), H(1), S(0), S(1), CX()]
+    tgt = [s.H(0), s.H(1), s.S(0), s.S(1), s.CX()]
+
+    #C2 = mulclose(src, verbose=True)
+    #print("C2:", len(C2))
+
+    Sp2 = mulclose(tgt)
+    print("Sp2:", len(Sp2))
+    assert len(Sp2) == 720
+
+    found = []
+    for E in Sp2:
+        base = QCode.from_encoder(E, 1)
+        cover = Cover.frombase(base)
+        total = cover.total
+        if total.d < 2 or not total.is_css():
+            continue
+        #print(base, total)
+        #print(total.longstr())
+        found.append(cover)
+        break
+
+    s = SymplecticSpace(4)
+    CX, CZ, H, S, SWAP = s.CX, s.CZ, s.H, s.S, s.SWAP
+
+    E1 = cover.lift(E)
+    E1 = E1 * H(2) * H(3) * SWAP(1,2)
+    print(base, total)
+    print()
+    print(base.longstr())
+    print()
+    print(total.longstr())
+    print()
+    code = QCode.from_encoder(E1, 2)
+    print(code.longstr())
+    print()
+
+
+    return
+
+    #hom = mulclose_hom(src, tgt, verbose=True)
+    #print(len(hom))
+
+    for E in C2: # encoder
+        pairs = []
+        for TL in C1: # logical
+            #print(E, E.shape)
+            #print(TL, TL.shape)
+            #print((v0@TL).shape)
+            rhs = E * (v0 @ TL)
+            for TP in C2: # physical
+                lhs = TP*E*v0I
+                if lhs==rhs:
+                    pairs.append((TP, TL))
+                    break
+        print(len(pairs))
+
+
+def test_chamon():
+    # See https://arxiv.org/pdf/1006.4871
+
+    mi, mj, mk = 2, 3, 5 # [[120, 4, 6]]
+    mi, mj, mk = 3, 3, 3 # [[108, 12, 6]]
+    mi, mj, mk = 4, 4, 4 # [[108, 12, 6]]
+    lattice = lambda i,j,k : (i % (2*mi), j%(2*mj), k%(2*mk))
+
+    stabs = []
+    keys = []
+    for i in range(2*mi):
+     for j in range(2*mj):
+      for k in range(2*mk):
+        if (i+j+k)%2 == 0:
+            continue
+        stab = {
+            lattice(i+1,j,k):"X",
+            lattice(i-1,j,k):"X",
+            lattice(i,j+1,k):"Y",
+            lattice(i,j-1,k):"Y",
+            lattice(i,j,k+1):"Z",
+            lattice(i,j,k-1):"Z",
+        }
+        stabs.append(stab)
+        keys += list(stab.keys())
+
+    lookup = list(set(keys))
+    lookup.sort()
+    n = len(lookup)
+    H = []
+    for stab in stabs:
+        h = ["."]*n
+        for key,value in stab.items():
+            h[lookup.index(key)] = value # use dict lookup?
+        h = ''.join(h)
+        H.append(h)
+    print(n, len(stabs))
+    H = fromstr(' '.join(H))
+    H = linear_independent(H)
+    code = QCode(H) # slooow
+    d = code.distance("z3")
+    print(code)
+    #print(code.longstr())
+
+
 
 
 def test():
