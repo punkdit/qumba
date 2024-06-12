@@ -1854,9 +1854,10 @@ def test_small():
 def test_chamon():
     # See https://arxiv.org/pdf/1006.4871
 
-    mi, mj, mk = 2, 3, 5 # [[120, 4, 6]]
-    mi, mj, mk = 3, 3, 3 # [[108, 12, 6]]
-    mi, mj, mk = 4, 4, 4 # [[108, 12, 6]]
+    mi, mj, mk = 2, 2, 2 # [[32, 8, 4]]
+    #mi, mj, mk = 2, 3, 5 # [[120, 4, 6]]
+    #mi, mj, mk = 3, 3, 3 # [[108, 12, 6]]
+    #mi, mj, mk = 4, 4, 4 # [[256, 16, 8]]
     lattice = lambda i,j,k : (i % (2*mi), j%(2*mj), k%(2*mk))
 
     stabs = []
