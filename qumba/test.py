@@ -1897,6 +1897,32 @@ def test_chamon():
     #print(code.longstr())
 
 
+def test_fault_tolerant():
+    # Golay code:
+    H = parse("""
+    1...........11...111.1.1
+    .1...........11...111.11
+    ..1.........1111.11.1...
+    ...1.........1111.11.1..
+    ....1.........1111.11.1.
+    .....1......11.11..11..1
+    ......1......11.11..11.1
+    .......1......11.11..111
+    ........1...11.111...11.
+    .........1..1.1.1..1.111
+    ..........1.1..1..11111.
+    ...........11...111.1.11
+    """)
+    H = H[1:, 1:] # puncture
+    print(H.shape)
+    H = linear_independent(H)
+    print(H.shape)
+    code = CSSCode(Hx=H, Hz=H)
+    print(code)
+    print(code.Hx)
+
+    E = code.to_qcode().get_encoder()
+    print(shortstr(E))
 
 
 def test():
