@@ -1499,6 +1499,7 @@ def test_all_412():
             print()
         count += 1
     print(count)
+
     
 def find_all_perm_lc_412():
     n, k, d = 4, 1, 2
@@ -1522,6 +1523,73 @@ def find_all_perm_lc_412():
     hom = equ.quotient_rep(codes, lc_perm)
     found = list(set(hom.values()))
     print("equs:", len(found))
+
+
+def sp_find(items):
+    n = 2
+    space = SymplecticSpace(n)
+
+    nn = 2*n
+    F = space.F
+
+    solver = Solver()
+    Add = solver.add
+    U = UMatrix.unknown(nn, nn)
+    Add(U.t*F*U == F) # U symplectic
+
+    parse = space.parse
+    pairs = []
+    for item in items:
+        src, tgt = item.split()
+        src = parse(src).t
+        tgt = parse(tgt).t
+        #print(src, tgt)
+        pairs.append((src, tgt))
+
+        Add(U * src == tgt)
+        
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("unsat")
+            return
+
+        model = solver.model()
+        M = U.get_interp(model)
+        assert M.t*F*M == F
+    
+        yield M
+        #print(M)
+        #print()
+        for src, tgt in pairs:
+            assert (M*src == tgt)
+        Add(U != M)
+
+
+def test_braid():
+    n = 2
+    space = SymplecticSpace(n)
+
+    CX, S, H = space.CX, space.S, space.H
+    gen = [CX(0,1), CX(1,0), S(0), S(1), H(0), H(1)]
+    G = mulclose(gen)
+    G = list(G)
+    print(len(G))
+
+    found = set()
+    #rhs = ["YI YZ", "IY ZY", "ZX IX", "XZ XI"]
+    rhs = ["YI YZ", "IY ZY", "XZ IX", "ZX XI"]
+    for R in sp_find(rhs):
+        lhs = "XI XZ,IX ZX,ZY YI,YZ IY".split(',')
+        for L in sp_find(lhs):
+            U = L*R
+            found.add(U)
+
+    for g in found:
+        print(g)
+        g = G[G.index(g)]
+        print(g.name)
+
 
 
 if __name__ == "__main__":
