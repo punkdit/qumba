@@ -947,10 +947,10 @@ def distance_lower_bound_z3(Hx, Lx, d):
     v = array2(v)
 
     u = dot2(Hx, v)
-    assert u.sum() == 0, "bug bug... try updating z3?"
+    assert u.sum() == 0, "bug bug... try updating z3? pip3 install z3-solver"
     u = dot2(Lx, v)
-    assert u.sum() != 0, "bug bug... try updating z3?"
-    assert v.sum() <= d, ("v.sum()==%d: bug bug... try updating z3?"%v.sum())
+    assert u.sum() != 0, "bug bug... try updating z3? pip3 install z3-solver"
+    assert v.sum() <= d, ("v.sum()==%d: bug bug... try updating z3? pip3 install z3-solver"%v.sum())
     return v
 
 
@@ -1012,7 +1012,6 @@ def test_distance():
 if __name__ == "__main__":
 
     from time import time
-    start_time = time()
     start_time = time()
 
     profile = argv.profile
