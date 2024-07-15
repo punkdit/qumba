@@ -548,16 +548,27 @@ def test_xzzx():
     assert code.k == 2
     assert code.get_distance() == 2
 
-    from qumba.distance import distance_z3
+    code = get_xzzx(1,2)
+    assert code.n == 5
+    assert code.k == 1
+    assert code.get_distance() == 3
+
     code = get_xzzx(1,3)
     assert code.n == 10
     assert code.k == 2
     assert code.get_distance() == 3
+
+    from qumba.distance import distance_z3
     code = get_xzzx(3,4)
     assert code.n == 25
     assert code.k == 1
     assert distance_z3(code) == 3+4
     #print(code.longstr())
+
+    #from qumba.transversal import find_local_cliffords
+    #for E in find_local_cliffords(code, code):
+    #    print(E)
+    #return
 
 
 def get_css(param):
