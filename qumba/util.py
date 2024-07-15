@@ -1,6 +1,29 @@
 #!/usr/bin/env python3
 
 
+def all_subsets(items):
+
+    items = list(items)
+    n = len(items)
+    if n==0:
+        yield []
+        return
+
+    if n==1:
+        yield []
+        yield [items[0]]
+        return
+
+    for subset in all_subsets(items[:n-1]):
+        yield subset
+        yield subset + [items[n-1]] # sorted !!
+
+assert len(list(all_subsets(list(range(5))))) == 2**5
+
+
+
+
+
 # tried caching this, not any faster
 def factorial(n):
     r = 1
