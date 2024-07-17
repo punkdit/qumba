@@ -67,6 +67,7 @@ class SymplecticSpace(object):
                 if c=='Z' or c=='Y':
                     A[i, 2*j+1] = 1
         return Matrix(A, self.p, name=name)
+    fromstr = parse
 
     def get_identity(self):
         A = identity2(self.nn)

@@ -565,11 +565,6 @@ def test_xzzx():
     assert distance_z3(code) == 3+4
     #print(code.longstr())
 
-    #from qumba.transversal import find_local_cliffords
-    #for E in find_local_cliffords(code, code):
-    #    print(E)
-    #return
-
 
 def get_css(param):
     H = Hx = Hz = None
