@@ -173,6 +173,9 @@ class Matrix(object):
     def is_zero(self):
         return self.A.sum() == 0
 
+    def is_identity(self):
+        return self == Matrix.identity(len(self))
+
     def __len__(self):
         return len(self.A)
 
@@ -223,6 +226,13 @@ class Matrix(object):
     def __matmul__(self, other):
         A = numpy.kron(self.A, other.A)
         return Matrix(A, self.p)
+
+    def __pow__(self, n):
+        assert n>=0
+        A = Matrix.identity(len(self))
+        for i in range(n):
+            A = self*A
+        return A
 
     def direct_sum(self, other):
         "direct_sum"

@@ -78,21 +78,31 @@ def all_cyclic(n, dmin=1, gf4_linear=True):
         #print(code.longstr())
 
 def main():
+    gf4_linear = argv.get("gf4_linear", True)
     for n0 in range(2, 20):
         if argv.even:
             n = 2*n0
         else:
             n = 2*n0 + 1
-        for code in all_cyclic(n, 3):
+        for code in all_cyclic(n, 3, gf4_linear):
             sd = code.is_selfdual()
             H = code.H
             rws = [get_weight(h) for h in H.A]
-            if code.k:
-                print(code, set(rws), "*" if sd else "")
-                #print(code.longstr())
-            assert code.is_gf4_linear()
+            if gf4_linear:
+                assert code.is_gf4_linear()
             tgt = code.apply_perm([(i+1)%n for i in range(n)])
             assert tgt.is_equiv(code)
+            L = tgt.get_logical(code)
+            if code.k:
+                print(code, set(rws), 
+                    "*" if sd else "", 
+                    "gf4" if code.is_gf4_linear() else "")
+                #print(code.longstr())
+                assert (L**n).is_identity()
+                if not L.is_identity():
+                    #print(L)
+                    print("L")
+                    print()
 
 
 def test_513():
