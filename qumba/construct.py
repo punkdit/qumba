@@ -108,7 +108,7 @@ def get_713():
     return code
 
 
-def golay():
+def get_golay():
     # Golay code:
     H = parse("""
     1...........11...111.1.1

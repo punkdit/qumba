@@ -868,6 +868,15 @@ class QCode(object):
             tgt = tgt.apply_CNOT(i, n+i)
         return src.is_equiv(tgt)
 
+    def is_gf4_linear(self):
+        "check for transversal SH"
+        n = self.n
+        tgt = self
+        for i in range(n):
+            tgt = tgt.apply_H(i)
+            tgt = tgt.apply_S(i)
+        return self.is_equiv(tgt)
+
     def is_selfdual(self):
         tgt = self.apply_H()
         return self.is_equiv(tgt)

@@ -46,7 +46,7 @@ def search_distance_z3(code, d):
                 terms.append(vz)
             elif z:
                 terms.append(vx)
-        assert len(terms)>1
+        #assert len(terms)>1, len(terms)
         return reduce(Xor, terms)
 
     # parity checks

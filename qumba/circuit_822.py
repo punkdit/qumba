@@ -19,7 +19,7 @@ from qumba.qcode import QCode, SymplecticSpace, strop, fromstr
 from qumba.csscode import CSSCode, find_logicals
 from qumba.autos import get_autos
 from qumba import csscode, construct
-from qumba.construct import get_422, get_513, golay, get_10_2_3, reed_muller
+from qumba.construct import get_422, get_513, get_golay, get_10_2_3, reed_muller
 from qumba.action import mulclose, mulclose_hom, mulclose_find
 from qumba.util import cross
 from qumba.symplectic import Building
