@@ -88,14 +88,12 @@ def all_cyclic_gf2(n):
     x = R.gen()
 
     A = factor(x**n - 1)
-    #print(A)
+    print(A)
     space = SymplecticSpace(n)
-
-    mkpauli = lambda a:''.join({0:'.', 1:'X', z2:'Z', z2+1:'Y'}[a[i]] for i in range(n))
 
     factors = [a for (a,j) in A]
     N = len(factors)
-    #print("factors:", N)
+    print("factors:", N)
 
     Hs = []
     for bits in numpy.ndindex((2,)*N):
@@ -104,33 +102,59 @@ def all_cyclic_gf2(n):
             assert a == x**n+1, a
             continue 
         gen = numpy.array([int(a[k]) for k in range(n)], dtype=int)
-        rows = []
-        for i in range(n):
-            v = [gen[(i+k)%n] for k in range(n)]
-            rows.append(v)
-        H = numpy.array(rows)
-        H = Matrix(H)
-        H = H.linear_independent()
-        yield H
+        yield gen
+
+#        rows = []
+#        for i in range(n):
+#            v = [gen[(i+k)%n] for k in range(n)]
+#            rows.append(v)
+#        H = numpy.array(rows)
+#        H = Matrix(H)
+#        H = H.linear_independent()
+#        yield H
 
 
 def all_cyclic_sp(n, dmin):
 
-    for Hx0 in all_cyclic_gf2(n):
+    space = SymplecticSpace(n)
+    nn = 2*n
+    for hx0 in all_cyclic_gf2(n):
+      for hz in all_cyclic_gf2(n):
         for i in range(n):
             idxs = [(i+k)%n for k in range(n)]
-            Hx = Hx0[:, idxs]
-            #print(Hx)
-            #print()
-            #for Hz0 in all_cyclic_gf2(n):
-            #    H = numpy.zeros((
+            hx = hx0[idxs]
+            h = numpy.zeros((n,2), dtype=int)
+            h[:,0] = hx
+            h[:,1] = hz
+            #print(hx, hz)
+            #print(h)
+            rows = []
+            for j in range(n):
+                idxs = [(j+k)%n for k in range(n)]
+                h1 = h[idxs, :].copy()
+                h1.shape = nn,
+                rows.append(h1)
+            #H = numpy.array(rows)
+            H = Matrix(rows)
+            if (H*space.F*H.t).sum()==0:
+                H = H.linear_independent()
+                code = QCode(H)
+                yield code
+                #print(H)
+                #print()
 
-        yield None
+        #print()
 
 
 def main():
     n = 5
+    for h in all_cyclic_gf2(n):
+        print(h)
+    return
+
     for code in all_cyclic_sp(n, 3):
+        print(code)
+        print(code.longstr())
         pass
 
 
