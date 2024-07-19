@@ -26,6 +26,8 @@ from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr
 from qumba import construct
 from qumba.argv import argv
 from qumba.distance import distance_z3
+from qumba.transversal import find_local_cliffords
+from qumba.action import mulclose
 
 
 def all_cyclic(n, dmin=1, gf4_linear=True):
@@ -77,9 +79,11 @@ def all_cyclic(n, dmin=1, gf4_linear=True):
         #print(gen, code)
         #print(code.longstr())
 
+
 def main():
     gf4_linear = argv.get("gf4_linear", True)
-    for n0 in range(2, 20):
+    n = argv.get("n", 20)
+    for n0 in range(2, n):
         if argv.even:
             n = 2*n0
         else:
@@ -92,17 +96,24 @@ def main():
                 assert code.is_gf4_linear()
             tgt = code.apply_perm([(i+1)%n for i in range(n)])
             assert tgt.is_equiv(code)
+            if code.k==0:
+                continue
             L = tgt.get_logical(code)
-            if code.k:
-                print(code, set(rws), 
-                    "*" if sd else "", 
-                    "gf4" if code.is_gf4_linear() else "")
-                #print(code.longstr())
-                assert (L**n).is_identity()
-                if not L.is_identity():
-                    #print(L)
-                    print("L")
-                    print()
+            print(code, set(rws), 
+                "*" if sd else "", 
+                "gf4" if code.is_gf4_linear() else "")
+            #print(code.longstr())
+            assert (L**n).is_identity()
+            if not L.is_identity():
+                print("L")
+            #N, perms = code.get_autos()
+            gen = list(find_local_cliffords(code))
+            if len(gen)==1:
+                continue
+            gen = [code.get_logical(g*code) for g in gen] + [L]
+            G = mulclose(gen)
+            print("|G| =", len(G))
+            print()
 
 
 def test_513():

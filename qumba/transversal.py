@@ -391,8 +391,11 @@ def find_transversal(*codes, constant=False, verbose=True):
             print("gen:", len(gen), "fgen:", len(fgen))
 
 
-def find_local_cliffords(tgt, src, constant=False, verbose=True):
+def find_local_cliffords(tgt, src=None, constant=False, verbose=True):
     #print("find_local_clifford")
+    if src is None:
+        src = tgt
+
     solver = Solver()
     Add = solver.add
 
