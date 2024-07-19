@@ -30,7 +30,7 @@ from qumba.transversal import find_local_cliffords
 from qumba.action import mulclose
 
 
-def all_cyclic(n, dmin=1, gf4_linear=True):
+def all_cyclic_gf4(n, dmin=1, gf4_linear=True):
     F = GF(4)
     z2 = F.gen()
     R = PolynomialRing(F, "x")
@@ -80,7 +80,61 @@ def all_cyclic(n, dmin=1, gf4_linear=True):
         #print(code.longstr())
 
 
+def all_cyclic_gf2(n):
+    assert n%2, n
+    F = GF(2)
+    z2 = F.gen()
+    R = PolynomialRing(F, "x")
+    x = R.gen()
+
+    A = factor(x**n - 1)
+    #print(A)
+    space = SymplecticSpace(n)
+
+    mkpauli = lambda a:''.join({0:'.', 1:'X', z2:'Z', z2+1:'Y'}[a[i]] for i in range(n))
+
+    factors = [a for (a,j) in A]
+    N = len(factors)
+    #print("factors:", N)
+
+    Hs = []
+    for bits in numpy.ndindex((2,)*N):
+        a = reduce(mul, (factors[i] for i in range(N) if bits[i]), x**0)
+        if sum(bits)==N:
+            assert a == x**n+1, a
+            continue 
+        gen = numpy.array([int(a[k]) for k in range(n)], dtype=int)
+        rows = []
+        for i in range(n):
+            v = [gen[(i+k)%n] for k in range(n)]
+            rows.append(v)
+        H = numpy.array(rows)
+        H = Matrix(H)
+        H = H.linear_independent()
+        yield H
+
+
+def all_cyclic_sp(n, dmin):
+
+    for Hx0 in all_cyclic_gf2(n):
+        for i in range(n):
+            idxs = [(i+k)%n for k in range(n)]
+            Hx = Hx0[:, idxs]
+            #print(Hx)
+            #print()
+            #for Hz0 in all_cyclic_gf2(n):
+            #    H = numpy.zeros((
+
+        yield None
+
+
 def main():
+    n = 5
+    for code in all_cyclic_sp(n, 3):
+        pass
+
+
+def main_gf4():
     gf4_linear = argv.get("gf4_linear", True)
     n = argv.get("n", 20)
     for n0 in range(2, n):
@@ -88,7 +142,7 @@ def main():
             n = 2*n0
         else:
             n = 2*n0 + 1
-        for code in all_cyclic(n, 3, gf4_linear):
+        for code in all_cyclic_gf4(n, 3, gf4_linear):
             sd = code.is_selfdual()
             H = code.H
             rws = [get_weight(h) for h in H.A]
@@ -98,10 +152,11 @@ def main():
             assert tgt.is_equiv(code)
             if code.k==0:
                 continue
-            L = tgt.get_logical(code)
             print(code, set(rws), 
                 "*" if sd else "", 
                 "gf4" if code.is_gf4_linear() else "")
+            continue
+            L = tgt.get_logical(code)
             #print(code.longstr())
             assert (L**n).is_identity()
             if not L.is_identity():
