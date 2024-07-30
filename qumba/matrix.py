@@ -131,6 +131,11 @@ class Matrix(object):
         A = numpy.identity(n, dtype=scalar)
         return Matrix(A, p, name="I")
 
+    @classmethod
+    def zeros(cls, shape, p=DEFAULT_P):
+        A = numpy.zeros(shape, dtype=scalar)
+        return Matrix(A, p, name="0")
+
     def __str__(self):
         return shortstr(self.A)
         #return str(self.A).replace("0", ".")
