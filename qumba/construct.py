@@ -62,7 +62,8 @@ def get_513(idx=None):
         ZX.XZ
         """
     else:
-        # some other 5,1,3 codes:
+        # Some other [[5,1,3]] codes.
+        # These are all LC-equivalent to above [[5,1,3]].
         data = """
         Y.ZZX ZYZ.Y ZZXZ. .ZZYZ
         XZZX. ZY.XZ .ZXZZ Z.ZZX

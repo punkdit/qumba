@@ -515,6 +515,92 @@ def main():
         print()
 
 
+def test_513():
+    code = construct.get_513()
+
+    #print(code.longstr())
+    p = [1,2,3,4,0]
+    lc_ops = set()
+    gen = set()
+    for g in find_local_cliffords(code, code):
+        if g.is_identity():
+            continue
+        dode = code.apply(g)
+        assert dode.is_equiv(code)
+        L = dode.get_logical(code)
+        gen.add(L)
+        lc_ops.add(L)
+        break
+
+    space = code.space
+    for p in allperms(list(range(5))):
+        if p==(0,1,2,3,4):
+            continue
+        P = space.get_perm(p)
+        dode = code.apply_perm(p)
+        for g in find_local_cliffords(code, dode):
+            break
+        else:
+            assert 0
+        #print(g)
+        eode = dode.apply(g)
+        assert eode.is_equiv(code)
+        L = eode.get_logical(code)
+        if L in gen:
+            continue
+        gen.add(L)
+        gp = g*P
+        dode = code.apply(gp)
+        assert dode.is_equiv(code)
+        lc_ops.add(L)
+        break
+        
+    G = mulclose(gen)
+    assert len(G)==6
+    assert len(lc_ops) == 2
+
+    gen = []
+    #I = space.get_identity()
+    I = SymplecticSpace(1).get_identity()
+    for g in lc_ops:
+        op = [g,I,I]
+        op = reduce(Matrix.direct_sum, op)
+        #print(op)
+        #print()
+        gen.append(op)
+
+    N = 3
+    count = 0
+    arg = [code]*N
+    src = reduce(add, arg)
+    print(src)
+    print("N =", N)
+    for M,L in find_transversal(*arg, constant=argv.constant):
+        gen.append(L)
+        tgt = src.apply(M)
+        assert tgt.is_equiv(src)
+        count += 1
+    print()
+    print("gen:", len(gen))
+    for g in gen:
+        print(g, g.shape)
+    G = mulclose(gen, verbose=True)
+    print("|G| =", len(G))
+    print()
+
+
+
+    f = open("generate_513.gap", "w")
+    names = []
+    for i,M in enumerate(gen):
+        name = "M%d"%i
+        print("%s := %s;"%(name,M.gap()), file=f)
+        names.append(name)
+    print("G := Group([%s]);"%(','.join(names)), file=f)
+    print("Order(G);", file=f)
+    f.close()
+
+
 def test_833():
     # See:
     # https://arxiv.org/abs/quant-ph/9702029"
