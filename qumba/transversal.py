@@ -17,7 +17,7 @@ from qumba.util import allperms
 from qumba import equ
 from qumba import construct 
 from qumba import autos
-from qumba.unwrap import unwrap
+from qumba.unwrap import unwrap, Cover
 from qumba.argv import argv
 
 
@@ -464,8 +464,10 @@ def main():
         code = QCode.fromstr("XXXX ZZZZ")
     elif argv.code == (5,1,3):
         code = construct.get_513()
+    #elif argv.code == (4,1,2):
+    #    code = QCode.fromstr("XYZI IXYZ ZIXY")
     elif argv.code == (4,1,2):
-        code = QCode.fromstr("XYZI IXYZ ZIXY")
+        code = QCode.fromstr("XXZZ ZZXX XZXZ")
     elif argv.code == (6,2,2):
         code = QCode.fromstr("XXXIXI ZZIZIZ IYZXII IIYYYY")
     elif argv.code == (7,1,3) and argv.css:
@@ -521,14 +523,12 @@ def test_513():
     #print(code.longstr())
     p = [1,2,3,4,0]
     lc_ops = set()
-    gen = set()
     for g in find_local_cliffords(code, code):
         if g.is_identity():
             continue
         dode = code.apply(g)
         assert dode.is_equiv(code)
         L = dode.get_logical(code)
-        gen.add(L)
         lc_ops.add(L)
         break
 
@@ -546,30 +546,25 @@ def test_513():
         eode = dode.apply(g)
         assert eode.is_equiv(code)
         L = eode.get_logical(code)
-        if L in gen:
+        if L in lc_ops:
             continue
-        gen.add(L)
         gp = g*P
         dode = code.apply(gp)
         assert dode.is_equiv(code)
         lc_ops.add(L)
         break
         
-    G = mulclose(gen)
+    G = mulclose(lc_ops)
     assert len(G)==6
     assert len(lc_ops) == 2
 
+    N = 4
     gen = []
-    #I = space.get_identity()
     I = SymplecticSpace(1).get_identity()
     for g in lc_ops:
-        op = [g,I,I]
-        op = reduce(Matrix.direct_sum, op)
-        #print(op)
-        #print()
+        op = reduce(Matrix.direct_sum, [g]+[I]*(N-1))
         gen.append(op)
 
-    N = 3
     count = 0
     arg = [code]*N
     src = reduce(add, arg)
@@ -588,9 +583,7 @@ def test_513():
     print("|G| =", len(G))
     print()
 
-
-
-    f = open("generate_513.gap", "w")
+    f = open("generate_513_%d.gap"%N, "w")
     names = []
     for i,M in enumerate(gen):
         name = "M%d"%i
@@ -599,6 +592,67 @@ def test_513():
     print("G := Group([%s]);"%(','.join(names)), file=f)
     print("Order(G);", file=f)
     f.close()
+
+
+def test_513_cover():
+    code = construct.get_513()
+
+    #print(code.longstr())
+    p = [1,2,3,4,0]
+    lc_ops = set()
+    physical = set()
+    for g in find_local_cliffords(code, code):
+        if g.is_identity():
+            continue
+        dode = code.apply(g)
+        assert dode.is_equiv(code)
+        L = dode.get_logical(code)
+        lc_ops.add(L)
+        physical.add(g)
+        break
+
+    space = code.space
+    for p in allperms(list(range(5))):
+        if p==(0,1,2,3,4):
+            continue
+        P = space.get_perm(p)
+        dode = code.apply_perm(p)
+        for g in find_local_cliffords(code, dode):
+            break
+        else:
+            assert 0
+        #print(g)
+        eode = dode.apply(g)
+        assert eode.is_equiv(code)
+        L = eode.get_logical(code)
+        if L in lc_ops:
+            continue
+        gp = g*P
+        dode = code.apply(gp)
+        assert dode.is_equiv(code)
+        physical.add(gp)
+        lc_ops.add(L)
+        break
+        
+    G = mulclose(lc_ops)
+    assert len(G)==6
+    assert len(lc_ops) == 2
+
+    cover = Cover.frombase(code)
+    total = cover.total
+
+    gen = set()
+    for g in physical:
+        g = cover.lift(g)
+        gen.add(total.get_logical(g*total))
+
+    g = cover.get_ZX()
+    gen.add(total.get_logical(g*total))
+    g = cover.get_CZ()
+    gen.add(total.get_logical(g*total))
+
+    G = mulclose(gen)
+    assert len(G) == 36
 
 
 def test_833():
