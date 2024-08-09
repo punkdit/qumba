@@ -28,6 +28,7 @@ from qumba.argv import argv
 from qumba.distance import distance_z3
 from qumba.transversal import find_local_cliffords
 from qumba.action import mulclose
+from qumba.autos import is_iso
 
 
 def all_cyclic_gf4(n, dmin=1, gf4_linear=True):
@@ -179,9 +180,10 @@ def main_gf4():
             print(code, set(rws), 
                 "*" if sd else "", 
                 "gf4" if code.is_gf4_linear() else "")
+            print(code.longstr())
+            print()
             continue
             L = tgt.get_logical(code)
-            #print(code.longstr())
             assert (L**n).is_identity()
             if not L.is_identity():
                 print("L")
@@ -193,6 +195,31 @@ def main_gf4():
             G = mulclose(gen)
             print("|G| =", len(G))
             print()
+
+
+def test_713():
+    code = QCode.fromstr("""
+    X.XXX..
+    Z.ZZZ..
+    .XXX..X
+    .ZZZ..Z
+    XXX..X.
+    ZZZ..Z.
+    """)
+
+    code = QCode.fromstr("""
+XXX.X..
+ZZZ.Z..
+ZZ.Z..Z
+YY.Y..Y
+X.X..XX
+Z.Z..ZZ
+    """)
+
+    tgt = construct.get_713()
+
+    print(is_iso(code, tgt))
+
 
 
 def test_513():
