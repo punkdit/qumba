@@ -498,8 +498,14 @@ def main():
         checks = [''.join(check[(i+j)%13] for i in range(n)) for j in range(n-1)]
         code = QCode.fromstr(' '.join(checks))
         print(code.get_params())
+    elif argv.code == "YY":
+        code = QCode.fromstr("YY", None, "Y. ZZ")
+    elif argv.code:
+        code = QCode.fromstr(argv.code)
     else:
         return
+
+    print(code.longstr())
 
     #for N in [1, 2, 3, 4, 5, 6]:
     for N in range(1, argv.get("N", 4)+1):

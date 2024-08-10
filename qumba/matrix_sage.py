@@ -218,3 +218,68 @@ class Matrix(object):
         return vecs
 
 
+def test():
+    "Orthogonal matrixes over GF(2)[x] / x**2 "
+    from util import cross
+    from random import shuffle
+    from sage.all_cmdline import GF, PolynomialRing
+    K = GF(2)
+    R = PolynomialRing(K, "x")
+    x = R.gens()[0]
+    S = R.quo(x**2)
+    print(S)
+
+    x = S.gens()[0]
+    zero = x**2
+    one = (x+1)**2
+
+    els = [zero, one, one+x]
+    found = []
+    n = argv.get("n", 2)
+    I = Matrix.identity(S, n)
+    rows = list(cross([els]*n))
+    shuffle(rows)
+    #for cols in cross( [rows]*n ):
+    while 1:
+        cols = [choice(rows) for i in range(n)]
+        M = Matrix(S, cols)
+        if M*M.t == I:
+            found.append(M)
+            print('/', end='', flush=True)
+            if len(found) > 1:
+                G = mulclose(found, verbose=True)
+                print("|G|=", len(G))
+                #break
+    print()
+
+
+if __name__ == "__main__":
+
+    from time import time
+    start_time = time()
+
+    profile = argv.profile
+    name = argv.next() or "test"
+    _seed = argv.get("seed")
+    if _seed is not None:
+        print("seed(%s)"%(_seed))
+        seed(_seed)
+
+    if profile:
+        import cProfile as profile
+        profile.run("%s()"%name)
+
+    elif name is not None:
+        fn = eval(name)
+        fn()
+
+    else:
+        test()
+
+
+    t = time() - start_time
+    print("OK! finished in %.3f seconds\n"%t)
+
+
+
+
