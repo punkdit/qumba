@@ -249,6 +249,7 @@ def test():
             if len(found) > 1:
                 G = mulclose(found, verbose=True)
                 print("|G|=", len(G))
+                del G # free mem
                 #break
     print()
 
