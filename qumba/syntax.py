@@ -10,7 +10,9 @@ class Term(object):
 
     def __str__(self):
         atoms = self.atoms
-        return "*".join("%s%s"%((name,)+(arg,)) for (name,arg) in atoms)
+        s = "*".join("%s%s"%((name,)+(arg,)) for (name,arg) in atoms)
+        s = s.replace(',)', ')')
+        return s
 
     @property
     def name(self):
@@ -18,10 +20,14 @@ class Term(object):
         return tuple("%s%s"%((name,)+(arg,)) for (name,arg) in atoms)
 
     def __mul__(self, other):
+        from qumba.qcode import QCode
         atoms = self.atoms
         if isinstance(other, Term):
             atoms = atoms + other.atoms
             return Term(atoms)
+
+        if isinstance(other, QCode):
+            return (self * other.space) * other
 
         op = other.get_identity()
         for (name, arg) in reversed(atoms):
@@ -52,7 +58,7 @@ def test():
     X, Z, Y = s.X, s.Z, s.Y
     S, H, CX = s.S, s.H, s.CX
     prog = X(0)*Z(2)
-    assert str(prog) == "X(0)*Z(2)"
+    assert str(prog) == "X(0)*Z(2)", str(prog)
 
     n = 3
     space = Clifford(n)

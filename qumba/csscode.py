@@ -229,11 +229,9 @@ class CSSCode(object):
 
         Ax = Hx if Ax is None else Ax
         Az = Hz if Az is None else Az
-        if Hx is None:
-            assert Ax is not None
+        if Hx is None and Ax is not None:
             Hx = linear_independent(Ax)
-        if Hz is None:
-            assert Az is not None
+        if Hz is None and Az is not None:
             Hz = linear_independent(Az)
 
         self.Lx = Lx
@@ -334,7 +332,7 @@ class CSSCode(object):
 
     def build_from_gauge(self, check=True, verbose=False):
 
-        write("build_from_gauge:")
+        print("build_from_gauge:")
 
         Gx, Gz = self.Gx, self.Gz
         Hx, Hz = self.Hx, self.Hz
@@ -397,7 +395,7 @@ class CSSCode(object):
         if Lz is None:
             Lz = solve.find_logops(Gx, Hz)
 
-        write('\n')
+        print('\n')
 
         print("Gxr", Gxr.shape)
         print("Gzr", Gzr.shape)
@@ -428,7 +426,7 @@ class CSSCode(object):
         Tx, Tz = self.Tx, self.Tz
 
         if verbose:
-            _write = write
+            _write = print
         else:
             _write = lambda *args : None
     
