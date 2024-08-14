@@ -73,17 +73,18 @@ def test_decode():
     print(code.longstr())
 
     ancilla = QCode.fromstr("Z")
-    print(ancilla)
+    flag = QCode.fromstr("X")
 
-    circ = ancilla + code
+    circ = code + ancilla + flag
     print(circ)
     print(circ.longstr())
 
+    n = code.n
     s = Syntax()
     CX, CZ, H = s.CX, s.CZ, s.H
 
     a, b, c, d = 1, 2, 4, 5
-    op = CX(1+c, 0) * CX(1+d, 0) * CX(1+a, 0) * CX(1+b, 0)
+    op = CX(c, n) * CX(n+1, n) * CX(d, n) * CX(a, n) * CX(n+1, n) * CX(b, n)
     dode = op*circ
 
     print()
@@ -117,7 +118,7 @@ def test_support():
     print()
 
 
-def test():
+def test_gcolour():
     # gauge colour (color) code 
     Gx = Gz = parse("""
     1111...........
