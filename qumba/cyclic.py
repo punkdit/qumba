@@ -312,6 +312,141 @@ def test_13_1_5():
     return
 
 
+def all_cyclic_gf2_poly(n):
+    assert n%2, n
+    F = GF(2)
+    z2 = F.gen()
+    R = PolynomialRing(F, "x")
+    x = R.gen()
+
+    A = factor(x**n - 1)
+    print(A)
+    space = SymplecticSpace(n)
+
+    factors = [a for (a,j) in A]
+    N = len(factors)
+    print("factors:", N)
+
+    Hs = []
+    for bits in numpy.ndindex((2,)*N):
+        a = reduce(mul, (factors[i] for i in range(N) if bits[i]), x**0)
+        yield a
+
+
+
+
+def all_cyclic(n):
+
+    K = GF(2)
+    R = PolynomialRing(K, "x")
+    x = R.gen()
+
+    A = factor(x**n - 1)
+
+    def conv(f, h):
+        v = zeros2(n)
+        for i in range(n):
+            for j in range(n):
+                v[i] += f[(i+j)%n]*h[(-j)%n]
+        return v % 2
+
+#    def sy(f, g, h, l):
+#        fb = list(reversed(f))
+#        lb = list(reversed(l))
+#        #return numpy.alltrue(conv(fb, h) == conv(g, lb))
+#        hb = list(reversed(h))
+#        return numpy.alltrue(conv(fb, l) == conv(g, hb))
+
+    def sy(f, g):
+        fb = list(reversed(f))
+        gb = list(reversed(g))
+        return numpy.alltrue( conv(fb, g) == conv(f, gb) )
+
+    if n==5:
+        #print(conv([0,1,0,0,0], [0,1,0,0,0])) # x*x --> [0 0 1 0 0 0]
+        #print(conv([1,0,0,0,0], [0,1,0,0,0])) # x*x --> [0 0 1 0 0 0]
+        f = [1,1,0,0,0]
+        g = [0,0,0,1,1]
+        #assert sy(f,g,f,g)
+    
+        #fb = list(reversed(f))
+        #gb = list(reversed(g))
+        #print( conv(fb, g), conv( f, gb ) )
+        #print(numpy.alltrue( conv(fb, g) == conv( f, gb ) ) )
+    
+        assert not sy(f, g)
+        #return
+    
+        #print( conv([1,1,1,1,1], [1,1,0,0,0]) )
+
+    z = zeros2(n)
+
+    F = list(all_cyclic_gf2(n)) + [z]
+    #print(F)
+
+    pairs = []
+    for f in F:
+      for h in F:
+        #if h.sum() == 0:
+        #    continue # classical codes...
+        fb = list(reversed(f))
+        if conv(fb, h).sum() == 0:
+            pairs.append((f, h))
+    print("pairs:", len(pairs))
+
+    # <(f,g), (f,g)> = 0
+
+    def mkpauli(f, g):
+        op = []
+        for i in range(n):
+            if f[i] and g[i]:
+                op.append("Y")
+            elif f[i]:
+                op.append("X")
+            elif g[i]:
+                op.append("Z")
+            else:
+                op.append('.')
+        return ''.join(op)
+
+    for (f,h) in pairs:
+      for g in numpy.ndindex((2,)*n):
+        if not sy(f, g):
+            continue
+
+        #print( shortstr(f), shortstr(g), "--", shortstr(z), shortstr(h) )
+        #print(f, g, h)
+        l, r = mkpauli(f, g), mkpauli(z, h) 
+        #if l.count(".")==n:
+        #    continue
+        a,b,c = (l+r).count("X"), (l+r).count("Y"), (l+r).count("Z")
+        if [a,b,c].count(0)>1:
+            continue # classical codes
+        #print()
+        #print( shortstr(f), shortstr(g), "--", shortstr(z), shortstr(h) )
+        #print(l,r)
+        stabs = []
+        for i in range(n):
+            stabs.append( ''.join(l[(j-i)%n] for j in range(n)) )
+            stabs.append( ''.join(r[(j-i)%n] for j in range(n)) )
+        #print(stabs)
+        stabs = ' '.join(stabs)
+        H = fromstr(stabs)
+        #print(shortstr(H))
+        #print()
+        H = linear_independent(H)
+        code = QCode(H)
+        yield code
+    
+
+def test_cyclic():
+    for n in [5, 7, 9]:
+      for code in all_cyclic(n):
+        if code.k:
+            print(code, code.is_css())
+
+
+
 
 if __name__ == "__main__":
 
