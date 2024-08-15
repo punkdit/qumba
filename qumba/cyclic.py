@@ -442,6 +442,8 @@ def test_cyclic():
     for code in all_cyclic(n):
         if code.k:
             code.d = code.distance("z3")
+            if code.d <= 2:
+                continue
             print(code, "+" if sum(code.cyclic_gens[1])==0 else " ", end=" ", flush=True)
             #print(code, "+" if code.is_css() else " ", 
             #    'l' if code.is_gf4_linear() else " ")
