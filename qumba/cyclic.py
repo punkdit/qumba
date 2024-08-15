@@ -81,6 +81,27 @@ def all_cyclic_gf4(n, dmin=1, gf4_linear=True):
         #print(code.longstr())
 
 
+def all_cyclic_gf2_poly(n):
+    assert n%2, n
+    F = GF(2)
+    z2 = F.gen()
+    R = PolynomialRing(F, "x")
+    x = R.gen()
+
+    A = factor(x**n - 1)
+    #print(A)
+    space = SymplecticSpace(n)
+
+    factors = [a for (a,j) in A]
+    N = len(factors)
+    #print("factors:", N)
+
+    Hs = []
+    for bits in numpy.ndindex((2,)*N):
+        a = reduce(mul, (factors[i] for i in range(N) if bits[i]), x**0)
+        yield a
+
+
 def all_cyclic_gf2(n):
     assert n%2, n
     F = GF(2)
@@ -89,12 +110,12 @@ def all_cyclic_gf2(n):
     x = R.gen()
 
     A = factor(x**n - 1)
-    print(A)
+    #print(A)
     space = SymplecticSpace(n)
 
     factors = [a for (a,j) in A]
     N = len(factors)
-    print("factors:", N)
+    #print("factors:", N)
 
     Hs = []
     for bits in numpy.ndindex((2,)*N):
@@ -104,15 +125,6 @@ def all_cyclic_gf2(n):
             continue 
         gen = numpy.array([int(a[k]) for k in range(n)], dtype=int)
         yield gen
-
-#        rows = []
-#        for i in range(n):
-#            v = [gen[(i+k)%n] for k in range(n)]
-#            rows.append(v)
-#        H = numpy.array(rows)
-#        H = Matrix(H)
-#        H = H.linear_independent()
-#        yield H
 
 
 def all_cyclic_sp(n, dmin):
@@ -312,27 +324,6 @@ def test_13_1_5():
     return
 
 
-def all_cyclic_gf2_poly(n):
-    assert n%2, n
-    F = GF(2)
-    z2 = F.gen()
-    R = PolynomialRing(F, "x")
-    x = R.gen()
-
-    A = factor(x**n - 1)
-    print(A)
-    space = SymplecticSpace(n)
-
-    factors = [a for (a,j) in A]
-    N = len(factors)
-    print("factors:", N)
-
-    Hs = []
-    for bits in numpy.ndindex((2,)*N):
-        a = reduce(mul, (factors[i] for i in range(N) if bits[i]), x**0)
-        yield a
-
-
 
 
 def all_cyclic(n):
@@ -409,7 +400,9 @@ def all_cyclic(n):
                 op.append('.')
         return ''.join(op)
 
+    g = z
     for (f,h) in pairs:
+
       for g in numpy.ndindex((2,)*n):
         if not sy(f, g):
             continue
@@ -435,15 +428,27 @@ def all_cyclic(n):
         #print(shortstr(H))
         #print()
         H = linear_independent(H)
+        if len(H) == n:
+            continue # stabilizer states
         code = QCode(H)
+        code.cyclic_gens = (f, g, h)
         yield code
     
 
 def test_cyclic():
-    for n in [5, 7, 9]:
-      for code in all_cyclic(n):
+    n = argv.get("n", 7)
+    print("all_cyclic", n)
+    count = 0
+    for code in all_cyclic(n):
         if code.k:
-            print(code, code.is_css())
+            code.d = code.distance("z3")
+            print(code, "+" if sum(code.cyclic_gens[1])==0 else " ", end=" ", flush=True)
+            #print(code, "+" if code.is_css() else " ", 
+            #    'l' if code.is_gf4_linear() else " ")
+            count += 1
+            if count % 8 == 0:
+                print()
+    print()
 
 
 
