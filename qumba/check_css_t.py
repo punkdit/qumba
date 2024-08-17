@@ -15,16 +15,18 @@ from qumba import solve
 
 def dump_transverse(Hx, Lx, t=3):
     SX,LX,SZ,LZ = CSSLO.CSSCode(Hx, Lx)
-    N = 1<<t
-    zList, qList, V, K_M = CSSLO.comm_method(SX, LX, SZ, t, compact=True, debug=False)
-    for z,q in zip(zList,qList):
-        #print(z, q)
-        print(CSSLO.CP2Str(2*q,V,N),"=>",CSSLO.z2Str(z,N))
-    print()
-    return zList
+    CSSLO.CZLO(SX, LX)
+    #N = 1<<t
+    #zList, qList, V, K_M = CSSLO.comm_method(SX, LX, SZ, t, compact=True, debug=False)
+    #for z,q in zip(zList,qList):
+    #    #print(z, q)
+    #    print(CSSLO.CP2Str(2*q,V,N),"=>",CSSLO.z2Str(z,N))
+    #print()
+    #return zList
 
 
-names = os.listdir("Matrices")
+path = "Cyclic-CSS-T/Matrices/"
+names = os.listdir(path)
 
 names = [n for n in names if n.endswith(".npy")]
 names.sort()
@@ -42,19 +44,20 @@ stems.sort( key = lambda stem : int(stem.split("_")[0]) )
 for stem in stems:
     print(stem)
 
-    H1 = numpy.load("Matrices/"+stem+'_C1.npy')
-    H2 = numpy.load("Matrices/"+stem+'_C2.npy')
+    H1 = numpy.load(path+stem+'_C1.npy')
+    H2 = numpy.load(path+stem+'_C2.npy')
 
     K1 = solve.kernel(H1)
     K2 = solve.kernel(H2)
 
+    if K1.shape[1]>32:
+        break
+
     code = CSSCode(Hx=K2, Hz=K1)
     print(code)
     print(distance_z3(code))
-    #dump_transverse(code.Hx, code.Lx)
+    dump_transverse(code.Hx, code.Lx)
     print()
-
-    #break
 
 
 

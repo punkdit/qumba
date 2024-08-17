@@ -159,18 +159,6 @@ def all_cyclic_sp(n, dmin):
         #print()
 
 
-def main():
-    n = 5
-    for h in all_cyclic_gf2(n):
-        print(h)
-    return
-
-    for code in all_cyclic_sp(n, 3):
-        print(code)
-        print(code.longstr())
-        pass
-
-
 def main_gf4():
     gf4_linear = argv.get("gf4_linear", True)
     n = argv.get("n", 20)
@@ -344,14 +332,14 @@ def all_cyclic(n):
 #    def sy(f, g, h, l):
 #        fb = list(reversed(f))
 #        lb = list(reversed(l))
-#        #return numpy.alltrue(conv(fb, h) == conv(g, lb))
+#        #return numpy.all(conv(fb, h) == conv(g, lb))
 #        hb = list(reversed(h))
-#        return numpy.alltrue(conv(fb, l) == conv(g, hb))
+#        return numpy.all(conv(fb, l) == conv(g, hb))
 
     def sy(f, g):
         fb = list(reversed(f))
         gb = list(reversed(g))
-        return numpy.alltrue( conv(fb, g) == conv(f, gb) )
+        return numpy.all( conv(fb, g) == conv(f, gb) )
 
     if n==5:
         #print(conv([0,1,0,0,0], [0,1,0,0,0])) # x*x --> [0 0 1 0 0 0]
@@ -363,7 +351,7 @@ def all_cyclic(n):
         #fb = list(reversed(f))
         #gb = list(reversed(g))
         #print( conv(fb, g), conv( f, gb ) )
-        #print(numpy.alltrue( conv(fb, g) == conv( f, gb ) ) )
+        #print(numpy.all( conv(fb, g) == conv( f, gb ) ) )
     
         assert not sy(f, g)
         #return
@@ -427,7 +415,7 @@ def all_cyclic(n):
         H = fromstr(stabs)
         #print(shortstr(H))
         #print()
-        H = linear_independent(H)
+        H = linear_independent(H) # bottleneck
         if len(H) == n:
             continue # stabilizer states
         code = QCode(H)
@@ -435,7 +423,7 @@ def all_cyclic(n):
         yield code
     
 
-def test_cyclic():
+def main():
     n = argv.get("n", 7)
     print("all_cyclic", n)
     count = 0
