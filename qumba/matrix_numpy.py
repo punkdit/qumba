@@ -34,7 +34,7 @@ class Matrix(object):
         assert isinstance(other, Matrix)
         assert self.ring == other.ring
         assert self.shape == other.shape
-        return numpy.alltrue(self.M == other.M)
+        return numpy.all(self.M == other.M)
 
     def __hash__(self):
         items = tuple(self.M[i] for i in numpy.ndindex(self.shape))

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from random import shuffle, randint
+from random import shuffle, randint, choice
 from operator import add, matmul, mul
 from functools import reduce
 
@@ -451,6 +451,36 @@ def test_clifford():
                 break
         else:
             assert 0
+
+
+def test_clifford_ccz():
+    from qumba.clifford import Clifford, Matrix
+
+    n = 3
+    space = SymplecticSpace(n)
+    c = Clifford(n)
+
+    S, H, CZ = c.S, c.H, c.CZ
+
+    gen = [S(0), S(1), S(2), H(0), H(1), H(2), CZ(0,1), CZ(0,2), CZ(1,2)]
+    #G = mulclose(gen, verbose=True)
+    #print(len(G))
+
+    #ccz = c.identity()
+    ccz = c.I.M.copy()
+    ccz[7,7] = -1
+    ccz = Matrix(c.K, ccz)
+    print(ccz)
+    #gen = [S(0), S(1), S(2), CZ(0,1), CZ(0,2), CZ(1,2), ccz]
+    gen = gen + [ccz]
+    #G = mulclose(gen, verbose=True, maxsize=1000000)
+    #print(len(G))
+
+    A = choice(gen)
+    for i in range(1000):
+        A = A*choice(gen)
+    print(A)
+
 
 
 def test_encoder():
