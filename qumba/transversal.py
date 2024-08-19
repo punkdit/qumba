@@ -500,6 +500,8 @@ def main():
         print(code.get_params())
     elif argv.code == "YY":
         code = QCode.fromstr("YY", None, "Y. ZZ")
+    elif argv.code == "YYY":
+        code = QCode.fromstr("YYY")
     elif argv.code:
         code = QCode.fromstr(argv.code)
     else:
@@ -521,6 +523,22 @@ def main():
         G = mulclose(gen)
         print("|G| =", len(G))
         print()
+
+        make_gap("transversal_%d.gap"%(N,), gen)
+
+
+def make_gap(name, gen):
+    print("make_gap", name)
+    f = open(name, "w")
+    names = []
+    for i,M in enumerate(gen):
+        name = "M%d"%i
+        print("%s := %s;"%(name,M.gap()), file=f)
+        names.append(name)
+    print("G := Group([%s]);"%(','.join(names)), file=f)
+    print("Order(G);", file=f)
+    f.close()
+
 
 
 def test_513():
