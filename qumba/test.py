@@ -1955,6 +1955,41 @@ def test_fault_tolerant():
     print(shortstr(E))
 
 
+def test_bruhat():
+    
+    s = SymplecticSpace(2)
+    gen = [
+        s.H(0), s.H(1), s.S(0), s.S(1), 
+        s.CX(0,1), s.CX(1,0)]
+    G = mulclose(gen)
+    G = list(G)
+    assert len(G)==720
+
+    #for op in "ZI IX"
+
+    fromstr = s.fromstr
+    pairs = [
+        #("ZI IX", "ZZ XX"),
+        #("ZI IZ", "ZI IZ"),
+        #("ZI IZ", "YI IZ"),
+        ("ZI IZ", "YX XY"),
+        #("ZI IZ", "ZX XZ"),
+        #("ZI IY", "YI IY"),
+        #("ZI IY", "ZX XY"),
+        ("ZI IY", "YX XY"),
+    ]
+
+    for g in G:
+        for src,tgt in pairs:
+            src = fromstr(src)
+            tgt = fromstr(tgt)
+            if g*src.t != tgt.t:
+                break
+        else:
+            print("found")
+
+
+
 def test():
     print("\ntest()")
     get_422()

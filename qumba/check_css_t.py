@@ -56,7 +56,11 @@ for stem in stems:
     code = CSSCode(Hx=K2, Hz=K1)
     print(code)
     print(distance_z3(code))
-    dump_transverse(code.Hx, code.Lx)
+    #dump_transverse(code.Hx, code.Lx)
+    print("Hx =")
+    print(code.Hx)
+    print("Hz =")
+    print(code.Hz)
     print()
 
 
