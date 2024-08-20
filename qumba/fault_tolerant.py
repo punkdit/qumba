@@ -92,11 +92,28 @@ def test_decode():
     print(dode.longstr())
 
 
+def get_pairs(code):
+    n = code.n
+    d = code.d
+    wenum = get_wenum(code)
+    hs = wenum[d]
+    found = []
+    for i in range(n):
+     for j in range(i+1, n):
+        for h in wenum[d]:
+            if h[i] and h[j]:
+                break
+        else:
+            found.append((i, j))
+    return found
+
+
 def test_support():
-    #code = get_surf9()
+    code = get_surf9()
+    code = construct.get_10_2_3()
     #code = construct.get_713()
     #code = construct.get_bring()
-    code = construct.get_832()
+    #code = construct.get_832()
     d = code.d
 
     print(code)
@@ -107,15 +124,7 @@ def test_support():
     for l in hs:
         print(l)
     
-    print("found:", end="")
-    for i in range(n):
-     for j in range(i+1, n):
-        for h in wenum[d]:
-            if h[i] and h[j]:
-                break
-        else:
-            print((i, j), end=" ")
-    print()
+    print("found:", get_pairs(code))
 
 
 def test_gcolour():
@@ -174,6 +183,90 @@ def test_gcolour():
     print()
 
 
+
+def test_clifford():
+    code = construct.get_10_2_3()
+    #code = construct.get_513()
+    #code = construct.get_toric(2,2) # 8,2,2
+
+    n = code.n
+    s = code.space
+    CX, CZ = s.CX, s.CZ
+    gates =  [CX(i,j) for i in range(n) for j in range(n) if i!=j]
+    #gates += [CZ(i,j) for i in range(n) for j in range(i+1,n)]
+
+    print(code)
+    d = code.d
+    assert d is not None
+
+    bdy = {code}
+    found = {code.H}
+
+    while bdy:
+        print(len(bdy))
+        _bdy = set()
+        for src in bdy:
+          for g in gates:
+            tgt = g*src
+            if tgt.distance() < d:
+                continue
+            if tgt in found:
+                continue
+#            for other in found:
+#                if tgt.is_equiv(other):
+#                    break
+            else:
+                print(".", end='', flush=True)
+                found.add(tgt.H)
+                _bdy.add(tgt)
+        bdy = _bdy
+
+    print()
+                
+        
+def test_clifford_pairs():
+    # equivalent & slower than just searching non-distance decreasing gates 
+    code = construct.get_10_2_3()
+    #code = construct.get_513()
+    #code = construct.get_toric(2,2) # 8,2,2
+
+    n = code.n
+    s = code.space
+    CX, CZ = s.CX, s.CZ
+
+    print(code)
+    d = code.d
+    assert d is not None
+
+    bdy = {code}
+    found = set(bdy)
+
+    gates =  {(i,j):CX(i,j) for i in range(n) for j in range(n) if i!=j}
+    while bdy:
+        print(len(bdy))
+        _bdy = set()
+        for src in bdy:
+          pairs = get_pairs(src)
+          #for g in gates:
+          for pair in pairs:
+           for (i,j) in [pair,reversed(pair)]:
+            g = gates[i,j]
+            tgt = g*src
+            if tgt.distance() < d:
+                continue
+            if tgt in found:
+                continue
+            for other in found:
+                if tgt.is_equiv(other):
+                    break
+            else:
+                print(".", end='', flush=True)
+                found.add(tgt)
+                _bdy.add(tgt)
+        bdy = _bdy
+
+    print()
+                
 
 
 
