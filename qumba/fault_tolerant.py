@@ -184,6 +184,85 @@ def test_gcolour():
 
 
 
+def test_find():
+    code = construct.get_10_2_3()
+    #code = construct.get_513()
+    #code = construct.get_toric(2,2) # 8,2,2
+
+    src = code
+    print(src.longstr())
+    E = src.get_encoder()
+    #print(E)
+
+    n = src.n
+    s = src.space
+    CX, CZ, S, H, P, SWAP, invert = s.CX, s.CZ, s.S, s.H, s.P, s.SWAP, s.invert
+
+    g = CX(8,9)
+    #g = S(8)*S(9) # nope
+    #g = H(8)*H(9) # nope
+
+    tgt = QCode.from_encoder(E*g, k=2)
+    assert (tgt.is_equiv(src))
+
+    L = tgt.get_logical(src)
+    #assert L == SymplecticSpace(2).CX()
+
+    Ei = invert(E)
+    physical = E*g*Ei
+    print(physical)
+
+    assert (physical*src).is_equiv(src)
+
+    gates = [CX(i,j) for i in range(n) for j in range(n) if i!=j]
+
+    circuit = []
+    for trial in range(1000):
+        found = gate_search(s, gates, physical)
+        if found is None:
+            continue
+        if not found:
+            break
+        g = found[-1]
+        code = g*src
+        d = code.distance()
+        if d == src.d:
+            print("*")
+            src = code
+            circuit.insert(0, g)
+            physical = invert(g)*physical
+        
+    print()
+    if physical == s.get_identity():
+        print([g.name for g in circuit], len(circuit))
+    else:
+        print("not found")
+
+
+def gate_search(space, gates, target):
+    gates = list(gates)
+    A = space.get_identity()
+    found = []
+    while A != target:
+        if len(found) > 100:
+            return
+        count = (A+target).sum()
+        print(count, end=' ')
+        shuffle(gates)
+        for g in gates:
+            B = g*A # right to left
+            if (B+target).sum() <= count:
+                break
+        else:
+            print("X ", end='', flush=True)
+            return None
+        found.insert(0, g)
+        A = B
+    print("^", end='')
+    return found
+
+
+
 def test_clifford():
     code = construct.get_10_2_3()
     #code = construct.get_513()

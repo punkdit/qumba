@@ -10,7 +10,7 @@ import os
 import numpy
 import CSSLO
 from qumba.csscode import CSSCode, distance_z3
-from qumba import solve
+from qumba.solve import rank, dot2, shortstr, kernel
 
 
 def dump_transverse(Hx, Lx, t=3):
@@ -44,27 +44,31 @@ stems.sort( key = lambda stem : int(stem.split("_")[0]) )
 for stem in stems:
     print(stem)
 
-    H1 = numpy.load(path+stem+'_C1.npy')
-    H2 = numpy.load(path+stem+'_C2.npy')
+    C1 = numpy.load(path+stem+'_C1.npy')
+    C2 = numpy.load(path+stem+'_C2.npy')
 
-    K1 = solve.kernel(H1)
-    K2 = solve.kernel(H2)
+    H = numpy.concatenate((C1,C2))
 
-    if K1.shape[1]>32:
-        break
+    Hz = C1
+    Hx = kernel(C2)
+    assert dot2(Hz, Hx.transpose()).sum() == 0
 
-    code = CSSCode(Hx=K2, Hz=K1)
+    #if C1.shape[1]>32:
+    #    break
+
+    code = CSSCode(Hx=Hx, Hz=Hz)
     print(code)
     print(distance_z3(code))
     #dump_transverse(code.Hx, code.Lx)
     print("Hx =")
-    print(code.Hx)
+    print(shortstr(code.Hx))
     print("Hz =")
-    print(code.Hz)
+    print(shortstr(code.Hz))
     print()
 
 
 
+print("done.\n")
 
 
 

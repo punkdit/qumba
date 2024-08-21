@@ -5,6 +5,7 @@ _looking for transversal logical clifford operations
 
 from functools import reduce
 from operator import add, matmul, mul
+from random import shuffle
 
 import numpy
 
@@ -538,6 +539,77 @@ def make_gap(name, gen):
     print("G := Group([%s]);"%(','.join(names)), file=f)
     print("Order(G);", file=f)
     f.close()
+
+
+
+def find_clifford_stab():
+    #code = construct.get_513()
+    n, k = 4, 2
+    space = SymplecticSpace(n)
+    I = space.get_identity()
+    code = QCode.from_encoder(I, k=k)
+
+    n = code.n
+    m = code.m
+    H = code.H
+    Ht = H.t
+
+    F = code.space.F
+
+    gen = []
+
+    solver = Solver()
+    Add = solver.add
+
+    U = UMatrix.unknown(2*n, 2*n)
+    Add(U.t*F*U == F) # quadratic constraint
+    #Add(U*Ht == Ht)
+
+    V = UMatrix.unknown(m, m)
+    Vi = UMatrix.unknown(m, m)
+    I = Matrix.identity(m, m)
+    Add(V*Vi==I)
+
+    Add(U*Ht*V == Ht)
+    
+    while 1:
+    #for _ in range(10):
+        result = solver.check()
+        if result != z3.sat:
+            print("result:", result)
+            break
+    
+        model = solver.model()
+        u = U.get_interp(model)
+        assert u.t*F*u == F
+        gen.append(u)
+        #print(u)
+        #print()
+
+        v = V.get_interp(model)
+        #vi = Vi.get_interp(model)
+        assert u*Ht*v == Ht
+
+        Add(U != u)
+        
+        dode = u*code
+        assert dode.is_equiv(code)
+        L = dode.get_logical(code)
+        #print(L)
+        G = mulclose(gen, verbose=True)
+        G = list(G)
+        shuffle(G)
+        for g in G[:1000]:
+            Add(U!=g) # woah
+        #if len(G) == 4608:
+        #    break
+        #if len(G) == 4128768:
+        #    break
+        if len(G) == 8847360:
+            break
+        del G
+
+    make_gap("clifford_stab_42", gen)
 
 
 
