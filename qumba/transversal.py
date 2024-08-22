@@ -598,18 +598,18 @@ def find_clifford_stab():
         #print(L)
         G = mulclose(gen, verbose=True)
         G = list(G)
-        shuffle(G)
-        for g in G[:1000]:
-            Add(U!=g) # woah
+        #shuffle(G)
+        #for g in G[:1000]:
+        #    Add(U!=g) # woah
         #if len(G) == 4608:
         #    break
         #if len(G) == 4128768:
         #    break
-        if len(G) == 8847360:
-            break
+        #if len(G) == 8847360:
+        #    break
         del G
 
-    make_gap("clifford_stab_42", gen)
+    #make_gap("clifford_stab_42", gen)
 
 
 

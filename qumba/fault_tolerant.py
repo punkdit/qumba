@@ -216,6 +216,8 @@ def test_find():
 
     gates = [CX(i,j) for i in range(n) for j in range(n) if i!=j]
 
+    # FAIL:
+
     circuit = []
     for trial in range(1000):
         found = gate_search(s, gates, physical)
@@ -262,6 +264,94 @@ def gate_search(space, gates, target):
     return found
 
 
+
+def test_search_clifford():
+    #code = construct.get_10_2_3()
+    #code = construct.get_513()
+    #code = construct.get_toric(2,2) # [[8,2,2]]
+    #code = construct.get_toric(3,1) # [[10,2,3]]
+    #code = construct.get_toric(4,2) # [[20,2,4]]
+    code = construct.get_toric(3,3) # [[18,2,3]]
+    code = construct.get_toric(4,0) # [[16,2,4]]
+    code.distance()
+    print(code)
+
+    n = code.n
+    s = code.space
+    CX, CZ = s.CX, s.CZ
+    gates =  [CX(i,j) for i in range(n) for j in range(n) if i!=j]
+    #gates += [CZ(i,j) for i in range(n) for j in range(i+1,n)]
+
+    while 1:
+        circ = search_clifford(code, gates)
+        if circ is not None:
+            print([g.name for g in circ])
+
+    # i think this is the knight move gate on [[10,2,3]]:
+    # [('CX(3,8)',), ('CX(2,7)',), ('CX(0,5)',), ('CX(1,6)',), ('CX(4,9)',), 
+    #  ('CX(8,3)',), ('CX(7,2)',), ('CX(9,4)',), ('CX(6,1)',), ('CX(5,0)',)]
+
+
+
+def search_clifford(code, gates):
+    d = code.d
+    assert d is not None
+
+    circ = []
+    src = code
+    r = src.m
+    count = 0
+    while r or count < 10:
+        count += 1
+        shuffle(gates)
+        for g in gates:
+            tgt = g*src
+            if tgt.distance() < d:
+                continue
+            src = tgt
+            circ.append(g)
+            break
+        r = src.H.intersect(code.H).rank()
+        print(r, end=' ', flush=True)
+    print("/", end=' ', flush=True)
+
+    count = 0
+    while r < src.m:
+        count += 1
+        if count > 20:
+            print("?")
+            return # Fail
+        found = []
+        for g in gates:
+            tgt = g*src
+            if tgt.distance() < d:
+                continue
+            r1 = tgt.H.intersect(code.H).rank()
+            if r1 > r:
+                found = [g]
+                r = r1
+            elif r1 == r:
+                found.append(g)
+        if not found:
+            print("X")
+            return
+        shuffle(found)
+        g = found[0]
+        src = g*src
+        circ.append(g)
+        r = src.H.intersect(code.H).rank()
+        print(r, end=' ', flush=True)
+
+    assert src.is_equiv(code)
+    print()
+    print(src.get_logical(code))
+    circ = list(reversed(circ))
+    return circ
+
+    
+
+                
+        
 
 def test_clifford():
     code = construct.get_10_2_3()
