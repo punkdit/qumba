@@ -168,6 +168,10 @@ class UMatrix(object):
         A = numpy.dot(self.A, other.A)
         return UMatrix(A)
 
+    def __matmul__(self, other):
+        A = numpy.kron(self.A, other.A)
+        return UMatrix(A)
+
     def __rmul__(self, other):
         if isinstance(other, Matrix):
             A = numpy.dot(other.A, self.A)
