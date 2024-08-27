@@ -24,7 +24,8 @@ def get_swap(n):
 
 def main():
 
-    n = 3
+    n = 3 # also works for n=4
+    n = 5
 
     I = UMatrix(numpy.identity(n, dtype=object))
     swap = get_swap(n)
