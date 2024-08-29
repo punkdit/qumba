@@ -143,7 +143,7 @@ class UMatrix(object):
         if A is None:
             A = numpy.empty(shape, dtype=object)
             A[:] = zero
-        self.A = numpy.array(A, dtype=object)
+        self.A = A = numpy.array(A, dtype=object)
         assert shape is None or shape == A.shape
         self.shape = A.shape
 
@@ -1832,6 +1832,92 @@ def test_braid():
         print(g)
         g = G[G.index(g)]
         print(g.name)
+
+
+def find_equivariant(X):
+    G = X.G
+    n = len(X)
+    print("find_equivariant", n)
+
+    perms = []
+    for g in G:
+        send = X(g)
+        items = send.items # Coset's
+        lookup = dict((v,k) for (k,v) in enumerate(items))
+        send = {i:lookup[send[items[i]]] for i in range(len(items))}
+        assert len(send) == n
+        perms.append(send)
+
+    solver = Solver()
+    Add = solver.add
+
+    hx = UMatrix.unknown(n)
+    hz = UMatrix.unknown(n)
+
+    # we have a transitive G action, so we can fix the 0 bit:
+    hx[0] = 1
+    hz[0] = 1
+
+    Hx = [[hx[g[i]] for i in range(n)] for g in perms]
+    Hx = UMatrix(Hx)
+
+    c = Hx * hz.t
+    Add(c==0)
+
+    weight = lambda h : Sum([If(h[i].get(),1,0) for i in range(1, n)])+1
+    row_weight = 10
+    Add(weight(hx) < row_weight)
+    Add(weight(hz) < row_weight)
+
+    while 1:
+        print()
+        result = solver.check()
+        if result != z3.sat:
+            print("unsat")
+            return
+    
+        model = solver.model()
+        _hx = hx.get_interp(model)
+        _hz = hz.get_interp(model)
+
+        Add(hx[1:] != _hx[1:])
+        Add(hz[1:] != _hz[1:])
+    
+        #hx = Hx[0]
+        print("hx:", _hx)
+        print("hz:", _hz)
+    
+        Hx = Matrix([[_hx[g[i]] for i in range(n)] for g in perms])
+        Hx = Hx.linear_independent()
+    
+        Hz = Matrix([[_hz[g[i]] for i in range(n)] for g in perms])
+        Hz = Hz.linear_independent()
+    
+        from qumba.csscode import CSSCode, distance_z3
+        code = CSSCode(Hx=Hx.A, Hz=Hz.A)
+        print(code)
+        if code.k == 0:
+            continue
+
+        d = distance_z3(code)
+        print("distance =", d)
+        print(code.longstr())
+
+
+def test_equivariant():
+    G = Group.alternating(5)
+    print(len(G))
+
+    n = argv.get("n", 30)
+
+    Hs = [H for H in G.conjugacy_subgroups() if len(H)<len(G)]
+    for H in Hs:
+        X = G.action_subgroup(H)
+        if len(X) != n:
+            continue
+        for code in find_equivariant(X):
+            pass
+    
 
 
 
