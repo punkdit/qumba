@@ -187,8 +187,10 @@ class UMatrix(object):
                 rhs = other[idx]
             else:
                 rhs = other
-            #print("\t", idx, self[idx], rhs)
-            terms.append(self[idx] != rhs)
+            term = self[idx] != rhs
+            #print("\t", idx, self[idx], rhs, type(term), )
+            if not isinstance(term, numpy.bool_): # hmm, edge cases? empty terms ?
+                terms.append(term)
         term = reduce(Or, terms)
         return term
 
@@ -1835,6 +1837,8 @@ def test_braid():
 
 
 def find_equivariant(X):
+    from qumba.csscode import CSSCode, distance_z3
+
     G = X.G
     n = len(X)
     print("find_equivariant", n)
@@ -1870,53 +1874,74 @@ def find_equivariant(X):
     Add(weight(hz) < row_weight)
 
     while 1:
-        print()
         result = solver.check()
         if result != z3.sat:
-            print("unsat")
+            #print("unsat")
             return
     
         model = solver.model()
         _hx = hx.get_interp(model)
         _hz = hz.get_interp(model)
 
-        Add(hx[1:] != _hx[1:])
-        Add(hz[1:] != _hz[1:])
+        #Add(hx != _hx)
+        #Add(hz != _hz)
     
         #hx = Hx[0]
-        print("hx:", _hx)
-        print("hz:", _hz)
+        #print("hx:", _hx)
+        #print("hz:", _hz)
     
         Hx = Matrix([[_hx[g[i]] for i in range(n)] for g in perms])
+        for _hx in Hx:
+            Add(hx != _hx)
         Hx = Hx.linear_independent()
     
         Hz = Matrix([[_hz[g[i]] for i in range(n)] for g in perms])
+        for _hz in Hz:
+            Add(hz != _hz)
         Hz = Hz.linear_independent()
     
-        from qumba.csscode import CSSCode, distance_z3
         code = CSSCode(Hx=Hx.A, Hz=Hz.A)
-        print(code)
         if code.k == 0:
             continue
 
-        d = distance_z3(code)
-        print("distance =", d)
-        print(code.longstr())
+        yield code
 
 
 def test_equivariant():
-    G = Group.alternating(5)
-    print(len(G))
+    from qumba.csscode import CSSCode, distance_z3
+    if argv.dihedral:
+        n = argv.get("n", 10)
+        G = Group.dihedral(n)
+    elif argv.symmetric:
+        m = argv.get("m", 4)
+        G = Group.symmetric(m)
+    elif argv.coxeter_bc:
+        m = argv.get("m", 3)
+        G = Group.coxeter_bc(m)
+        n = len(G)
+    else:
+        G = Group.alternating(5)
+        n = 30
 
-    n = argv.get("n", 30)
+    n = argv.get("n", len(G))
+    print("|G| =", len(G))
+
 
     Hs = [H for H in G.conjugacy_subgroups() if len(H)<len(G)]
+    print("subgroups:")
+    print('\t', [len(H) for H in Hs])
     for H in Hs:
         X = G.action_subgroup(H)
         if len(X) != n:
             continue
         for code in find_equivariant(X):
-            pass
+            d = distance_z3(code)
+            if d < 3:
+                continue
+            print("[[%d, %d, %d]]"%(code.n, code.k, d))
+            #print(code)
+            #print("distance =", d)
+            #print(code.longstr())
     
 
 
