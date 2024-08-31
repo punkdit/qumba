@@ -194,7 +194,7 @@ class Perm(object):
 
     @classmethod
     def fromcycles(cls, cycles, items, *args, **kw):
-        perm = {}
+        perm = {i:i for i in items}
         for cycle in cycles:
             m = len(cycle)
             for i in range(m):
@@ -627,7 +627,7 @@ class Group(object):
 #        return id(self) < id(other)
 
     @classmethod
-    def generate(cls, gen, *args, **kw):
+    def generate(cls, gen, *args, verbose=False, **kw):
         items = kw.get("items")
         if items is not None:
             del kw["items"]
@@ -637,7 +637,7 @@ class Group(object):
             items = []
         if not gen:
             gen = [Perm.identity(items)]
-        perms = list(mulclose(gen, *args))
+        perms = list(mulclose(gen, *args, verbose=verbose))
         G = cls(perms, items, **kw)
         G.gen = gen
         G.gens = gen # deprecate this?

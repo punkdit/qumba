@@ -13,7 +13,7 @@ import z3
 from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver
 
 from qumba.qcode import QCode, SymplecticSpace, Matrix, fromstr, shortstr, strop
-from qumba.action import mulclose, Group, mulclose_find
+from qumba.action import mulclose, Group, Perm, mulclose_find
 from qumba.util import allperms
 from qumba import equ
 from qumba import construct 
@@ -1909,31 +1909,129 @@ def find_equivariant(X):
 
 def test_equivariant():
     from qumba.csscode import CSSCode, distance_z3
+
+    Hs = None
+    Xs = None
+    n = None
+
     if argv.dihedral:
         n = argv.get("n", 10)
         G = Group.dihedral(n)
+
     elif argv.symmetric:
         m = argv.get("m", 4)
         G = Group.symmetric(m)
+
     elif argv.coxeter_bc:
         m = argv.get("m", 3)
         G = Group.coxeter_bc(m)
         n = len(G)
-    else:
-        G = Group.alternating(5)
-        n = 30
 
-    n = argv.get("n", len(G))
+    elif argv.GL32:
+        n = 7
+        items = list(range(1, n+1))
+        a = Perm.fromcycles([(1,), (2,), (7,), (3,5), (4,6)], items)
+        b = Perm.fromcycles([(1,6,3), (5,), (2,4,7)], items)
+        G = Group.generate([a,b])
+        assert len(G) == 168
+
+    elif argv.L2_8:
+        n = 9
+        items = list(range(1, n+1))
+        a = Perm.fromcycles([ (1,2),(3,4),(6,7),(8,9) ], items)
+        b = Perm.fromcycles([ (1,3,2),(4,5,6),(7,8,9) ], items)
+        G = Group.generate([a,b])
+        assert len(G) == 504
+        X = G.tautological_action() # No solution
+        X = X*X
+        Xs = X.get_components()
+
+    elif argv.L2_11:
+        n = 11
+        items = list(range(1, n+1))
+        a = Perm.fromcycles([ (2,10),(3,4),(5,9),(6,7), ], items)
+        b = Perm.fromcycles([(1,2,11),(3,5,10),(6,8,9) ], items)
+        G = Group.generate([a,b])
+        assert len(G) == 660
+        X = G.tautological_action() # No solution
+        X = X*X
+        Xs = X.get_components()
+
+    elif argv.L2_13:
+        n = 14
+        items = list(range(1, n+1))
+        a = Perm.fromcycles([(1,12),(2,6),(3,4),(7,11),(9,10),(13,14)], items)
+        b = Perm.fromcycles([ (1,6,11),(2,4,5),(7,8,10),(12,14,13) ], items)
+        G = Group.generate([a,b])
+        assert len(G) == 1092, len(G)
+        X = G.tautological_action() # No solution
+        X = X*X
+        Xs = X.get_components()
+
+    elif argv.L2_16:
+        n = 17
+        items = list(range(1, n+1))
+        a = Perm.fromcycles([ (1,2),(3,4),(5,6),(7,9),(10,11),(12,13),(14,16),(15,17), ], items)
+        b = Perm.fromcycles([ (1,3,2),(4,5,7),(6,8,10),(11,12,14),(13,15,17) ], items)
+        G = Group.generate([a,b])
+        assert len(G) == 4080
+        X = G.tautological_action()
+        Xs = [X]
+
+    elif argv.M11:
+        n = 11
+        items = list(range(1, n+1))
+        a = Perm.fromcycles([(2,10),(4,11),(5,7),(8,9)], items)
+        b = Perm.fromcycles([(1,4,3,8),(2,5,6,9)], items)
+        G = Group.generate([a,b])
+        assert len(G) == 7920
+        X = G.tautological_action()
+        Xs = [X]
+
+    elif argv.M20:
+        n = 20
+        items = list(range(1, n+1))
+        a = Perm.fromcycles(
+            [(1,2,4,3),(5,11,7,12),(6,13),(8,14),(9,15,10,16),(17,19,20,18)], items)
+        b = Perm.fromcycles(
+            [(2,5,6),(3,7,8),(4,9,10),(11,17,12),(13,16,18),(14,15,19)], items)
+        G = Group.generate([a,b], verbose=True)
+        assert len(G) == 960
+        X = G.tautological_action()
+        Xs = [X]
+
+    elif argv.M21:
+        n = 21
+        items = list(range(1, n+1))
+        a = Perm.fromcycles([(1,2),(4,6),(5,7),(8,12),(9,14),(10,15),(11,17),(13,19)], items)
+        b = Perm.fromcycles([(2,3,5,4),(6,8,13,9),(7,10,16,11),(12,18),(14,20,21,15),(17,19)], items)
+        G = Group.generate([a,b], verbose=True)
+        assert len(G) == 20160
+        X = G.tautological_action()
+        Xs = [X]
+
+    else:
+        m = argv.get("m", 4)
+        G = Group.alternating(m)
+
+    n = argv.get("n", n or len(G))
     print("|G| =", len(G))
 
+    if Xs is None:
+        #Hs = [H for H in G.conjugacy_subgroups() if len(H)<len(G)]
+        Hs = [H for H in G.subgroups() if len(H)<len(G)]
+        print("indexes:")
+        print('\t', [len(G)//len(H) for H in Hs])
+        Xs = [G.action_subgroup(H) for H in Hs if len(G)//len(H) == n]
 
-    Hs = [H for H in G.conjugacy_subgroups() if len(H)<len(G)]
-    print("subgroups:")
-    print('\t', [len(H) for H in Hs])
-    for H in Hs:
-        X = G.action_subgroup(H)
-        if len(X) != n:
-            continue
+    print("|Xs| =", len(Xs))
+
+#    for H in Hs:
+#        if len(G)//len(H) != n:
+#            continue
+#        print("|H| =", len(H))
+#        X = G.action_subgroup(H)
+    for X in Xs:
         for code in find_equivariant(X):
             d = distance_z3(code)
             if d < 3:
