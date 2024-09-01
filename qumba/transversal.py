@@ -1914,6 +1914,10 @@ def test_equivariant():
     Xs = None
     n = None
 
+    # gap> LoadPackage( "AtlasRep", false );
+    # gap> G := AtlasGroup("L2(11)");
+    # Group([ (2,10)(3,4)(5,9)(6,7), (1,2,11)(3,5,10)(6,8,9) ])
+
     if argv.dihedral:
         n = argv.get("n", 10)
         G = Group.dihedral(n)
@@ -1975,7 +1979,7 @@ def test_equivariant():
         b = Perm.fromcycles([ (1,3,2),(4,5,7),(6,8,10),(11,12,14),(13,15,17) ], items)
         G = Group.generate([a,b])
         assert len(G) == 4080
-        X = G.tautological_action()
+        X = G.tautological_action() # No solution
         Xs = [X]
 
     elif argv.M11:
