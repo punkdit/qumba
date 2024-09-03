@@ -1907,6 +1907,18 @@ def find_equivariant(X):
         yield code
 
 
+def prune(Xs):
+    i = 0
+    while i < len(Xs):
+        j = i+1
+        while j < len(Xs) and i < len(Xs):
+            if Xs[i].isomorphic(Xs[j]):
+                Xs.pop(j)
+            else:
+                j += 1
+        i += 1
+
+
 def test_equivariant():
     from qumba.csscode import CSSCode, distance_z3
 
@@ -2030,11 +2042,18 @@ def test_equivariant():
 
     print("|Xs| =", len(Xs))
 
+    if argv.prune and len(Xs)>1:
+        print("prune...")
+        prune(Xs)
+        print("|Xs| =", len(Xs))
+
 #    for H in Hs:
 #        if len(G)//len(H) != n:
 #            continue
 #        print("|H| =", len(H))
 #        X = G.action_subgroup(H)
+    show = argv.show
+
     for X in Xs:
         for code in find_equivariant(X):
             d = distance_z3(code)
@@ -2044,6 +2063,12 @@ def test_equivariant():
             #print(code)
             #print("distance =", d)
             #print(code.longstr())
+            if (code.n, code.k, d) == show:
+                print("Hx =")
+                print(code.Hx)
+                print("Hz =")
+                print(code.Hz)
+                print()
     
 
 

@@ -15,13 +15,13 @@ from qumba.solve import rank, dot2, shortstr, kernel
 
 def dump_transverse(Hx, Lx, t=3):
     SX,LX,SZ,LZ = CSSLO.CSSCode(Hx, Lx)
-    CSSLO.CZLO(SX, LX)
-    #N = 1<<t
-    #zList, qList, V, K_M = CSSLO.comm_method(SX, LX, SZ, t, compact=True, debug=False)
-    #for z,q in zip(zList,qList):
-    #    #print(z, q)
-    #    print(CSSLO.CP2Str(2*q,V,N),"=>",CSSLO.z2Str(z,N))
-    #print()
+    #CSSLO.CZLO(SX, LX)
+    N = 1<<t
+    zList, qList, V, K_M = CSSLO.comm_method(SX, LX, SZ, t, compact=True, debug=False)
+    for z,q in zip(zList,qList):
+        #print(z, q)
+        print(CSSLO.CP2Str(2*q,V,N),"=>",CSSLO.z2Str(z,N))
+    print()
     #return zList
 
 
@@ -58,8 +58,8 @@ for stem in stems:
 
     code = CSSCode(Hx=Hx, Hz=Hz)
     print(code)
-    #print(distance_z3(code))
-    #dump_transverse(code.Hx, code.Lx)
+    print(distance_z3(code))
+    dump_transverse(code.Hx, code.Lx)
     print("Hx =")
     print(shortstr(code.Hx))
     print("Hz =")
