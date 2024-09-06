@@ -25,7 +25,7 @@ def get_swap(n):
 def main():
 
     n = 3 # also works for n=4
-    n = 5
+    n = argv.get("n", 3)
 
     I = UMatrix(numpy.identity(n, dtype=object))
     swap = get_swap(n)
@@ -63,6 +63,7 @@ def main():
 
     result = solver.check()
     assert result == z3.unsat, result
+    print(result)
 
     #model = solver.model()
     #comul = comul.get_interp(model)
