@@ -477,6 +477,8 @@ def main():
         code = QCode.fromstr("XXZZ ZZXX XZXZ")
     elif argv.code == (6,2,2):
         code = QCode.fromstr("XXXIXI ZZIZIZ IYZXII IIYYYY")
+    elif argv.code == (6,3,2):
+        code = QCode.fromstr("XXXXXX ZZZZII IIIIZZ")
     elif argv.code == (7,1,3) and argv.css:
         code = construct.get_713()
     elif argv.code == (7,1,3):
