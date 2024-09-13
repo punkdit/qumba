@@ -573,10 +573,11 @@ class CSSCode(object):
             if rank(Hz) < mz:
                 continue
             kern = numpy.array(solve.kernel(Hz))
+            #print("kern:", kern.shape)
     
             Hx = zeros2(mx, n)
             for i in range(mx):
-                v = rand2(1, n-mx)
+                v = rand2(1, n-mz)
                 Hx[i] = dot2(v, kern)
             C = cls(Hx=Hx, Hz=Hz, **kw)
     
