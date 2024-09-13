@@ -582,7 +582,7 @@ class CSSCode(object):
     
             if distance is None:
                 break
-            dx,dz = C.distance()
+            dx,dz = C.bz_distance()
             if min(dx,dz) >= distance:
                 break
             #print('.', flush=True, end='')
@@ -600,6 +600,25 @@ class CSSCode(object):
             build, self.check or check)
         self._dual = code
         return code
+
+    def bz_distance(code):
+        #t0 = time()
+        Hx = shortstr(code.Hx).replace("1", "X").replace('.', "I")
+        Hz = shortstr(code.Hz).replace("1", "Z").replace('.', "I")
+    
+        from subprocess import Popen, PIPE
+        child = Popen("distance --zx".split(), stdin=PIPE, stdout=PIPE)
+    
+        s = "%s\n%s\n"%(Hx, Hz)
+        child.stdin.write(s.encode())
+        child.stdin.close()
+        result = child.stdout.read().decode()
+        rval = child.wait()
+        assert rval == 0, "child return %s"%rval
+        d_x, d_z = str(result).split()
+    
+        #print("bz_distance took %.3f seconds" % (time() - t0))
+        return int(d_x), int(d_z)
 
     def to_qcode(self):
         return qcode.QCode.build_css(self.Hx, self.Hz, self.Tx, self.Tz, self.Lx, self.Lz)
@@ -898,8 +917,8 @@ def test_find():
     mz = argv.get("mz", m)
     d = argv.get("d", 3)
     code = find_z3(n, mx, mz, d)
-    print(code)
-    print(code.distance())
+    d_x, d_z = (code.distance())
+    print(code, d_x, d_z)
     #print(code.longstr())
 
 
@@ -1005,6 +1024,18 @@ def test_distance():
     print("d1 =", d1)
     print(code)
     #print(code.longstr())
+
+
+def test_random():
+    n = argv.get("n", 15)
+    k = argv.get("k", 1)
+    d = argv.get("d", 3)
+
+    code = CSSCode.random(n, (n-k)//2, (n-k)//2, d)
+    d0 = distance_z3_css(code)
+    print(code, d0)
+    
+
 
 
 if __name__ == "__main__":

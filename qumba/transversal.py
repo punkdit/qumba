@@ -10,7 +10,7 @@ from random import shuffle
 import numpy
 
 import z3
-from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver
+from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, ForAll
 
 from qumba.qcode import QCode, SymplecticSpace, Matrix, fromstr, shortstr, strop
 from qumba.action import mulclose, Group, Perm, mulclose_find
@@ -163,6 +163,13 @@ class UMatrix(object):
 #    def promote(self, item):
 #        if isinstance(item, UMatrix):
 #            return item
+
+    def sum(self):
+        return self.A.sum()
+
+    def __add__(self, other):
+        A = self.A + other.A
+        return UMatrix(A)
 
     def __mul__(self, other):
         A = numpy.dot(self.A, other.A)
@@ -2072,6 +2079,91 @@ def test_equivariant():
                 print(code.Hz)
                 print()
     
+
+def find_css():
+    # see also previous version: csscode.find_z3
+    mx = argv.get("mx", 3)
+    mz = argv.get("mz", 3)
+    n = argv.get("n", mx+mz+1)
+    k = n-mx-mz
+    assert k>0
+
+    d = argv.get("d", 3) 
+
+    solver = Solver()
+    Add = solver.add
+
+    Hx = UMatrix.unknown(mx, n)
+    Hz = UMatrix.unknown(mz, n)
+    Tx = UMatrix.unknown(mx, n)
+    Tz = UMatrix.unknown(mz, n)
+    Lx = UMatrix.unknown(k, n)
+    Lz = UMatrix.unknown(k, n)
+
+    Add( Hx*Tz.t == Matrix.identity(mx) ) # Hx full rank
+    Add( Hx*Hz.t == Matrix.zeros((mx, mz)) ) # Hx/Hz commuting
+    Add( Hx*Lz.t == Matrix.zeros((mx, k)) )
+
+    #Add( Tx*Tz.t == Matrix.zeros((mx, mz)) )
+    Add( Tx*Hz.t == Matrix.identity(mx) ) # Hz full rank
+    #Add( Tx*Lz.t == Matrix.zeros((mx, k)) )
+
+    #Add( Lx*Tz.t == Matrix.zeros((mx, mz)) )
+    Add( Lx*Hz.t == Matrix.zeros((mx, mx)) )
+    Add( Lx*Lz.t == Matrix.identity(k) )
+
+    #Rx = UMatrix.unknown(n, mx)
+    #Rz = UMatrix.unknown(n, mz)
+
+    #Add( Hx*Rx == Matrix.identity(mx, mx) )
+    #Add( Hz*Rz == Matrix.identity(mz, mz) )
+
+    if argv.selfdual:
+        print("selfdual")
+        Add(Hx==Hz)
+        #Add(Tx==Tz)
+
+    A = UMatrix.unknown(1, mx+k)
+    u = A[:, :mx]
+    v = A[:, mx:]
+
+    op = u*Hx + v*Lx
+    lhs = reduce(Or, [v[0,i].get() for i in range(k)])
+    rhs = Sum([If(op[0,i].get(),1,0) for i in range(n)]) >= d
+    Add(ForAll([A[0,i].v for i in range(mx+k)], If(lhs, rhs, True)))
+
+    op = u*Hz + v*Lz
+    lhs = reduce(Or, [v[0,i].get() for i in range(k)])
+    rhs = Sum([If(op[0,i].get(),1,0) for i in range(n)]) >= d
+    Add(ForAll([A[0,i].v for i in range(mz+k)], If(lhs, rhs, True)))
+
+    result = solver.check()
+    if str(result) != "sat":
+        print(result)
+        return
+
+    model = solver.model()
+    Hx = Hx.get_interp(model)
+    Hz = Hz.get_interp(model)
+    Tx = Tx.get_interp(model)
+    Tz = Tz.get_interp(model)
+    Lx = Lx.get_interp(model)
+    Lz = Lz.get_interp(model)
+
+    print("Hx:")
+    print(Hx)
+
+    print("Hz:")
+    print(Hz)
+
+    from qumba.csscode import CSSCode
+    #code = CSSCode(Hx=Hx.A, Hz=Hz.A, Lx=Lx.A, Lz=Lz.A, Tx=Tx.A, Tz=Tz.A)
+    code = CSSCode(Hx=Hx.A, Hz=Hz.A)
+
+    d_x, d_z = code.distance()
+    print(code, d_x, d_z)
+
+    print(code.longstr())
 
 
 

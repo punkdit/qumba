@@ -226,7 +226,7 @@ class Complex(object):
         #print(H1)
         if check:
             HH = numpy.dot(H0, H1)
-            assert numpy.alltrue(HH==0)
+            assert numpy.all(HH==0)
         cx = cls()
         m, n = H0.shape
         verts = [cx.vertex() for i in range(m)]
@@ -633,7 +633,7 @@ def test():
     H0 = cx.bdy(0)
     H1 = cx.bdy(1)
     HH = numpy.dot(H0, H1)
-    assert numpy.alltrue(HH==0)
+    assert numpy.all(HH==0)
     assert cx.is_homology()
     assert cx.euler == 2
 
@@ -1096,7 +1096,7 @@ def build_geometry(key=(5,4), idx=8):
         print(shortstr(B), B.shape)
     cx = Complex.frombdy(A, B, check=False)
     vd = cx.get_degree()
-    assert numpy.alltrue(vd==4), vd
+    assert numpy.all(vd==4), vd
     return cx
 
     try:

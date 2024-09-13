@@ -13,7 +13,7 @@ import json
 
 import numpy, sys
 numpy.set_printoptions(threshold=sys.maxsize)
-from numpy import alltrue, zeros, dot, concatenate
+from numpy import zeros, dot, concatenate
 
 from qumba import solve 
 from qumba.solve import (
