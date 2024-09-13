@@ -1030,8 +1030,12 @@ def test_random():
     n = argv.get("n", 15)
     k = argv.get("k", 1)
     d = argv.get("d", 3)
+    mx = argv.get("mx", (n-k)//2)
+    mz = argv.get("mz", (n-k)//2)
+    k = n-mx-mz
+    assert k>0
 
-    code = CSSCode.random(n, (n-k)//2, (n-k)//2, d)
+    code = CSSCode.random(n, mx, mz, d)
     d0 = distance_z3_css(code)
     print(code, d0)
     
