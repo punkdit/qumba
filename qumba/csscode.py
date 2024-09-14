@@ -1032,7 +1032,7 @@ def test_random():
     k = argv.get("k", 1)
     d = argv.get("d", 3)
     mx = argv.get("mx", (n-k)//2)
-    mz = argv.get("mz", (n-k)//2)
+    mz = argv.get("mz", n-k-mx)
     k = n-mx-mz
     assert k>0
 
@@ -1040,6 +1040,156 @@ def test_random():
     d0 = distance_z3_css(code)
     print(code, d0)
     
+
+
+def selfdual_random():
+    n, k, d = argv.get("code", (7,1,3))
+
+    assert (n-k)%2 == 0
+    m = (n-k)//2
+
+    vecs = []
+    for v in numpy.ndindex((2,)*(n-m)):
+        v = array2(v)
+        r = v.sum()
+        if r%2 and r>1:
+            vecs.append(v)
+    shuffle(vecs)
+    N = len(vecs)
+    V = array2(vecs)
+    print(shortstr(V))
+
+    W = dot2(V, V.transpose())
+    print()
+    print(shortstr(W))
+    print()
+
+    idxs = list(range(N))
+
+    while 1:
+        found = []
+        H = zeros2(m, n)
+        H[:m, :m] = identity2(m)
+        while len(found) < m:
+            row = len(found)
+            shuffle(idxs)
+            for idx in idxs:
+                H[row, m:] = vecs[idx]
+                H1 = H[:row+1, :]
+                if dot2(H1, H1.transpose()).sum() == 0:
+                    found.append(idx)
+                    break
+            else:
+                break
+        else:
+            H = zeros2(m, n)
+            H[:m, :m] = identity2(m)
+            for i,idx in enumerate(found):
+                H[i, m:] = vecs[idx]
+            assert dot2(H, H.transpose()).sum() == 0
+            code = CSSCode(Hx=H, Hz=H)
+            d_x, d_z = code.bz_distance()
+            if min(d_x, d_z)>=d:
+                break
+            print(".", end="", flush=True)
+    print("found")
+    print(code.longstr())
+
+
+
+def selfdual():
+    n, k, d = argv.get("code", (7,1,3))
+
+    assert (n-k)%2 == 0
+    m = (n-k)//2
+
+    vecs = []
+    for v in numpy.ndindex((2,)*(n-m)):
+        v = array2(v)
+        r = v.sum()
+        if r%2 and r>1:
+            vecs.append(v)
+    shuffle(vecs)
+    N = len(vecs)
+    V = array2(vecs)
+    print(shortstr(V))
+
+    W = dot2(V, V.transpose())
+    print()
+    print(shortstr(W))
+    print()
+
+    def show():
+        print(found)
+        for i in found:
+          for j in found:
+            print(W[i,j], end='')
+          print()
+        print()
+
+    def accept(found):
+        H = zeros2(m, n)
+        H[:m, :m] = identity2(m)
+        for i,idx in enumerate(found):
+            H[i, m:] = vecs[idx]
+        assert dot2(H, H.transpose()).sum() == 0
+        #print(shortstr(H))
+        #print(H.sum(0), H.sum(1))
+        cols = H.sum(0)
+        if numpy.min(cols) == 0:
+            return 
+        #print(".", end='', flush=True)
+        code = CSSCode(Hx=H, Hz=H)
+        d_x, d_z = code.bz_distance()
+        if min(d_x, d_z)>=d:
+            return code
+
+
+    idx = 0
+    found = []
+
+    def backtrack():
+        # backtrack
+        while found:
+            idx = found.pop() + 1
+            if idx < N:
+                print(found, idx)
+                return idx
+
+    while 1:
+        while len(found) < m and idx is not None:
+            #print("idx", idx)
+            #show()
+            # try idx
+            for jdx in found:
+                if W[idx, jdx]:
+                    idx += 1
+                    break
+            else:
+                found.append(idx)
+                #idx = 0
+                #continue
+                idx += 1 # ?
+
+            if idx==N:
+                idx = backtrack()
+
+        if idx is None:
+            print("fini")
+            break
+
+        code = accept(found)
+        if code is not None:
+            print("accept", code, code.bz_distance())
+            print("H =")
+            print(shortstr(code.Hx))
+            print(code.longstr())
+            break
+
+        idx = backtrack()
+        if idx is None:
+            print("fini")
+            break
 
 
 

@@ -2082,13 +2082,21 @@ def test_equivariant():
 
 def find_css():
     # see also previous version: csscode.find_z3
-    mx = argv.get("mx", 3)
-    mz = argv.get("mz", 3)
-    n = argv.get("n", mx+mz+1)
-    k = n-mx-mz
-    assert k>0
+    params = argv.code
+    if params is not None:
+        n, k, d = params
+        mx = (n-k)//2
+        mz = n-k-mx
+    else:
+        mx = argv.get("mx", 3)
+        mz = argv.get("mz", 3)
+        n = argv.get("n", mx+mz+1)
+        k = n-mx-mz
+        assert k>0
+    
+        d = argv.get("d", 3) 
 
-    d = argv.get("d", 3) 
+    print("code: [[%d, %d, %d]]"%(n, k, d))
 
     solver = Solver()
     Add = solver.add
@@ -2100,15 +2108,25 @@ def find_css():
     Lx = UMatrix.unknown(k, n)
     Lz = UMatrix.unknown(k, n)
 
+    if argv.normal:
+        print("normal")
+        #print( type(Hx[:,mx]) )
+        Add( Hx[:, :mx] == Matrix.identity(mx) )
+        Add( Hz[:, :mz] == Matrix.identity(mz) )
+        #Add( Tx[:, :mx] == Matrix.identity(mx) )
+        #Add( Tx[:, mx:] == Matrix.zeros((mx, n-mx)) )
+        #Add( Tz[:, :mz] == Matrix.identity(mz) )
+        #Add( Tz[:, mz:] == Matrix.zeros((mz, n-mz)) )
+
     Add( Hx*Tz.t == Matrix.identity(mx) ) # Hx full rank
     Add( Hx*Hz.t == Matrix.zeros((mx, mz)) ) # Hx/Hz commuting
     Add( Hx*Lz.t == Matrix.zeros((mx, k)) )
 
-    #Add( Tx*Tz.t == Matrix.zeros((mx, mz)) )
+    Add( Tx*Tz.t == Matrix.zeros((mx, mz)) )
     Add( Tx*Hz.t == Matrix.identity(mx) ) # Hz full rank
-    #Add( Tx*Lz.t == Matrix.zeros((mx, k)) )
+    Add( Tx*Lz.t == Matrix.zeros((mx, k)) )
 
-    #Add( Lx*Tz.t == Matrix.zeros((mx, mz)) )
+    Add( Lx*Tz.t == Matrix.zeros((mx, mz)) )
     Add( Lx*Hz.t == Matrix.zeros((mx, mx)) )
     Add( Lx*Lz.t == Matrix.identity(k) )
 
@@ -2120,22 +2138,38 @@ def find_css():
 
     if argv.selfdual:
         print("selfdual")
+        assert mx==mz
         Add(Hx==Hz)
-        #Add(Tx==Tz)
+        Add(Tx==Tz)
+        Add(Lx==Lz)
 
-    A = UMatrix.unknown(1, mx+k)
-    u = A[:, :mx]
-    v = A[:, mx:]
+    if k > 0:
+        A = UMatrix.unknown(1, mx+k)
+        u = A[:, :mx]
+        v = A[:, mx:]
+    
+        op = u*Hx + v*Lx
+        lhs = reduce(Or, [v[0,i].get() for i in range(k)])
+        rhs = Sum([If(op[0,i].get(),1,0) for i in range(n)]) >= d
+        Add(ForAll([A[0,i].v for i in range(mx+k)], If(lhs, rhs, True)))
+    
+        A = UMatrix.unknown(1, mz+k)
+        u = A[:, :mz]
+        v = A[:, mz:]
+    
+        op = u*Hz + v*Lz
+        lhs = reduce(Or, [v[0,i].get() for i in range(k)])
+        rhs = Sum([If(op[0,i].get(),1,0) for i in range(n)]) >= d
+        Add(ForAll([A[0,i].v for i in range(mz+k)], If(lhs, rhs, True)))
 
-    op = u*Hx + v*Lx
-    lhs = reduce(Or, [v[0,i].get() for i in range(k)])
-    rhs = Sum([If(op[0,i].get(),1,0) for i in range(n)]) >= d
-    Add(ForAll([A[0,i].v for i in range(mx+k)], If(lhs, rhs, True)))
+    else:
+        u = UMatrix.unknown(1, mx)
+        for v in numpy.ndindex((2,)*k):
+            v = numpy.array(v)
+            v.shape = (1,k)
+            v = Matrix(v)
+            l = v*Lx
 
-    op = u*Hz + v*Lz
-    lhs = reduce(Or, [v[0,i].get() for i in range(k)])
-    rhs = Sum([If(op[0,i].get(),1,0) for i in range(n)]) >= d
-    Add(ForAll([A[0,i].v for i in range(mz+k)], If(lhs, rhs, True)))
 
     result = solver.check()
     if str(result) != "sat":
