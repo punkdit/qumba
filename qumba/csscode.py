@@ -1044,6 +1044,9 @@ def test_random():
 
 def selfdual_random():
     n, k, d = argv.get("code", (7,1,3))
+    weight = argv.get("weight", None)
+    minweight = argv.get("minweight", weight or 3)
+    maxweight = argv.get("maxweight", weight)
 
     assert (n-k)%2 == 0
     m = (n-k)//2
@@ -1052,20 +1055,22 @@ def selfdual_random():
     for v in numpy.ndindex((2,)*(n-m)):
         v = array2(v)
         r = v.sum()
-        if r%2 and r>1:
+        if r%2 and r>=minweight and (maxweight is None or r<=maxweight):
             vecs.append(v)
     shuffle(vecs)
     N = len(vecs)
-    V = array2(vecs)
-    print(shortstr(V))
+    #V = array2(vecs)
+    #print(shortstr(V))
+    print("vecs:", N)
 
-    W = dot2(V, V.transpose())
-    print()
-    print(shortstr(W))
-    print()
+    #W = dot2(V, V.transpose())
+    #print()
+    #print(shortstr(W))
+    #print()
 
     idxs = list(range(N))
 
+    count = 0
     while 1:
         found = []
         H = zeros2(m, n)
@@ -1086,19 +1091,23 @@ def selfdual_random():
             H[:m, :m] = identity2(m)
             for i,idx in enumerate(found):
                 H[i, m:] = vecs[idx]
-            assert dot2(H, H.transpose()).sum() == 0
-            code = CSSCode(Hx=H, Hz=H)
+            #assert dot2(H, H.transpose()).sum() == 0
+            code = CSSCode(Hx=H, Hz=H, check=False)
             d_x, d_z = code.bz_distance()
             if min(d_x, d_z)>=d:
                 break
-            print(".", end="", flush=True)
-    print("found")
+            count += 1
+            if count%100 == 0:
+                return
+                print(".", end="", flush=True)
+    print()
+    print(code, code.bz_distance())
     print(code.longstr())
-
 
 
 def selfdual():
     n, k, d = argv.get("code", (7,1,3))
+    weight = argv.get("weight", 3)
 
     assert (n-k)%2 == 0
     m = (n-k)//2
@@ -1107,17 +1116,18 @@ def selfdual():
     for v in numpy.ndindex((2,)*(n-m)):
         v = array2(v)
         r = v.sum()
-        if r%2 and r>1:
+        if r%2 and r>=weight:
             vecs.append(v)
     shuffle(vecs)
     N = len(vecs)
+    print("vecs:", N)
     V = array2(vecs)
-    print(shortstr(V))
+    #print(shortstr(V))
 
     W = dot2(V, V.transpose())
-    print()
-    print(shortstr(W))
-    print()
+    #print()
+    #print(shortstr(W))
+    #print()
 
     def show():
         print(found)
@@ -1132,14 +1142,12 @@ def selfdual():
         H[:m, :m] = identity2(m)
         for i,idx in enumerate(found):
             H[i, m:] = vecs[idx]
-        assert dot2(H, H.transpose()).sum() == 0
-        #print(shortstr(H))
-        #print(H.sum(0), H.sum(1))
+        #assert dot2(H, H.transpose()).sum() == 0
         cols = H.sum(0)
         if numpy.min(cols) == 0:
             return 
         #print(".", end='', flush=True)
-        code = CSSCode(Hx=H, Hz=H)
+        code = CSSCode(Hx=H, Hz=H, check=False)
         d_x, d_z = code.bz_distance()
         if min(d_x, d_z)>=d:
             return code
@@ -1153,7 +1161,7 @@ def selfdual():
         while found:
             idx = found.pop() + 1
             if idx < N:
-                print(found, idx)
+                #print(found, idx)
                 return idx
 
     while 1:
