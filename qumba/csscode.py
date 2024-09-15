@@ -1027,7 +1027,7 @@ def test_distance():
     #print(code.longstr())
 
 
-def test_random():
+def css_sample():
     n = argv.get("n", 15)
     k = argv.get("k", 1)
     d = argv.get("d", 3)
@@ -1041,12 +1041,82 @@ def test_random():
     print(code, d0)
     
 
-
-def selfdual_random():
+def css_random():
+    # probably not any better than css_sample ... ??
     n, k, d = argv.get("code", (7,1,3))
     weight = argv.get("weight", None)
-    minweight = argv.get("minweight", weight or 3)
+    minweight = argv.get("minweight", weight or 4) - 1
     maxweight = argv.get("maxweight", weight)
+    maxweight = maxweight - 1 if maxweight is not None else None
+
+    assert (n-k)%2 == 0
+    m = (n-k)//2
+
+    vecs = []
+    for v in numpy.ndindex((2,)*(n-m)):
+        v = array2(v)
+        r = v.sum()
+        if r%2 and r>=minweight and (maxweight is None or r<=maxweight):
+            vecs.append(v)
+    shuffle(vecs)
+    N = len(vecs)
+    print("vecs:", N)
+
+    Hx = zeros2(m, n)
+    Hx[:m, :m] = identity2(m)
+
+    Hz = zeros2(m, n)
+    Hz[:m, :m] = identity2(m)
+
+    count = 0
+    while 1:
+        idxs = []
+        jdxs = []
+        for trial in range(10*m):
+            assert len(idxs) == len(jdxs)
+            row = len(idxs)
+            idx = randint(0, N-1)
+            Hx[row, m:] = vecs[idx]
+
+            jdx = randint(0, N-1)
+            Hz[row, m:] = vecs[jdx]
+
+            row += 1
+            if dot2(Hz[:row,:], Hx[:row,:].transpose()).sum() == 0:
+                idxs.append(idx)
+                jdxs.append(jdx)
+
+            trial += 1
+            if len(idxs) == m:
+                break
+
+        if len(idxs) == m:
+            if numpy.min(Hx.sum(0)) == 0:
+                continue
+            if numpy.min(Hz.sum(0)) == 0:
+                continue
+            #assert dot2(H, H.transpose()).sum() == 0
+            code = CSSCode(Hx=Hx, Hz=Hz, check=False, build=False)
+            d_x, d_z = code.bz_distance()
+            if min(d_x, d_z)>=d:
+                break
+            count += 1
+            if count%100 == 0:
+                print(".", end="", flush=True)
+    print()
+    code.build()
+    print(code, code.bz_distance())
+    print(code.longstr())
+
+
+
+
+def selfdual_random_slow():
+    n, k, d = argv.get("code", (7,1,3))
+    weight = argv.get("weight", None)
+    minweight = argv.get("minweight", weight or 4) - 1
+    maxweight = argv.get("maxweight", weight)
+    maxweight = maxweight - 1 if maxweight is not None else None
 
     assert (n-k)%2 == 0
     m = (n-k)//2
@@ -1078,7 +1148,7 @@ def selfdual_random():
         while len(found) < m:
             row = len(found)
             shuffle(idxs)
-            for idx in idxs:
+            for idx in idxs: # exhaustive search 
                 H[row, m:] = vecs[idx]
                 H1 = H[:row+1, :]
                 if dot2(H1, H1.transpose()).sum() == 0:
@@ -1098,16 +1168,79 @@ def selfdual_random():
                 break
             count += 1
             if count%100 == 0:
-                return
                 print(".", end="", flush=True)
     print()
     print(code, code.bz_distance())
     print(code.longstr())
 
 
+
+def selfdual_random():
+    n, k, d = argv.get("code", (7,1,3))
+    weight = argv.get("weight", None)
+    minweight = argv.get("minweight", weight or 4) - 1
+    maxweight = argv.get("maxweight", weight)
+    maxweight = maxweight - 1 if maxweight is not None else None
+
+    assert (n-k)%2 == 0
+    m = (n-k)//2
+
+    vecs = []
+    for v in numpy.ndindex((2,)*(n-m)):
+        v = array2(v)
+        r = v.sum()
+        if r%2 and r>=minweight and (maxweight is None or r<=maxweight):
+            vecs.append(v)
+    shuffle(vecs)
+    N = len(vecs)
+    #V = array2(vecs)
+    #print(shortstr(V))
+    print("vecs:", N)
+
+    #W = dot2(V, V.transpose())
+    #print()
+    #print(shortstr(W))
+    #print()
+
+    count = 0
+    while 1:
+        found = []
+        H = zeros2(m, n)
+        H[:m, :m] = identity2(m)
+        trial = 0
+        while len(found) < m and trial < 100:
+            row = len(found)
+            idx = randint(0, N-1)
+            H[row, m:] = vecs[idx]
+            H1 = H[:row+1, :]
+            if dot2(H1, H1.transpose()).sum() == 0:
+                found.append(idx)
+            trial += 1
+        if len(found) == m:
+            H = zeros2(m, n)
+            H[:m, :m] = identity2(m)
+            for i,idx in enumerate(found):
+                H[i, m:] = vecs[idx]
+            cols = H.sum(0)
+            if numpy.min(cols) == 0:
+                continue
+            #assert dot2(H, H.transpose()).sum() == 0
+            code = CSSCode(Hx=H, Hz=H, check=False, build=False)
+            d_x, d_z = code.bz_distance()
+            if min(d_x, d_z)>=d:
+                break
+            count += 1
+            if count%100 == 0:
+                print(".", end="", flush=True)
+    print()
+    code.build()
+    print(code, code.bz_distance())
+    print(code.longstr())
+
+
 def selfdual():
     n, k, d = argv.get("code", (7,1,3))
-    weight = argv.get("weight", 3)
+    weight = argv.get("weight", 4) - 1
 
     assert (n-k)%2 == 0
     m = (n-k)//2
@@ -1227,8 +1360,6 @@ if __name__ == "__main__":
 
     t = time() - start_time
     print("OK! finished in %.3f seconds\n"%t)
-
-
 
 
 
