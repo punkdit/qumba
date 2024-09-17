@@ -23,6 +23,71 @@ def get_swap(n):
 
 
 def main():
+    n = 2 # qubits
+
+    I = UMatrix(numpy.identity(n, dtype=object))
+    one = Matrix([[1]])
+    swap = get_swap(n)
+    unknown = UMatrix.unknown
+
+    # black/white phase=0 spiders
+    bb_b = unknown(n*n, n)
+    b_bb = unknown(n, n*n)
+    ww_w = unknown(n*n, n)
+    w_ww = unknown(n, n*n)
+
+    # phase=1
+    _b1 = unknown(1, n)
+    b1_ = unknown(n, 1)
+    _w1 = unknown(1, n)
+    w1_ = unknown(n, 1)
+
+    h = UMatrix([[0,1],[1,0]])
+
+    # phase=1
+    w1 = UMatrix([[1,1],[0,1]])
+    b1 = UMatrix([[1,1],[1,0]])
+
+    #assert h*h == I
+    #assert w1*h == b1
+    #assert b1*h == w1
+
+    # phase=0
+    _b = _b1 * b1
+    b_ = b1 * b1_ 
+    _w = _w1 * w1
+    w_ = w1 * w1_ 
+
+    solver = z3.Solver()
+    Add = solver.add
+
+    Add( _b * w1_ == one )
+    Add( _b * w_ == one )
+    Add( _b * b_ == one )
+
+    # comm
+    Add(swap*bb_b == bb_b)
+    Add(b_bb*swap == b_bb)
+    Add(swap*ww_w == ww_w)
+    Add(w_ww*swap == w_ww)
+
+    # unit
+    print(I.direct_sum(_b)*bb_b)
+    Add(I.direct_sum(_b) * bb_b == I)
+    
+    # bialgebra
+    lhs = b_bb.direct_sum(b_bb) * (I.direct_sum(swap).direct_sum(I)) * ww_w.direct_sum(ww_w)
+    rhs = ww_w * b_bb
+
+    Add(lhs==rhs)
+
+    result = solver.check()
+    #assert result == z3.sat, result
+    print(result)
+
+
+
+def main_unsat():
 
     n = 3 # also works for n=4
     n = argv.get("n", 3)
