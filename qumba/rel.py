@@ -1,5 +1,14 @@
 #!/usr/bin/env python
 
+"""
+Lagrangian relations 
+also known as
+Pauli flows
+
+https://arxiv.org/abs/2105.06244v2
+
+"""
+
 from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
 from operator import add, mul
@@ -9,6 +18,7 @@ import numpy
 
 from qumba.matrix import Matrix, pullback
 from qumba.smap import SMap
+from qumba.action import mulclose
 from qumba.argv import argv
 
 
@@ -72,6 +82,10 @@ class Relation(object):
         if v is None:
             return False
         return (u*v).is_identity() and (v*u).is_identity()
+
+# fail...
+#    def __hash__(self):
+#        return hash((self.left, self.right))
 
     def __mul__(lhs, rhs):
         assert isinstance(rhs, Relation)
@@ -146,26 +160,22 @@ def main():
     assert I*h==h*I==h
     assert h*h == I
 
+    # black unit
+    b_ = Relation([[0],[1]], zeros(0,1))
+
     # phase=1
     b1 = Relation([[1,1],[0,1]])
     w1 = h*b1*h
 
     assert b1 != w1
 
-    assert w1*w1 == I # S gate
-    assert b1*b1 == I # R gate (=HSH)
+    assert w1*w1 == I
+    assert b1*b1 == I
 
-    b1_ = Relation([[1],[0]], zeros(0,1))
-    b_ = b1 * b1_
+    b1_ = b1*b_
     
     w1_ = h*b1_
     w_ = w1 * w1_
-
-    #print(b1_ == w1_) # False
-    #print(b_ == w_) # False
-
-    assert(b_ == b1_) # True
-    assert(w_ == w1_) # True
 
     _b1 = b1_.op
     _b = b_.op
@@ -177,6 +187,10 @@ def main():
     assert h == b1*w1*b1
 
     assert _b * w_  == one
+
+    assert _b1 == _w1
+    assert _b != _b1
+    assert _w != _w1
 
     z = zeros(n,n)
     i = Matrix.identity(n)
@@ -210,6 +224,8 @@ def main():
     ww_w = (h@h) * bb_b * h
     w_ww = ww_w.op
 
+    assert ww_w != bb_b
+
     # special
     assert b_bb*bb_b == I
     assert w_ww*ww_w == I
@@ -219,19 +235,15 @@ def main():
     rhs = (I @ bb_b) * bb_b 
     assert( lhs==rhs )
 
-    b_ = Relation([[0],[1]], zeros(0,1))
     _b = b_.op
-    lhs = (I@_b)*bb_b 
+    w_ = h*b_
+
+    # unital
     assert (I@_b)*bb_b == I
     assert (_b@I)*bb_b == I
 
-    w_ = h*b_
+    # copy
     assert bb_b * w_ == w_@w_
-
-    assert ww_w != bb_b
-
-    assert swap*bb_b == bb_b
-    assert swap*ww_w == ww_w
 
     # frobenius
     lhs = bb_b * b_bb
@@ -255,8 +267,50 @@ def main():
     rhs = b_ @ _b
     assert lhs==rhs
 
-    b1_ = b1 * b_
     assert( h == b1 * w_ww * (b1 @ b1_) )
+
+    assert( b1 * b_bb == b_bb * (b1@I) )
+    assert( b1 * b_bb == b_bb * (I@b1) )
+
+    assert( w1 * w_ww == w_ww * (w1@I) )
+    assert( w1 * w_ww == w_ww * (I@w1) )
+
+    cup = bb_b * b_
+    assert cup == ww_w * w_
+    cap = _b * b_bb
+    assert cap == _w * w_ww
+
+    # snakes
+    assert (I @ cap) * (cup @ I) == I
+    assert (cap @ I) * (I @ cup) == I
+
+    cnot = (I @ b_bb) * (ww_w @ I)
+    assert cnot != I@I
+    assert cnot * cnot == I@I
+
+    if 0: # SLOW
+        gen = [cnot, w1@I, I@w1, h@I, I@h]
+    
+    #    G = mulclose(gen, maxsize=100)
+    #    for g in G:
+    #      for h in G:
+    #        if g==h:
+    #            assert hash(g) == hash(h)
+    
+        found = list(gen)
+        while 1:
+            bdy = []
+            for g in found:
+                for h in gen:
+                    gh = g*h
+                    if gh not in found and gh not in bdy:
+                        bdy.append(gh)
+            if not bdy:
+                break
+            found += bdy
+            print(len(found))
+
+        assert len(found) == 720 # Sp(4,2)
 
 
 
