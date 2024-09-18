@@ -83,9 +83,9 @@ class Relation(object):
             return False
         return (u*v).is_identity() and (v*u).is_identity()
 
-# fail...
-#    def __hash__(self):
-#        return hash((self.left, self.right))
+    # fail...
+    def __hash__(self):
+        return hash((self.left, self.right))
 
     def __mul__(lhs, rhs):
         assert isinstance(rhs, Relation)
@@ -288,8 +288,14 @@ def main():
     assert cnot != I@I
     assert cnot * cnot == I@I
 
+    gen = [cnot, w1@I, I@w1, h@I, I@h]
+    G = mulclose(gen, maxsize=100)
+
+    for g in G:
+        assert g * g.op == I@I
+        assert g.op * g == I@I
+
     if 0: # SLOW
-        gen = [cnot, w1@I, I@w1, h@I, I@h]
     
     #    G = mulclose(gen, maxsize=100)
     #    for g in G:

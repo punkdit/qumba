@@ -1197,16 +1197,27 @@ def selfdual_random():
     #print(shortstr(V))
     print("vecs:", N)
 
-    #W = dot2(V, V.transpose())
-    #print()
-    #print(shortstr(W))
-    #print()
+#    uecs = [v for v in vecs if v.sum() == minweight]
+#    M = len(uecs)
+#    print("uecs:", M)
 
     count = 0
     while 1:
         found = []
         H = zeros2(m, n)
         H[:m, :m] = identity2(m)
+#        trial = 0
+#        while len(found) < 4 and trial < 100:
+#            row = len(found)
+#            idx = randint(0, M-1)
+#            H[row, m:] = uecs[idx]
+#            H1 = H[:row+1, :]
+#            if dot2(H1, H1.transpose()).sum() == 0:
+#                found.append(idx)
+#            trial += 1
+#        #assert len(found) == 4
+#        if len(found) < 4:
+#            continue
         trial = 0
         while len(found) < m and trial < 100:
             row = len(found)
@@ -1217,13 +1228,13 @@ def selfdual_random():
                 found.append(idx)
             trial += 1
         if len(found) == m:
-            H = zeros2(m, n)
-            H[:m, :m] = identity2(m)
-            for i,idx in enumerate(found):
-                H[i, m:] = vecs[idx]
             cols = H.sum(0)
             if numpy.min(cols) == 0:
                 continue
+            assert numpy.min(H.sum(1))-1 >= minweight
+            assert numpy.max(H.sum(1))-1 <= maxweight
+            #if numpy.min(H.sum(1)) == 6:
+            #    continue
             #assert dot2(H, H.transpose()).sum() == 0
             code = CSSCode(Hx=H, Hz=H, check=False, build=False)
             d_x, d_z = code.bz_distance()
@@ -1236,6 +1247,12 @@ def selfdual_random():
     code.build()
     print(code, code.bz_distance())
     print(code.longstr())
+
+    #perms = code.find_autos()
+    #print(len(perms))
+
+    #N, gen = code.to_qcode().get_autos()
+    #print(N)
 
 
 def selfdual():
