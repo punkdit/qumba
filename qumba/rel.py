@@ -36,7 +36,7 @@ class Relation(object):
         else:
             right = Matrix.promote(right)
         assert left.shape[1] == right.shape[1]
-        #left, right = normalize(left, right)
+        left, right = normalize(left, right)
         self.left = left
         self.right = right
         self.shape = left.shape + (right.shape[0],)
@@ -147,15 +147,8 @@ def main():
     assert h*h == I
 
     # phase=1
-    w1 = Relation([[1,1],[0,1]])
-    #b1 = Relation([[1,1],[1,0]])
-
-    b1 = h*w1*h
-    #print("b1")
-    #print(b1)
-
-    #print("b2")
-    #print(b1*b1)
+    b1 = Relation([[1,1],[0,1]])
+    w1 = h*b1*h
 
     assert b1 != w1
 
@@ -169,7 +162,10 @@ def main():
     w_ = w1 * w1_
 
     #print(b1_ == w1_) # False
-    #print(b_ == w_) # True
+    #print(b_ == w_) # False
+
+    assert(b_ == b1_) # True
+    assert(w_ == w1_) # True
 
     _b1 = b1_.op
     _b = b_.op
@@ -180,7 +176,7 @@ def main():
     assert h == w1*b1*w1
     assert h == b1*w1*b1
 
-    #print( _b * w_  == one) # hmm
+    assert _b * w_  == one
 
     z = zeros(n,n)
     i = Matrix.identity(n)
@@ -194,88 +190,73 @@ def main():
       for b in [I,w1,b1,h]:
         assert swap*(a@b) == (b@a)*swap
 
-    # copy
-    #bb_b = Relation(i.concatenate(i))
-    #bb_b = Relation(Matrix.identity(2*n), i.concatenate(i,axis=1))
-
-    #print("w_")
-    #print(w_)
-
     for v_ in all_subspaces(2, 1):
         assert swap * (v_@I) == I@v_
 
-    print("search:")
-    for bb_b in all_linear(4, 2):
-        if swap*bb_b != bb_b:
-            continue
+    # copy
+    bb_b = Relation([
+        [1,0,0],
+        [0,0,1],
+        [0,1,0],
+        [0,0,1],
+    ], [
+        [1,1,0],
+        [0,0,1],
+    ])
 
-        print("symmetric")
-        b_bb = bb_b.op
-        if b_bb*bb_b != I:
-            continue
-
-        print("special")
-        #print(b_bb)
-
-        lhs = (bb_b @ I) * bb_b 
-        rhs = (I @ bb_b) * bb_b 
-        if lhs==rhs:
-            print("assoc")
-
-        return
-
-        for b_ in all_subspaces(2, 1):
-            #print(b_)
-            _b = b_.op
-            #print(I@_b)
-            lhs = (I@_b)*bb_b 
-            print( (I@_b).shape )
-            print(lhs.shape, I.shape)
-            if (I@_b)*bb_b != I:
-                continue
-            assert (_b@I)*bb_b == I
-
-            #print(bb_b)
-
-            print( (bb_b*w_).shape, (w_@w_).shape )
-    
-            w_ = h*b_
-            if bb_b * w_ == w_@w_:
-                print("bb_b:")
-                print(bb_b)
-
-    print()
-    return
+    assert swap*bb_b == bb_b
 
     b_bb = bb_b.op
-
-    print("bb_b")
-    print(bb_b)
-
-
     ww_w = (h@h) * bb_b * h
     w_ww = ww_w.op
 
-    #assert ww_w != bb_b
+    # special
+    assert b_bb*bb_b == I
+    assert w_ww*ww_w == I
+
+    # _assoc
+    lhs = (bb_b @ I) * bb_b 
+    rhs = (I @ bb_b) * bb_b 
+    assert( lhs==rhs )
+
+    b_ = Relation([[0],[1]], zeros(0,1))
+    _b = b_.op
+    lhs = (I@_b)*bb_b 
+    assert (I@_b)*bb_b == I
+    assert (_b@I)*bb_b == I
+
+    w_ = h*b_
+    assert bb_b * w_ == w_@w_
+
+    assert ww_w != bb_b
 
     assert swap*bb_b == bb_b
     assert swap*ww_w == ww_w
 
-    #return
+    # frobenius
+    lhs = bb_b * b_bb
+    rhs = (I @ b_bb) * (bb_b @ I)
+    assert lhs==rhs
+    rhs = (b_bb @ I) * (I @ bb_b)
+    assert lhs==rhs
 
-    #assert bb_b * w_ == w_@w_
-    print(w_)
-    #print(bb_b)
+    lhs = ww_w * w_ww
+    rhs = (I @ w_ww) * (ww_w @ I)
+    assert lhs==rhs
+    rhs = (w_ww @ I) * (I @ ww_w)
+    assert lhs==rhs
 
-    lhs = bb_b * w_
-    rhs = w_@w_
+    # bialgebra
+    lhs = ww_w * b_bb
+    rhs = (b_bb @ b_bb) * (I @ swap @ I) * (ww_w @ ww_w)
+    assert lhs == rhs
 
-    print(lhs)
-    print(rhs)
+    lhs = b_bb * (h@h) * bb_b
+    rhs = b_ @ _b
+    assert lhs==rhs
 
-    #print(lhs == rhs)
-
-
+    b1_ = b1 * b_
+    assert( h == b1 * w_ww * (b1 @ b1_) )
 
 
 
