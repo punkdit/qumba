@@ -563,10 +563,10 @@ class CSSCode(object):
             k = n-mx-mz
             assert k>=0
     
-            #print("rate:", 1.*k//n)
+            #print("rate:", 1.*k/n)
             #H = lambda p: -p*log(p) - (1-p)*log(1-p)
             #d = 56
-            #print(1-2*H(1.*d//n)) # works!
+            #print(1-2*H(1.*distance/n)) # works!
     
             Hz = rand2(mz, n)
             #print(shortstr(Hz))
@@ -586,8 +586,8 @@ class CSSCode(object):
             dx,dz = C.bz_distance()
             if min(dx,dz) >= distance:
                 break
-            #print('.', flush=True, end='')
-        #print() 
+            print('.', flush=True, end='')
+        print() 
         return C
     
     _dual = None
@@ -1028,18 +1028,27 @@ def test_distance():
 
 
 def css_sample():
-    n = argv.get("n", 15)
-    k = argv.get("k", 1)
-    d = argv.get("d", 3)
+#    n = argv.get("n", 15)
+#    k = argv.get("k", 1)
+#    d = argv.get("d", 3)
+#    mx = argv.get("mx", (n-k)//2)
+#    mz = argv.get("mz", n-k-mx)
+#    k = n-mx-mz
+#    assert k>0
+
+    n, k, d = argv.get("code", (7,1,3))
     mx = argv.get("mx", (n-k)//2)
     mz = argv.get("mz", n-k-mx)
-    k = n-mx-mz
-    assert k>0
 
     code = CSSCode.random(n, mx, mz, d)
-    d0 = distance_z3_css(code)
-    print(code, d0)
+    #d0 = distance_z3_css(code)
+    #print(code, d0)
     
+    from qumba.qcode import strop
+    print()
+    print(strop(code.to_qcode().H).replace(".","I"))
+    print(code, code.bz_distance())
+
 
 def css_random():
     # probably not any better than css_sample ... ??
@@ -1107,7 +1116,6 @@ def css_random():
     code.build()
     print(code, code.bz_distance())
     print(code.longstr())
-
 
 
 
