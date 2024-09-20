@@ -1163,14 +1163,14 @@ def test_422_encode():
     E = CX(0,1)*CX(0,2)*CX(2,0)*CX(0,3)*CX(1,0)*CX(3,1)*CX(1,3)*H(1)
 
     # test the encoder...
-    assert E*X0 == X0*X1*X2*X3*E
-    assert E*Z0 == Z0*Z1*Z2*E
-    assert E*X1 == Z0*Z1*Z2*Z3*E
-    assert E*Z1 == X3*E
-    assert E*X2 == X0*X1*E
-    assert E*Z2 == Z0*Z2*E
-    assert E*X3 == X0*X2*E
-    assert E*Z3 == Z0*Z1*E
+    assert E*X0 == X0*X1*X2*X3*E # stabilizer 1
+    assert E*Z0 == Z0*Z1*Z2*E    # de-stabilizer 1
+    assert E*X1 == Z0*Z1*Z2*Z3*E # stabilizer 2
+    assert E*Z1 == X3*E          # de-stabilizer 2
+    assert E*X2 == X0*X1*E       # logical X1
+    assert E*Z2 == Z0*Z2*E       # logical Z1
+    assert E*X3 == X0*X2*E       # logical X2
+    assert E*Z3 == Z0*Z1*E       # logical Z2
 
     # transversal hadamard -------------------
     g = H0*H1*H2*H3
