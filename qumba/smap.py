@@ -34,6 +34,7 @@ class SMap(object):
                     col += 1
                     cols = max(cols, col)
         else:
+            idx = -1
             for idx, c in enumerate(s):
                 self.data[i, j+idx] = c
             rows = max(rows, i)

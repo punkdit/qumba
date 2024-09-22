@@ -16,7 +16,8 @@ import numpy
 
 from qumba.default_p import DEFAULT_P
 from qumba.solve import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
-    kernel, span, pseudo_inverse, rank, row_reduce, linear_independent, rand2, parse)
+    kernel, span, pseudo_inverse, rank, row_reduce, linear_independent, rand2, parse,
+    normal_form,)
 from qumba.solve import int_scalar as scalar
 from qumba import solve
 from qumba.action import mulclose
@@ -321,6 +322,10 @@ class Matrix(object):
 
     def row_reduce(self):
         A = row_reduce(self.A)
+        return Matrix(A)
+
+    def normal_form(self):
+        A = normal_form(self.A)
         return Matrix(A)
 
     def linear_independent(self):

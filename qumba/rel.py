@@ -12,11 +12,13 @@ https://arxiv.org/abs/2105.06244v2
 from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
 from operator import add, mul
-from random import choice
+from random import choice, shuffle
 
 import numpy
 
 from qumba.matrix import Matrix, pullback
+from qumba.symplectic import symplectic_form
+from qumba.qcode import strop
 from qumba.smap import SMap
 from qumba.action import mulclose
 from qumba.argv import argv
@@ -27,13 +29,9 @@ def normalize(left, right):
     assert left.shape[1] == right.shape[1]
     m, n = left.shape[0], right.shape[0]
     A = left.concatenate(right)
-    #print(A)
-    assert A.shape[1] == left.shape[1]
-    A = A.t.row_reduce().t
+    A = A.t.normal_form().t
     left = A[:m, :]
     right = A[m:, :]
-    #print("-->")
-    #print(A)
     return left, right
 
 
@@ -58,11 +56,33 @@ class Relation(object):
         I = Matrix.identity(n)
         return Relation(I, I)
 
+    def is_lagrangian(self):
+        left, right = self.left, self.right
+        A = left.concatenate(right)
+        nn, m = A.shape
+        assert nn%2 == 0
+        assert nn//2 == m, A.shape
+        F = symplectic_form(m)
+        # assert isotropic
+        At = A.transpose()
+        AFA = At * F * A
+        return AFA.sum() == 0
+
     def __str__(self):
-        s = "[%s <--- %s ---> %s]\n"%self.shape
-        s += "left: %s\n%s\nright: %s\n%s"%(
-            self.left.shape, self.left.A, self.right.shape, self.right.A)
-        return "="*10 + '\n' + s + "\n" + "="*10
+        left, right = self.left.t, self.right.t
+        #A = numpy.concatenate((left, right))
+        #return str(A.transpose())
+        smap = SMap()
+        smap[0,0] = strop(left)
+        w = left.shape[1] // 2
+        for i in range(left.shape[0]):
+            smap[i,w] = "|"
+        smap[0,w+1] = strop(right)
+        return str(smap)
+        #s = "[%s <--- %s ---> %s]\n"%self.shape
+        #s += "left: %s\n%s\nright: %s\n%s"%(
+        #    self.left.shape, self.left.A, self.right.shape, self.right.A)
+        #return "="*10 + '\n' + s + "\n" + "="*10
 
     def __eq__(self, other):
         assert isinstance(other, Relation)
@@ -289,34 +309,47 @@ def main():
     assert cnot * cnot == I@I
 
     gen = [cnot, w1@I, I@w1, h@I, I@h]
-    G = mulclose(gen, maxsize=100)
+    G = list(gen)
+    for _ in range(100):
+        a = choice(G)
+        b = choice(gen)
+        G.append(a*b)
 
     for g in G:
         assert g * g.op == I@I
         assert g.op * g == I@I
 
-    if 0: # SLOW
-    
-    #    G = mulclose(gen, maxsize=100)
-    #    for g in G:
-    #      for h in G:
-    #        if g==h:
-    #            assert hash(g) == hash(h)
-    
-        found = list(gen)
-        while 1:
-            bdy = []
-            for g in found:
-                for h in gen:
-                    gh = g*h
-                    if gh not in found and gh not in bdy:
-                        bdy.append(gh)
-            if not bdy:
-                break
-            found += bdy
-            print(len(found))
+    for a in G:
+      for b in G:
+        if a==b and hash(a) != hash(b):
+            assert 0
 
-        assert len(found) == 720 # Sp(4,2)
+    #print("w_")
+    #print(w_)
+    #print()
+    assert str(w_) == "X| "
+
+    G = mulclose(gen, verbose=True)
+    assert len(G) == 720 # Sp(4,2)
+
+    for g in G:
+        assert g.is_lagrangian()
+
+    for g in list(G)[:10]:
+        str(g)
+        #print(g)
+        #print()
+        #print(g * (w_@I))
+        #print()
+    
+    bone = w_ * _w
+    gen = [cnot, w1@I, I@w1, h@I, I@h, bone@I, I@bone]
+
+    M = mulclose(gen, verbose=True)
+    assert len(M) == 2295
+
+    for m in M:
+        assert m.is_lagrangian()
 
 
 
