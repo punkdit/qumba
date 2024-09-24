@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from random import shuffle
-from functools import reduce
+from functools import reduce, cache
 from operator import add
 
 import numpy
@@ -10,6 +10,7 @@ from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identit
     zeros2, rank, rand2, pseudo_inverse, kernel, direct_sum, span)
 from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr
 from qumba.csscode import CSSCode, find_zx_duality
+from qumba.sp_pascal import i_grassmannian
 from qumba.argv import argv
 
 def get_412():
@@ -348,23 +349,24 @@ def all_css(n, k, distance=3):
         #return
 
 
-
-
-def all_codes(n=4, k=1, d=2):
-    from bruhat.sp_pascal import i_grassmannian
-
-    space = SymplecticSpace(n)
-    gen = []
+@cache
+def uturn_to_zip(n):
     perm = []
     for i in range(n):
         perm.append(i)
         perm.append(2*n - i - 1)
-        gen.append(space.get_S(i))
-        gen.append(space.get_H(i))
-    found = []
+    return perm
+
+
+def all_codes(n=4, k=1, d=2):
+
+    space = SymplecticSpace(n)
+    perm = uturn_to_zip(n)
 
     F = space.F
-    for _,H in i_grassmannian(n, n-k):
+    for R in i_grassmannian(n, n-k):
+        H = R.A
+        print(R.left is not None, R.right is not None)
         H = H[:, perm] # reshuffle to qumba symplectic
         H = Matrix(H)
         code = QCode(H, check=False)

@@ -22,6 +22,7 @@ from qumba.qcode import strop
 from qumba.smap import SMap
 from qumba.action import mulclose
 from qumba.argv import argv
+from qumba.construct import all_codes
 
 
 def normalize(left, right):
@@ -126,6 +127,7 @@ class Relation(object):
         return Relation(self.right, self.left)
 
 
+
 zeros = lambda a,b : Matrix.zeros((a,b))
 
 def all_linear(tgt, src):
@@ -154,11 +156,7 @@ def test():
         assert Relation(fg) == Relation(f)*Relation(g)
         assert ((Relation(fg)==Relation(gh)) 
             == (Relation(f)*Relation(g)==Relation(g)*Relation(h)))
-    print("OK")
 
-
-def main():
-    #test()
 
     n = 2 # qubits
 
@@ -352,11 +350,29 @@ def main():
         assert m.is_lagrangian()
 
 
+def main():
+
+    n = argv.get("n", 4)
+
+    found = set()
+    for code in all_codes(n, 0, 0):
+        #print(code.longstr())
+        H = code.H
+        Ht = H.t
+        l, r = H[:, :n//2], H[:, n//2:]
+        rel = Relation(l.t, r.t)
+        assert rel.is_lagrangian()
+        found.add(rel)
+    found = list(found)
+    print("found:", len(found))
+
+
+
 
 if __name__ == "__main__":
     from time import time
     start_time = time()
-    fn = argv.next() or "main"
+    fn = argv.next() or "test"
 
     if argv.profile:
         import cProfile as profile
