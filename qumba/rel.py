@@ -104,7 +104,6 @@ class Relation(object):
             return False
         return (u*v).is_identity() and (v*u).is_identity()
 
-    # fail...
     def __hash__(self):
         return hash((self.left, self.right))
 
@@ -145,7 +144,7 @@ def all_subspaces(tgt, src):
         yield rel
 
 
-def test():
+def test_linear():
     lins = [a.left for a in all_linear(3,3)]
     for trial in range(100):
         f = choice(lins)
@@ -157,15 +156,16 @@ def test():
         assert ((Relation(fg)==Relation(gh)) 
             == (Relation(f)*Relation(g)==Relation(g)*Relation(h)))
 
+    #b_ = Relation(
 
-    n = 2 # qubits
 
+def test_symplectic():
     one = Relation(zeros(0,0), zeros(0,0))
     #print(one)
     #print(one*one)
     assert one*one == one
 
-    I = Relation.identity(n)
+    I = Relation.identity(2)
     h = Relation([[0,1],[1,0]])
 
     #print("h:")
@@ -210,8 +210,8 @@ def test():
     assert _b != _b1
     assert _w != _w1
 
-    z = zeros(n,n)
-    i = Matrix.identity(n)
+    z = zeros(2,2)
+    i = Matrix.identity(2)
     l = z.concatenate(i)
     r = i.concatenate(z)
     swap = Relation(l.concatenate(r, axis=1))
@@ -348,6 +348,11 @@ def test():
 
     for m in M:
         assert m.is_lagrangian()
+
+
+def test():
+    test_linear()
+    test_symplectic()
 
 
 def main():
