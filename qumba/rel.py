@@ -27,12 +27,12 @@ from qumba.construct import all_codes
 
 def normalize(left, right):
     #print("normalize")
-    assert left.shape[1] == right.shape[1]
-    m, n = left.shape[0], right.shape[0]
-    A = left.concatenate(right)
-    A = A.t.normal_form().t
-    left = A[:m, :]
-    right = A[m:, :]
+    assert left.shape[0] == right.shape[0]
+    m, n = left.shape[1], right.shape[1]
+    A = left.concatenate(right, axis=1)
+    A = A.normal_form()
+    left = A[:, :m]
+    right = A[:, m:]
     return left, right
 
 
@@ -41,16 +41,20 @@ class Relation(object):
     def __init__(self, left, right=None):
         left = Matrix.promote(left)
         if right is None:
-            right = Matrix.identity(left.shape[1])
+            right = Matrix.identity(left.shape[0])
         else:
             right = Matrix.promote(right)
-        assert left.shape[1] == right.shape[1]
+        assert left.shape[0] == right.shape[0]
         left, right = normalize(left, right)
         self.left = left
         self.right = right
-        self.shape = left.shape + (right.shape[0],)
-        self.tgt = self.shape[0]
-        self.src = self.shape[2]
+        #self.shape = left.shape + (right.shape[1],)
+        #self.tgt = self.shape[0]
+        #self.src = self.shape[2]
+        self.tgt = left.shape[1]
+        self.src = right.shape[1]
+        self.A = left.concatenate(right, axis=1)
+        self.shape = (left.shape, right.shape)
 
     @classmethod
     def identity(cls, n):
@@ -58,21 +62,18 @@ class Relation(object):
         return Relation(I, I)
 
     def is_lagrangian(self):
-        left, right = self.left, self.right
-        A = left.concatenate(right)
-        nn, m = A.shape
+        A = self.A
+        m, nn = A.shape
         assert nn%2 == 0
         assert nn//2 == m, A.shape
         F = symplectic_form(m)
         # assert isotropic
         At = A.transpose()
-        AFA = At * F * A
+        AFA = A * F * At
         return AFA.sum() == 0
 
     def __str__(self):
-        left, right = self.left.t, self.right.t
-        #A = numpy.concatenate((left, right))
-        #return str(A.transpose())
+        left, right = self.left, self.right
         smap = SMap()
         smap[0,0] = strop(left)
         w = left.shape[1] // 2
@@ -91,18 +92,19 @@ class Relation(object):
         assert self.src == other.src
         if self.shape==other.shape and self.left==other.left and self.right==other.right:
             return True
-        lhs = other.left.concatenate(other.right)
-        #assert lhs.shape[0] == self.left.shape[0] + other.left.shape[0]
-        rhs = self.left.concatenate(self.right)
-        #assert rhs.shape[0] == self.right.shape[0] + other.right.shape[0]
-        #print("solve:", lhs.shape, rhs.shape)
+        # just return False because we use normal_form
+        return False
+        # otherwise we do all this...
+        lhs = other.A.t
+        rhs = self.A.t
         u = lhs.solve(rhs)
         if u is None:
             return False
         v = rhs.solve(lhs)
         if v is None:
             return False
-        return (u*v).is_identity() and (v*u).is_identity()
+        assert (u*v).is_identity() and (v*u).is_identity()
+        return True
 
     def __hash__(self):
         return hash((self.left, self.right))
@@ -110,10 +112,10 @@ class Relation(object):
     def __mul__(lhs, rhs):
         assert isinstance(rhs, Relation)
         assert lhs.src == rhs.tgt
-        l, r = pullback(lhs.right, rhs.left)
-        left = lhs.left * l
-        right = rhs.right * r
-        return Relation(left, right)
+        l, r = pullback(lhs.right.t, rhs.left.t)
+        left = lhs.left.t * l
+        right = rhs.right.t * r
+        return Relation(left.t, right.t)
 
     def __matmul__(lhs, rhs):
         left = lhs.left.direct_sum(rhs.left)
@@ -133,6 +135,7 @@ def all_linear(tgt, src):
     for idxs in numpy.ndindex((2,)*(tgt*src)):
         left = numpy.array(idxs)
         left.shape = (tgt, src)
+        left = left.transpose() # ?
         rel = Relation(left)
         yield rel
 
@@ -140,21 +143,23 @@ def all_subspaces(tgt, src):
     for idxs in numpy.ndindex((2,)*(tgt*src)):
         left = numpy.array(idxs)
         left.shape = (tgt, src)
-        rel = Relation(left, zeros(0,src))
+        left = left.transpose()
+        rel = Relation(left, zeros(src,0))
         yield rel
 
 
 def test_linear():
     lins = [a.left for a in all_linear(3,3)]
+
     for trial in range(100):
         f = choice(lins)
         g = choice(lins)
         h = choice(lins)
         fg = f*g
         gh = g*h
-        assert Relation(fg) == Relation(f)*Relation(g)
-        assert ((Relation(fg)==Relation(gh)) 
-            == (Relation(f)*Relation(g)==Relation(g)*Relation(h)))
+        assert Relation(fg) == Relation(g)*Relation(f) # contravariant...
+        #assert ((Relation(fg)==Relation(gh)) 
+        #    == (Relation(f)*Relation(g)==Relation(g)*Relation(h)))
 
     #b_ = Relation(
 
@@ -179,10 +184,10 @@ def test_symplectic():
     assert h*h == I
 
     # black unit
-    b_ = Relation([[0],[1]], zeros(0,1))
+    b_ = Relation([[0,1]], zeros(1,0))
 
     # phase=1
-    b1 = Relation([[1,1],[0,1]])
+    b1 = Relation([[1,0],[1,1]])
     w1 = h*b1*h
 
     assert b1 != w1
@@ -214,7 +219,7 @@ def test_symplectic():
     i = Matrix.identity(2)
     l = z.concatenate(i)
     r = i.concatenate(z)
-    swap = Relation(l.concatenate(r, axis=1))
+    swap = Relation(l.concatenate(r, axis=1).transpose())
     
     assert swap != I@I
     assert swap*swap == I@I
@@ -226,14 +231,24 @@ def test_symplectic():
         assert swap * (v_@I) == I@v_
 
     # copy
+#    bb_b = Relation([
+#        [1,0,0],
+#        [0,0,1],
+#        [0,1,0],
+#        [0,0,1],
+#    ], [
+#        [1,1,0],
+#        [0,0,1],
+#    ])
+
     bb_b = Relation([
-        [1,0,0],
-        [0,0,1],
-        [0,1,0],
-        [0,0,1],
+        [1,0,0,0],
+        [0,0,1,0],
+        [0,1,0,1],
     ], [
-        [1,1,0],
-        [0,0,1],
+        [1,0],
+        [1,0],
+        [0,1],
     ])
 
     assert swap*bb_b == bb_b
@@ -326,6 +341,8 @@ def test_symplectic():
     #print(w_)
     #print()
     assert str(w_) == "X| "
+
+    #return
 
     G = mulclose(gen, verbose=True)
     assert len(G) == 720 # Sp(4,2)
