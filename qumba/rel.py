@@ -25,12 +25,12 @@ from qumba.argv import argv
 from qumba.construct import all_codes
 
 
-def normalize(left, right):
+def normalize(left, right, truncate=True):
     #print("normalize")
     assert left.shape[0] == right.shape[0]
     m, n = left.shape[1], right.shape[1]
     A = left.concatenate(right, axis=1)
-    A = A.normal_form()
+    A = A.normal_form(truncate)
     left = A[:, :m]
     right = A[:, m:]
     return left, right
@@ -44,50 +44,39 @@ class Relation(object):
             right = Matrix.identity(left.shape[0])
         else:
             right = Matrix.promote(right)
-        assert left.shape[0] == right.shape[0]
+        rows = left.shape[0]
+        assert rows == right.shape[0]
         left, right = normalize(left, right)
         self.left = left
         self.right = right
-        #self.shape = left.shape + (right.shape[1],)
-        #self.tgt = self.shape[0]
-        #self.src = self.shape[2]
         self.tgt = left.shape[1]
         self.src = right.shape[1]
+        self.rows = rows
         self.A = left.concatenate(right, axis=1)
-        self.shape = (left.shape, right.shape)
+        self.shape = (left.shape, right.shape) # um..
 
     @classmethod
     def identity(cls, n):
         I = Matrix.identity(n)
-        return Relation(I, I)
-
-    def is_lagrangian(self):
-        A = self.A
-        m, nn = A.shape
-        assert nn%2 == 0
-        assert nn//2 == m, A.shape
-        F = symplectic_form(m)
-        # assert isotropic
-        At = A.transpose()
-        AFA = A * F * At
-        return AFA.sum() == 0
+        return cls(I, I)
 
     def __str__(self):
-        left, right = self.left, self.right
+        w = self.left.shape[1]
+        v = self.right.shape[1]
         smap = SMap()
-        smap[0,0] = strop(left)
-        w = left.shape[1] // 2
-        for i in range(left.shape[0]):
-            smap[i,w] = "|"
-        smap[0,w+1] = strop(right)
+        row = 0
+        for row in range(self.left.shape[0]):
+            smap[row,1] = "["
+            smap[row,w+v+3] = "],"
+            smap[row,w+2] = "|"
+        smap[0,2] = str(self.left)
+        smap[0,w+3] = str(self.right)
+        smap[0,0] = "["
+        smap[row,w+v+4] = "]"
         return str(smap)
-        #s = "[%s <--- %s ---> %s]\n"%self.shape
-        #s += "left: %s\n%s\nright: %s\n%s"%(
-        #    self.left.shape, self.left.A, self.right.shape, self.right.A)
-        #return "="*10 + '\n' + s + "\n" + "="*10
 
     def __eq__(self, other):
-        assert isinstance(other, Relation)
+        assert isinstance(other, self.__class__)
         assert self.tgt == other.tgt
         assert self.src == other.src
         if self.shape==other.shape and self.left==other.left and self.right==other.right:
@@ -110,22 +99,63 @@ class Relation(object):
         return hash((self.left, self.right))
 
     def __mul__(lhs, rhs):
-        assert isinstance(rhs, Relation)
+        assert isinstance(rhs, lhs.__class__)
         assert lhs.src == rhs.tgt
         l, r = pullback(lhs.right.t, rhs.left.t)
         left = lhs.left.t * l
         right = rhs.right.t * r
-        return Relation(left.t, right.t)
+        return lhs.__class__(left.t, right.t)
 
     def __matmul__(lhs, rhs):
         left = lhs.left.direct_sum(rhs.left)
         right = lhs.right.direct_sum(rhs.right)
-        return Relation(left, right)
+        return lhs.__class__(left, right)
 
     @property
     #@cache # needs hash, needs _normal form
     def op(self):
-        return Relation(self.right, self.left)
+        return self.__class__(self.right, self.left)
+
+    @classmethod
+    def get_swap(cls):
+        z = zeros(2,2)
+        i = Matrix.identity(2)
+        l = z.concatenate(i)
+        r = i.concatenate(z)
+        swap = Relation(i, [[0,1],[1,0]])
+        return swap
+
+
+class Symplectic(Relation):
+    def is_lagrangian(self):
+        A = self.A
+        m, nn = A.shape
+        assert nn%2 == 0
+        assert nn//2 == m, A.shape
+        F = symplectic_form(m)
+        # assert isotropic
+        At = A.transpose()
+        AFA = A * F * At
+        return AFA.sum() == 0
+
+    def __str__(self):
+        left, right = self.left, self.right
+        smap = SMap()
+        smap[0,0] = strop(left)
+        w = left.shape[1] // 2
+        for i in range(left.shape[0]):
+            smap[i,w] = "|"
+        smap[0,w+1] = strop(right)
+        return str(smap)
+
+    @classmethod
+    def get_swap(cls):
+        z = zeros(2,2)
+        i = Matrix.identity(2)
+        l = z.concatenate(i)
+        r = i.concatenate(z)
+        swap = Symplectic(l.concatenate(r, axis=1).transpose())
+        return swap
 
 
 
@@ -158,20 +188,97 @@ def test_linear():
         fg = f*g
         gh = g*h
         assert Relation(fg) == Relation(g)*Relation(f) # contravariant...
-        #assert ((Relation(fg)==Relation(gh)) 
-        #    == (Relation(f)*Relation(g)==Relation(g)*Relation(h)))
+        assert ((Relation(fg)==Relation(gh)) 
+            == (Relation(g)*Relation(f)==Relation(h)*Relation(g)))
 
-    #b_ = Relation(
+    b_ = Relation([[1]], zeros(1,0))
+    bb_ = Relation([[1,1]], zeros(1,0))
+    bb_b = Relation([[1,1]], [[1]])
+    _b = b_.op
+    _bb = bb_.op
+    b_bb = bb_b.op
+
+    assert b_ * _b == b_ @ _b # elevator identity
+    assert str(_b * b_) == "[[|]]"
+
+    w_ = Relation([[0]], zeros(1,0))
+    ww_ = Relation([[1,1]], zeros(1,0))
+    ww_w = Relation([[1,1],[0,1]], [[0],[1]])
+
+    _w = w_.op
+    _ww = ww_.op
+    w_ww = ww_w.op
+
+    assert _w*b_bb == _w@_w
+    r = (_w@_w)
+    #print(r.A.shape)
+    #print(r)
+    #print(_w)
+
+    assert b_ * _w == Relation([[1]],[[0]])
+
+    assert _b@_b == _b * w_ww
+
+    one = Relation(zeros(0,0), zeros(0,0))
+    assert _b*w_ == one
+
+    I = Relation([[1]], [[1]])
+    assert I*I == I
+
+    swap = Relation.get_swap()
+
+    # commutative
+    assert swap*bb_b == bb_b
+    assert swap*ww_w == ww_w
+    assert b_bb*swap == b_bb
+    assert w_ww*swap == w_ww
+
+    assert ww_w != bb_b
+
+    # special
+    assert b_bb*bb_b == I
+    assert w_ww*ww_w == I
+
+    # _assoc
+    lhs = (bb_b @ I) * bb_b 
+    rhs = (I @ bb_b) * bb_b 
+    assert( lhs==rhs )
+
+    # unital
+    assert (I@_b)*bb_b == I
+    assert (_b@I)*bb_b == I
+
+    # copy
+    assert bb_b * w_ == w_@w_
+
+    # frobenius
+    lhs = bb_b * b_bb
+    rhs = (I @ b_bb) * (bb_b @ I)
+    assert lhs==rhs
+    rhs = (b_bb @ I) * (I @ bb_b)
+    assert lhs==rhs
+
+    lhs = ww_w * w_ww
+    rhs = (I @ w_ww) * (ww_w @ I)
+    assert lhs==rhs
+    rhs = (w_ww @ I) * (I @ ww_w)
+    assert lhs==rhs
+
+    # bialgebra
+    lhs = (b_bb @ b_bb) * (I @ swap @ I) * (ww_w @ ww_w)
+    rhs = ww_w * b_bb
+    assert lhs == rhs
+
 
 
 def test_symplectic():
-    one = Relation(zeros(0,0), zeros(0,0))
+    one = Symplectic(zeros(0,0), zeros(0,0))
     #print(one)
     #print(one*one)
     assert one*one == one
 
-    I = Relation.identity(2)
-    h = Relation([[0,1],[1,0]])
+    I = Symplectic.identity(2)
+    h = Symplectic([[0,1],[1,0]])
 
     #print("h:")
     #print(h)
@@ -184,10 +291,10 @@ def test_symplectic():
     assert h*h == I
 
     # black unit
-    b_ = Relation([[0,1]], zeros(1,0))
+    b_ = Symplectic([[0,1]], zeros(1,0))
 
     # phase=1
-    b1 = Relation([[1,0],[1,1]])
+    b1 = Symplectic([[1,0],[1,1]])
     w1 = h*b1*h
 
     assert b1 != w1
@@ -215,11 +322,7 @@ def test_symplectic():
     assert _b != _b1
     assert _w != _w1
 
-    z = zeros(2,2)
-    i = Matrix.identity(2)
-    l = z.concatenate(i)
-    r = i.concatenate(z)
-    swap = Relation(l.concatenate(r, axis=1).transpose())
+    swap = Symplectic.get_swap()
     
     assert swap != I@I
     assert swap*swap == I@I
@@ -227,21 +330,12 @@ def test_symplectic():
       for b in [I,w1,b1,h]:
         assert swap*(a@b) == (b@a)*swap
 
-    for v_ in all_subspaces(2, 1):
-        assert swap * (v_@I) == I@v_
+    #for v_ in all_subspaces(2, 1): # not Symplectic ...
+    #    assert isinstance(v_@I, Symplectic)
+    #    assert swap * (v_@I) == I@v_
 
     # copy
-#    bb_b = Relation([
-#        [1,0,0],
-#        [0,0,1],
-#        [0,1,0],
-#        [0,0,1],
-#    ], [
-#        [1,1,0],
-#        [0,0,1],
-#    ])
-
-    bb_b = Relation([
+    bb_b = Symplectic([
         [1,0,0,0],
         [0,0,1,0],
         [0,1,0,1],
@@ -382,7 +476,7 @@ def main():
         H = code.H
         Ht = H.t
         l, r = H[:, :n//2], H[:, n//2:]
-        rel = Relation(l.t, r.t)
+        rel = Symplectic(l.t, r.t)
         assert rel.is_lagrangian()
         found.add(rel)
     found = list(found)

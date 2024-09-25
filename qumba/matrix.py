@@ -324,8 +324,8 @@ class Matrix(object):
         A = row_reduce(self.A)
         return Matrix(A)
 
-    def normal_form(self):
-        A = normal_form(self.A)
+    def normal_form(self, truncate=True):
+        A = normal_form(self.A, truncate)
         return Matrix(A)
 
     def linear_independent(self):
