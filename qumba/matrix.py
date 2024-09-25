@@ -242,6 +242,7 @@ class Matrix(object):
 
     def direct_sum(self, other):
         "direct_sum"
+        other = Matrix.promote(other)
         A = direct_sum(self.A, other.A)
         return Matrix(A, self.p)
     #__add__ = direct_sum # ??
@@ -318,21 +319,26 @@ class Matrix(object):
             yield u
 
     def rank(self):
+        assert self.p == 2, "not implemented"
         return rank(self.A)
 
     def row_reduce(self):
+        assert self.p == 2, "not implemented"
         A = row_reduce(self.A)
         return Matrix(A)
 
     def normal_form(self, truncate=True):
+        assert self.p == 2, "not implemented"
         A = normal_form(self.A, truncate)
         return Matrix(A)
 
     def linear_independent(self):
+        assert self.p == 2, "not implemented"
         A = linear_independent(self.A)
         return Matrix(A)
 
     def intersect(self, other):
+        assert self.p == 2, "not implemented"
         A = intersect(self.A, other.A)
         return Matrix(A)
 

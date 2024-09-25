@@ -38,27 +38,42 @@ def normalize(left, right, truncate=True):
 
 class Relation(object):
 
-    def __init__(self, left, right=None):
+    def __init__(self, left, right=None, p=2):
         left = Matrix.promote(left)
         if right is None:
             right = Matrix.identity(left.shape[0])
         else:
             right = Matrix.promote(right)
-        rows = left.shape[0]
-        assert rows == right.shape[0]
+        assert left.shape[0] == right.shape[0]
         left, right = normalize(left, right)
+        rank = left.shape[0]
         self.left = left
         self.right = right
         self.tgt = left.shape[1]
         self.src = right.shape[1]
-        self.rows = rows
+        self.rank = rank
         self.A = left.concatenate(right, axis=1)
-        self.shape = (left.shape, right.shape) # um..
+        self.shape = (rank, self.tgt, self.src)
+        self.p = p
 
     @classmethod
-    def identity(cls, n):
-        I = Matrix.identity(n)
+    def identity(cls, n, p=2):
+        I = Matrix.identity(n, p)
         return cls(I, I)
+
+    @classmethod
+    def black(cls, tgt, src, p=2):
+        return Relation([[1]*tgt], [[1]*src], p)
+
+    @classmethod
+    def white(cls, tgt, src, p=2):
+        n = tgt + src
+        a = numpy.zeros((n-1, n), dtype=int)
+        for i in range(n-1):
+            a[i, i] = 1
+            a[i, i+1] = -1
+        A = Matrix(a, p)
+        return Relation(A[:, :tgt], A[:, tgt:], p)
 
     def __str__(self):
         w = self.left.shape[1]
@@ -74,6 +89,7 @@ class Relation(object):
         smap[0,0] = "["
         smap[row,w+v+4] = "]"
         return str(smap)
+        #return "%s %s"%(smap, self.shape)
 
     def __eq__(self, other):
         assert isinstance(other, self.__class__)
@@ -201,6 +217,13 @@ def test_linear():
     assert b_ * _b == b_ @ _b # elevator identity
     assert str(_b * b_) == "[[|]]"
 
+    assert b_ == Relation.black(1, 0)
+    assert bb_ == Relation.black(2, 0)
+    assert bb_b == Relation.black(2, 1)
+    assert _b == Relation.black(0, 1)
+    assert _bb == Relation.black(0, 2)
+    assert b_bb == Relation.black(1, 2)
+
     w_ = Relation([[0]], zeros(1,0))
     ww_ = Relation([[1,1]], zeros(1,0))
     ww_w = Relation([[1,1],[0,1]], [[0],[1]])
@@ -209,14 +232,15 @@ def test_linear():
     _ww = ww_.op
     w_ww = ww_w.op
 
+    assert w_ == Relation.white(1, 0)
+    assert ww_ == Relation.white(2, 0)
+    assert ww_w == Relation.white(2, 1)
+    assert _w == Relation.white(0, 1)
+    assert _ww == Relation.white(0, 2)
+    assert w_ww == Relation.white(1, 2)
+
     assert _w*b_bb == _w@_w
-    r = (_w@_w)
-    #print(r.A.shape)
-    #print(r)
-    #print(_w)
-
     assert b_ * _w == Relation([[1]],[[0]])
-
     assert _b@_b == _b * w_ww
 
     one = Relation(zeros(0,0), zeros(0,0))
@@ -269,6 +293,80 @@ def test_linear():
     rhs = ww_w * b_bb
     assert lhs == rhs
 
+    #print(b_ * _w)
+
+    assert Relation.white(1,1) == I
+    assert Relation.black(1,1) == I
+
+    rel = (w_ @ I) * (I @ _b)
+
+    rel = rel * Relation(Matrix.identity(2), zeros(2,0))
+    print(rel)
+
+    print( (w_@w_) * (_b@_b) )
+
+
+
+def test_pascal():
+    # q-deformed pascal triangle
+    p = 2
+
+    rows = []
+
+    rel = Relation.identity(0, p)
+    row = [{rel}]
+    rows.append(row)
+
+    for n in range(1, 5):
+
+        assert len(rows) == n
+
+        row = []
+        rel = Relation(zeros(0,n-1), zeros(0,1), p)
+        assert rel.src == 1
+        row.append({rel})
+        #print(n, "choose", 0, "=", 1)
+        for m in range(1, n):
+
+            cell = set()
+            for left in rows[n-1][m-1]:
+                A = left.A
+                A = A.direct_sum([[1]])
+                rel = Relation(A[:,:n-1], A[:,n-1:], p)
+                assert rel.src == 1
+                cell.add(rel)
+
+            for right in rows[n-1][m]:
+                A = right.A
+                assert A.shape[1] == n-1, (n, A.shape)
+                for bits in numpy.ndindex((p,)*A.shape[0]):
+                    v = numpy.array(bits)
+                    v.shape = (A.shape[0],1)
+                    B = numpy.concatenate((A, v), axis=1)
+                    assert B.shape[1] == n
+                    rel = Relation(B[:,:n-1], B[:,n-1:], p)
+                    assert rel.src == 1
+                    #print(rel)
+                    assert rel not in cell
+                    cell.add(rel)
+
+            #print(n, "choose", m)
+            row.append(cell)
+
+        A = Matrix.identity(n)
+        rel = Relation(A[:,:n-1], A[:,n-1:], p)
+        assert rel.src == 1
+        row.append({rel})
+        #print(n, "choose", n, "=", 1)
+
+        assert len(row) == n+1
+        rows.append(row)
+
+    for row in rows:
+        print([len(cell) for cell in row])
+
+
+    
 
 
 def test_symplectic():
