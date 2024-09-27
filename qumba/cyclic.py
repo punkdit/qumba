@@ -426,19 +426,83 @@ def all_cyclic(n):
 def main():
     n = argv.get("n", 7)
     print("all_cyclic", n)
+    params = argv.params
     count = 0
     for code in all_cyclic(n):
         if code.k:
             code.d = code.distance("z3")
             if code.d <= 2:
                 continue
-            print(code, "+" if sum(code.cyclic_gens[1])==0 else " ", end=" ", flush=True)
-            #print(code, "+" if code.is_css() else " ", 
-            #    'l' if code.is_gf4_linear() else " ")
             count += 1
-            if count % 8 == 0:
+            if (code.n, code.k, code.d) == params:
                 print()
+                print(code)
+                print(code.longstr())
+                print()
+    
+            else:
+                print(code, "+" if sum(code.cyclic_gens[1])==0 else " ", end=" ", flush=True)
+                #print(code, "+" if code.is_css() else " ", 
+                #    'l' if code.is_gf4_linear() else " ")
+                if count % 8 == 0:
+                    print()
     print()
+
+
+def find_gates():
+    from qumba.transversal import find_local_cliffords, search_gate
+
+    # [[9,3,3]]
+    code = QCode.fromstr("""
+    YZZYZ...Z
+    ZYZZYZ...
+    .ZYZZYZ..
+    ..ZYZZYZ.
+    ...ZYZZYZ
+    Z...ZYZZY
+    """)
+
+    # [[17,1,7]]
+    code = QCode.fromstr("""
+    YYZZ..Z.....Z..ZZ
+    ZYYZZ..Z.....Z..Z
+    ZZYYZZ..Z.....Z..
+    .ZZYYZZ..Z.....Z.
+    ..ZZYYZZ..Z.....Z
+    Z..ZZYYZZ..Z.....
+    .Z..ZZYYZZ..Z....
+    ..Z..ZZYYZZ..Z...
+    ...Z..ZZYYZZ..Z..
+    ....Z..ZZYYZZ..Z.
+    .....Z..ZZYYZZ..Z
+    Z.....Z..ZZYYZZ..
+    .Z.....Z..ZZYYZZ.
+    ..Z.....Z..ZZYYZZ
+    Z..Z.....Z..ZZYYZ
+    ZZ..Z.....Z..ZZYY
+    """)
+
+    from qumba.autos import get_autos, get_isos
+
+    print(code)
+    #N, perms = code.get_autos()
+    #print(N)
+    G = get_autos(code)
+    print("|G| =", len(G))
+    
+    space = code.space
+    for perm in perms:
+        print(perm)
+        P = space.get_perm(perm)
+
+        dode = P*code
+        assert code.is_equiv(dode)
+        print(dode.get_logical(code))
+
+    for M in find_local_cliffords(code):
+        print(M)
+
+    #for M in search_gate
 
 
 
