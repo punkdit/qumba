@@ -460,6 +460,7 @@ def find_local_cliffords(tgt, src=None, constant=False, verbose=True):
 
         Add(U != M)
 
+
 def get_local_clifford(tgt, src, constant=False, verbose=False):
     for M in find_local_cliffords(tgt, src, constant, verbose):
         return M
@@ -469,6 +470,108 @@ def is_local_clifford_equiv(tgt, src, constant=False, verbose=False):
     for M in find_local_cliffords(tgt, src, constant, verbose):
         return True
     return False
+
+
+def find_autos(code):
+
+    # find all automorphism permutations
+
+    n = code.n
+    nn = 2*n
+    space = code.space
+    F = space.F
+
+    solver = Solver()
+    Add = solver.add
+
+    # permutation matrix
+    P = UMatrix.unknown(n, n)
+    #print(P.A[0,0])
+
+    # symplectic permutation matrix
+    A = numpy.zeros((nn,nn), dtype=object)
+    for i in range(n):
+      for j in range(n):
+        A[2*i,2*j] = P[i,j]
+        A[2*i+1,2*j+1] = P[i,j]
+    P2 = UMatrix(A)
+    #print(P2)
+
+    for i in range(n):
+        Add(Sum([If(P[i,j].get(),1,0) for j in range(n)])==1)
+
+    I = Matrix.identity(n, n)
+    Add(P * P.t == I)
+
+    H = code.H
+    m = code.m
+    H1 = H * P2
+
+    R = UMatrix.unknown(m, m)
+    Add( R*H == H1 )
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("result:", result)
+            break
+    
+        model = solver.model()
+        p = P.get_interp(model)
+        p2 = P2.get_interp(model)
+
+        assert (p2*code).is_equiv(code)
+
+        yield p2
+
+        Add(P != p) # could also add all generators
+
+
+def find_autos_lc(code):
+
+    # find all local clifford automorphism permutations
+
+    n = code.n
+    nn = 2*n
+    space = code.space
+    F = space.F
+
+    solver = Solver()
+    Add = solver.add
+
+    U = UMatrix.unknown(nn, nn)
+
+    for i in range(nn):
+        Add(Sum([If(U[i,j].get(),1,0) for j in range(nn)])<=2)
+
+    I = Matrix.identity(n, n)
+
+    Add(U.t*F*U == F) # quadratic constraint
+
+    H = code.H
+    m = code.m
+    H1 = H * U.t
+
+    # U preserves the stabilizer group
+    R = UMatrix.unknown(m, m)
+    Add( R*H == H1 )
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("result:", result)
+            break
+    
+        model = solver.model()
+        u = U.get_interp(model)
+
+        assert (u*code).is_equiv(code)
+
+        yield u
+
+        Add(U != u) # could also add all generators
+
+
 
 
 def main():
@@ -1939,7 +2042,11 @@ def test_equivariant():
     # gap> G := AtlasGroup("L2(11)");
     # Group([ (2,10)(3,4)(5,9)(6,7), (1,2,11)(3,5,10)(6,8,9) ])
 
-    if argv.dihedral:
+    if argv.cyclic:
+        n = argv.get("n", 10)
+        G = Group.cyclic(n)
+
+    elif argv.dihedral:
         n = argv.get("n", 10)
         G = Group.dihedral(n)
 

@@ -27,7 +27,7 @@ from qumba import construct
 from qumba.argv import argv
 from qumba.distance import distance_z3
 from qumba.transversal import find_local_cliffords
-from qumba.action import mulclose
+from qumba.action import mulclose, Perm, Group
 from qumba.autos import is_iso
 
 
@@ -452,58 +452,110 @@ def main():
 def find_gates():
     from qumba.transversal import find_local_cliffords, search_gate
 
-    # [[9,3,3]]
-    code = QCode.fromstr("""
-    YZZYZ...Z
-    ZYZZYZ...
-    .ZYZZYZ..
-    ..ZYZZYZ.
-    ...ZYZZYZ
-    Z...ZYZZY
-    """)
+    if argv.code == (9,3,3):
+        # [[9,3,3]]
+        code = QCode.fromstr("""
+        YZZYZ...Z
+        ZYZZYZ...
+        .ZYZZYZ..
+        ..ZYZZYZ.
+        ...ZYZZYZ
+        Z...ZYZZY
+        """)
 
-    # [[17,1,7]]
-    code = QCode.fromstr("""
-    YYZZ..Z.....Z..ZZ
-    ZYYZZ..Z.....Z..Z
-    ZZYYZZ..Z.....Z..
-    .ZZYYZZ..Z.....Z.
-    ..ZZYYZZ..Z.....Z
-    Z..ZZYYZZ..Z.....
-    .Z..ZZYYZZ..Z....
-    ..Z..ZZYYZZ..Z...
-    ...Z..ZZYYZZ..Z..
-    ....Z..ZZYYZZ..Z.
-    .....Z..ZZYYZZ..Z
-    Z.....Z..ZZYYZZ..
-    .Z.....Z..ZZYYZZ.
-    ..Z.....Z..ZZYYZZ
-    Z..Z.....Z..ZZYYZ
-    ZZ..Z.....Z..ZZYY
-    """)
+    elif argv.code == (17,1,7):
+        # [[17,1,7]]
+        code = QCode.fromstr("""
+        XXZZ..Z.....Z..ZZ
+        ZXXZZ..Z.....Z..Z
+        ZZXXZZ..Z.....Z..
+        .ZZXXZZ..Z.....Z.
+        ..ZZXXZZ..Z.....Z
+        Z..ZZXXZZ..Z.....
+        .Z..ZZXXZZ..Z....
+        ..Z..ZZXXZZ..Z...
+        ...Z..ZZXXZZ..Z..
+        ....Z..ZZXXZZ..Z.
+        .....Z..ZZXXZZ..Z
+        Z.....Z..ZZXXZZ..
+        .Z.....Z..ZZXXZZ.
+        ..Z.....Z..ZZXXZZ
+        Z..Z.....Z..ZZXXZ
+        ZZ..Z.....Z..ZZXX
+        """)
+
+    elif argv.code == (5,1,3):
+        code = construct.get_513()
+
+    else:
+        return
 
     from qumba.autos import get_autos, get_isos
+    from qumba.transversal import find_autos, find_autos_lc
 
     print(code)
-    #N, perms = code.get_autos()
-    #print(N)
-    G = get_autos(code)
-    print("|G| =", len(G))
-    
     space = code.space
-    for perm in perms:
-        print(perm)
-        P = space.get_perm(perm)
+    n = code.n
 
-        dode = P*code
-        assert code.is_equiv(dode)
-        print(dode.get_logical(code))
+    found = []
+    #for P in find_autos(code):
+    #    found.append(P)
+    for U in find_autos_lc(code):
+        print(U)
+        found.append(U)
 
+    print(len(found))
+
+    logical = set()
+    for g in found:
+        l = code.get_logical(g*code)
+        if l not in logical:
+            print(l)
+            logical.add(l)
+    print(len(logical))
+
+    return
+
+    found = []
     for M in find_local_cliffords(code):
-        print(M)
+        #print(M)
+        found.append(M)
+    print("local cliffords:", len(found))
 
-    #for M in search_gate
+    perm = {0:0}
+    for i in range(1,n):
+        perm[i] = (i*3)%n
+    assert len(perm) == n
+    perm = Perm(perm, list(range(n)))
+    print(perm)
 
+    G = Group.dihedral(n)
+    print(len(G))
+
+    H = Group.generate([perm])
+    print(len(H))
+
+    for h in H:
+        print(int(h in G), end=" ")
+    print()
+
+    #return
+
+    get_perm = lambda perm : space.get_perm([perm[i] for i in range(n)])
+
+    for g in G:
+        sigma = get_perm(g)
+        assert (sigma*code).is_equiv(code)
+
+    found = list(G)
+    for h in H:
+        sigma = get_perm(h)
+        equiv = (sigma*code).is_equiv(code)
+        if equiv:
+            found.append(h)
+
+    K = mulclose(found)
+    print(len(K))
 
 
 
