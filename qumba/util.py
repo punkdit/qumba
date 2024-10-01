@@ -89,3 +89,57 @@ def cross(itemss):
                 yield (head,)+tail
 
 
+def all_primes(n, ps=None):
+    "list of primes < n"
+
+    items = [0]*n
+    p = 2
+
+    while p**2 < n:
+        i = 2
+        while p*i < n:
+            items[p*i] = 1
+            i += 1
+
+        p += 1
+        while p < n and items[p]:
+            p += 1
+
+    ps = [i for i in range(2, n) if items[i]==0]
+    return ps
+
+
+def is_prime(n):
+    for p in all_primes(n+1):
+        if p==n:
+            return True
+        elif n%p == 0:
+            return False
+    assert n==1
+    return True
+
+
+def factorize(n):
+    factors = []
+    top = int(ceil(n**0.5))
+    if n==1:
+        return [1]
+    for p in all_primes(top+1):
+        while n%p == 0:
+            factors.append(p)
+            n //= p
+    if n>1:
+        factors.append(n)
+    return factors
+
+def divisors(n):
+    divs = [1]
+    for i in range(2, n):
+        if n%i == 0:
+            divs.append(i)
+    if n>1:
+        divs.append(n)
+    return divs
+
+
+

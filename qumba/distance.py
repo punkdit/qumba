@@ -19,6 +19,8 @@ def search_distance_z3(code, d):
 
     if code.k == 0:
         return 
+    if code.m == 0:
+        return 1
     H, L = code.H, code.L
 
     #print("search_distance: d=%d"%d)

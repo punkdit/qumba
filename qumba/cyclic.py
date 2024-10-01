@@ -22,7 +22,7 @@ from sage import all_cmdline
 
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     zeros2, rank, rand2, pseudo_inverse, kernel, direct_sum, span)
-from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr
+from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr, strop
 from qumba import construct
 from qumba.argv import argv
 from qumba.distance import distance_z3
@@ -162,39 +162,35 @@ def all_cyclic_sp(n, dmin):
 def main_gf4():
     gf4_linear = argv.get("gf4_linear", True)
     n = argv.get("n", 20)
-    for n0 in range(2, n):
-        if argv.even:
-            n = 2*n0
-        else:
-            n = 2*n0 + 1
-        for code in all_cyclic_gf4(n, 3, gf4_linear):
-            sd = code.is_selfdual()
-            H = code.H
-            rws = [get_weight(h) for h in H.A]
-            if gf4_linear:
-                assert code.is_gf4_linear()
-            tgt = code.apply_perm([(i+1)%n for i in range(n)])
-            assert tgt.is_equiv(code)
-            if code.k==0:
-                continue
-            print(code, set(rws), 
-                "*" if sd else "", 
-                "gf4" if code.is_gf4_linear() else "")
-            print(code.longstr())
-            print()
+    d = argv.get("d", 3)
+    for code in all_cyclic_gf4(n, d, gf4_linear):
+        sd = code.is_selfdual()
+        H = code.H
+        rws = [get_weight(h) for h in H.A]
+        if gf4_linear:
+            assert code.is_gf4_linear()
+        tgt = code.apply_perm([(i+1)%n for i in range(n)])
+        assert tgt.is_equiv(code)
+        if code.k==0:
             continue
-            L = tgt.get_logical(code)
-            assert (L**n).is_identity()
-            if not L.is_identity():
-                print("L")
-            #N, perms = code.get_autos()
-            gen = list(find_local_cliffords(code))
-            if len(gen)==1:
-                continue
-            gen = [code.get_logical(g*code) for g in gen] + [L]
-            G = mulclose(gen)
-            print("|G| =", len(G))
-            print()
+        print(code, set(rws), 
+            "*" if sd else "", 
+            "gf4" if code.is_gf4_linear() else "")
+        print(code.longstr())
+        print()
+        continue
+        L = tgt.get_logical(code)
+        assert (L**n).is_identity()
+        if not L.is_identity():
+            print("L")
+        #N, perms = code.get_autos()
+        gen = list(find_local_cliffords(code))
+        if len(gen)==1:
+            continue
+        gen = [code.get_logical(g*code) for g in gen] + [L]
+        G = mulclose(gen)
+        print("|G| =", len(G))
+        print()
 
 
 def test_713():
@@ -436,17 +432,68 @@ def main():
             count += 1
             if (code.n, code.k, code.d) == params:
                 print()
-                print(code)
-                print(code.longstr())
+                print(code, 'l' if code.is_gf4_linear() else "")
+                #print(code.longstr())
+                print(strop(code.H))
                 print()
     
             else:
-                print(code, "+" if sum(code.cyclic_gens[1])==0 else " ", end=" ", flush=True)
-                #print(code, "+" if code.is_css() else " ", 
-                #    'l' if code.is_gf4_linear() else " ")
+                #print(code, "+" if sum(code.cyclic_gens[1])==0 else " ", end=" ", flush=True)
+                print(code, "+" if code.is_css() else " ", 
+                    'l' if code.is_gf4_linear() else " ", end = " ", flush=True)
                 if count % 8 == 0:
                     print()
     print()
+
+
+def find_prime():
+
+    from qumba.util import all_primes
+
+    for n in all_primes(50):
+        if n != 29:
+            continue
+
+        print(n, n%4)
+        space = SymplecticSpace(n)
+
+        #for bits in numpy.ndindex((2,)*(n-6)):
+        m = (n-6)//2
+        for left in numpy.ndindex((2,)*m):
+            bits = left + (0,) + tuple(reversed(left))
+            if numpy.sum(bits) > 8:
+                continue
+            #print(bits)
+            bits = list("XXZZ") + [".Z"[bit] for bit in bits] + list("ZZ")
+            code = is_cyclic(space, bits)
+            if code is None:
+                continue
+            if code.k == 0:
+                continue
+            code.distance("z3")
+            gf4 = code.is_gf4_linear()
+            print("found", ''.join(bits), code, 'gf4' if gf4 else '')
+            if gf4:
+                break
+
+
+def is_cyclic(space, word):
+    n = space.n
+    F = space.F
+    w = ''.join(word)
+    words = [w]
+    v0 = space.parse(w)
+    for j in range(1,n):
+        w1 = ''.join(w[(i+j)%n] for i in range(n))
+        words.append(w1)
+        v1 = space.parse(w1)
+        if (v1*F*v0.t).sum():
+            return None
+    H = space.parse(' '.join(words))
+    H = H.linear_independent()
+    code = QCode(H)
+    return code
+
 
 
 def find_gates():
@@ -463,7 +510,23 @@ def find_gates():
         Z...ZYZZY
         """)
 
-    elif argv.code == (17,1,7):
+    elif argv.code == (13,1,5): # GF4 linear
+        code = QCode.fromstr("""
+        XXZZ.Z...Z.ZZ
+        ZXXZZ.Z...Z.Z
+        ZZXXZZ.Z...Z.
+        .ZZXXZZ.Z...Z
+        Z.ZZXXZZ.Z...
+        .Z.ZZXXZZ.Z..
+        ..Z.ZZXXZZ.Z.
+        ...Z.ZZXXZZ.Z
+        Z...Z.ZZXXZZ.
+        .Z...Z.ZZXXZZ
+        Z.Z...Z.ZZXXZ
+        ZZ.Z...Z.ZZXX
+        """)
+
+    elif argv.code == (17,1,7): # GF4 linear
         # [[17,1,7]]
         code = QCode.fromstr("""
         XXZZ..Z.....Z..ZZ
@@ -497,30 +560,31 @@ def find_gates():
     space = code.space
     n = code.n
 
-    found = []
-    #for P in find_autos(code):
-    #    found.append(P)
-    for U in find_autos_lc(code):
-        print(U)
-        found.append(U)
-
-    print(len(found))
-
-    logical = set()
-    for g in found:
-        l = code.get_logical(g*code)
-        if l not in logical:
-            print(l)
-            logical.add(l)
-    print(len(logical))
-
-    return
-
-    found = []
-    for M in find_local_cliffords(code):
-        #print(M)
-        found.append(M)
-    print("local cliffords:", len(found))
+    if 0:
+        found = []
+        #for P in find_autos(code):
+        #    found.append(P)
+        for U in find_autos_lc(code):
+            print(U)
+            found.append(U)
+    
+        print(len(found))
+    
+        logical = set()
+        for g in found:
+            l = code.get_logical(g*code)
+            if l not in logical:
+                print(l)
+                logical.add(l)
+        print(len(logical))
+    
+        return
+    
+        found = []
+        for M in find_local_cliffords(code):
+            #print(M)
+            found.append(M)
+        print("local cliffords:", len(found))
 
     perm = {0:0}
     for i in range(1,n):
@@ -548,14 +612,87 @@ def find_gates():
         assert (sigma*code).is_equiv(code)
 
     found = list(G)
+    logical = []
     for h in H:
         sigma = get_perm(h)
-        equiv = (sigma*code).is_equiv(code)
-        if equiv:
-            found.append(h)
+        dode = sigma*code
+        equiv = dode.is_equiv(code)
+        #if equiv:
+        #    found.append(h)
+        #    continue
 
-    K = mulclose(found)
-    print(len(K))
+        print("?", end="")
+        for M in find_local_cliffords(code, dode):
+            print("/")
+            eode = M*dode
+            assert eode.is_equiv(code)
+            L = eode.get_logical(code)
+            logical.append(L)
+            break
+
+    #K = mulclose(found)
+    #print(len(K))
+
+    print(len(mulclose(logical)))
+    
+
+
+def find_cyclic():
+    n = argv.get("n", 5)
+    nn = 2*n
+
+    from qumba.transversal import UMatrix, Solver, z3
+    solver = Solver()
+    Add = solver.add
+
+    H0 = UMatrix.unknown(1, nn)
+    H0[0,0] = 1
+    H0[0,1] = 0
+
+    H = UMatrix.unknown(n, nn)
+    for i in range(n):
+      for j in range(n):
+        jj = (j-i)%n
+        H[i, 2*j:2*j+2] = H0[0, 2*jj:2*jj+2]
+
+    #print(H)
+
+    space = SymplecticSpace(n)
+    F = space.F
+
+    Add( H * F * H.t == 0 )
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            break
+
+        model = solver.model()
+        h0 = H0.get_interp(model)
+
+        h = H.get_interp(model)
+
+        #for i in range(n):
+        #    Add(H0 != H[i:i+1, :])
+        Add( H0 != h0 )
+
+        #(strop(h))
+        h = h.linear_independent()
+        if len(h) == n or len(h) == 0: # k==0
+            continue
+        code = QCode(h)
+
+        code.distance("z3")
+
+        if code.d > 2:
+            print(strop(h0), code,
+                #"css" if code.is_css() else "   ", 
+                'gf4' if code.is_gf4_linear() else "   ")
+
+        #break
+
+    print("done.")
+
 
 
 

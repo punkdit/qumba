@@ -659,6 +659,57 @@ def make_gap(name, gen):
     f.close()
 
 
+def main_autos_lc():
+    if argv.code == (5,1,3):
+        #code = construct.get_513()
+        code = QCode.fromstr(
+        "XZZXI IXZZX XIXZZ ZXIXZ", Ls="XXXXX ZZZZZ")
+    elif argv.code == (13,1,5):
+        n = 13
+        check = "XXZZ.Z...Z.ZZ"
+        checks = [''.join(check[(i+j)%n] for i in range(n)) for j in range(n-1)]
+        code = QCode.fromstr(' '.join(checks))
+    else:
+        return
+
+    print(code)
+    print(code.longstr())
+    assert code.is_gf4_linear()
+
+#    N, perms = code.get_autos()
+#
+#    for perm in perms:
+#        P = code.space.get_perm(perm)
+#        dode = P*code
+#        assert code.is_equiv(dode)
+#        #print(dode.get_logical(code))
+#        #print()
+
+    space = code.space
+    H, S = space.H, space.S
+    op = reduce(mul, [S(i) for i in range(code.n)])
+    dode = op*code
+    assert not dode.is_equiv(code)
+
+    iso = code.get_isomorphism(dode)
+    p = space.get_perm(iso)
+    eode = p*dode
+    assert eode.is_equiv(code)
+    print(eode.get_logical(code))
+
+    return
+
+    found = []
+    for u in find_autos_lc(code):
+        #print(u)
+        #print()
+        assert (u*code).is_equiv(code)
+        found.append(u)
+        print('.', end='', flush=True)
+
+    print(len(found))
+
+
 
 def find_clifford_stab():
     #code = construct.get_513()
@@ -2032,6 +2083,8 @@ def prune(Xs):
 
 
 def test_equivariant():
+    # find equivariant CSS codes
+
     from qumba.csscode import CSSCode, distance_z3
 
     Hs = None
