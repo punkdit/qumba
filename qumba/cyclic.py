@@ -660,7 +660,18 @@ def find_cyclic():
     space = SymplecticSpace(n)
     F = space.F
 
-    Add( H * F * H.t == 0 )
+    Add( H * F * H.t == 0 ) # isotropic
+
+    # X or Z, no Y
+    for i in range(1, n):
+        Add( H0[0,2*i]*H0[0,2*i+1] == 0 )
+
+    if argv.gf4:
+        op = reduce(mul, [space.S(i) for i in range(n)])
+        op *= reduce(mul, [space.H(i) for i in range(n)])
+        V = op*H0.t
+        W = UMatrix.unknown(n, 1)
+        Add( H.t * W == V )
 
     while 1:
         result = solver.check()
