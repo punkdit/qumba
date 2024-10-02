@@ -691,23 +691,31 @@ def main_autos_lc():
     dode = op*code
     assert not dode.is_equiv(code)
 
-    iso = code.get_isomorphism(dode)
-    p = space.get_perm(iso)
-    eode = p*dode
-    assert eode.is_equiv(code)
-    print(eode.get_logical(code))
+    if code.n == 5:
+        iso = code.get_isomorphism(dode)
+        p = space.get_perm(iso)
+        eode = p*dode
+        assert eode.is_equiv(code)
+        print(eode.get_logical(code))
 
-    return
+    #return
 
-    found = []
+    print("find_autos_lc:")
+
+    gen = []
     for u in find_autos_lc(code):
-        #print(u)
-        #print()
         assert (u*code).is_equiv(code)
-        found.append(u)
+        gen.append(u)
         print('.', end='', flush=True)
+        G = mulclose(gen, verbose=True) #, maxsize=10000)
+        #if len(G) == 660:
+        #    break
+        #for g in G:
+        #    assert (g*code).is_equiv(code)
+        #print("yes")
+    print()
 
-    print(len(found))
+    print(len(G))
 
 
 

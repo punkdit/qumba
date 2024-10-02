@@ -644,10 +644,10 @@ class QCode(object):
             self.d = d
         return d
 
-    def distance(self, method=None):
+    def distance(self, method=None, verbose=False):
         if method == "z3":
             from qumba.distance import distance_z3
-            return distance_z3(self)
+            return distance_z3(self, verbose)
         else:
             return self.get_distance()
 

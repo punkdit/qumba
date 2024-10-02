@@ -26,9 +26,13 @@ from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr, str
 from qumba import construct
 from qumba.argv import argv
 from qumba.distance import distance_z3
-from qumba.transversal import find_local_cliffords
+from qumba.transversal import find_local_cliffords, search_gate
+from qumba.transversal import find_autos, find_autos_lc
+from qumba.autos import get_autos, get_isos
 from qumba.action import mulclose, Perm, Group
 from qumba.autos import is_iso
+from qumba.smap import SMap
+from qumba.util import all_primes
 
 
 def all_cyclic_gf4(n, dmin=1, gf4_linear=True):
@@ -432,15 +436,15 @@ def main():
             count += 1
             if (code.n, code.k, code.d) == params:
                 print()
-                print(code, 'l' if code.is_gf4_linear() else "")
+                print(code, 'gf4' if code.is_gf4_linear() else "")
                 #print(code.longstr())
                 print(strop(code.H))
                 print()
     
             else:
                 #print(code, "+" if sum(code.cyclic_gens[1])==0 else " ", end=" ", flush=True)
-                print(code, "+" if code.is_css() else " ", 
-                    'l' if code.is_gf4_linear() else " ", end = " ", flush=True)
+                print(code, "css" if code.is_css() else " ", 
+                    'gf4' if code.is_gf4_linear() else " ", end = "", flush=True)
                 if count % 8 == 0:
                     print()
     print()
@@ -448,7 +452,6 @@ def main():
 
 def find_prime():
 
-    from qumba.util import all_primes
 
     for n in all_primes(50):
         if n != 29:
@@ -495,11 +498,13 @@ def is_cyclic(space, word):
     return code
 
 
+def get_code(spec=None):
+    if spec is None:
+        spec = argv.code
+    if spec == (5,1,3):
+        code = construct.get_513() # GF4 linear
 
-def find_gates():
-    from qumba.transversal import find_local_cliffords, search_gate
-
-    if argv.code == (9,3,3):
+    elif spec == (9,3,3):
         # [[9,3,3]]
         code = QCode.fromstr("""
         YZZYZ...Z
@@ -510,7 +515,7 @@ def find_gates():
         Z...ZYZZY
         """)
 
-    elif argv.code == (13,1,5): # GF4 linear
+    elif spec == (13,1,5): # GF4 linear
         code = QCode.fromstr("""
         XXZZ.Z...Z.ZZ
         ZXXZZ.Z...Z.Z
@@ -526,7 +531,33 @@ def find_gates():
         ZZ.Z...Z.ZZXX
         """)
 
-    elif argv.code == (17,1,7): # GF4 linear
+#    elif spec == (17,1,7): # GF4 linear
+#        # [[17,1,7]]
+#        code = QCode.fromstr("""
+#
+#        """)
+    elif spec == (17,1,7,0): # GF4 linear
+        # [[17,1,7]]
+        code = QCode.fromstr("""
+        XXZ.ZZZ.Z.Z.ZZZ.Z
+        ZXXZ.ZZZ.Z.Z.ZZZ.
+        .ZXXZ.ZZZ.Z.Z.ZZZ
+        Z.ZXXZ.ZZZ.Z.Z.ZZ
+        ZZ.ZXXZ.ZZZ.Z.Z.Z
+        ZZZ.ZXXZ.ZZZ.Z.Z.
+        .ZZZ.ZXXZ.ZZZ.Z.Z
+        Z.ZZZ.ZXXZ.ZZZ.Z.
+        .Z.ZZZ.ZXXZ.ZZZ.Z
+        Z.Z.ZZZ.ZXXZ.ZZZ.
+        .Z.Z.ZZZ.ZXXZ.ZZZ
+        Z.Z.Z.ZZZ.ZXXZ.ZZ
+        ZZ.Z.Z.ZZZ.ZXXZ.Z
+        ZZZ.Z.Z.ZZZ.ZXXZ.
+        .ZZZ.Z.Z.ZZZ.ZXXZ
+        Z.ZZZ.Z.Z.ZZZ.ZXX
+        """)
+
+    elif spec == (17,1,7,1): # GF4 linear
         # [[17,1,7]]
         code = QCode.fromstr("""
         XXZZ..Z.....Z..ZZ
@@ -547,15 +578,49 @@ def find_gates():
         ZZ..Z.....Z..ZZXX
         """)
 
-    elif argv.code == (5,1,3):
-        code = construct.get_513()
+    elif spec == (29,1,9):
+        # [[29,1,9]]
+        code = QCode.fromstr("""
+        ..ZZXXZZ...Y.Y...Y...Y...Y.Y.
+        ...ZZXXZZ...Y.Y...Y...Y...Y.Y
+        Y...ZZXXZZ...Y.Y...Y...Y...Y.
+        .Y...ZZXXZZ...Y.Y...Y...Y...Y
+        Y.Y...ZZXXZZ...Y.Y...Y...Y...
+        .Y.Y...ZZXXZZ...Y.Y...Y...Y..
+        ..Y.Y...ZZXXZZ...Y.Y...Y...Y.
+        ...Y.Y...ZZXXZZ...Y.Y...Y...Y
+        Y...Y.Y...ZZXXZZ...Y.Y...Y...
+        .Y...Y.Y...ZZXXZZ...Y.Y...Y..
+        ..Y...Y.Y...ZZXXZZ...Y.Y...Y.
+        ...Y...Y.Y...ZZXXZZ...Y.Y...Y
+        Y...Y...Y.Y...ZZXXZZ...Y.Y...
+        .Y...Y...Y.Y...ZZXXZZ...Y.Y..
+        ..Y...Y...Y.Y...ZZXXZZ...Y.Y.
+        ...Y...Y...Y.Y...ZZXXZZ...Y.Y
+        Y...Y...Y...Y.Y...ZZXXZZ...Y.
+        .Y...Y...Y...Y.Y...ZZXXZZ...Y
+        Y.Y...Y...Y...Y.Y...ZZXXZZ...
+        .Y.Y...Y...Y...Y.Y...ZZXXZZ..
+        ..Y.Y...Y...Y...Y.Y...ZZXXZZ.
+        ...Y.Y...Y...Y...Y.Y...ZZXXZZ
+        Z...Y.Y...Y...Y...Y.Y...ZZXXZ
+        ZZ...Y.Y...Y...Y...Y.Y...ZZXX
+        XZZ...Y.Y...Y...Y...Y.Y...ZZX
+        XXZZ...Y.Y...Y...Y...Y.Y...ZZ
+        ZXXZZ...Y.Y...Y...Y...Y.Y...Z
+        ZZXXZZ...Y.Y...Y...Y...Y.Y...
+        """)
 
     else:
-        return
+        print("no code specified")
 
-    from qumba.autos import get_autos, get_isos
-    from qumba.transversal import find_autos, find_autos_lc
+    return code
 
+
+
+def find_gates():
+
+    code = get_code()
     print(code)
     space = code.space
     n = code.n
@@ -636,6 +701,185 @@ def find_gates():
     print(len(mulclose(logical)))
     
 
+def gen_group():
+    n = argv.get("n", 5)
+
+    gl = list(range(1, n))
+    gens = []
+    for a in gl:
+        found = set( (a**i)%n for i in range(n) )
+        if len(found) == n-1:
+            gens.append(a)
+
+    print("gens:", gens)
+
+    rotate = [(i+1)%n for i in range(n)]
+    print(rotate)
+
+    perms = [rotate]
+
+    for a in gens:
+        cycle = []
+        for i in range(n-1):
+            cycle.append( (a**i)%n )
+
+        perm = [0] + [None]*(n-1)
+        for i in range(n-1):
+            perm[cycle[i]] = cycle[(i+1)%(n-1)]
+        print(perm)
+        perms.append(perm)
+        #break
+
+    items = list(range(n))
+    perms = [Perm(perm, items) for perm in perms]
+
+    a, b = perms[:2]
+    assert (a*b != b*a)
+
+    G = Group.generate(perms)
+    assert len(G) == n*(n-1)
+
+
+def build_qr_code(n):
+    space = SymplecticSpace(n)
+
+    gl = list(range(1, n))
+
+    residues = {(i**2)%n for i in gl}
+    #print(residues)
+
+    smap = SMap()
+    op = []
+    for i in range(n):
+        smap[0,i] = str(i)[-1:]
+        if i==0:
+            op.append('.')
+            #smap[1,i] = "."
+            #smap[2,i] = "."
+        elif i in residues:
+            op.append('Z')
+            smap[1,i] = "*"
+            smap[2,i] = "."
+        else:
+            op.append('X')
+            smap[1,i] = "."
+            smap[2,i] = "*"
+
+    #print(smap)
+    H0 = ''.join(op)
+    #print(H0)
+
+    H = []
+    for i in range(n):
+        H1 = ''.join(H0[(i-j)%n] for j in range(n))
+        H.append(H1)
+    H = "\n".join(H)
+    #print(H)
+
+    F = space.F
+    H = space.fromstr(H)
+
+    if argv.gf4:
+        op = reduce(mul, [space.S(i) for i in range(n)])
+        op *= reduce(mul, [space.H(i) for i in range(n)])
+        H1 = H*op
+        H = H.concatenate(H1)
+
+    A = H * F * H.t
+    if A.sum() != 0:
+        return None
+
+    #print(strop(code.H))
+
+    H = H.linear_independent()
+    code = QCode(H)
+
+    if code.n < 20:
+        code.distance("z3")
+
+    return code
+
+    
+def find_residues():
+    for n in all_primes(200):
+        if n < 5:
+            continue
+
+        code = build_qr_code(n)
+        print(n, n%4, n%8, code, end=" ")
+        if code is not None:
+            print("gf4" if code.is_gf4_linear() else " ")
+        else:
+            print()
+
+def make_cyclic():
+    H0 = "..Y.Y...Y...Y...Y.Y...ZZXXZZ."
+    n = len(H0)
+    space = SymplecticSpace(n)
+        
+    H = []
+    for i in range(n):
+        H1 = ''.join(H0[(i-j)%n] for j in range(n))
+        H.append(H1)
+    H = "\n".join(H)
+    #print(H)
+
+    F = space.F
+    H = space.fromstr(H)
+
+    if argv.gf4:
+        op = reduce(mul, [space.S(i) for i in range(n)])
+        op *= reduce(mul, [space.H(i) for i in range(n)])
+        H1 = H*op
+        H = H.concatenate(H1)
+
+    A = H * F * H.t
+    assert A.sum() == 0
+    H = H.linear_independent()
+    code = QCode(H)
+
+    print(code)
+    print(strop(code.H))
+
+    if argv.distance:
+        code.distance("z3", True)
+        print(code)
+
+
+def test_residues():
+    #n = argv.get("n", 5)
+    n = argv.n
+
+    code = build_qr_code(n)
+    H = code.H
+    print(strop(H))
+    print()
+
+    m, nn = H.shape
+
+#    for i in range(1, m):
+#      for j in range(i+1, m):
+#        h = H[0] + H[i] + H[j]
+#        print(strop(h), get_weight(h.A))
+
+    best = n
+    best_h = None
+    #for h in H.rowspan():
+    for bits in numpy.ndindex((2,)*m):
+        bits = Matrix(bits)
+        h = bits * H
+        #print(h, h.shape)
+        A = h.A.copy()
+        A.shape = (nn,)
+        w = get_weight(A) 
+        if 0 < w < best:
+            best = w
+            best_h = h
+            print(strop(best_h), w)
+
+    print(strop(best_h), best)
+
+
 
 def find_cyclic():
     n = argv.get("n", 5)
@@ -646,8 +890,14 @@ def find_cyclic():
     Add = solver.add
 
     H0 = UMatrix.unknown(1, nn)
-    H0[0,0] = 1
-    H0[0,1] = 0
+    H0[0,0:2] = [1,0] # X
+
+    if n==29:
+        print(" guess from smaller examples..? ")
+        H0[0,2:4] = [1,0] # X
+        H0[0,4:6] = [0,1] # Z
+        H0[0,6:8] = [0,0] # .
+        H0[0,8:10] = [0,1] # Z
 
     H = UMatrix.unknown(n, nn)
     for i in range(n):
@@ -704,6 +954,116 @@ def find_cyclic():
 
     print("done.")
 
+
+def test_galois():
+
+    left = get_code((17,1,7,0))
+    right = get_code((17,1,7,1))
+    space = left.space
+
+    print(left)
+    n = left.n
+
+    gl = list(range(1, n))
+    gens = []
+    for a in gl:
+        found = set( (a**i)%n for i in range(n) )
+        if len(found) == n-1:
+            gens.append(a)
+
+    print("gens:", gens)
+
+    rotate = [(i+1)%n for i in range(n)]
+    print("rotate:", rotate)
+
+    logical = []
+
+    for a in gens:
+        cycle = []
+        for i in range(n-1):
+            cycle.append( (a**i)%n )
+
+        perm = [0] + [None]*(n-1)
+        for i in range(n-1):
+            perm[cycle[i]] = cycle[(i+1)%(n-1)]
+        print(perm)
+
+        P = space.get_perm(perm)
+
+        #if n==17:
+        #    P = P*P
+
+        dode = P*left
+
+        #print(dode.is_equiv(left), dode.is_equiv(right))
+
+        for g in find_local_cliffords(right, dode, constant=True):
+            eode = g*dode
+            assert eode.is_equiv(right)
+            print("found")
+            break
+        else:
+            print("not found")
+
+    
+
+
+def test_cyclotomic():
+
+    code = get_code()
+    space = code.space
+
+    print(code)
+    n = code.n
+
+    gl = list(range(1, n))
+    gens = []
+    for a in gl:
+        found = set( (a**i)%n for i in range(n) )
+        if len(found) == n-1:
+            gens.append(a)
+
+    print("gens:", gens)
+
+    rotate = [(i+1)%n for i in range(n)]
+    print("rotate:", rotate)
+
+    logical = []
+
+    for a in gens:
+        cycle = []
+        for i in range(n-1):
+            cycle.append( (a**i)%n )
+
+        perm = [0] + [None]*(n-1)
+        for i in range(n-1):
+            perm[cycle[i]] = cycle[(i+1)%(n-1)]
+        print(perm)
+
+        P = space.get_perm(perm)
+
+        #if n==17:
+        #    P = P*P
+
+        dode = P*code
+
+        eode = space.get_perm(rotate)*dode
+        print("cyclic:", eode.is_equiv(dode))
+        print("gf4:", dode.is_gf4_linear())
+
+        for g in find_local_cliffords(code, dode, constant=True):
+            eode = g*dode
+            assert eode.is_equiv(code)
+            L = eode.get_logical(code)
+            logical.append(L)
+            print("found")
+            print(L)
+            break
+        else:
+            print("not found")
+
+    G = mulclose(logical)
+    print("gates:", len(G))
 
 
 

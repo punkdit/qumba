@@ -78,7 +78,7 @@ def search_distance_z3(code, d):
     return v
 
 
-def distance_z3(code):
+def distance_z3(code, verbose=False):
 
     # XXX this leaks memory XXX
 
@@ -91,6 +91,8 @@ def distance_z3(code):
             if code.d is None:
                 code.d = d
             return d
+        if verbose:
+            print("d >", d)
         d += 1
 
 
