@@ -1007,6 +1007,55 @@ def distance_z3(code):
     return min(d_x, d_z)
 
 
+def distance_meetup(code, max_m=None, verbose=False):
+    assert isinstance(code, CSSCode)
+    lz = logop_meetup(code.Hx, code.Lx, max_m, verbose)
+    lx = logop_meetup(code.Hz, code.Lz, max_m, verbose)
+    w = None
+    if lz is not None:
+        w = lz.sum()
+    if lx is not None:
+        w = min(w or code.n, lx.sum())
+    return w
+
+
+def logop_meetup(Hx, Lx, max_m=None, verbose=False):
+    from qumba.util import choose
+
+    _, n = Hx.shape
+    if max_m is None:
+        max_m = 1+n//2
+    items = list(range(n))
+
+    lookup = {}
+    v = numpy.zeros((n,), dtype=numpy.int8)
+    #print(v)
+    m = 1
+    while m <= max_m:
+      if verbose: print("m =", m)
+      for idxs in choose(items, m):
+        for bits in numpy.ndindex((2,)*m):
+            v[:] = 0
+            for i,idx in enumerate(idxs):
+                v[idx] = bits[i]
+            s = dot2(Hx, v)
+            key = s.tobytes()
+            u = lookup.get(key)
+            if u is None:
+                #print(".", end="")
+                lookup[key] = v.copy()
+            else:
+                #print("*", end="")
+                l = (u+v)%2
+                assert dot2(Hx, l).sum() == 0
+                if dot2(Lx, l).sum():
+                    if verbose: print("lookup size:", len(lookup))
+                    #print("found")
+                    return l
+      #print()
+      m += 1
+
+
 
 def test_distance():
     print("\ntest()")
@@ -1016,7 +1065,10 @@ def test_distance():
     print(code)
     #print(code.longstr())
     d0 = distance_z3(code)
-    print("d =", d0)
+    print("distance_z3: ", d0)
+    d1 = distance_meetup(code, verbose=True)
+    print("distance_meetup: ", d1)
+    assert d0==d1, (d0, d1, d0==d1)
     return
     code = code.to_qcode()
     from qumba import distance 
@@ -1385,6 +1437,5 @@ if __name__ == "__main__":
 
     t = time() - start_time
     print("OK! finished in %.3f seconds\n"%t)
-
 
 
