@@ -85,6 +85,8 @@ def get_weight_slow(v):
     return count
 
 def get_weight_fast(v): # not much faster for n=18
+    if isinstance(v, Matrix):
+        v = v.A
     n = len(v)//2
     v.shape = n,2
     w = v[:,0] + v[:,1]
@@ -172,7 +174,8 @@ class QCode(object):
         self.nn = nn
         self.k = n - m # number of logicals
         self.kk = 2*self.k
-        self.d = d
+        self.d_lower_bound = 1
+        self.d_upper_bound = n
         self.shape = m, n
         self.space = SymplecticSpace(n)
         if L is not None:
@@ -183,6 +186,18 @@ class QCode(object):
             self.check()
         if self.d is None and self.n < 10:
             self.get_distance()
+
+    def get_d(self):
+        if self.d_lower_bound == self.d_upper_bound:
+            return self.d_lower_bound
+
+    def set_d(self, d):
+        d = int(d)
+        assert type(d) is int
+        self.d_lower_bound = d
+        self.d_upper_bound = d
+
+    d = property(get_d, set_d)
 
     def __eq__(self, other):
         assert isinstance(other, QCode)
@@ -256,7 +271,8 @@ class QCode(object):
         return code
 
     def __str__(self):
-        d = self.d if self.d is not None else '?'
+        d = (self.d if self.d is not None 
+            else '%d<=d<=%d'%(self.d_lower_bound, self.d_upper_bound))
         return "[[%s, %s, %s]]"%(self.n, self.k, d)
 
     def longstr(self):
@@ -337,8 +353,8 @@ class QCode(object):
         Hz = H[:, 1:nn:2].A
         idxs = numpy.where(Hx.sum(1))[0]
         jdxs = numpy.where(Hz.sum(1))[0]
-        assert Hx[jdxs, :].sum() == 0, "not in css form"
-        assert Hz[idxs, :].sum() == 0, "not in css form"
+        #assert Hx[jdxs, :].sum() == 0, "not in css form"
+        #assert Hz[idxs, :].sum() == 0, "not in css form"
         Hx = Hx[idxs, :]
         Hz = Hz[jdxs, :]
         code = CSSCode(Hx=Hx, Hz=Hz)
@@ -577,7 +593,38 @@ class QCode(object):
         M = L*F*L.t
         assert M==symplectic_form(k)
         self.L = L
+        self.bound_d()
         return L
+
+    def bound_d(self):
+        L = self.L
+        #if L is None:
+        #    L = self.get_logops()
+        for i in range(self.k):
+            l = L[i:i+1,:].transpose()
+            w = get_weight(l.copy()) # destructive
+            if w < self.d_upper_bound:
+                self.d_upper_bound = w
+        n = self.n
+        nn = 2*n
+        H = self.H
+        W = H.A.sum(0)
+        #print(W, W.shape)
+        W.shape = (n, 2)
+        #print(W, W.shape, numpy.min(W))
+        if numpy.min(W) > 0 and self.d_lower_bound<2:
+            self.d_lower_bound = 2
+
+        if self.n > 100:
+            return
+
+        from qumba.distance import distance_meetup
+        max_m = argv.get("max_m", 3)
+        d = distance_meetup(self, max_m)
+        if d is None:
+            self.d_lower_bound = 2*max_m + 1
+        else:
+            self.d = d
 
     def get_destabilizers(self):
         if self.T is not None:

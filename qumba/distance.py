@@ -80,8 +80,6 @@ def search_distance_z3(code, d):
 
 def distance_z3(code, verbose=False):
 
-    # XXX this leaks memory XXX
-
     if code.k == 0:
         return code.n
 
@@ -96,8 +94,139 @@ def distance_z3(code, verbose=False):
         d += 1
 
 
+def distance_z3_lb(code, max_d, verbose=False):
+    "is the distance > max_d ?"
+
+    if code.k == 0:
+        return code.n > max_d # ?
+
+    d = 1
+    while d <= max_d:
+        if search_distance_z3(code, d) is not None:
+            if code.d is None:
+                code.d = d
+            return False
+        if verbose:
+            print("d >", d)
+        d += 1
+
+    return True
+
+
+def distance_meetup(code, max_m=None, verbose=False):
+    w = logop_meetup(code, max_m, verbose)
+    if w is not None:
+        return get_weight(w)
+
+
+def logop_meetup(code, max_m=None, verbose=False):
+    from qumba.util import choose
+
+    n = code.n
+    if max_m is None:
+        max_m = 1+n//2
+    nn = 2*n
+    items = list(range(n))
+
+    H = code.H.A
+    L = code.L.A
+
+    lookup = {}
+    v = numpy.zeros((nn,), dtype=numpy.int8)
+    #print(v)
+    m = 1
+    while m <= max_m:
+      if verbose: print("m =", m)
+      for idxs in choose(items, m):
+        for bits in numpy.ndindex((3,)*m):
+            v[:] = 0
+            for i,idx in enumerate(idxs):
+                tgt = v[2*idx:2*idx+2]
+                bit = bits[i]
+                if bit==0:
+                    tgt[:] = [1,0] # X
+                elif bit==1:
+                    tgt[:] = [0,1] # Z
+                elif bit==2:
+                    tgt[:] = [1,1] # Y
+                else:
+                    assert 0
+            s = dot2(H, v)
+            key = s.tobytes()
+            u = lookup.get(key)
+            if u is None:
+                #print(".", end="")
+                lookup[key] = v.copy()
+            else:
+                #print("*", end="")
+                w = (u+v)%2
+                assert dot2(H, w).sum() == 0
+                if dot2(L, w).sum():
+                    if verbose: print("lookup size:", len(lookup))
+                    #print("found")
+                    return w
+      #print()
+      m += 1
+
+    #return 2*m+1
 
 
 
+def test():
+    from qumba.matrix import Matrix
+    from qumba.cyclic import get_code
+    from qumba.qcode import strop
+
+    #code = QCode.fromstr("""
+    #""")
+
+    #code = get_code((13,1,5))
+    code = get_code()
+
+    print(code)
+
+    w = distance_meetup(code)
+    d = get_weight(w)
+    code.d = d
+    print(code)
+    w = Matrix(w)
+    #print(w)
+    print(strop(w))
+
+
+
+
+
+
+
+if __name__ == "__main__":
+
+    from time import time
+    from qumba.argv import argv
+
+    start_time = time()
+
+
+    profile = argv.profile
+    name = argv.next() or "test"
+    _seed = argv.get("seed")
+    if _seed is not None:
+        print("seed(%s)"%(_seed))
+        seed(_seed)
+
+    if profile:
+        import cProfile as profile
+        profile.run("%s()"%name)
+
+    elif name is not None:
+        fn = eval(name)
+        fn()
+
+    else:
+        test()
+
+
+    t = time() - start_time
+    print("OK! finished in %.3f seconds\n"%t)
 
 

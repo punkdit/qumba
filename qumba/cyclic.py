@@ -25,7 +25,7 @@ from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identit
 from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr, strop
 from qumba import construct
 from qumba.argv import argv
-from qumba.distance import distance_z3
+from qumba.distance import distance_z3, distance_z3_lb, distance_meetup
 from qumba.transversal import find_local_cliffords, search_gate
 from qumba.transversal import find_autos, find_autos_lc
 from qumba.autos import get_autos, get_isos
@@ -77,9 +77,8 @@ def all_cyclic_gf4(n, dmin=1, gf4_linear=True):
         code = QCode(H)
         #print(code.longstr())
         #print(code, end=' ', flush=True)
-        d = distance_z3(code)
-        code.d = d
-        if d >= dmin:
+        #d = distance_z3(code, verbose=True)
+        if distance_z3_lb(code, dmin-1):
             yield code
         #print(gen, code)
         #print(code.longstr())
@@ -177,11 +176,31 @@ def main_gf4():
         assert tgt.is_equiv(code)
         if code.k==0:
             continue
+        if sd and argv.distance:
+            #print(strop(code.H))
+            css = code.to_css()
+            assert css.k == code.k
+            d = css.bz_distance()
+            #print(css)
+            code.d = min(d)
+        elif argv.distance:
+            distance_z3(code, verbose=True)
+        elif argv.distance_meetup:
+            print()
+            d = distance_meetup(code, max_m=3, verbose=False)
+            print("distance_meetup(3):", d)
+            d = distance_meetup(code, max_m=4, verbose=False)
+            print("distance_meetup(4):", d)
+            code.d = distance_meetup(code, verbose=False)
         print(code, set(rws), 
             "*" if sd else "", 
             "gf4" if code.is_gf4_linear() else "")
-        print(code.longstr())
-        print()
+        #if code.k > 1:
+        #    distance_z3_lb(code, 5, verbose=True)
+        if argv.show:
+            print(strop(code.H))
+        #print(code.longstr())
+        #print()
         continue
         L = tgt.get_logical(code)
         assert (L**n).is_identity()
@@ -811,6 +830,23 @@ def find_residues():
             print("gf4" if code.is_gf4_linear() else " ")
         else:
             print()
+
+
+def find_qr_distance():
+    from qumba.unwrap import unwrap
+    for n in all_primes(100):
+        if n < 50 or (n%4)!=1:
+            continue
+
+        code = build_qr_code(n)
+        print(code)
+
+        css = unwrap(code)
+        css = css.to_css()
+        print(css.bz_distance())
+        print()
+    
+
 
 def make_cyclic():
     H0 = "..Y.Y...Y...Y...Y.Y...ZZXXZZ."
