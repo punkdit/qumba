@@ -149,7 +149,10 @@ def strop(H):
 
 
 class QCode(object):
-    def __init__(self, H=None, T=None, L=None, J=None, A=None, d=None, check=True):
+    def __init__(self, H=None, T=None, L=None, J=None, A=None, 
+            d=None, d_lower_bound=None, d_upper_bound=None,
+            name=None, desc="", check=True, **attrs
+        ):
         A = Matrix.promote(A)
         if H is None:
             assert A is not None
@@ -174,8 +177,8 @@ class QCode(object):
         self.nn = nn
         self.k = n - m # number of logicals
         self.kk = 2*self.k
-        self.d_lower_bound = 1
-        self.d_upper_bound = n
+        self.d_lower_bound = d_lower_bound or 1
+        self.d_upper_bound = d_upper_bound or n
         self.shape = m, n
         self.space = SymplecticSpace(n)
         if L is not None:
@@ -186,6 +189,9 @@ class QCode(object):
             self.check()
         if self.d is None and self.n < 10:
             self.get_distance()
+        self.name = name
+        self.desc = desc
+        self.attrs = attrs # serialize these attrs
 
     def get_d(self):
         if self.d_lower_bound == self.d_upper_bound:
@@ -198,6 +204,11 @@ class QCode(object):
         self.d_upper_bound = d
 
     d = property(get_d, set_d)
+
+    def __getattr__(self, name):
+        if name in self.attrs:
+            return self.attrs[name]
+        raise AttributeError
 
     def __eq__(self, other):
         assert isinstance(other, QCode)
@@ -271,6 +282,8 @@ class QCode(object):
         return code
 
     def __str__(self):
+        #if self.name is not None:
+            #return self.name #???
         d = (self.d if self.d is not None 
             else '%d<=d<=%d'%(self.d_lower_bound, self.d_upper_bound))
         return "[[%s, %s, %s]]"%(self.n, self.k, d)

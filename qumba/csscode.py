@@ -1061,14 +1061,17 @@ def test_distance():
     print("\ntest()")
     n = argv.get("n", 15)
     d = argv.get("d", 3)
-    code = CSSCode.random(n, n//2, n//2, d, check=False)
-    print(code)
-    #print(code.longstr())
-    d0 = distance_z3(code)
-    print("distance_z3: ", d0)
-    d1 = distance_meetup(code, verbose=True)
-    print("distance_meetup: ", d1)
-    assert d0==d1, (d0, d1, d0==d1)
+
+    for trial in range(100):
+        code = CSSCode.random(n, n//2, n//2, d, check=False)
+        print(code)
+        #print(code.longstr())
+        d0 = distance_z3(code)
+        print("distance_z3: ", d0)
+        d1 = distance_meetup(code, verbose=True)
+        print("distance_meetup: ", d1)
+        assert d0==d1, (d0, d1, d0==d1)
+
     return
     code = code.to_qcode()
     from qumba import distance 
