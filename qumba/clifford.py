@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-build clifford/pauli groups in sage
+build clifford/pauli groups (and some non-cliffords) in sage
 
 ported from:
 https://github.com/punkdit/bruhat/blob/master/bruhat/clifford_sage.py
@@ -1049,10 +1049,20 @@ def test_higher():
     T = Matrix(ring, [[1,0],[0,w]])
     I = c1.get_identity()
     assert [T**n==I for n in range(1,9)] == [False]*7+[True]
-    H,S = c1.get_H(),c1.get_S()
-    R = H*S*H
+    H, S = c1.get_H(), c1.get_S()
+    X, Y, Z = c1.X(), c1.Y(), c1.Z()
+    assert T*T == S
+    Tx = H*T*H
+    Sx = H*S*H
+    Sy = S*H*S*H*S.d
+    Ty = S*H*T*H*S.d
+    assert Sx*Sx == X
+    assert Sy*Sy == Y
+    assert Tx*Tx == Sx
+    assert Ty*Ty == Sy
+    assert Ty.d*X*Ty == H
     I1 = c1.get_identity()
-    M = I1.direct_sum(R)
+    M = I1.direct_sum(Sx)
     assert M*M == c2.get_CNOT()
 
 

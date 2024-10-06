@@ -6,6 +6,8 @@ build clifford/pauli groups using integer numpy matrices
 XXX need rationals
 FAIL
 
+see: clifford.py for sage version
+
 """
 
 from random import choice
