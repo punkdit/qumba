@@ -130,6 +130,74 @@ def all_cyclic_gf2(n):
         yield gen
 
 
+def all_cyclic_css(n):
+    vs = list(all_cyclic_gf2(n))    
+    N = len(vs)
+    print()
+    print("all_cyclic_css(n=%d)   n mod 4 = %d,  n mod 8 = %d"%(n, n%4, n%8))
+
+    Hs = [
+        numpy.array([numpy.array([v[(i+j)%n] for i in range(n)]) for j in range(n)])
+        for v in vs
+    ]
+    Hs = [linear_independent(H) for H in Hs]
+    print("Hs:", N)
+
+    for i in range(N):
+      for j in range(i, N):
+        if dot2(Hs[i], Hs[j].transpose()).sum():
+            continue
+        code = QCode.build_css(Hs[i], Hs[j])
+        if code.k == 0 or code.d_upper_bound <= 2:
+            continue
+        yield code
+
+
+def unique(codes):
+    from qumba.transversal import find_isomorphisms_css
+    def isomorphic(code, dode):
+        for iso in find_isomorphisms_css(code, dode):
+            return True
+        return False
+
+    found = {} # map each code to a unique representative
+
+    for code in codes:
+        for prev in list(found.keys()):
+            #if code.is_equiv(prev):
+            if isomorphic(code, prev):
+                found[code] = found[prev]
+                print("!")
+                break
+            #if isomorphic(code.get_dual(), prev): # up to n=15 didn't find any... hmm..
+            #    found[code] = found[prev]
+            #    print("d")
+            #    break
+            #print("/", end="")
+            if code.n < 10 and code.k == prev.k and code.get_isomorphism(prev): # slooooow
+                found[code] = found[prev]
+                print("!")
+                break
+        else:
+            found[code] = code # i am the representative 
+            yield code
+    print("found:", len(set(found.values())), "of", len(set(found.keys())))
+
+
+def main_css():
+    #n = argv.get("n", 19)
+    #for n in all_primes(100):
+    for idx in range(2, argv.get("idx", 11)):
+        n = 2*idx + 1
+        if n < 5:
+            continue
+        #if n%4 == 3:
+        #codes = list(all_cyclic_css(n))
+        for code in  unique(all_cyclic_css(n)):
+            print(code, "*" if code.is_selfdual() else " ")
+        print()
+
+
 def all_cyclic_sp(n, dmin):
 
     space = SymplecticSpace(n)
@@ -160,6 +228,7 @@ def all_cyclic_sp(n, dmin):
                 #print()
 
         #print()
+
 
 
 def main_gf4():

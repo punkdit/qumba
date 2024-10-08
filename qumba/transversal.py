@@ -472,12 +472,19 @@ def is_local_clifford_equiv(tgt, src, constant=False, verbose=False):
     return False
 
 
-def find_autos(code):
+def find_isomorphisms(code, dode=None):
 
     # find all automorphism permutations
 
+    if dode is None:
+        dode = code
+
+    if code.n != dode.n or code.k != dode.k:
+        return
+
     n = code.n
     nn = 2*n
+    m = code.m
     space = code.space
     F = space.F
 
@@ -486,7 +493,6 @@ def find_autos(code):
 
     # permutation matrix
     P = UMatrix.unknown(n, n)
-    #print(P.A[0,0])
 
     # symplectic permutation matrix
     A = numpy.zeros((nn,nn), dtype=object)
@@ -495,20 +501,26 @@ def find_autos(code):
         A[2*i,2*j] = P[i,j]
         A[2*i+1,2*j+1] = P[i,j]
     P2 = UMatrix(A)
-    #print(P2)
 
     for i in range(n):
-        Add(Sum([If(P[i,j].get(),1,0) for j in range(n)])==1)
+      for j in range(n):
+        rhs = reduce(And, [P[i,k]==0 for k in range(n) if k!=j])
+        Add( Or(P[i,j]==0, rhs) )
+        rhs = reduce(And, [P[k,j]==0 for k in range(n) if k!=i])
+        Add( Or(P[i,j]==0, rhs) )
 
-    I = Matrix.identity(n, n)
-    Add(P * P.t == I)
+    for i in range(n):
+        Add( reduce(Or, [P[i,j]!=0 for j in range(n)]) )
 
-    H = code.H
-    m = code.m
-    H1 = H * P2
+    #I = Matrix.identity(n, n)
+    #Add(P * P.t == I)
+
+    #H = code.H
+    #H1 = H * P2
 
     R = UMatrix.unknown(m, m)
-    Add( R*H == H1 )
+    #Add( R*H == H1 )
+    Add( R*code.H == dode.H*P2 )
 
     while 1:
         result = solver.check()
@@ -520,11 +532,85 @@ def find_autos(code):
         p = P.get_interp(model)
         p2 = P2.get_interp(model)
 
-        assert (p2*code).is_equiv(code)
+        assert (p2*code).is_equiv(dode)
 
         yield p2
 
         Add(P != p) # could also add all generators
+
+find_autos = find_isomorphisms
+
+def find_isomorphisms_css(code, dode=None):
+
+    # find all automorphism permutations
+
+    if dode is None:
+        dode = code
+
+    if code.n != dode.n or code.k != dode.k:
+        return
+
+    code = code.to_css()
+    dode = dode.to_css()
+
+    n = code.n
+    mx = code.mx
+    mz = code.mz
+
+    if code.mx != dode.mx or code.mz != dode.mz:
+        return
+
+    solver = Solver()
+    Add = solver.add
+
+    # permutation matrix
+    P = UMatrix.unknown(n, n)
+
+    #for i in range(n):
+    #    Add(Sum([If(P[i,j].get(),1,0) for j in range(n)])==1)
+
+    for i in range(n):
+      for j in range(n):
+        rhs = reduce(And, [P[i,k]==0 for k in range(n) if k!=j])
+        Add( Or(P[i,j]==0, rhs) )
+        rhs = reduce(And, [P[k,j]==0 for k in range(n) if k!=i])
+        Add( Or(P[i,j]==0, rhs) )
+
+    for i in range(n):
+        Add( reduce(Or, [P[i,j]!=0 for j in range(n)]) )
+
+    #I = Matrix.identity(n, n)
+    #Add(P * P.t == I)
+
+    #H = code.H
+    #H1 = H * P2
+
+    Rx = UMatrix.unknown(mx, mx)
+    Rz = UMatrix.unknown(mz, mz)
+
+    Hx = Matrix(code.Hx)
+    Hz = Matrix(code.Hz)
+    Jx = Matrix(dode.Hx)
+    Jz = Matrix(dode.Hz)
+
+    Add( Rx*Hx == Jx*P )
+    Add( Rz*Hz == Jz*P )
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("result:", result)
+            break
+    
+        model = solver.model()
+        p = P.get_interp(model)
+
+        #assert (p*code).is_equiv(dode) # ... fix..
+
+        #print(p)
+        yield p
+
+        Add(P != p) # could also add all generated perms
 
 
 def find_autos_lc(code):

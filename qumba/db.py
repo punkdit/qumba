@@ -1,11 +1,17 @@
 #!/usr/bin/env python
 
+from time import time
+
 import pymongo
 
 from qumba.qcode import strop
 from qumba.argv import argv
 
-client = pymongo.MongoClient("mongodb://localhost:27017/")
+#client = pymongo.MongoClient("mongodb://localhost:27017/")
+user,passwd = argv.user, argv.passwd
+if user is None:
+    user,passwd = open("qumba_creds.txt").read().split()
+client = pymongo.MongoClient("mongodb://%s:%s@arrowtheory.com:27017"%(user,passwd))
 db = client["qumba"]
 codes = db["codes"]
 
@@ -23,13 +29,8 @@ def add(code, force=False):
         "d_lower_bound" : code.d_lower_bound,
         "d_upper_bound" : code.d_upper_bound,
         "desc" : code.desc,
+        "timestamp" : int(time()), # is this UTC? I don't know. Do we care?
     }
-    #codes.insert_one({"H":"ZXXZI IZXXZ ZIZXX XZIZX"})
-    #codes.delete_one({"_id":res.inserted_id})
-    #codes.insert_one({"name":"[[5,1,3]]", "H":"XZZXI IXZZX XIXZZ ZXIXZ"})
-    #codes.find({"name":"[[5,1,3]]"})
-    #codes.find_({"name":"[[5,1,3]]"})
-    #codes.find_({"name":"[[5,1,3]]"})
     res = codes.find_one(data)
     if res is None or force:
         codes.insert_one(data)
@@ -74,7 +75,8 @@ def query():
 def test():
     from qumba import construct 
 
-    code = construct.get_513()
+#    code = construct.get_513()
+    code = construct.get_412()
 
     add(code)
 
@@ -93,7 +95,6 @@ def drop():
 
 if __name__ == "__main__":
 
-    from time import time
     start_time = time()
 
     profile = argv.profile

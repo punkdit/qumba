@@ -349,6 +349,9 @@ class QCode(object):
 
     def is_equiv(self, other):
         assert isinstance(other, QCode)
+        assert self.n == other.n, "wut"
+        if self.k != other.k:
+            return False
         H1, H2 = self.H.t, other.H.t
         U = solve2(H1.A, H2.A)
         if U is None:
@@ -376,6 +379,7 @@ class QCode(object):
     def to_qcode(self):
         return self
 
+    @cache
     def get_graph(self):
         "encode into a pynauty Graph"
         from pynauty import Graph
@@ -625,10 +629,14 @@ class QCode(object):
         #print(W, W.shape)
         W.shape = (n, 2)
         #print(W, W.shape, numpy.min(W))
+
         if numpy.min(W) > 0 and self.d_lower_bound<2:
             self.d_lower_bound = 2
 
         if self.n > 100:
+            return
+
+        if self.k == 0:
             return
 
         from qumba.distance import distance_meetup
