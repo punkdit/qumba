@@ -165,9 +165,9 @@ def unique(codes):
     for code in codes:
         for prev in list(found.keys()):
             #if code.is_equiv(prev):
-            if isomorphic(code, prev):
+            if code.n < 30 and isomorphic(code, prev):
                 found[code] = found[prev]
-                print("!")
+                print("dup")
                 break
             #if isomorphic(code.get_dual(), prev): # up to n=15 didn't find any... hmm..
             #    found[code] = found[prev]
@@ -176,7 +176,7 @@ def unique(codes):
             #print("/", end="")
             if code.n < 10 and code.k == prev.k and code.get_isomorphism(prev): # slooooow
                 found[code] = found[prev]
-                print("!")
+                print("dup")
                 break
         else:
             found[code] = code # i am the representative 
@@ -193,9 +193,17 @@ def main_css():
             continue
         #if n%4 == 3:
         #codes = list(all_cyclic_css(n))
-        for code in  unique(all_cyclic_css(n)):
-            print(code, "*" if code.is_selfdual() else " ")
+        for code in unique(all_cyclic_css(n)):
+            code = code.to_css()
+            code.bz_distance()
+            code = code.to_qcode()
+            print(code.cssname, "*" if code.is_selfdual() else " ")
+            if argv.db:
+                from qumba import db
+                db.add(code)
         print()
+
+        
 
 
 def all_cyclic_sp(n, dmin):

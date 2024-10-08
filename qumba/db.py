@@ -16,26 +16,36 @@ db = client["qumba"]
 codes = db["codes"]
 
 def add(code, force=False):
+    ichar = "I"
+    sep = " "
     data = {
-        "name" : str(code).replace(" ", ""),
-        "H" : strop(code.H),
-        "T" : strop(code.T),
-        "L" : strop(code.L),
-        #"J" : strop(code.J),
-        #"A" : strop(code.A),
+        #"name" : str(code).replace(" ", ""), # nah..
+        "name" : str(code),
+        "H" : strop(code.H, ichar, sep),
+        "T" : strop(code.T, ichar, sep),
+        "L" : strop(code.L, ichar, sep),
+        #"J" : strop(code.J, ichar, sep),
+        #"A" : strop(code.A, ichar, sep),
         "n" : code.n,
         "k" : code.k,
+    }
+    res = codes.find_one(data)
+    if not force and res:
+        print("qumba.db.add: %s already in db" % str(code))
+        return
+    data.update({
         "d" : code.d,
         "d_lower_bound" : code.d_lower_bound,
         "d_upper_bound" : code.d_upper_bound,
         "desc" : code.desc,
-        "timestamp" : int(time()), # is this UTC? I don't know. Do we care?
-    }
-    res = codes.find_one(data)
-    if res is None or force:
-        codes.insert_one(data)
-    else:
-        print("%s already in db" % str(code))
+        "created" : int(time()), # is this UTC? I don't know. Do we care?
+    })
+    for (k,v) in code.attrs.items():
+        assert k not in data
+        data[k] = v
+    codes.insert_one(data)
+    print("qumba.db.add: %s added." % str(code))
+
 
 def get(name, **attrs):
     from qumba.qcode import QCode
@@ -75,8 +85,8 @@ def query():
 def test():
     from qumba import construct 
 
-#    code = construct.get_513()
-    code = construct.get_412()
+    code = construct.get_513()
+    #code = construct.get_412()
 
     add(code)
 
@@ -88,7 +98,7 @@ def dump():
 
 
 def drop():
-    assert 0, "no"
+    #assert 0, "no"
     codes.drop()
     
 

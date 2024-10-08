@@ -127,7 +127,7 @@ def monte_carlo(H, v, p=0.5, trials=10000):
     #print("]")
     return d0
 
-def strop(H):
+def strop(H, ichar=".", sep="\n"):
     assert len(H.shape) in (1,2), H.shape
     if len(H.shape) == 1:
         shape = (1,)+H.shape
@@ -137,7 +137,7 @@ def strop(H):
     for i in range(m):
       for j in range(nn//2):
         x, z = H[i, 2*j:2*j+2]
-        c = '.'
+        c = ichar
         if x and z:
             c = 'Y'
         elif x:
@@ -145,7 +145,7 @@ def strop(H):
         elif z:
             c = 'Z'
         smap[i,j] = c
-    return str(smap)
+    return str(smap).replace("\n", sep)
 
 
 class QCode(object):
@@ -179,6 +179,8 @@ class QCode(object):
         self.kk = 2*self.k
         self.d_lower_bound = d_lower_bound or 1
         self.d_upper_bound = d_upper_bound or n
+        if d is not None:
+            self.d = d
         self.shape = m, n
         self.space = SymplecticSpace(n)
         if L is not None:
@@ -361,6 +363,7 @@ class QCode(object):
             return False
         return True
 
+    @cache 
     def to_css(self):
         from qumba.csscode import CSSCode
         H = self.H
@@ -379,7 +382,7 @@ class QCode(object):
     def to_qcode(self):
         return self
 
-    @cache
+    #@cache
     def get_graph(self):
         "encode into a pynauty Graph"
         from pynauty import Graph

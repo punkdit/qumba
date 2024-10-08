@@ -4,7 +4,7 @@ import sys, os
 from math import *
 from random import *
 import time
-from functools import reduce
+from functools import reduce, cache
 
 import numpy
 import numpy.random as ra
@@ -221,7 +221,7 @@ class CSSCode(object):
             Hz=None, Tx=None,
             Gx=None, Gz=None, 
             Ax=None, Az=None,
-            build=True, check=True, verbose=False, logops_only=False):
+            build=True, check=True, verbose=False, logops_only=False, dx=None, dz=None):
 
         if Hx is None and Hz is not None:
             # This is a classical code
@@ -282,6 +282,9 @@ class CSSCode(object):
         if self.Gz is not None:
             self.gz = self.Gz.shape[0]
 
+        self.dx = dx
+        self.dz = dz
+
         self.check = check
         self.do_check()
 
@@ -303,6 +306,20 @@ class CSSCode(object):
     def to_css(self):
         return self
 
+    def is_selfdual(self):
+        if self.mx != self.mz:
+            return False
+        Hx, Hz = self.Hx, self.Hz
+        if eq2(Hx, Hz):
+            return True
+        A = solve.solve(Hx.transpose(), Hz.transpose())
+        if A is None:
+            return False
+        A = solve.solve(Hz.transpose(), Hx.transpose())
+        if A is None:
+            return False
+        return True
+
     def __add__(self, other):
         "perform direct sum"
         Gx, Gz = direct_sum(self.Gx, other.Gx), direct_sum(self.Gz, other.Gz)
@@ -321,13 +338,13 @@ class CSSCode(object):
             code = self + code
         return code
 
-    def __hash__(self):
+    def __hash__(self): # do we mutate ? check this...
         ss = []
         for H in [
             self.Lx, self.Lz, self.Hx,
             self.Tz, self.Hz, self.Tx]:
             if H is not None:
-                ss.append(H.tostring())
+                ss.append(H.tobytes())
         return hash(tuple(ss))
 
     def build_from_gauge(self, check=True, verbose=False):
@@ -602,10 +619,10 @@ class CSSCode(object):
         self._dual = code
         return code
 
-    def bz_distance(code):
+    def bz_distance(self):
         #t0 = time()
-        Hx = shortstr(code.Hx).replace("1", "X").replace('.', "I")
-        Hz = shortstr(code.Hz).replace("1", "Z").replace('.', "I")
+        Hx = shortstr(self.Hx).replace("1", "X").replace('.', "I")
+        Hz = shortstr(self.Hz).replace("1", "Z").replace('.', "I")
     
         from subprocess import Popen, PIPE
         child = Popen("distance --zx".split(), stdin=PIPE, stdout=PIPE)
@@ -616,13 +633,19 @@ class CSSCode(object):
         result = child.stdout.read().decode()
         rval = child.wait()
         assert rval == 0, "child return %s"%rval
-        d_x, d_z = str(result).split()
+        dx, dz = str(result).split()
     
         #print("bz_distance took %.3f seconds" % (time() - t0))
-        return int(d_x), int(d_z)
+        dx, dz = int(dx), int(dz)
+        self.dx, self.dz = dx, dz
+        return dx, dz
 
+    @cache
     def to_qcode(self):
-        return qcode.QCode.build_css(self.Hx, self.Hz, self.Tx, self.Tz, self.Lx, self.Lz)
+        dx, dz = self.dx, self.dz
+        d = min(dx,dz) if dx and dz else None
+        return qcode.QCode.build_css(self.Hx, self.Hz, self.Tx, self.Tz, self.Lx, self.Lz, 
+            dx=self.dx, dz=self.dz, d=d, cssname=str(self))
 
     def __repr__(self):
         Lx = len(self.Lx) if self.Lx is not None else None
@@ -642,7 +665,11 @@ class CSSCode(object):
             n, Lx, Lz, Hx, Tz, Hz, Tx, Gx, Gz)
 
     def __str__(self):
-        return "[[%d, %d]]"%(self.n, self.k)
+        dx, dz = self.dx, self.dz
+        if dx and dz:
+            return "[[%d, %d, (%d, %d)]]"%(self.n, self.k, self.dx, self.dz)
+        else:
+            return "[[%d, %d, ?]]"%(self.n, self.k)
 
     def save(self, name=None, stem=None):
         assert name or stem
