@@ -109,22 +109,26 @@ def get_pairs(code):
 
 
 def test_support():
-    code = get_surf9()
-    code = construct.get_10_2_3()
+    #code = get_surf9()
+    #code = construct.get_10_2_3()
     #code = construct.get_713()
     #code = construct.get_bring()
     #code = construct.get_832()
-    d = code.d
 
-    print(code)
-    n = code.n
-    wenum = get_wenum(code)
-    print([len(wenum[i]) for i in range(code.n+1)])
-    hs = wenum[3]
-    for l in hs:
-        print(l)
+    from qumba.db import get_codes
+
+    for code in get_codes():
+        d = code.d
     
-    print("found:", get_pairs(code))
+        print(code)
+        n = code.n
+        wenum = get_wenum(code)
+        print([len(wenum[i]) for i in range(code.n+1)])
+        hs = wenum[3]
+        for l in hs:
+            print(l)
+        
+        print("found:", get_pairs(code))
 
 
 def test_gcolour():

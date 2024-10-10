@@ -26,7 +26,7 @@ from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr, str
 from qumba import construct
 from qumba.argv import argv
 from qumba.distance import distance_z3, distance_z3_lb, distance_meetup
-from qumba.transversal import find_local_cliffords, search_gate
+from qumba.transversal import find_local_cliffords
 from qumba.transversal import find_autos, find_autos_lc
 from qumba.autos import get_autos, get_isos
 from qumba.action import mulclose, Perm, Group
@@ -74,7 +74,7 @@ def all_cyclic_gf4(n, dmin=1, gf4_linear=True):
         if U.sum():
             continue # not isotropic
         #print(H)
-        code = QCode(H)
+        code = QCode(H, cyclic=True)
         #print(code.longstr())
         #print(code, end=' ', flush=True)
         #d = distance_z3(code, verbose=True)
@@ -106,7 +106,7 @@ def all_cyclic_gf2_poly(n):
 
 
 def all_cyclic_gf2(n):
-    assert n%2, n
+    #assert n%2, n
     F = GF(2)
     z2 = F.gen()
     R = PolynomialRing(F, "x")
@@ -123,7 +123,7 @@ def all_cyclic_gf2(n):
     Hs = []
     for bits in numpy.ndindex((2,)*N):
         a = reduce(mul, (factors[i] for i in range(N) if bits[i]), x**0)
-        if sum(bits)==N:
+        if sum(bits)==N and n%2:
             assert a == x**n+1, a
             continue 
         gen = numpy.array([int(a[k]) for k in range(n)], dtype=int)
@@ -147,27 +147,42 @@ def all_cyclic_css(n):
       for j in range(i, N):
         if dot2(Hs[i], Hs[j].transpose()).sum():
             continue
-        code = QCode.build_css(Hs[i], Hs[j])
+        code = QCode.build_css(Hs[i], Hs[j], cyclic=True)
         if code.k == 0 or code.d_upper_bound <= 2:
             continue
         yield code
 
 
-def unique(codes):
-    from qumba.transversal import find_isomorphisms_css
-    def isomorphic(code, dode):
+def unique(codes, min_d=3):
+    from qumba.transversal import find_isomorphisms_css, find_isomorphisms
+    def isomorphic_css(code, dode):
         for iso in find_isomorphisms_css(code, dode):
+            return True
+        return False
+    def isomorphic(code, dode):
+        for iso in find_isomorphisms(code, dode):
             return True
         return False
 
     found = {} # map each code to a unique representative
 
     for code in codes:
+        if code.d is not None and code.d < min_d:
+            print("d.", end="", flush=True)
+            continue
+        #print("\n", code.d, min_d)
         for prev in list(found.keys()):
-            #if code.is_equiv(prev):
+            if code.is_equiv(prev):
+                found[code] = found[prev]
+                print("e.", end="", flush=True)
+                break
+            if code.n < 30 and code.is_css() and prev.is_css() and isomorphic_css(code, prev):
+                found[code] = found[prev]
+                print("i.", end="", flush=True)
+                break
             if code.n < 30 and isomorphic(code, prev):
                 found[code] = found[prev]
-                print("dup")
+                print("i.", end="", flush=True)
                 break
             #if isomorphic(code.get_dual(), prev): # up to n=15 didn't find any... hmm..
             #    found[code] = found[prev]
@@ -176,15 +191,16 @@ def unique(codes):
             #print("/", end="")
             if code.n < 10 and code.k == prev.k and code.get_isomorphism(prev): # slooooow
                 found[code] = found[prev]
-                print("dup")
+                print("i.", end="", flush=True)
                 break
         else:
             found[code] = code # i am the representative 
             yield code
-    print("found:", len(set(found.values())), "of", len(set(found.keys())))
+    print("\nfound:", len(set(found.values())), "of", len(set(found.keys())))
 
 
 def main_css():
+    min_d = argv.get("min_d", 3)
     #n = argv.get("n", 19)
     #for n in all_primes(100):
     for idx in range(2, argv.get("idx", 11)):
@@ -193,12 +209,12 @@ def main_css():
             continue
         #if n%4 == 3:
         #codes = list(all_cyclic_css(n))
-        for code in unique(all_cyclic_css(n)):
+        for code in unique(all_cyclic_css(n), min_d):
             code = code.to_css()
             code.bz_distance()
             code = code.to_qcode()
             print(code.cssname, "*" if code.is_selfdual() else " ")
-            if argv.db:
+            if argv.store_db:
                 from qumba import db
                 db.add(code)
         print()
@@ -230,7 +246,7 @@ def all_cyclic_sp(n, dmin):
             H = Matrix(rows)
             if (H*space.F*H.t).sum()==0:
                 H = H.linear_independent()
-                code = QCode(H)
+                code = QCode(H, cyclic=True)
                 yield code
                 #print(H)
                 #print()
@@ -248,7 +264,7 @@ def main_gf4():
         H = code.H
         rws = [get_weight(h) for h in H.A]
         if gf4_linear:
-            assert code.is_gf4_linear()
+            assert code.is_gf4()
         tgt = code.apply_perm([(i+1)%n for i in range(n)])
         assert tgt.is_equiv(code)
         if code.k==0:
@@ -271,7 +287,7 @@ def main_gf4():
             code.d = distance_meetup(code, verbose=False)
         print(code, set(rws), 
             "*" if sd else "", 
-            "gf4" if code.is_gf4_linear() else "")
+            "gf4" if code.is_gf4() else "")
         #if code.k > 1:
         #    distance_z3_lb(code, 5, verbose=True)
         if argv.show:
@@ -320,7 +336,7 @@ Z.Z..ZZ
 
 def test_513():
     code = construct.get_513()
-    assert code.is_gf4_linear()
+    assert code.is_gf4()
 
 
 def test_golay():
@@ -334,7 +350,7 @@ def test_golay():
         print(code)
 
         print(code.longstr())
-        assert code.is_gf4_linear()
+        assert code.is_gf4()
         assert code.is_selfdual()
     
         tgt = code.apply_perm([(i+1)%n for i in range(n)])
@@ -514,35 +530,40 @@ def all_cyclic(n):
         H = linear_independent(H) # bottleneck
         if len(H) == n:
             continue # stabilizer states
-        code = QCode(H)
+        code = QCode(H, cyclic=True)
         code.cyclic_gens = (f, g, h)
         yield code
     
 
 def main():
     n = argv.get("n", 7)
+    min_d = argv.get("min_d", 3)
     print("all_cyclic", n)
     params = argv.params
     count = 0
-    for code in all_cyclic(n):
-        if code.k:
-            code.d = code.distance("z3")
-            if code.d <= 2:
-                continue
-            count += 1
-            if (code.n, code.k, code.d) == params:
+    for code in unique(all_cyclic(n), min_d):
+        if code.k == 0:
+            continue
+        #code.d = code.distance("z3")
+        #if code.d <= 2:
+        #    continue
+        count += 1
+        if (code.n, code.k, code.d) == params:
+            print()
+            print(code, 'gf4' if code.is_gf4() else "")
+            #print(code.longstr())
+            print(strop(code.H))
+            print()
+
+        else:
+            #print(code, "+" if sum(code.cyclic_gens[1])==0 else " ", end=" ", flush=True)
+            print(str(code) + ( "css" if code.is_css() else 
+                ('gf4' if code.is_gf4() else "   ")), end = "", flush=True)
+            if count % 8 == 0:
                 print()
-                print(code, 'gf4' if code.is_gf4_linear() else "")
-                #print(code.longstr())
-                print(strop(code.H))
-                print()
-    
-            else:
-                #print(code, "+" if sum(code.cyclic_gens[1])==0 else " ", end=" ", flush=True)
-                print(code, "css" if code.is_css() else " ", 
-                    'gf4' if code.is_gf4_linear() else " ", end = "", flush=True)
-                if count % 8 == 0:
-                    print()
+        if argv.store_db:
+            from qumba import db
+            db.add(code)
     print()
 
 
@@ -570,7 +591,7 @@ def find_prime():
             if code.k == 0:
                 continue
             code.distance("z3")
-            gf4 = code.is_gf4_linear()
+            gf4 = code.is_gf4()
             print("found", ''.join(bits), code, 'gf4' if gf4 else '')
             if gf4:
                 break
@@ -651,7 +672,7 @@ def get_code(spec=None):
         ZZZ.Z.Z.ZZZ.ZXXZ.
         .ZZZ.Z.Z.ZZZ.ZXXZ
         Z.ZZZ.Z.Z.ZZZ.ZXX
-        """)
+        """, d=7)
 
     elif spec == (17,1,7,1): # GF4 linear
         # [[17,1,7]]
@@ -672,7 +693,7 @@ def get_code(spec=None):
         ..Z.....Z..ZZXXZZ
         Z..Z.....Z..ZZXXZ
         ZZ..Z.....Z..ZZXX
-        """)
+        """, d=7)
 
     elif spec == (29,1,9):
         # [[29,1,9]]
@@ -705,10 +726,10 @@ def get_code(spec=None):
         XXZZ...Y.Y...Y...Y...Y.Y...ZZ
         ZXXZZ...Y.Y...Y...Y...Y.Y...Z
         ZZXXZZ...Y.Y...Y...Y...Y.Y...
-        """)
+        """, d=9)
 
     else:
-        print("no code specified")
+        assert 0, "no code specified"
 
     return code
 
@@ -720,6 +741,10 @@ def find_gates():
     print(code)
     space = code.space
     n = code.n
+
+    if argv.store_db:
+        from qumba import db
+        db.add(code)
 
     if 0:
         found = []
@@ -747,22 +772,30 @@ def find_gates():
             found.append(M)
         print("local cliffords:", len(found))
 
+    search_qr(code)
+
+
+def search_qr(code):
+
+    n = code.n
+    space = code.space
+
     perm = {0:0}
     for i in range(1,n):
         perm[i] = (i*3)%n
     assert len(perm) == n
     perm = Perm(perm, list(range(n)))
-    print(perm)
+    #print(perm)
 
     G = Group.dihedral(n)
-    print(len(G))
+    #print(len(G))
 
     H = Group.generate([perm])
-    print(len(H))
+    #print(len(H))
 
-    for h in H:
-        print(int(h in G), end=" ")
-    print()
+    #for h in H:
+        #print(int(h in G), end=" ")
+    #print()
 
     #return
 
@@ -782,19 +815,27 @@ def find_gates():
         #    found.append(h)
         #    continue
 
-        print("?", end="")
+        print("?", end="", flush=True)
         for M in find_local_cliffords(code, dode):
-            print("/")
+            print("y", end=" ", flush=True)
             eode = M*dode
             assert eode.is_equiv(code)
             L = eode.get_logical(code)
             logical.append(L)
             break
+        else:
+            print("n", end=" ", flush=True)
+            continue
+
+        if len(mulclose(logical)) == 6:
+            break
 
     #K = mulclose(found)
     #print(len(K))
 
-    print(len(mulclose(logical)))
+    print()
+    print("|G| =", len(mulclose(logical)))
+    print()
     
 
 def gen_group():
@@ -903,10 +944,12 @@ def find_residues():
 
         code = build_qr_code(n)
         print(n, n%4, n%8, code, end=" ")
-        if code is not None:
-            print("gf4" if code.is_gf4_linear() else " ")
-        else:
+        if code is None:
             print()
+            continue
+
+        print("gf4" if code.is_gf4() else " ")
+        search_qr(code)
 
 
 def find_qr_distance():
@@ -1061,7 +1104,7 @@ def find_cyclic():
         if code.d > 2:
             print(strop(h0), code,
                 #"css" if code.is_css() else "   ", 
-                'gf4' if code.is_gf4_linear() else "   ")
+                'gf4' if code.is_gf4() else "   ")
 
         #break
 
@@ -1162,7 +1205,7 @@ def test_cyclotomic():
 
         eode = space.get_perm(rotate)*dode
         print("cyclic:", eode.is_equiv(dode))
-        print("gf4:", dode.is_gf4_linear())
+        print("gf4:", dode.is_gf4())
 
         for g in find_local_cliffords(code, dode, constant=True):
             eode = g*dode

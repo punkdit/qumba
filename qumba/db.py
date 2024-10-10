@@ -47,9 +47,26 @@ def add(code, force=False):
     print("qumba.db.add: %s added." % str(code))
 
 
-def get(name, **attrs):
+def delete(code):
+    ichar = "I"
+    sep = " "
+    data = {
+        #"name" : str(code).replace(" ", ""), # nah..
+        "name" : str(code),
+        "H" : strop(code.H, ichar, sep),
+        "T" : strop(code.T, ichar, sep),
+        "L" : strop(code.L, ichar, sep),
+        "n" : code.n,
+        "k" : code.k,
+    }
+    print("qumba.db.delete:", code)
+    res = codes.delete_one(data)
+    print(res)
+
+
+def get(**attrs):
     from qumba.qcode import QCode
-    data = {"name" : name}
+    data = {}
     data.update(attrs)
     cursor = codes.find(data)
     for data in cursor:
@@ -68,27 +85,62 @@ def get(name, **attrs):
         for k,v in data.items():
             if k not in list("HTL"):
                 attrs[k] = v
+        print("qumba.db.get:", attrs)
         code = QCode.fromstr(
             data["H"],
             data.get("T"),
             data.get("L"),
             **attrs)
         yield code
-        
+
+
+def get_codes():
+    name = argv.name
+    n = argv.n
+    k = argv.k
+    d = argv.d
+    ns = {}
+    for attr in "name n k d css gf4 cyclic sd desc".split():
+        value = getattr(argv, attr)
+        if type(value) is list:
+            value = str(value)
+        if value is not None:
+            ns[attr] = value
+    if not ns:
+        return
+    for code in get(**ns):
+        yield code
+
 
 def query():
-    name = argv.next()
-    for code in get(name):
-        print(code, code._id)
+    for code in get_codes():
+        print(code, "_id=%s"%code._id)
+
+        if argv.delete:
+            delete(code)
 
 
 def test():
     from qumba import construct 
 
     code = construct.get_513()
-    #code = construct.get_412()
-
     add(code)
+
+    code = construct.get_412()
+    add(code)
+
+
+def load_codetables():
+    from qumba.qcode import QCode
+    for code in QCode.load_codetables():
+        if code.k == 0:
+            continue
+        if code.d_lower_bound < 3:
+            continue
+        code.is_css()
+        code.is_gf4()
+        add(code)
+        #delete(code)
 
 
 def dump():
@@ -98,7 +150,7 @@ def dump():
 
 
 def drop():
-    #assert 0, "no"
+    assert 0, "no"
     codes.drop()
     
 

@@ -482,6 +482,9 @@ def find_isomorphisms(code, dode=None):
     if code.n != dode.n or code.k != dode.k:
         return
 
+    if code.d is not None and dode.d is not None and code.d != dode.d:
+        return
+
     n = code.n
     nn = 2*n
     m = code.m
@@ -548,6 +551,9 @@ def find_isomorphisms_css(code, dode=None):
         dode = code
 
     if code.n != dode.n or code.k != dode.k:
+        return
+
+    if code.d is not None and dode.d is not None and code.d != dode.d:
         return
 
     code = code.to_css()
@@ -760,7 +766,7 @@ def main_autos_lc():
 
     print(code)
     print(code.longstr())
-    assert code.is_gf4_linear()
+    assert code.is_gf4()
 
 #    N, perms = code.get_autos()
 #
@@ -2289,9 +2295,12 @@ def test_equivariant():
         X = G.tautological_action()
         Xs = [X]
 
-    else:
+    elif argv.alternating:
         m = argv.get("m", 4)
         G = Group.alternating(m)
+
+    else:
+        return
 
     n = argv.get("n", n or len(G))
     print("|G| =", len(G))

@@ -195,6 +195,10 @@ class QCode(object):
         self.desc = desc
         self.attrs = attrs # serialize these attrs
 
+        #if argv.store_db:
+        #    from qumba import db
+        #    db.add(self)
+
     def get_d(self):
         if self.d_lower_bound == self.d_upper_bound:
             return self.d_lower_bound
@@ -278,7 +282,7 @@ class QCode(object):
         L = fromstr(Ls) if Ls is not None else None
         J = fromstr(Js) if Js is not None else None
         if H is None and J is not None:
-            code = QCode.build_gauge(J, T=T, L=L)
+            code = QCode.build_gauge(J, T=T, L=L, check=check, **kw)
         else:
             code = QCode(H, T, L, J, check=check, **kw)
         return code
@@ -633,6 +637,9 @@ class QCode(object):
         W.shape = (n, 2)
         #print(W, W.shape, numpy.min(W))
 
+        if self.d is not None:
+            return
+
         if numpy.min(W) > 0 and self.d_lower_bound<2:
             self.d_lower_bound = 2
 
@@ -927,9 +934,11 @@ class QCode(object):
             n = record['n']
             k = record['k']
             stabs = record["stabs"]
-            code = QCode.fromstr(stabs, d=record["d"])
+            code = QCode.fromstr(stabs, d=record["d"], desc="codetables") 
+            assert code.d is not None, (record["d"], str(code), id(code))
             yield code
 
+    @cache
     def is_css(self):
         "check for transversal CNOT"
         n = self.n
@@ -937,20 +946,28 @@ class QCode(object):
         tgt = src
         for i in range(n):
             tgt = tgt.apply_CNOT(i, n+i)
-        return src.is_equiv(tgt)
+        css = src.is_equiv(tgt)
+        self.attrs["css"] = css
+        return css
 
-    def is_gf4_linear(self):
+    @cache
+    def is_gf4(self):
         "check for transversal SH"
         n = self.n
         tgt = self
         for i in range(n):
             tgt = tgt.apply_H(i)
             tgt = tgt.apply_S(i)
-        return self.is_equiv(tgt)
+        gf4 = self.is_equiv(tgt)
+        self.attrs["gf4"] = gf4
+        return gf4
 
+    @cache
     def is_selfdual(self):
         tgt = self.apply_H()
-        return self.is_equiv(tgt)
+        sd = self.is_equiv(tgt)
+        self.attrs["sd"] = sd
+        return sd
 
     def get_logical(self, other, check=False):
         if check:
