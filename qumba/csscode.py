@@ -633,19 +633,38 @@ class CSSCode(object):
         result = child.stdout.read().decode()
         rval = child.wait()
         assert rval == 0, "child return %s"%rval
-        dx, dz = str(result).split()
+        dz, dx = str(result).split() # argh, swapped !
     
         #print("bz_distance took %.3f seconds" % (time() - t0))
         dx, dz = int(dx), int(dz)
         self.dx, self.dz = dx, dz
         return dx, dz
 
+    @property
+    def d(self):
+        if self.dx and self.dz:
+            return min(self.dx, self.dz)
+
     @cache
-    def to_qcode(self):
+    def to_qcode(self, **attrs):
         dx, dz = self.dx, self.dz
         d = min(dx,dz) if dx and dz else None
         return qcode.QCode.build_css(self.Hx, self.Hz, self.Tx, self.Tz, self.Lx, self.Lz, 
-            dx=self.dx, dz=self.dz, d=d, cssname=str(self))
+            dx=self.dx, dz=self.dz, d=d, css=True, cssname=str(self), **attrs)
+
+    def is_equiv(self, other):
+        assert isinstance(other, CSSCode)
+        if self.n != other.n or self.mx != other.mx or self.mz != other.mz:
+            return False
+        if self.d is not None and other.d is not None and self.d != other.d:
+            return False
+        A = solve.solve(self.Hx.transpose(), other.Hx.transpose())
+        if A is None:
+            return False
+        A = solve.solve(self.Hz.transpose(), other.Hz.transpose())
+        if A is None:
+            return False
+        return True
 
     def __repr__(self):
         Lx = len(self.Lx) if self.Lx is not None else None
@@ -1038,12 +1057,20 @@ def distance_meetup(code, max_m=None, verbose=False):
     assert isinstance(code, CSSCode)
     lz = logop_meetup(code.Hx, code.Lx, max_m, verbose)
     lx = logop_meetup(code.Hz, code.Lz, max_m, verbose)
-    w = None
+    dx = dz = None
     if lz is not None:
-        w = lz.sum()
+        dz = int(lz.sum())
+        code.dz = dz
     if lx is not None:
-        w = min(w or code.n, lx.sum())
-    return w
+        dx = int(lx.sum())
+        code.dx = dx
+    if dx and dz:
+        #assert code.bz_distance() == (dx, dz)
+        return min(dx, dz)
+    elif dx:
+        return dx
+    elif dz:
+        return dz
 
 
 def logop_meetup(Hx, Lx, max_m=None, verbose=False):

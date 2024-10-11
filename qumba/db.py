@@ -100,7 +100,7 @@ def get_codes():
     k = argv.k
     d = argv.d
     ns = {}
-    for attr in "name n k d css gf4 cyclic sd desc".split():
+    for attr in "name n k d css dx dz gf4 cyclic sd desc homogeneous".split():
         value = getattr(argv, attr)
         if type(value) is list:
             value = str(value)
@@ -108,8 +108,16 @@ def get_codes():
             ns[attr] = value
     if not ns:
         return
+    print("query:", ns)
     for code in get(**ns):
         yield code
+
+
+def check(code):
+    print("check:", code)
+    print("\tgf4:", code.is_gf4())
+    print("\tcss:", code.is_css())
+    print("\tselfdual:", code.is_selfdual())
 
 
 def query():
@@ -118,6 +126,9 @@ def query():
 
         if argv.delete:
             delete(code)
+
+        if argv.check:
+            check(code)
 
 
 def test():

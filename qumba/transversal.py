@@ -13,6 +13,7 @@ import z3
 from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, ForAll
 
 from qumba.qcode import QCode, SymplecticSpace, Matrix, fromstr, shortstr, strop
+from qumba import csscode
 from qumba.action import mulclose, Group, Perm, mulclose_find
 from qumba.util import allperms
 from qumba import equ
@@ -2100,8 +2101,6 @@ def test_braid():
 
 
 def find_equivariant(X):
-    from qumba.csscode import CSSCode, distance_z3
-
     G = X.G
     n = len(X)
     print("find_equivariant", n)
@@ -2132,9 +2131,11 @@ def find_equivariant(X):
     Add(c==0)
 
     weight = lambda h : Sum([If(h[i].get(),1,0) for i in range(1, n)])+1
-    row_weight = 10
-    Add(weight(hx) < row_weight)
-    Add(weight(hz) < row_weight)
+    row_weight = argv.get("row_weight")
+    print("row_weight:", row_weight)
+    if row_weight is not None:
+        Add(weight(hx) <= row_weight)
+        Add(weight(hz) <= row_weight)
 
     while 1:
         result = solver.check()
@@ -2163,7 +2164,7 @@ def find_equivariant(X):
             Add(hz != _hz)
         Hz = Hz.linear_independent()
     
-        code = CSSCode(Hx=Hx.A, Hz=Hz.A)
+        code = csscode.CSSCode(Hx=Hx.A, Hz=Hz.A)
         if code.k == 0:
             continue
 
@@ -2182,10 +2183,65 @@ def prune(Xs):
         i += 1
 
 
+def isomorphic_css(code, dode):
+    for iso in find_isomorphisms_css(code, dode):
+        return True
+    return False
+
+def isomorphic(code, dode):
+    for iso in find_isomorphisms(code, dode):
+        return True
+    return False
+
+
+def unique_css(codes, min_d=3, found=None):
+    if found is None:
+        found = {} # map each code to a unique representative
+
+    for code in codes:
+
+        if code.n < 40:
+            #print("/", end="", flush=True)
+            dx, dz = code.bz_distance()
+            #print("\\", end="", flush=True)
+            if code.d < min_d:
+                continue
+
+        else:
+            w = csscode.distance_meetup(code, max_m=2)
+            if w is not None and w < min_d:
+                continue
+
+        #if code.d is not None and code.d < min_d:
+        #    print("d.", end="", flush=True)
+        #    continue
+        #print("\n", code.d, min_d)
+        for prev in list(found.keys()):
+            if code.is_equiv(prev):
+                found[code] = found[prev]
+                print("e.", end="", flush=True)
+                break
+            if code.get_dual().is_equiv(prev):
+                found[code] = found[prev]
+                print("f.", end="", flush=True)
+                break
+            #print("i?", end='', flush=True)
+            #if isomorphic_css(code, prev):
+            #    found[code] = found[prev]
+            #    print("y", end="", flush=True)
+            #    break
+            #print("n", end="", flush=True)
+        else:
+            found[code] = code # i am the representative
+            yield code
+    print("\nfound:", len(set(found.values())), "of", len(set(found.keys())))
+
+
+
+
 def test_equivariant():
     # find equivariant CSS codes
 
-    from qumba.csscode import CSSCode, distance_z3
 
     Hs = None
     Xs = None
@@ -2195,22 +2251,28 @@ def test_equivariant():
     # gap> G := AtlasGroup("L2(11)");
     # Group([ (2,10)(3,4)(5,9)(6,7), (1,2,11)(3,5,10)(6,8,9) ])
 
+    gname = None
+
     if argv.cyclic:
         n = argv.get("n", 10)
         G = Group.cyclic(n)
+        gname = "C_%d"%n
 
     elif argv.dihedral:
         n = argv.get("n", 10)
         G = Group.dihedral(n)
+        gname = "D_%d"%n
 
     elif argv.symmetric:
         m = argv.get("m", 4)
         G = Group.symmetric(m)
+        gname = "S_%d"%m
 
     elif argv.coxeter_bc:
         m = argv.get("m", 3)
         G = Group.coxeter_bc(m)
         n = len(G)
+        gname = "CoxeterBC_%d"%m
 
     elif argv.GL32:
         n = 7
@@ -2219,6 +2281,7 @@ def test_equivariant():
         b = Perm.fromcycles([(1,6,3), (5,), (2,4,7)], items)
         G = Group.generate([a,b])
         assert len(G) == 168
+        gname = "GL32"
 
     elif argv.L2_8:
         n = 9
@@ -2272,6 +2335,7 @@ def test_equivariant():
         assert len(G) == 7920
         X = G.tautological_action()
         Xs = [X]
+        gname = "M11"
 
     elif argv.M20:
         n = 20
@@ -2284,6 +2348,7 @@ def test_equivariant():
         assert len(G) == 960
         X = G.tautological_action()
         Xs = [X]
+        gname = "M20"
 
     elif argv.M21:
         n = 21
@@ -2294,10 +2359,12 @@ def test_equivariant():
         assert len(G) == 20160
         X = G.tautological_action()
         Xs = [X]
+        gname = "M21"
 
     elif argv.alternating:
         m = argv.get("m", 4)
         G = Group.alternating(m)
+        gname = "A_%d"%m
 
     else:
         return
@@ -2326,21 +2393,19 @@ def test_equivariant():
 #        X = G.action_subgroup(H)
     show = argv.show
 
+    found = {}
     for X in Xs:
-        for code in find_equivariant(X):
-            d = distance_z3(code)
-            if d < 3:
-                continue
-            print("[[%d, %d, %d]]"%(code.n, code.k, d))
-            #print(code)
-            #print("distance =", d)
-            #print(code.longstr())
-            if (code.n, code.k, d) == show:
-                print("Hx =")
-                print(code.Hx)
-                print("Hz =")
-                print(code.Hz)
+        count = 0
+        for code in unique_css(find_equivariant(X), found=found):
+            print(code, end="\t")
+            count += 1
+            if count % 6 == 0:
                 print()
+            if argv.store_db:
+                from qumba.db import add
+                code = code.to_qcode(homogeneous=True, G=gname)
+                add(code)
+        #print("found:", count)
     
 
 def find_css():
