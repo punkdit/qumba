@@ -84,6 +84,24 @@ def all_cyclic_gf4(n, dmin=1, gf4_linear=True):
         #print(code.longstr())
 
 
+def main_multi():
+    
+    p, l = 5, 25
+
+    F = GF(2)
+    z2 = F.gen()
+    R = PolynomialRing(F, 2, "x")
+    x0, x1 = R.gens()
+
+    poly = (x0**p - 1) * (x1**l - 1)
+    A = factor(poly)
+
+    factors = [a for (a,j) in A]
+    print(factors)
+    N = len(factors)
+    print("factors:", N)
+
+
 def all_cyclic_gf2_poly(n):
     assert n%2, n
     F = GF(2)
@@ -159,6 +177,7 @@ def unique(codes, min_d=3):
         for iso in find_isomorphisms_css(code, dode):
             return True
         return False
+
     def isomorphic(code, dode):
         for iso in find_isomorphisms(code, dode):
             return True
@@ -775,29 +794,52 @@ def find_gates():
     search_qr(code)
 
 
+def find_residues():
+    for n in all_primes(200):
+        if n < 5:
+            continue
+
+        code = build_qr_code(n)
+        if code is None:
+            #print()
+            continue
+
+        print(n, n%4, n%8, code, end=" ")
+        print("gf4" if code.is_gf4() else " ", flush=True)
+        if n%8 in [1, 5]:
+            search_qr(code)
+
+
 def search_qr(code):
 
     n = code.n
     space = code.space
 
-    perm = {0:0}
-    for i in range(1,n):
-        perm[i] = (i*3)%n
-    assert len(perm) == n
-    perm = Perm(perm, list(range(n)))
-    #print(perm)
-
     G = Group.dihedral(n)
     #print(len(G))
 
-    H = Group.generate([perm])
-    #print(len(H))
+    for a in range(2, n): # look for generator
+        perm = {0:0}
+        for i in range(1,n):
+            perm[i] = (i*a)%n
+        assert len(perm) == n
+        perm = Perm(perm, list(range(n)))
+        #print(perm)
+    
+        H = Group.generate([perm])
+        #print(len(H))
+        if len(H) == n-1:
+            break
+    else:
+        assert 0
 
     #for h in H:
         #print(int(h in G), end=" ")
     #print()
 
     #return
+
+    #H, S = space.H, space.S
 
     get_perm = lambda perm : space.get_perm([perm[i] for i in range(n)])
 
@@ -807,31 +849,34 @@ def search_qr(code):
 
     found = list(G)
     logical = []
-    for h in H:
+    pattern = []
+    #for h in H:
+    for k in range(0, n-1):
+        h = perm ** k
         sigma = get_perm(h)
         dode = sigma*code
         equiv = dode.is_equiv(code)
-        #if equiv:
-        #    found.append(h)
-        #    continue
-
-        print("?", end="", flush=True)
-        for M in find_local_cliffords(code, dode):
-            print("y", end=" ", flush=True)
-            eode = M*dode
-            assert eode.is_equiv(code)
-            L = eode.get_logical(code)
+        if equiv:
+            L = dode.get_logical(code)
+            pattern.append(".")
+            #print(L)
             logical.append(L)
-            break
-        else:
-            print("n", end=" ", flush=True)
-            continue
+            #continue
 
-        if len(mulclose(logical)) == 6:
-            break
+        for op in "SH":
+            M = reduce(mul, [getattr(space, op)(i) for i in range(n)])
+            eode = M*dode
+            if eode.is_equiv(code):
+                pattern.append(op)
+                L = eode.get_logical(code)
+                #print(L)
+                logical.append(L)
+        #pattern.append("*")
 
-    #K = mulclose(found)
-    #print(len(K))
+        #if len(mulclose(logical)) == 6:
+        #    break
+
+    print(''.join(pattern))
 
     print()
     print("|G| =", len(mulclose(logical)))
@@ -937,21 +982,6 @@ def build_qr_code(n):
     return code
 
     
-def find_residues():
-    for n in all_primes(200):
-        if n < 5:
-            continue
-
-        code = build_qr_code(n)
-        print(n, n%4, n%8, code, end=" ")
-        if code is None:
-            print()
-            continue
-
-        print("gf4" if code.is_gf4() else " ")
-        search_qr(code)
-
-
 def find_qr_distance():
     from qumba.unwrap import unwrap
     for n in all_primes(100):

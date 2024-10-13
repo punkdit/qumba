@@ -100,7 +100,7 @@ def get_codes():
     k = argv.k
     d = argv.d
     ns = {}
-    for attr in "name n k d css dx dz gf4 cyclic sd desc homogeneous".split():
+    for attr in "name n k d css dx dz gf4 cyclic sd desc homogeneous d_lower_bound d_upper_bound".split():
         value = getattr(argv, attr)
         if type(value) is list:
             value = str(value)
@@ -109,8 +109,12 @@ def get_codes():
     if not ns:
         return
     print("query:", ns)
-    for code in get(**ns):
-        yield code
+    #for code in get(**ns):
+    #    yield code
+
+    codes = list(get(**ns))
+    codes.sort(key = lambda code : (code.k, code.d or 0))
+    return codes
 
 
 def check(code):
@@ -120,15 +124,29 @@ def check(code):
     print("\tselfdual:", code.is_selfdual())
 
 
+
+
 def query():
     for code in get_codes():
         print(code, "_id=%s"%code._id)
+
+        if argv.show:
+            print(code.longstr())
 
         if argv.delete:
             delete(code)
 
         if argv.check:
             check(code)
+
+        if argv.distance:
+            if code.css:
+                code = code.to_css()
+                dx, dz = code.bz_distance()
+                print(dx, dz)
+
+        if argv.update:
+            update(code)
 
 
 def test():
