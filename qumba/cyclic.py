@@ -49,7 +49,7 @@ def all_cyclic_gf4(n, dmin=1, gf4_linear=True):
 
     factors = [a for (a,j) in A]
     N = len(factors)
-    #print("factors:", N)
+    print("factors:", N)
 
     scalars = [1, z2, z2+1] if gf4_linear else [1]
 
@@ -287,6 +287,7 @@ def main_gf4():
         tgt = code.apply_perm([(i+1)%n for i in range(n)])
         assert tgt.is_equiv(code)
         if code.k==0:
+            print(code)
             continue
         if sd and argv.distance:
             #print(strop(code.H))
@@ -298,12 +299,12 @@ def main_gf4():
         elif argv.distance:
             distance_z3(code, verbose=True)
         elif argv.distance_meetup:
-            print()
-            d = distance_meetup(code, max_m=3, verbose=False)
-            print("distance_meetup(3):", d)
-            d = distance_meetup(code, max_m=4, verbose=False)
-            print("distance_meetup(4):", d)
-            code.d = distance_meetup(code, verbose=False)
+            #print()
+            #d = distance_meetup(code, max_m=3, verbose=False)
+            #print("distance_meetup(3):", d)
+            #d = distance_meetup(code, max_m=4, verbose=False)
+            #print("distance_meetup(4):", d)
+            code.d = distance_meetup(code, verbose=True)
         print(code, set(rws), 
             "*" if sd else "", 
             "gf4" if code.is_gf4() else "")
@@ -313,6 +314,7 @@ def main_gf4():
             print(strop(code.H))
         #print(code.longstr())
         #print()
+        search_qr(code)
         continue
         L = tgt.get_logical(code)
         assert (L**n).is_identity()
@@ -815,7 +817,8 @@ def search_qr(code):
     n = code.n
     space = code.space
 
-    G = Group.dihedral(n)
+    #G = Group.dihedral(n)
+    G = Group.cyclic(n)
     #print(len(G))
 
     for a in range(2, n): # look for generator
