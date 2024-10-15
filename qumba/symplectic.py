@@ -363,6 +363,12 @@ class SymplecticSpace(object):
         G = mulclose(gen)
         return G
 
+    def grassmannian(self, k):
+        from qumba.sp_pascal import grassmannian
+        for U in grassmannian(self.n, k):
+            A = Matrix(U.A)
+            yield A
+
 
 
 class Building(object):

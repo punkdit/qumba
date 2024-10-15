@@ -19,6 +19,7 @@ from qumba.util import allperms, all_subsets
 from qumba import equ
 from qumba import construct
 from qumba import autos
+from qumba.smap import SMap
 from qumba.unwrap import unwrap
 from qumba.argv import argv
 
@@ -60,6 +61,37 @@ def algclose(gen, verbose=False, maxsize=None):
     return els
 
 
+class Algebra(object):
+    def __init__(self, items):
+        items = list(items)
+        items.sort(key = lambda a:(str(a).count('1'), a))
+        self.items = tuple(items)
+
+    def __eq__(self, other):
+        return self.items == other.items
+
+    def __hash__(self):
+        return hash(self.items)
+
+    def __len__(self):
+        return len(self.items)
+
+    def __getitem__(self, idx):
+        return self.items[idx]
+
+    @classmethod
+    def generate(cls, gen):
+        A = algclose(gen)
+        return cls(A)
+
+    def dump(algebra):
+        smap = SMap()
+        for i,a in enumerate(algebra):
+            smap[0, 4*i] = str(a)
+        print(smap)
+        print()
+
+
 
 def main_1():
 
@@ -75,45 +107,71 @@ def main_1():
     algebra = span(G)
     assert len(algebra) == 16
 
-    found = set()
-    for gen in all_subsets(G):
-        if not gen:
-            continue
-#        H = algclose(gen)
-#        H = list(H)
-#        H.sort()
-#        H = tuple(H)
-        algebra = algclose(gen)
-        algebra = list(algebra)
-        algebra.sort()
-        algebra = tuple(algebra)
-        found.add(algebra)
-        #print(len(H), len(algebra))
+    print("algebra:")
+    Algebra(algebra).dump()
+    #return
 
-    print("found:", len(found))
+    count = 0
+    found = set()
+    for gen in all_subsets(algebra):
+        count += 1
+        if algebra[0] not in gen:
+            continue
+
+        if I not in gen:
+            continue
+
+#        algebra = algclose(gen)
+#        algebra = list(algebra)
+#        algebra = tuple(algebra)
+#        found.add(algebra)
+        A = Algebra.generate(gen)
+        found.add(A)
+
+        #if len(found) > 2:
+        #    break
+
+    print("found:", len(found), "count:", count)
+    found = list(found)
+    found.sort(key = lambda A : (len(A), tuple(A)))
     for A in found:
         print("|A| = ", len(A))
-        for a in A:
-            print(a)
-            print()
+        A.dump()
 
-class Algebra(object):
-    def __init__(self, items):
-        items = list(items)
-        items.sort()
-        self.items = tuple(items)
-    def __eq__(self, other):
-        return self.items == other.items
-    def __hash__(self):
-        return hash(self.items)
-    def __len__(self):
-        return len(self.items)
-    def __getitem__(self, idx):
-        return self.items[idx]
-    @classmethod
-    def generate(cls, gen):
-        A = algclose(gen)
-        return cls(A)
+        for a in A:
+          for b in A:
+            assert a+b in A
+            assert a*b in A
+
+    #return
+
+    #from qumba.sp_pascal import grassmannian
+
+    m, n = 2, 3
+    space = SymplecticSpace(n)
+
+    sigs = set()
+    for C in space.grassmannian(m):
+        C2 = C.reshape(m, n, 2)
+        Ct = C.t
+        sig = []
+        for algebra in found:
+            for a in algebra:
+                D = C2*a
+                D = D.reshape(m, 2*n)
+                u = Ct.solve(D.t)
+                if u is None:
+                    sig.append(".")
+                    break
+            else:
+                sig.append("*")
+        sigs.add(''.join(sig))
+
+    sigs = list(sigs)
+    sigs.sort()
+    for sig in sigs:
+        print(sig)
+    
 
 
 def main():
