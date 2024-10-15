@@ -39,7 +39,7 @@ def span(G):
     return algebra
 
 
-def algclose(gen, verbose=False, maxsize=None):
+def generate(gen, verbose=False, maxsize=None):
     els = set(gen)
     bdy = list(els)
     changed = True
@@ -81,7 +81,7 @@ class Algebra(object):
 
     @classmethod
     def generate(cls, gen):
-        A = algclose(gen)
+        A = generate(gen)
         return cls(A)
 
     def dump(algebra):
@@ -111,6 +111,9 @@ def main_1():
     Algebra(algebra).dump()
     #return
 
+    for g in G:
+        assert g*~g == I
+
     count = 0
     found = set()
     for gen in all_subsets(algebra):
@@ -121,10 +124,6 @@ def main_1():
         if I not in gen:
             continue
 
-#        algebra = algclose(gen)
-#        algebra = list(algebra)
-#        algebra = tuple(algebra)
-#        found.add(algebra)
         A = Algebra.generate(gen)
         found.add(A)
 
@@ -143,11 +142,17 @@ def main_1():
             assert a+b in A
             assert a*b in A
 
-    #return
+    for A in found:
+        sig = ['.']*len(found)
+        for g in G:
+            B = Algebra([g*a*~g for a in A])
+            i = found.index(B)
+            sig[i] = "*"
+        print(''.join(sig))
 
-    #from qumba.sp_pascal import grassmannian
+    return
 
-    m, n = 2, 3
+    m, n = 3, 5
     space = SymplecticSpace(n)
 
     sigs = set()

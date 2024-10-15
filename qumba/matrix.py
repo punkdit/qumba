@@ -66,7 +66,6 @@ class Matrix(object):
             A = A.astype(scalar) # will always make a copy
         else:
             raise TypeError( "whats this: %s"%(type(A)) )
-        #A = flatten(A)
         if shape is not None:
             A.shape = shape
         self.A = A
@@ -290,6 +289,7 @@ class Matrix(object):
     def pseudo_inverse(self):
         A = pseudo_inverse(self.A)
         return Matrix(A)
+    __invert__ = pseudo_inverse
 
     def solve(self, other):
         A = solve.solve(self.A, other.A)
