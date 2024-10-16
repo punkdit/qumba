@@ -12,7 +12,8 @@ import numpy
 import z3
 from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, ForAll
 
-from qumba.qcode import QCode, SymplecticSpace, Matrix, fromstr, shortstr, strop
+from qumba.qcode import QCode, SymplecticSpace, fromstr, shortstr, strop
+from qumba.matrix import Matrix, scalar
 from qumba import csscode
 from qumba.action import mulclose, Group, Perm, mulclose_find
 from qumba.util import allperms
@@ -2171,6 +2172,35 @@ def find_equivariant(X):
         yield code
 
 
+def search_equivarant(X):
+    G = X.G
+    n = len(X)
+    print("search_equivarant", n)
+
+    perms = []
+    for g in G:
+        send = X(g)
+        items = send.items # Coset's
+        lookup = dict((v,k) for (k,v) in enumerate(items))
+        send = [lookup[send[items[i]]] for i in range(len(items))]
+        U = Matrix.perm(send)
+        perms.append(U)
+    G = perms
+
+    irreps = []
+    v = [0]*n
+    v[0] = 1
+    v = Matrix(v)
+    orbit = []
+    for g in G:
+        vg = v*g
+        orbit.append(vg)
+        print(vg)
+
+    return []
+
+
+
 def prune(Xs):
     i = 0
     while i < len(Xs):
@@ -2239,40 +2269,31 @@ def unique_css(codes, min_d=3, found=None):
 
 
 
-def test_equivariant():
-    # find equivariant CSS codes
-
-
-    Hs = None
-    Xs = None
-    n = None
-
+def get_group():
     # gap> LoadPackage( "AtlasRep", false );
     # gap> G := AtlasGroup("L2(11)");
     # Group([ (2,10)(3,4)(5,9)(6,7), (1,2,11)(3,5,10)(6,8,9) ])
 
-    gname = None
-
     if argv.cyclic:
         n = argv.get("n", 10)
         G = Group.cyclic(n)
-        gname = "C_%d"%n
+        G.name = "C_%d"%n
 
     elif argv.dihedral:
         n = argv.get("n", 10)
         G = Group.dihedral(n)
-        gname = "D_%d"%n
+        G.name = "D_%d"%n
 
     elif argv.symmetric:
         m = argv.get("m", 4)
         G = Group.symmetric(m)
-        gname = "S_%d"%m
+        G.name = "S_%d"%m
 
     elif argv.coxeter_bc:
         m = argv.get("m", 3)
         G = Group.coxeter_bc(m)
         n = len(G)
-        gname = "CoxeterBC_%d"%m
+        G.name = "CoxeterBC_%d"%m
 
     elif argv.GL32:
         n = 7
@@ -2281,7 +2302,7 @@ def test_equivariant():
         b = Perm.fromcycles([(1,6,3), (5,), (2,4,7)], items)
         G = Group.generate([a,b])
         assert len(G) == 168
-        gname = "GL32"
+        G.name = "GL32"
 
     elif argv.L2_8:
         n = 9
@@ -2335,7 +2356,7 @@ def test_equivariant():
         assert len(G) == 7920
         X = G.tautological_action()
         Xs = [X]
-        gname = "M11"
+        G.name = "M11"
 
     elif argv.M20:
         n = 20
@@ -2348,7 +2369,7 @@ def test_equivariant():
         assert len(G) == 960
         X = G.tautological_action()
         Xs = [X]
-        gname = "M20"
+        G.name = "M20"
 
     elif argv.M21:
         n = 21
@@ -2359,15 +2380,97 @@ def test_equivariant():
         assert len(G) == 20160
         X = G.tautological_action()
         Xs = [X]
-        gname = "M21"
+        G.name = "M21"
 
     elif argv.alternating:
         m = argv.get("m", 4)
         G = Group.alternating(m)
-        gname = "A_%d"%m
+        G.name = "A_%d"%m
+
+        for g in G:
+          for h in G:
+            if g*h != h*g:
+                print("non-abelian")
+                break
+          else:
+            continue
+          break
 
     else:
         return
+
+    return G
+
+
+def search_equivariant():
+    # find equivariant CSS codes
+    Hs = None
+    Xs = None
+    n = None
+
+    G = get_group()
+
+    n = argv.get("n", n or len(G))
+    print("|G| =", len(G))
+
+    Hs = [H for H in G.conjugacy_subgroups() if len(H)<len(G)]
+    #Hs = [H for H in G.subgroups()]
+    Hs.sort(key = len)
+    print("indexes:", [len(G)//len(H) for H in Hs])
+    Xs = [G.action_subgroup(H) for H in Hs]
+    print("|Xs| =", len(Xs))
+
+    #for X in Xs:
+    #Y = Xs[16]
+
+    for Y in Xs[1:]:
+        Hs = set()
+        for X in Xs:
+            for H in X.hecke(Y):
+                H = H.astype(scalar)
+                H = Matrix(H)
+                H = H.row_reduce()
+                Hs.add(H)
+    
+        Hs = list(Hs)
+        Hs.sort(key = lambda H: (len(str(H)), str(H)))
+
+        n = len(Y)
+        space = SymplecticSpace(n)
+
+        autos = []
+        for g in G:
+            send = Y(g)
+            items = send.items # Coset's
+            lookup = dict((v,k) for (k,v) in enumerate(items))
+            send = [lookup[send[items[i]]] for i in range(len(items))]
+            g = space.P(*send)
+            autos.append(g)
+    
+        for A in Hs:
+          for B in Hs:
+            if (A*B.t).sum() == 0:
+                code = QCode.build_css(A, B)
+                if code.k == 0:
+                    continue
+                if code.d <= 2:
+                    print(".", end='', flush=True)
+                    continue
+                print(code, end='', flush=True)
+                for g in autos:
+                    assert (g*code).is_equiv(code)
+        print()
+
+
+def test_equivariant():
+    # find equivariant CSS codes
+
+
+    Hs = None
+    Xs = None
+    n = None
+
+    G = get_group()
 
     n = argv.get("n", n or len(G))
     print("|G| =", len(G))
@@ -2403,7 +2506,7 @@ def test_equivariant():
                 print()
             if argv.store_db:
                 from qumba.db import add
-                code = code.to_qcode(homogeneous=True, G=gname)
+                code = code.to_qcode(homogeneous=True, G=G.name)
                 add(code)
         #print("found:", count)
     
