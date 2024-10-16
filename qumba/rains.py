@@ -8,12 +8,13 @@ try to implement section "Linear codes" in:
 
 """
 
-from functools import reduce
+from functools import reduce, cache
 from operator import add, matmul, mul
 
 import numpy
 
 from qumba.qcode import QCode, SymplecticSpace, Matrix, fromstr, shortstr, strop
+from qumba.matrix import scalar
 from qumba.action import mulclose, Group, mulclose_find
 from qumba.util import allperms, all_subsets
 from qumba import equ
@@ -130,6 +131,9 @@ def main_1():
         #if len(found) > 2:
         #    break
 
+    J = H
+    conj = lambda a : J*a.t*J
+
     print("found:", len(found), "count:", count)
     found = list(found)
     found.sort(key = lambda A : (len(A), tuple(A)))
@@ -138,9 +142,11 @@ def main_1():
         A.dump()
 
         for a in A:
-          for b in A:
-            assert a+b in A
-            assert a*b in A
+            assert conj(a) in A
+            for b in A:
+                assert a+b in A
+                assert a*b in A
+                assert conj(a*b) == conj(b)*conj(a)
 
     for A in found:
         sig = ['.']*len(found)
@@ -150,13 +156,14 @@ def main_1():
             sig[i] = "*"
         print(''.join(sig))
 
-    return
+    print()
 
-    m, n = 3, 5
+    m, n = 2, 4
     space = SymplecticSpace(n)
 
     sigs = set()
     for C in space.grassmannian(m):
+        C = C * uturn_to_zip(n)
         C2 = C.reshape(m, n, 2)
         Ct = C.t
         sig = []
@@ -170,13 +177,35 @@ def main_1():
                     break
             else:
                 sig.append("*")
+        sig = ''.join(sig)
         sigs.add(''.join(sig))
+
+        if sig == "*......*....":
+            code = QCode(C)
+            print(code)
+            assert code.is_gf4()
+            #print(code.longstr())
+            print(strop(code.H))
+            print()
 
     sigs = list(sigs)
     sigs.sort()
     for sig in sigs:
         print(sig)
     
+
+@cache
+def uturn_to_zip(n):
+    nn = 2*n
+    U = numpy.zeros((nn, nn), dtype=scalar)
+    #print(U)
+    for i in range(n):
+        U[2*i, i] = 1
+        #print(U)
+        U[2*i+1, 2*n-i-1] = 1
+        #print(U)
+    U = Matrix(U)
+    return U.t
 
 
 def main():

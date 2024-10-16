@@ -18,9 +18,9 @@ import numpy
 
 from qumba.matrix import Matrix, pullback
 from qumba.symplectic import symplectic_form
-from qumba.qcode import strop
+from qumba.qcode import strop, QCode
 from qumba.smap import SMap
-from qumba.action import mulclose
+from qumba.action import mulclose, mulclose_names
 from qumba.argv import argv
 from qumba.construct import all_codes
 
@@ -173,6 +173,15 @@ class Symplectic(Relation):
         swap = Symplectic(l.concatenate(r, axis=1).transpose())
         return swap
 
+    def to_qcode(self):
+        H = self.A
+        return QCode(H)
+
+    def get_op(self):
+        code = QCode(self.A)
+        A = code.T
+        k = self.tgt
+        return Symplectic(A[:, :k], A[:, k:])
 
 
 zeros = lambda a,b : Matrix.zeros((a,b))
@@ -420,6 +429,45 @@ def test_symplectic():
     assert _b != _b1
     assert _w != _w1
 
+    gen = [b1, w1, w_*_w, b_*_b]
+    names = mulclose_names(gen, "b w W B".split())
+    assert len(names) == 15 # number of 2-qubit stabilizer states
+
+    r = w1.get_op()
+
+    code = w1.to_qcode()
+    print(code.longstr())
+    T = code.T
+    assert r == Symplectic(T[:, :2], T[:, 2:])
+    assert r in names
+    #print(names[r])
+    assert r == b_*_w
+
+    dode = QCode(T)
+    print()
+    print(dode.longstr())
+
+    return
+
+    print("w1 =")
+    print(w1)
+    print("r =")
+    print(r)
+    q = r.get_op()
+    print("q =")
+    print(q)
+    assert r.get_op() == w1
+
+    M = list(names.keys())
+    for r in M:
+        q = r.get_op()
+        assert q != r, r
+        print(r == q.get_op())
+
+    return
+
+    # ---------- 2 qubits ----------------
+
     swap = Symplectic.get_swap()
     
     assert swap != I@I
@@ -534,7 +582,7 @@ def test_symplectic():
     #print()
     assert str(w_) == "X| "
 
-    #return
+    return
 
     G = mulclose(gen, verbose=True)
     assert len(G) == 720 # Sp(4,2)

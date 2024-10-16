@@ -316,6 +316,7 @@ class QCode(object):
         F = self.space.F # the symplectic form
         R = H * F * H.t
         if R.sum() != 0:
+            print("R =")
             print(shortstr(R))
             assert 0, "not isotropic"
         L = self.get_logops()

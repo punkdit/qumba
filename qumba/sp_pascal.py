@@ -4,6 +4,9 @@
 Pascal triangle for Sp(F_2)
 
 copied from bruhat
+
+Warning: the symplectic structure is the uturn not ziporder !
+
 """
 
 import sys, os
