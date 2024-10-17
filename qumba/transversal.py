@@ -2172,7 +2172,7 @@ def find_equivariant(X):
         yield code
 
 
-def search_equivarant(X):
+def fail_search_equivarant(X):
     G = X.G
     n = len(X)
     print("search_equivarant", n)
@@ -2403,7 +2403,9 @@ def get_group():
 
 
 def search_equivariant():
-    # find equivariant CSS codes
+    # build equivariant CSS codes from hecke operators.
+    # does not work very well. todo: use hecke operators to
+    # find irreps.
     Hs = None
     Xs = None
     n = None
@@ -2457,8 +2459,8 @@ def search_equivariant():
                     print(".", end='', flush=True)
                     continue
                 print(code, end='', flush=True)
-                for g in autos:
-                    assert (g*code).is_equiv(code)
+                #for g in autos:
+                #    assert (g*code).is_equiv(code)
         print()
 
 
