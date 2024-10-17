@@ -58,6 +58,7 @@ def css_to_symplectic(Lx, Lz):
     L = zeros2(2*m, n, 2)
     L[0::2, :, 0] = Lx
     L[1::2, :, 1] = Lz
+    L = flatten(L)
     return L
 
 
@@ -184,7 +185,7 @@ class QCode(object):
         self.shape = m, n
         self.space = SymplecticSpace(n)
         if L is not None:
-            assert L.shape == (2*self.k, nn)
+            assert L.shape == (2*self.k, nn), str((L.shape , (2*self.k, nn)))
         if T is not None:
             assert T.shape == (self.m, nn)
         if check:

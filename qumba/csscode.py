@@ -649,7 +649,8 @@ class CSSCode(object):
     def to_qcode(self, **attrs):
         dx, dz = self.dx, self.dz
         d = min(dx,dz) if dx and dz else None
-        return qcode.QCode.build_css(self.Hx, self.Hz, self.Tx, self.Tz, self.Lx, self.Lz, 
+        return qcode.QCode.build_css(
+            self.Hx, self.Hz, self.Tx, self.Tz, self.Lx, self.Lz, 
             dx=self.dx, dz=self.dz, d=d, css=True, cssname=str(self), **attrs)
 
     def is_equiv(self, other):
