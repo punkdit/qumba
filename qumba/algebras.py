@@ -247,6 +247,47 @@ def find_algebras(dim):
         Add( Or( (mul!=a) , (unit!=i) ) )
 
 
+def find_add_algebras(dim):
+
+    mul = UMatrix.unknown(dim, dim+dim)
+    unit = UMatrix.unknown(dim, 0)
+    I = UMatrix.identity(dim)
+
+    solver = Solver()
+    Add = solver.add
+
+    # unital
+    Add(mul*(unit<<I) == I)
+    Add(mul*(I<<unit) == I)
+
+    # Assoc
+    Add(mul*(I<<mul) == mul*(mul<<I))
+
+    while 1:
+        result = solver.check()
+        if str(result) != "sat":
+            return
+
+        model = solver.model()
+        a = mul.get_interp(model)
+        i = unit.get_interp(model)
+
+        yield (i, a)
+
+        Add( Or( (mul!=a) )) #, (unit!=i) ) )
+
+
+def main_add():
+    dim = 3
+    count = 0
+    for (unit, mul) in find_add_algebras(dim):
+        count += 1
+    # cocartesian => unique algebras
+    assert count == 1
+        
+
+
+
 def find_modules(dim, unit, mul):
 
     n = len(unit)
