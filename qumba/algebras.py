@@ -161,7 +161,6 @@ def main_rains():
 
     sigs = set()
     for C in space.grassmannian(m):
-        C = C * uturn_to_zip(n)
         C2 = C.reshape(m, n, 2)
         Ct = C.t
         sig = []
@@ -191,20 +190,6 @@ def main_rains():
     for sig in sigs:
         print(sig)
     
-
-@cache
-def uturn_to_zip(n):
-    nn = 2*n
-    U = numpy.zeros((nn, nn), dtype=scalar)
-    #print(U)
-    for i in range(n):
-        U[2*i, i] = 1
-        #print(U)
-        U[2*i+1, 2*n-i-1] = 1
-        #print(U)
-    U = Matrix(U)
-    return U.t
-
 
 def main_2():
     n = 2
@@ -290,6 +275,33 @@ def find_modules(dim, unit, mul):
         yield a
 
         Add( act != a )
+
+
+def find_coalgebras(dim):
+
+    comul = UMatrix.unknown(dim*dim, dim)
+    counit = UMatrix.unknown(1, dim)
+    I = UMatrix.identity(dim)
+
+    solver = Solver()
+    Add = solver.add
+
+    Add((counit@I)*comul == I)
+    Add((I@counit)*comul == I)
+    Add((I@comul)*comul == (comul@I)*comul)
+
+    while 1:
+        result = solver.check()
+        if str(result) != "sat":
+            return
+
+        model = solver.model()
+        _counit = counit.get_interp(model)
+        _comul = comul.get_interp(model)
+
+        yield (_counit, _comul)
+
+        Add( Or( (comul!=_comul) , (counit!=_counit) ) )
 
 
 def find_comodules(dim, counit, comul):
@@ -416,16 +428,20 @@ def find_scfa(dim):
         Add( Or( (mul!=_mul) , (unit!=_unit) ) )
 
 
-def main():
-    dim = argv.get("dim", 2)
-    count = 0
-    freq = {}
+def nonzero_vectors(dim):
     vs = []
     for idxs in numpy.ndindex((2,)*dim):
         v = numpy.array(idxs)
         v = Matrix(v)
         if v.sum():
             vs.append(v)
+    return vs
+
+def main():
+    dim = argv.get("dim", 2)
+    count = 0
+    freq = {}
+    vs = nonzero_vectors(dim)
     for (unit, mul, counit, comul) in find_scfa(dim):
         #print("unit =")
         #print(unit)
@@ -452,6 +468,122 @@ def main():
     print(freq)
 
 
+
+def main_modules():
+
+    m_dim = 2 # module dim is 2 for qubits
+    a_dim = 2 # algebra dim
+
+    vs = nonzero_vectors(a_dim)
+    vs = [v.reshape(a_dim, 1) for v in vs]
+    I = Matrix.identity(m_dim)
+
+    found = set()
+    for unit, mul in find_algebras(a_dim):
+    #for unit, mul, _, _ in find_scfa(a_dim):
+        for act in find_modules(m_dim, unit, mul):
+            lins = []
+            #found.append((unit, mul, act))
+            for v in vs:
+                u = act*(v@I)
+                if u.sum():
+                    lins.append(u)
+                #print(u,'\n')
+            lins.sort()
+            lins = tuple(lins)
+            found.add(lins)
+    print("modules:", len(found))
+    #return
+    found = list(found)
+    found.sort(key = lambda a:(len(a), a))
+
+    m, n = 2, 4
+    space = SymplecticSpace(n)
+
+    sigs = set()
+    count = 0
+    for C in space.grassmannian(m):
+        C2 = C.reshape(m, n, 2)
+        #print(C2,'\n')
+        Ct = C.t
+        sig = []
+        for algebra in found:
+            for a in algebra:
+                D = C2*a.t
+                D = D.reshape(m, 2*n)
+                u = Ct.solve(D.t)
+                if u is None:
+                    sig.append(".")
+                    break
+            else:
+                sig.append("*")
+        sig = ''.join(sig)
+        sigs.add(''.join(sig))
+        count += 1
+    print("codes:", count)
+
+    sigs = list(sigs)
+    sigs.sort()
+    for i,sig in enumerate(sigs):
+        print(sig, i)
+    
+
+def main_comodules():
+
+    m_dim = 2 # comodule dim is 2 for qubits
+    a_dim = 2 # algebra dim
+
+    vs = nonzero_vectors(a_dim)
+    #vs = [v.reshape(a_dim, 1) for v in vs]
+    I = Matrix.identity(m_dim)
+
+    found = set()
+    for counit, comul in find_coalgebras(a_dim):
+        for coact in find_comodules(m_dim, counit, comul):
+            lins = []
+            #found.append((unit, mul, act))
+            for v in vs:
+                u = (v@I)*coact
+                if u.sum():
+                    lins.append(u)
+                #print(u,'\n')
+            lins.sort()
+            lins = tuple(lins)
+            found.add(lins)
+    print("comodules:", len(found))
+    found = list(found)
+    found.sort(key = lambda a:(len(a), a))
+
+    m, n = 2, 4
+    space = SymplecticSpace(n)
+
+    sigs = set()
+    count = 0
+    for C in space.grassmannian(m):
+        C2 = C.reshape(m, n, 2)
+        #print(C2,'\n')
+        Ct = C.t
+        sig = []
+        for algebra in found:
+            for a in algebra:
+                D = C2*a.t
+                D = D.reshape(m, 2*n)
+                u = Ct.solve(D.t)
+                if u is None:
+                    sig.append(".")
+                    break
+            else:
+                sig.append("*")
+        sig = ''.join(sig)
+        sigs.add(''.join(sig))
+        count += 1
+    print("codes:", count)
+
+    sigs = list(sigs)
+    sigs.sort()
+    for i,sig in enumerate(sigs):
+        print(sig, i)
+    
 
 
 

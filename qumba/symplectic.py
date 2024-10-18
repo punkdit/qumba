@@ -365,9 +365,25 @@ class SymplecticSpace(object):
 
     def grassmannian(self, k):
         from qumba.sp_pascal import grassmannian
+        V = uturn_to_zip(self.n)
         for U in grassmannian(self.n, k):
             A = Matrix(U.A)
-            yield A
+            yield A*V
+
+
+@cache
+def uturn_to_zip(n):
+    nn = 2*n
+    U = numpy.zeros((nn, nn), dtype=scalar)
+    #print(U)
+    for i in range(n):
+        U[2*i, i] = 1
+        #print(U)
+        U[2*i+1, 2*n-i-1] = 1
+        #print(U)
+    U = Matrix(U)
+    return U.t
+
 
 
 
