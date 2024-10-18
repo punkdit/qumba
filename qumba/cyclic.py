@@ -716,8 +716,8 @@ def get_code(spec=None):
         ZZ..Z.....Z..ZZXX
         """, d=7)
 
-    elif spec == (29,1,9):
-        # [[29,1,9]]
+    elif spec == (29,1,11):
+        # [[29,1,11]]
         code = QCode.fromstr("""
         ..ZZXXZZ...Y.Y...Y...Y...Y.Y.
         ...ZZXXZZ...Y.Y...Y...Y...Y.Y
@@ -747,7 +747,7 @@ def get_code(spec=None):
         XXZZ...Y.Y...Y...Y...Y.Y...ZZ
         ZXXZZ...Y.Y...Y...Y...Y.Y...Z
         ZZXXZZ...Y.Y...Y...Y...Y.Y...
-        """, d=9)
+        """, d=11)
 
     else:
         assert 0, "no code specified"
