@@ -11,7 +11,7 @@ https://arxiv.org/abs/2105.06244v2
 
 from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
-from operator import add, mul
+from operator import add, mul, matmul
 from random import choice, shuffle
 
 import numpy
@@ -22,7 +22,7 @@ from qumba.qcode import strop, QCode
 from qumba.smap import SMap
 from qumba.action import mulclose, mulclose_names
 from qumba.argv import argv
-from qumba.construct import all_codes
+from qumba import construct
 
 
 def normalize(left, right, truncate=True):
@@ -45,7 +45,10 @@ class Relation(object):
         else:
             right = Matrix.promote(right)
         assert left.shape[0] == right.shape[0]
-        left, right = normalize(left, right)
+        self._left = left
+        self._right = right
+        if left.shape[1] or right.shape[1]: # ?!?!
+            left, right = normalize(left, right)
         rank = left.shape[0]
         self.left = left
         self.right = right
@@ -55,6 +58,10 @@ class Relation(object):
         self.A = left.concatenate(right, axis=1)
         self.shape = (rank, self.tgt, self.src)
         self.p = p
+
+    @property
+    def nf(self): # normal form
+        return self.__class__(self.left, self.right)
 
     @classmethod
     def identity(cls, n, p=2):
@@ -76,16 +83,17 @@ class Relation(object):
         return Relation(A[:, :tgt], A[:, tgt:], p)
 
     def __str__(self):
-        w = self.left.shape[1]
-        v = self.right.shape[1]
+        left, right = self._left, self._right
+        w = left.shape[1]
+        v = right.shape[1]
         smap = SMap()
         row = 0
-        for row in range(self.left.shape[0]):
+        for row in range(left.shape[0]):
             smap[row,1] = "["
             smap[row,w+v+3] = "],"
             smap[row,w+2] = "|"
-        smap[0,2] = str(self.left)
-        smap[0,w+3] = str(self.right)
+        smap[0,2] = str(left)
+        smap[0,w+3] = str(right)
         smap[0,0] = "["
         smap[row,w+v+4] = "]"
         return str(smap)
@@ -155,7 +163,7 @@ class Symplectic(Relation):
         return AFA.sum() == 0
 
     def __str__(self):
-        left, right = self.left, self.right
+        left, right = self._left, self._right
         smap = SMap()
         smap[0,0] = strop(left)
         w = left.shape[1] // 2
@@ -607,6 +615,70 @@ def test_symplectic():
         assert m.is_lagrangian()
 
 
+def test_code():
+
+    I = Symplectic.identity(2)
+    h = Symplectic([[0,1],[1,0]])
+    b_ = Symplectic([[0,1]], zeros(1,0))
+    b1 = Symplectic([[1,0],[1,1]])
+    w1 = h*b1*h
+    b1_ = b1*b_
+    w1_ = h*b1_
+    w_ = w1 * w1_
+    _b1 = b1_.op
+    _b = b_.op
+    _w1 = w1_.op
+    _w = w_.op
+
+    for code in [
+        construct.get_513(),
+        construct.get_713(),
+        #construct.get_10_2_3(),
+        #construct.get_622(),
+        #construct.get_14_3_3(),
+    ]:
+        n = code.n
+        space = code.space
+        #for i in range(n):
+        #    code = space.S(i) * code
+        #code = space.S(0) * code
+        #code = space.H(1) * code
+        print(code)
+        #print(code.longstr())
+        #print()
+    
+        E = code.get_encoder()
+        #print(strop(E.t))
+        #print()
+        encode = Symplectic(E.t)
+    
+        #print(encode)
+        #print()
+    
+        prep = reduce(matmul, [w_]*n)
+        prep = encode*prep
+        print("prep:")
+        print(prep)
+        print()
+    
+        #print("white measure:")
+        wgap = reduce(matmul, [w_ * _w]*n)
+        bgap = reduce(matmul, [b_ * _b]*n)
+        wm = reduce(matmul, [_w]*n)
+        bm = reduce(matmul, [_b]*n)
+        #print(wm*encode)
+        #print()
+    
+        u = wm*encode
+        print(u.nf, u.shape)
+        print()
+    
+        v = bm*encode
+        print(v.nf, v.shape)
+        print()
+    
+
+
 def test():
     test_linear()
     test_symplectic()
@@ -617,7 +689,7 @@ def main():
     n = argv.get("n", 4)
 
     found = set()
-    for code in all_codes(n, 0, 0):
+    for code in construct.all_codes(n, 0, 0):
         #print(code.longstr())
         H = code.H
         Ht = H.t

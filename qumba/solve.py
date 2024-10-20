@@ -373,7 +373,7 @@ def row_reduce(H, truncate=True, inplace=False, check=False, debug=False):
         H = H.copy()
 
     if m*n==0:
-        return H
+        return H[:0, :] if truncate else H
 
 #    if debug:
 #        print("solve:")
