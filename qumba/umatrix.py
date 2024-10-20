@@ -244,6 +244,7 @@ class UMatrix(object):
         M.A[:m, :n] = self.A
         M.A[m:, n:] = other.A
         return M
+    __lshift__ = direct_sum
 
     def get_interp(self, model):
         shape = self.shape

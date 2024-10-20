@@ -244,8 +244,8 @@ class Matrix(object):
         other = Matrix.promote(other)
         A = direct_sum(self.A, other.A)
         return Matrix(A, self.p)
+    __lshift__ = direct_sum # ???
     #__add__ = direct_sum # ??
-    #__lshift__ = direct_sum # ???
 
     def __getitem__(self, idx):
         A = self.A[idx]
