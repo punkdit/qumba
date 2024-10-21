@@ -150,7 +150,7 @@ class Relation(object):
         return swap
 
 
-class Symplectic(Relation):
+class Lagrangian(Relation):
     def is_lagrangian(self):
         A = self.A
         m, nn = A.shape
@@ -178,7 +178,7 @@ class Symplectic(Relation):
         i = Matrix.identity(2)
         l = z.concatenate(i)
         r = i.concatenate(z)
-        swap = Symplectic(l.concatenate(r, axis=1).transpose())
+        swap = Lagrangian(l.concatenate(r, axis=1).transpose())
         return swap
 
     def to_qcode(self):
@@ -189,7 +189,7 @@ class Symplectic(Relation):
         code = QCode(self.A)
         A = code.T
         k = self.tgt
-        return Symplectic(A[:, :k], A[:, k:])
+        return Lagrangian(A[:, :k], A[:, k:])
 
 
 zeros = lambda a,b : Matrix.zeros((a,b))
@@ -387,13 +387,13 @@ def test_pascal():
 
 
 def test_symplectic():
-    one = Symplectic(zeros(0,0), zeros(0,0))
+    one = Lagrangian(zeros(0,0), zeros(0,0))
     #print(one)
     #print(one*one)
     assert one*one == one
 
-    I = Symplectic.identity(2)
-    h = Symplectic([[0,1],[1,0]])
+    I = Lagrangian.identity(2)
+    h = Lagrangian([[0,1],[1,0]])
 
     #print("h:")
     #print(h)
@@ -406,10 +406,10 @@ def test_symplectic():
     assert h*h == I
 
     # black unit
-    b_ = Symplectic([[0,1]], zeros(1,0))
+    b_ = Lagrangian([[0,1]], zeros(1,0))
 
     # phase=1
-    b1 = Symplectic([[1,0],[1,1]])
+    b1 = Lagrangian([[1,0],[1,1]])
     w1 = h*b1*h
 
     assert b1 != w1
@@ -446,7 +446,7 @@ def test_symplectic():
     code = w1.to_qcode()
     print(code.longstr())
     T = code.T
-    assert r == Symplectic(T[:, :2], T[:, 2:])
+    assert r == Lagrangian(T[:, :2], T[:, 2:])
     assert r in names
     #print(names[r])
     assert r == b_*_w
@@ -476,7 +476,7 @@ def test_symplectic():
 
     # ---------- 2 qubits ----------------
 
-    swap = Symplectic.get_swap()
+    swap = Lagrangian.get_swap()
     
     assert swap != I@I
     assert swap*swap == I@I
@@ -484,12 +484,12 @@ def test_symplectic():
       for b in [I,w1,b1,h]:
         assert swap*(a@b) == (b@a)*swap
 
-    #for v_ in all_subspaces(2, 1): # not Symplectic ...
-    #    assert isinstance(v_@I, Symplectic)
+    #for v_ in all_subspaces(2, 1): # not Lagrangian ...
+    #    assert isinstance(v_@I, Lagrangian)
     #    assert swap * (v_@I) == I@v_
 
     # copy
-    bb_b = Symplectic([
+    bb_b = Lagrangian([
         [1,0,0,0],
         [0,0,1,0],
         [0,1,0,1],
@@ -617,10 +617,10 @@ def test_symplectic():
 
 def test_code():
 
-    I = Symplectic.identity(2)
-    h = Symplectic([[0,1],[1,0]])
-    b_ = Symplectic([[0,1]], zeros(1,0))
-    b1 = Symplectic([[1,0],[1,1]])
+    I = Lagrangian.identity(2)
+    h = Lagrangian([[0,1],[1,0]])
+    b_ = Lagrangian([[0,1]], zeros(1,0))
+    b1 = Lagrangian([[1,0],[1,1]])
     w1 = h*b1*h
     b1_ = b1*b_
     w1_ = h*b1_
@@ -650,7 +650,7 @@ def test_code():
         E = code.get_encoder()
         #print(strop(E.t))
         #print()
-        encode = Symplectic(E.t)
+        encode = Lagrangian(E.t)
     
         #print(encode)
         #print()
@@ -698,7 +698,7 @@ def main():
         H = code.H
         Ht = H.t
         l, r = H[:, :n//2], H[:, n//2:]
-        rel = Symplectic(l.t, r.t)
+        rel = Lagrangian(l.t, r.t)
         assert rel.is_lagrangian()
         found.add(rel)
     found = list(found)
