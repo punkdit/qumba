@@ -102,6 +102,11 @@ class Matrix(object):
         return Matrix(A)
 
     @classmethod
+    def einsum(cls, desc, *args):
+        A = numpy.einsum(desc, *[M.A for M in args])
+        return Matrix(A).reshape(*A.shape)
+
+    @classmethod
     def perm(cls, items, p=DEFAULT_P, name=None):
         n = len(items)
         A = numpy.zeros((n, n), dtype=scalar)
@@ -137,7 +142,10 @@ class Matrix(object):
         return Matrix(A, p, name="0")
 
     def __str__(self):
-        return shortstr(self.A)
+        if len(self.shape) <= 2:
+            return shortstr(self.A)
+        else:
+            return str(self.A)
         #return str(self.A).replace("0", ".")
         # XXX broken:
         #s = shortstr(self.A)
@@ -254,7 +262,7 @@ class Matrix(object):
             return A
         return Matrix(A, self.p)
 
-    def transpose(self):
+    def transpose(self, *arg):
         A = self.A
         name = self.name
         names = []
@@ -268,7 +276,7 @@ class Matrix(object):
                 names.append(n+".t")
         #name = tuple(n[:-2] if n.endswith(".t") else n+".t" for n in reversed(name))
         name = tuple(names)
-        return Matrix(A.transpose(), self.p, None, name)
+        return Matrix(A.transpose(*arg), self.p, None, name)
 
     @property
     def t(self):

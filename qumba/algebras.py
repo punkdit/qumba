@@ -14,6 +14,7 @@ from operator import add, matmul, mul
 import numpy
 
 from qumba.qcode import QCode, SymplecticSpace, Matrix, fromstr, shortstr, strop
+from qumba import construct
 from qumba.matrix import scalar
 from qumba.action import mulclose, Group, mulclose_find
 from qumba.smap import SMap
@@ -382,10 +383,10 @@ def main_algebras():
     dim = 2
     count = 0
     for (unit, mul) in find_algebras(dim):
-        #print("unit =")
-        #print(unit)
-        #print("mul =")
-        #print(mul)
+        print("unit =")
+        print(unit)
+        print("mul =")
+        print(mul)
 #        dount = 0
 #        for act in find_modules(2, unit, mul):
 #            #print("act =")
@@ -507,6 +508,59 @@ def main():
     print()
     print("found:", count)
     print(freq)
+
+
+def main_codes():
+
+    code = construct.get_513()
+    H = code.H
+    m, nn = H.shape
+    n = nn//2
+    H = H.reshape(m, n, 2)
+    print(H, H.shape)
+
+    # try to tensor product a code with an algebra.. fail
+
+    dim = 2
+    count = 0
+    vs = nonzero_vectors(dim)
+    omega = Matrix([[0,1],[1,0]])
+    I = Matrix.identity(2)
+    zero = Matrix([[0,0],[0,0]])
+    for (unit, mul) in find_algebras(dim):
+        copyable = [v for v in vs if v*mul==v@v]
+        #print("unit =")
+        #print(unit)
+        #print("mul =")
+        #print(mul)
+        #print("c =", len(copyable))
+        comul = mul.t
+        #special = mul * comul == I
+        #cond = omega*mul == mul * (omega @ I)
+        #cond = mul * (omega @ I) * comul == omega
+        #cond = comul * omega * mul == omega @ zero
+        op = comul*mul*(I@omega)*comul*mul
+        #op = comul*mul*(omega@I)*comul*mul
+        if op.sum():
+            continue
+        # H : (m, n, 2)
+        op = (comul * mul).reshape(2, 2, 2, 2)
+        #print(op.shape)
+        IH = (I@H).reshape(2, 2, *H.shape)
+        #print(IH.shape) # (2,2,m,n,2)  (i,j,m,n,k)
+        H1 = Matrix.einsum("ijmnk,jkuv", IH, op)
+        #print(H1.shape)
+        H1 = H1.transpose((0,3,4,1,2))
+        #print(H1.shape)
+        H1 = H1.reshape(2*m, 4*n)
+        #print(H1.shape)
+        H1 = H1.linear_independent()
+        code = QCode(H1)
+        print(code)
+        #print(code.longstr())
+        count += 1
+    print()
+    print("found:", count)
 
 
 
