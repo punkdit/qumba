@@ -642,7 +642,7 @@ def test_code():
         #for i in range(n):
         #    code = space.S(i) * code
         #code = space.S(0) * code
-        #code = space.H(1) * code
+        code = space.H(1) * code
         print(code)
         #print(code.longstr())
         #print()
@@ -662,18 +662,22 @@ def test_code():
         print()
     
         #print("white measure:")
-        wgap = reduce(matmul, [w_ * _w]*n)
-        bgap = reduce(matmul, [b_ * _b]*n)
+        #wgap = reduce(matmul, [w_ * _w]*n)
+        #bgap = reduce(matmul, [b_ * _b]*n)
         wm = reduce(matmul, [_w]*n)
         bm = reduce(matmul, [_b]*n)
         #print(wm*encode)
         #print()
+
+        op = [I]*n
+        op[1] = h
+        op = reduce(matmul, op)
     
-        u = wm*encode
+        u = wm*op*encode
         print(u.nf, u.shape)
         print()
     
-        v = bm*encode
+        v = bm*op*encode
         print(v.nf, v.shape)
         print()
     
