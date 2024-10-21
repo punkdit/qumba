@@ -366,11 +366,11 @@ def all_codes(n=4, k=1, d=2):
     F = space.F
     for R in i_grassmannian(n, n-k):
         H = R.A
-        print(R.left is not None, R.right is not None)
+        #print(R.left is not None, R.right is not None)
         H = H[:, perm] # reshuffle to qumba symplectic
         H = Matrix(H)
         code = QCode(H, check=False)
-        if code.get_distance() < d:
+        if d>1 and code.get_distance() < d:
             continue
         yield code
 

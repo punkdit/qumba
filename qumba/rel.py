@@ -11,14 +11,14 @@ https://arxiv.org/abs/2105.06244v2
 
 from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
-from operator import add, mul, matmul
+from operator import add, mul, matmul, lshift
 from random import choice, shuffle
 
 import numpy
 
 from qumba.matrix import Matrix, pullback
 from qumba.symplectic import symplectic_form
-from qumba.qcode import strop, QCode
+from qumba.qcode import strop, QCode, SymplecticSpace
 from qumba.smap import SMap
 from qumba.action import mulclose, mulclose_names
 from qumba.argv import argv
@@ -44,7 +44,7 @@ class Relation(object):
             right = Matrix.identity(left.shape[0])
         else:
             right = Matrix.promote(right)
-        assert left.shape[0] == right.shape[0]
+        assert left.shape[0] == right.shape[0], "%s %s"%(left.shape, right.shape)
         self._left = left
         self._right = right
         if left.shape[1] or right.shape[1]: # ?!?!
@@ -81,6 +81,12 @@ class Relation(object):
             a[i, i+1] = -1
         A = Matrix(a, p)
         return Relation(A[:, :tgt], A[:, tgt:], p)
+
+    @classmethod
+    def promote(cls, item):
+        if isinstance(item, cls):
+            return item
+        return cls(item)
 
     def __str__(self):
         left, right = self._left, self._right
@@ -123,16 +129,26 @@ class Relation(object):
         return hash((self.left, self.right))
 
     def __mul__(lhs, rhs):
-        assert isinstance(rhs, lhs.__class__)
+        #assert isinstance(rhs, lhs.__class__)
+        rhs = lhs.promote(rhs)
         assert lhs.src == rhs.tgt
         l, r = pullback(lhs.right.t, rhs.left.t)
         left = lhs.left.t * l
         right = rhs.right.t * r
         return lhs.__class__(left.t, right.t)
 
+    def __rmul__(self, other):
+        other = self.__class__(other)
+        return other.__mul__(self)
+
     def __matmul__(lhs, rhs):
         left = lhs.left.direct_sum(rhs.left)
         right = lhs.right.direct_sum(rhs.right)
+        return lhs.__class__(left, right)
+
+    def __lshift__(lhs, rhs):
+        left = lhs.left << rhs.left
+        right = lhs.right << rhs.right
         return lhs.__class__(left, right)
 
     @property
@@ -151,6 +167,16 @@ class Relation(object):
 
 
 class Lagrangian(Relation):
+    @classmethod
+    def all_rels(cls, tgt, src):
+        n = tgt+src
+        for code in construct.all_codes(n, 0, 0):
+            H = code.H
+            l, r = H[:, :2*tgt], H[:, 2*tgt:]
+            rel = Lagrangian(l, r)
+            assert rel.is_lagrangian()
+            yield rel
+
     def is_lagrangian(self):
         A = self.A
         m, nn = A.shape
@@ -191,6 +217,16 @@ class Lagrangian(Relation):
         k = self.tgt
         return Lagrangian(A[:, :k], A[:, k:])
 
+    def is_diag(self):
+        A = self.A
+        m, n = A.shape
+        if A.sum() != m:
+            return False
+#        for i in range(m):
+#          for j in range(n):
+#            i
+        return True
+
 
 zeros = lambda a,b : Matrix.zeros((a,b))
 
@@ -220,7 +256,7 @@ def test_linear():
         h = choice(lins)
         fg = f*g
         gh = g*h
-        assert Relation(fg) == Relation(g)*Relation(f) # contravariant...
+        assert Relation(fg) == Relation(g)*Relation(f) # _contravariant...
         assert ((Relation(fg)==Relation(gh)) 
             == (Relation(g)*Relation(f)==Relation(h)*Relation(g)))
 
@@ -617,6 +653,8 @@ def test_symplectic():
 
 def test_code():
 
+    # can we measure out the qubits of a CSS / non-CSS codes??
+
     I = Lagrangian.identity(2)
     h = Lagrangian([[0,1],[1,0]])
     b_ = Lagrangian([[0,1]], zeros(1,0))
@@ -630,9 +668,21 @@ def test_code():
     _w1 = w1_.op
     _w = w_.op
 
+#    code = construct.get_513()
+#    E = code.get_encoder()
+#    print(E)
+#    E2 = E << E
+#    print(E2)
+#    print(Lagrangian(E.t))
+#    return
+
+    dup = 2
+
     for code in [
+        #construct.get_412(),
+        construct.get_422(),
         construct.get_513(),
-        construct.get_713(),
+        #construct.get_713(),
         #construct.get_10_2_3(),
         #construct.get_622(),
         #construct.get_14_3_3(),
@@ -642,24 +692,25 @@ def test_code():
         #for i in range(n):
         #    code = space.S(i) * code
         #code = space.S(0) * code
-        code = space.H(1) * code
-        print(code)
+        #code = space.H(1) * code
+        #print(code)
         #print(code.longstr())
         #print()
-    
+
         E = code.get_encoder()
         #print(strop(E.t))
         #print()
         encode = Lagrangian(E.t)
     
-        #print(encode)
-        #print()
+        print("encode:")
+        print(encode)
+        print()
     
         prep = reduce(matmul, [w_]*n)
         prep = encode*prep
-        print("prep:")
-        print(prep)
-        print()
+        #print("prep:")
+        #print(prep)
+        #print()
     
         #print("white measure:")
         #wgap = reduce(matmul, [w_ * _w]*n)
@@ -670,7 +721,7 @@ def test_code():
         #print()
 
         op = [I]*n
-        op[1] = h
+        #op[1] = h
         op = reduce(matmul, op)
     
         u = wm*op*encode
@@ -681,6 +732,41 @@ def test_code():
         print(v.nf, v.shape)
         print()
     
+        f = list(range(n))
+        f = space.SWAP(0,1)
+        vf = v*f
+        fprep = f*prep
+
+        e2 = reduce(lshift, [encode]*dup)
+
+        s2 = reduce(lshift, [space]*dup)
+        f = []
+        for i in range(n):
+            for j in range(dup):
+                f.append(i+j*n)
+        p = s2.get_perm(f)
+        e2 = p.t*e2*p
+        print(e2.op.nf.op)
+
+        bell = Matrix([[1,0,1,0],[0,1,0,1]])
+        bell = Lagrangian(bell[:,:0], bell)
+
+        s1 = SymplecticSpace(2)
+        g = s1.S(0)*s1.H(0)
+        bell = bell*g
+
+        for r0 in Lagrangian.all_rels(0, dup):
+        #for r0 in [_w@_w]:
+        #for r0 in [bell]:
+            measure = reduce(matmul, [r0]*n)
+            me2 = measure * e2
+            me2 = me2.nf
+            if me2.is_diag():
+                print(r0)
+                print(me2)
+                print()
+
+            
 
 
 def test():
@@ -691,15 +777,13 @@ def test():
 def main():
 
     n = argv.get("n", 4)
+    m = argv.get("m", n//2)
 
     found = set()
-    for code in construct.all_codes(n, 0, 0):
-        #print(code.longstr())
-        H = code.H
-        Ht = H.t
-        l, r = H[:, :n//2], H[:, n//2:]
-        rel = Lagrangian(l.t, r.t)
-        assert rel.is_lagrangian()
+    for rel in Lagrangian.all_rels(n-m, m):
+        #print(rel)
+        #print()
+        assert rel not in found
         found.add(rel)
     found = list(found)
     print("found:", len(found))
