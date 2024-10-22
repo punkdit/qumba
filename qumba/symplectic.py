@@ -45,6 +45,12 @@ class SymplecticSpace(object):
         return SymplecticSpace(self.n + other.n, self.p)
     __add__ = __lshift__
 
+    def is_isotropic(self, H):
+        assert isinstance(H, Matrix)
+        nn = 2*self.n
+        F = self.F
+        return (H*F*H.t).sum() == 0
+
     def is_symplectic(self, M):
         assert isinstance(M, Matrix)
         nn = 2*self.n

@@ -528,6 +528,7 @@ def main_codes():
     I = Matrix.identity(2)
     zero = Matrix([[0,0],[0,0]])
     for (unit, mul) in find_algebras(dim):
+    #for (unit, mul, counit, comul) in find_scfa(dim):
         copyable = [v for v in vs if v*mul==v@v]
         #print("unit =")
         #print(unit)
@@ -539,10 +540,10 @@ def main_codes():
         #cond = omega*mul == mul * (omega @ I)
         #cond = mul * (omega @ I) * comul == omega
         #cond = comul * omega * mul == omega @ zero
-        op = comul*mul*(I@omega)*comul*mul
-        #op = comul*mul*(omega@I)*comul*mul
-        if op.sum():
-            continue
+        #op = comul*mul*(I@omega)*comul*mul
+        op = comul*mul*(omega@I)*comul*mul
+#        if op.sum():
+#            continue
         # H : (m, n, 2)
         op = (comul * mul).reshape(2, 2, 2, 2)
         #print(op.shape)
@@ -561,6 +562,74 @@ def main_codes():
         count += 1
     print()
     print("found:", count)
+
+
+
+def get_wenum(code):
+    from qumba.solve import dot2
+    css = code.to_css()
+    Hz = css.Hz
+    Lz = css.Lz
+    wenum = {w:[] for w in range(code.n+1)}
+    for ik in numpy.ndindex((2,)*css.k):
+      if ik == (0,)*css.k:
+        continue
+      for imz in numpy.ndindex((2,)*css.mz):
+        h = dot2(imz, css.Hz) + dot2(ik, css.Lz)
+        h %= 2
+        wenum[h.sum()].append(h)
+
+    return wenum
+
+
+def main_unwrap():
+    code = construct.get_513()
+    H = code.H
+    m, nn = H.shape
+    n = nn//2
+    H = H.reshape(m, n, 2)
+    #print(H)
+
+    swap = Matrix([
+        [1,0,0,0],
+        [0,0,1,0],
+        [0,1,0,0],
+        [0,0,0,1],
+    ])
+
+    g = Matrix.get_perm([1,0,2,3])
+    h = Matrix.get_perm([1,2,3,0])
+    G = mulclose([g,h])
+    assert len(G) == 24
+
+    space = SymplecticSpace(nn)
+
+    for U in G:
+        U = U.reshape(2,2,2,2)
+        #J = (H@U).reshape(m, n, 2, 2, 2, 2, 2)
+    
+        J = Matrix.einsum("mno,opqr", H, U)
+        J = J.transpose((0,2,1,3,4))
+        J = J.reshape(2*m, 2*n, 2)
+    
+        #print(J)
+        J = J.reshape(2*m, 4*n)
+
+        if not space.is_isotropic(J):
+            continue
+
+        code = QCode(J)
+    
+        if not code.is_css():
+            continue
+
+        print(code)
+        #print(code.longstr())
+        #print(strop(code.H))
+        wenum = get_wenum(code)
+        print([len(wenum[i]) for i in range(code.n+1)])
+
+        print(U.reshape(4,4))
 
 
 
