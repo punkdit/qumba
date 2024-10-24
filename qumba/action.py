@@ -8,7 +8,8 @@ Group actions.
 import sys
 import string
 from random import randint, shuffle
-from functools import reduce, cache
+from functools import reduce, lru_cache
+cache = lru_cache(None)
 
 #from qumba.util import factorial, all_subsets, write, uniqtuples, cross
 from qumba.equ import Equ, quotient_rep

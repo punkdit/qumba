@@ -8,7 +8,7 @@ See:
 
 """
 
-from functools import reduce, cache
+from functools import reduce
 from operator import add, matmul, mul
 
 import numpy
@@ -580,11 +580,18 @@ def main_interact():
     algebras = list(find_scfa(2))
 
     # adjoint structure (zig-zag)
+    cup = I.reshape(4,1)
+    cap = cup.t
     for A in algebras:
         cup = A.comul*A.unit
         cap = A.counit*A.mul
+        print(A)
+        print(cap, len(A.copyable))
+        print()
         assert (I@cap)*(cup@I) == I
         assert (cap@I)*(I@cup) == I
+
+    return
         
     g_gg = Matrix([
         [1,0,0,0],

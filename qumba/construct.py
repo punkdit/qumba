@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 from random import shuffle
-from functools import reduce, cache
+from functools import reduce, lru_cache
+cache = lru_cache(None)
 from operator import add
 
 import numpy

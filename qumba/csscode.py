@@ -4,7 +4,8 @@ import sys, os
 from math import *
 from random import *
 import time
-from functools import reduce, cache
+from functools import reduce, lru_cache
+cache = lru_cache(None)
 
 import numpy
 import numpy.random as ra
