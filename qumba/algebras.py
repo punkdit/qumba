@@ -39,23 +39,45 @@ def span(G):
     return algebra
 
 
+# broken...
+#def generate0(gen, verbose=False, maxsize=None):
+#    els = set(gen)
+#    bdy = list(els)
+#    changed = True
+#    while bdy:
+#        if verbose:
+#            print(len(els), end=" ", flush=True)
+#        _bdy = []
+#        for A in gen:
+#            for B in bdy:
+#                for C in [A*B, A+B]:
+#                  if C not in els:
+#                    els.add(C)
+#                    _bdy.append(C)
+#                    if maxsize and len(els)>=maxsize:
+#                        return els
+#        bdy = _bdy
+#    if verbose:
+#        print()
+#    return els
+
+
 def generate(gen, verbose=False, maxsize=None):
     els = set(gen)
-    bdy = list(els)
     changed = True
-    while bdy:
+    while changed:
+        changed = False
         if verbose:
             print(len(els), end=" ", flush=True)
-        _bdy = []
-        for A in gen:
-            for B in bdy:
+        items = list(els)
+        for A in items:
+            for B in items:
                 for C in [A*B, A+B]:
                   if C not in els:
                     els.add(C)
-                    _bdy.append(C)
+                    changed = True
                     if maxsize and len(els)>=maxsize:
                         return els
-        bdy = _bdy
     if verbose:
         print()
     return els
@@ -92,8 +114,7 @@ class Algebra(object):
         print()
 
 
-
-def main_rains():
+def get_algebra():
 
     space = SymplecticSpace(1)
     I = space.I()
@@ -104,15 +125,27 @@ def main_rains():
     G = list(G)
     assert len(G) == 6
 
+    for g in G:
+        assert g*~g == I
     algebra = span(G)
     assert len(algebra) == 16
 
-    print("algebra:")
-    Algebra(algebra).dump()
-    #return
+    return Algebra(algebra)
 
-    for g in G:
-        assert g*~g == I
+
+def main_rains():
+    space = SymplecticSpace(1)
+    I = space.I()
+    S = space.S()
+    H = space.H()
+
+    G = mulclose([S,H])
+    G = list(G)
+    assert len(G) == 6
+
+    algebra = get_algebra()
+
+    unital = argv.get("unital", True)
 
     count = 0
     found = set()
@@ -121,7 +154,7 @@ def main_rains():
         if algebra[0] not in gen:
             continue
 
-        if I not in gen:
+        if unital and I not in gen:
             continue
 
         A = Algebra.generate(gen)
@@ -178,7 +211,7 @@ def main_rains():
         sig = ''.join(sig)
         sigs.add(''.join(sig))
 
-        if sig == "*......*....":
+        if sig == "*......*...." and 0:
             code = QCode(C)
             print(code)
             assert code.is_gf4()
@@ -510,62 +543,62 @@ def main():
     print(freq)
 
 
-def main_codes():
+#def main_codes():
+#
+#    code = construct.get_513()
+#    H = code.H
+#    m, nn = H.shape
+#    n = nn//2
+#    H = H.reshape(m, n, 2)
+#    print(H, H.shape)
+#
+#    # try to tensor product a code with an algebra.. fail
+#
+#    dim = 2
+#    count = 0
+#    vs = nonzero_vectors(dim)
+#    omega = Matrix([[0,1],[1,0]])
+#    I = Matrix.identity(2)
+#    zero = Matrix([[0,0],[0,0]])
+#    for (unit, mul) in find_algebras(dim):
+#    #for (unit, mul, counit, comul) in find_scfa(dim):
+#        copyable = [v for v in vs if v*mul==v@v]
+#        #print("unit =")
+#        #print(unit)
+#        #print("mul =")
+#        #print(mul)
+#        #print("c =", len(copyable))
+#        comul = mul.t
+#        #special = mul * comul == I
+#        #cond = omega*mul == mul * (omega @ I)
+#        #cond = mul * (omega @ I) * comul == omega
+#        #cond = comul * omega * mul == omega @ zero
+#        #op = comul*mul*(I@omega)*comul*mul
+#        op = comul*mul*(omega@I)*comul*mul
+##        if op.sum():
+##            continue
+#        # H : (m, n, 2)
+#        op = (comul * mul).reshape(2, 2, 2, 2)
+#        #print(op.shape)
+#        IH = (I@H).reshape(2, 2, *H.shape)
+#        #print(IH.shape) # (2,2,m,n,2)  (i,j,m,n,k)
+#        H1 = Matrix.einsum("ijmnk,jkuv", IH, op)
+#        #print(H1.shape)
+#        H1 = H1.transpose((0,3,4,1,2))
+#        #print(H1.shape)
+#        H1 = H1.reshape(2*m, 4*n)
+#        #print(H1.shape)
+#        H1 = H1.linear_independent()
+#        code = QCode(H1)
+#        print(code)
+#        #print(code.longstr())
+#        count += 1
+#    print()
+#    print("found:", count)
+#
 
-    code = construct.get_513()
-    H = code.H
-    m, nn = H.shape
-    n = nn//2
-    H = H.reshape(m, n, 2)
-    print(H, H.shape)
 
-    # try to tensor product a code with an algebra.. fail
-
-    dim = 2
-    count = 0
-    vs = nonzero_vectors(dim)
-    omega = Matrix([[0,1],[1,0]])
-    I = Matrix.identity(2)
-    zero = Matrix([[0,0],[0,0]])
-    for (unit, mul) in find_algebras(dim):
-    #for (unit, mul, counit, comul) in find_scfa(dim):
-        copyable = [v for v in vs if v*mul==v@v]
-        #print("unit =")
-        #print(unit)
-        #print("mul =")
-        #print(mul)
-        #print("c =", len(copyable))
-        comul = mul.t
-        #special = mul * comul == I
-        #cond = omega*mul == mul * (omega @ I)
-        #cond = mul * (omega @ I) * comul == omega
-        #cond = comul * omega * mul == omega @ zero
-        #op = comul*mul*(I@omega)*comul*mul
-        op = comul*mul*(omega@I)*comul*mul
-#        if op.sum():
-#            continue
-        # H : (m, n, 2)
-        op = (comul * mul).reshape(2, 2, 2, 2)
-        #print(op.shape)
-        IH = (I@H).reshape(2, 2, *H.shape)
-        #print(IH.shape) # (2,2,m,n,2)  (i,j,m,n,k)
-        H1 = Matrix.einsum("ijmnk,jkuv", IH, op)
-        #print(H1.shape)
-        H1 = H1.transpose((0,3,4,1,2))
-        #print(H1.shape)
-        H1 = H1.reshape(2*m, 4*n)
-        #print(H1.shape)
-        H1 = H1.linear_independent()
-        code = QCode(H1)
-        print(code)
-        #print(code.longstr())
-        count += 1
-    print()
-    print("found:", count)
-
-
-
-def get_wenum(code):
+def css_get_wenum(code):
     from qumba.solve import dot2
     css = code.to_css()
     Hz = css.Hz
@@ -582,8 +615,25 @@ def get_wenum(code):
     return wenum
 
 
+def get_wenum(code):
+    H = code.H
+    m, nn = H.shape
+    wenum = {i:0 for i in range(nn+1)}
+    for idxs in numpy.ndindex((2,)*m):
+        a = Matrix(idxs).reshape(1,m)
+        v = a*H
+        wenum[v.sum()] += 1 # not the real weight... fix?
+    return [wenum[i] for i in range(nn+1)]
+
+
 def main_unwrap():
     code = construct.get_513()
+    #print(get_wenum(code))
+    #code = construct.get_14_3_3()
+    #code = construct.get_412()
+    #code = construct.toric(2,2).to_qcode()
+    #code = construct.get_512()
+    print(code)
     H = code.H
     m, nn = H.shape
     n = nn//2
@@ -602,34 +652,66 @@ def main_unwrap():
     G = mulclose([g,h])
     assert len(G) == 24
 
+    G = []
+
+    A = get_algebra()
+    for a in A:
+      for b in A:
+        U = numpy.zeros((4,4), dtype=scalar)
+        U[:2,:2] = a
+        U[:2,2:] = b
+        U[2:,:2] = b
+        U[2:,2:] = a
+        U = Matrix(U)
+        #print(U)
+        #return
+        G.append(U)
+    #return
+
+    assert len(G) == 256
+
     space = SymplecticSpace(nn)
 
+    found = 0
     for U in G:
         U = U.reshape(2,2,2,2)
         #J = (H@U).reshape(m, n, 2, 2, 2, 2, 2)
     
         J = Matrix.einsum("mno,opqr", H, U)
-        J = J.transpose((0,2,1,3,4))
+        #J = J.transpose((0,2,1,3,4))
+        J = J.transpose((0,2,1,4,3))
         J = J.reshape(2*m, 2*n, 2)
     
         #print(J)
         J = J.reshape(2*m, 4*n)
+
+        if J.rank() != 2*m:
+            continue
 
         if not space.is_isotropic(J):
             continue
 
         code = QCode(J)
     
-        if not code.is_css():
-            continue
+        #if not code.is_css():
+        #    continue
 
-        print(code)
+        print(code, "*" if code.is_css() else " ", "gf4" if code.is_gf4() else " ",
+            "+" if code.is_selfdual() else " ")
+
+#        if code.is_gf4():
+#            #print(strop(code.H))
+#            H0 = code.H.normal_form()
+#            print(strop(H0))
+        #print(U.reshape(4,4))
+        found += 1
+
         #print(code.longstr())
-        #print(strop(code.H))
-        wenum = get_wenum(code)
-        print([len(wenum[i]) for i in range(code.n+1)])
+        #wenum = get_wenum(code)
+        #print(wenum)
 
-        print(U.reshape(4,4))
+    print("found:", found)
+
 
 
 
