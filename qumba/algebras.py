@@ -147,10 +147,10 @@ def main_rains():
 
     unital = argv.get("unital", True)
 
-    count = 0
+    _count = 0
     found = set()
     for gen in all_subsets(algebra):
-        count += 1
+        _count += 1
         if algebra[0] not in gen:
             continue
 
@@ -166,7 +166,7 @@ def main_rains():
     J = H
     conj = lambda a : J*a.t*J
 
-    print("found:", len(found), "count:", count)
+    print("found:", len(found), "_count:", _count)
     found = list(found)
     found.sort(key = lambda A : (len(A), tuple(A)))
     for A in found:
@@ -313,11 +313,11 @@ def find_add_algebras(dim):
 
 def main_add():
     dim = 3
-    count = 0
+    _count = 0
     for (unit, mul) in find_add_algebras(dim):
-        count += 1
+        _count += 1
     # cocartesian => unique algebras
-    assert count == 1
+    assert _count == 1
         
 
 
@@ -414,7 +414,7 @@ def find_comodules(dim, counit, comul):
 def main_algebras():
 
     dim = 2
-    count = 0
+    _count = 0
     for (unit, mul) in find_algebras(dim):
         print("unit =")
         print(unit)
@@ -426,9 +426,9 @@ def main_algebras():
 #            #print(act)
 #            dount += 1
 #        print("[%d]"%dount, end="", flush=True)
-        count += 1
+        _count += 1
     print()
-    print("found:", count)
+    print("found:", _count)
 
 
 def get_swap(d):
@@ -439,24 +439,25 @@ def get_swap(d):
         row = d*i + j
         col = d*j + i
         swap[row, col] = 1
-    return UMatrix(swap)
+    #return UMatrix(swap)
+    return swap
 
 #print(get_swap(2))
 #print(get_swap(3))
 
-assert str(get_swap(2)) == str(UMatrix([
-    [1,0,0,0],
-    [0,0,1,0],
-    [0,1,0,0],
-    [0,0,0,1],
-]))
+#assert str(get_swap(2)) == str(UMatrix([
+#    [1,0,0,0],
+#    [0,0,1,0],
+#    [0,1,0,0],
+#    [0,0,0,1],
+#]))
 
 def find_scfa(dim):
     "special Commutative frobenius algebras"
 
     I = UMatrix.identity(dim)
 
-    swap = get_swap(dim)
+    swap = UMatrix(get_swap(dim))
 
     mul = UMatrix.unknown(dim, dim*dim)
     unit = UMatrix.unknown(dim, 1)
@@ -498,7 +499,7 @@ def find_scfa(dim):
         _comul = comul.get_interp(model)
         _counit = counit.get_interp(model)
 
-        yield (_unit, _mul, _counit, _comul)
+        yield SCFA(dim, _unit, _mul, _counit, _comul)
 
         Add( Or( (mul!=_mul) , (unit!=_unit) ) )
 
@@ -512,18 +513,45 @@ def nonzero_vectors(dim):
             vs.append(v)
     return vs
 
+
+class SCFA(object):
+    def __init__(self, dim, unit, mul, counit, comul):
+        assert unit.shape == (dim, 1)
+        assert mul.shape == (dim, dim*dim)
+        assert counit.shape == (1, dim)
+        assert comul.shape == (dim*dim, dim)
+        self.dim = dim
+        self.unit = unit
+        self.mul = mul
+        self.counit = counit
+        self.comul = comul
+        vs = nonzero_vectors(dim)
+        self.copyable = [v for v in vs if comul*v==v@v]
+
+    def __str__(self):
+        s = SMap()
+        dim = self.dim
+        i = 0
+        s[0,i] = str(self.unit); i += 2
+        s[0,i] = str(self.mul); i += dim*dim+1
+        s[0,i] = str(self.counit); i += dim+1
+        s[0,i] = str(self.comul); i += dim+1
+        s[0,i] = str(len(self.copyable))
+        return str(s)
+
+
 def main():
     dim = argv.get("dim", 2)
-    count = 0
+    _count = 0
     freq = {}
     vs = nonzero_vectors(dim)
-    for (unit, mul, counit, comul) in find_scfa(dim):
-        #print("unit =")
-        #print(unit)
-        #print("mul =")
-        #print(mul)
-        count += 1
-        copyable = [v for v in vs if comul*v==v@v]
+    I = Matrix.identity(dim)
+    print(I, I.shape)
+    for A in find_scfa(dim):
+        _count += 1
+        print(A)
+        print()
+        continue
 
         if 1:
             ms = list(find_modules(2, unit, mul))
@@ -536,66 +564,184 @@ def main():
             freq[len(ms)] = freq.get(len(ms), 0) + 1
         else:
             print('.', end='', flush=True)
-            if count%60==0:
-                print(count//60)
+            if _count%60==0:
+                print(_count//60)
     print()
-    print("found:", count)
+    print("found:", _count)
     print(freq)
 
 
-#def main_codes():
+def main_interact():
+    swap = Matrix(get_swap(2))
+    I = Matrix.identity(2)
+    H = Matrix([[0,1],[1,0]])
+    S = Matrix([[1,0],[1,1]])
+
+    algebras = list(find_scfa(2))
+
+    # adjoint structure (zig-zag)
+    for A in algebras:
+        cup = A.comul*A.unit
+        cap = A.counit*A.mul
+        assert (I@cap)*(cup@I) == I
+        assert (cap@I)*(I@cup) == I
+        
+    g_gg = Matrix([
+        [1,0,0,0],
+        [0,0,0,1],
+    ]) # green mul
+
+    r_rr = Matrix([
+        [1,0,0,0],
+        [0,1,1,1],
+    ]) # red mul
+
+    b_bb = Matrix([
+        [1,0,0,0],
+        [0,1,1,1],
+    ]) # blue mul
+
+    green, = [A for A in algebras if A.mul == g_gg]
+    red, = [A for A in algebras if A.mul == r_rr]
+    blue, = [A for A in algebras if A.mul == b_bb]
+
+    g_ = green.unit
+    _g = green.counit
+    gg_g = green.comul
+
+    r_ = red.unit
+    _r = red.counit
+    rr_r = red.comul
+
+    b_ = blue.unit
+    _b = blue.counit
+    bb_b = blue.comul
+    
+    #return
+
+    # interacting Hopf?
+    assert gg_g * r_ == r_@r_ 
+    assert gg_g * b_ == b_@b_ 
+    assert rr_r * g_ == g_@g_
+    assert rr_r * b_ != b_@b_ # wup
+    assert bb_b * g_ == g_@g_
+    assert bb_b * r_ != r_@r_ # wup
+
+    lhs = (gg_g * r_rr)
+    rhs = (r_rr@r_rr) * (I@swap@I) * (gg_g@gg_g)
+    assert lhs == rhs
+
+    lhs = (gg_g * b_bb)
+    rhs = (b_bb@b_bb) * (I@swap@I) * (gg_g@gg_g)
+    assert lhs == rhs
+
+    lhs = (rr_r * b_bb)
+    rhs = (b_bb@b_bb) * (I@swap@I) * (rr_r@rr_r)
+    assert lhs == rhs
+
+    #return
+
+#    assert r_*_r == Matrix([[1,0],[0,0]])
+#    assert r_*_b == Matrix([[0,1],[0,0]])
+#    assert b_*_b == Matrix([[0,0],[0,1]])
+#    assert b_*_r == Matrix([[0,0],[1,0]])
 #
-#    code = construct.get_513()
-#    H = code.H
-#    m, nn = H.shape
-#    n = nn//2
-#    H = H.reshape(m, n, 2)
-#    print(H, H.shape)
-#
-#    # try to tensor product a code with an algebra.. fail
-#
-#    dim = 2
-#    count = 0
-#    vs = nonzero_vectors(dim)
-#    omega = Matrix([[0,1],[1,0]])
-#    I = Matrix.identity(2)
-#    zero = Matrix([[0,0],[0,0]])
-#    for (unit, mul) in find_algebras(dim):
-#    #for (unit, mul, counit, comul) in find_scfa(dim):
-#        copyable = [v for v in vs if v*mul==v@v]
-#        #print("unit =")
-#        #print(unit)
-#        #print("mul =")
-#        #print(mul)
-#        #print("c =", len(copyable))
-#        comul = mul.t
-#        #special = mul * comul == I
-#        #cond = omega*mul == mul * (omega @ I)
-#        #cond = mul * (omega @ I) * comul == omega
-#        #cond = comul * omega * mul == omega @ zero
-#        #op = comul*mul*(I@omega)*comul*mul
-#        op = comul*mul*(omega@I)*comul*mul
-##        if op.sum():
-##            continue
-#        # H : (m, n, 2)
-#        op = (comul * mul).reshape(2, 2, 2, 2)
-#        #print(op.shape)
-#        IH = (I@H).reshape(2, 2, *H.shape)
-#        #print(IH.shape) # (2,2,m,n,2)  (i,j,m,n,k)
-#        H1 = Matrix.einsum("ijmnk,jkuv", IH, op)
-#        #print(H1.shape)
-#        H1 = H1.transpose((0,3,4,1,2))
-#        #print(H1.shape)
-#        H1 = H1.reshape(2*m, 4*n)
-#        #print(H1.shape)
-#        H1 = H1.linear_independent()
-#        code = QCode(H1)
-#        print(code)
-#        #print(code.longstr())
-#        count += 1
-#    print()
-#    print("found:", count)
-#
+#    assert g_*_r == Matrix([[1,0],[1,0]])
+#    assert g_*_b == Matrix([[0,1],[0,1]])
+#    assert r_*_g == Matrix([[1,1],[0,0]])
+#    assert b_*_g == Matrix([[0,0],[1,1]])
+
+    #return
+
+    G = mulclose([S,H])
+    assert len(G) == 6
+    for u in G:
+        lhs = [g_gg, r_rr, b_bb]
+        rhs = [u*mul*(u@u) for mul in lhs]
+        #print([(lhs.index(mul) if mul in lhs else "?") for mul in rhs])
+            #print("g_gg -> r_rr")
+            #print(u)
+            #print()
+
+    assert H*H==I
+    assert H*g_gg == g_gg*(H@H)
+
+    # facet 
+    u = H*S
+    #for mul in [g_gg, r_rr, b_bb]:
+    #    print(  u*g_gg*(u@u) == mul )
+
+    u = S*H*S
+    assert u*u == I
+    assert u*b_bb*(u@u) == b_bb
+    assert u*r_rr*(u@u) == r_rr
+    assert u*g_gg*(u@u) != g_gg
+
+    lhs = r_rr 
+    rhs = H*b_bb*(H@H)
+    #print(lhs)
+    #print()
+    #print(rhs)
+
+#    gen = (
+#        list(G) + [swap] + 
+#        [g_gg, gg_g, g_, _g] +
+#        [r_rr, rr_r, r_, _r])
+#        #[b_bb, bb_b, b_, _b, swap])
+
+    gen = list(G) + [swap]
+    for A in algebras:
+        gen += [A.unit, A.mul, A.counit, A.comul]
+
+    found = set(gen)
+
+    #for mul in [g_gg, r_rr, b_bb]:
+    #  for comul in [gg_g, rr_r, bb_b]:
+    #    print( (I@mul)*(comul@I) )
+    #    print()
+    
+    U = Matrix([
+        [1,0,0,0],
+        [0,0,0,1],
+        [0,0,1,0],
+        [0,1,0,0],
+    ])
+    U = Matrix([
+        [1,0,0,0],
+        [0,1,0,0],
+        [0,0,0,1],
+        [0,0,1,0],
+    ])
+    #search = [b_bb, bb_b, b_, _b]
+    search = [U]
+    bdy = list(found)
+    while bdy:
+
+        _bdy = []
+        for a in bdy:
+          for b in gen:
+            items = [a@b, b@a]
+            if a.shape[1] == b.shape[0]:
+                items.append(a*b)
+            if a.shape[0] == b.shape[1]:
+                items.append(b*a)
+            for c in items:
+                if c.shape[0]*c.shape[1] <= 2**5 and c not in found:
+                    found.add(c)
+                    _bdy.append(c)
+        bdy = _bdy
+        print("[%d:%d]"%(len(found), len(bdy)), end="", flush=True)
+        #if U in found:
+        #    break
+        for a in _bdy:
+            assert len(a.shape) == 2
+        for U in search:
+            if U not in found:
+                break
+        else:
+            break
+
+    print([U in found for U in search])
 
 
 def css_get_wenum(code):
@@ -747,7 +893,7 @@ def main_modules():
     space = SymplecticSpace(n)
 
     sigs = set()
-    count = 0
+    _count = 0
     for C in space.grassmannian(m):
         C2 = C.reshape(m, n, 2)
         #print(C2,'\n')
@@ -765,8 +911,8 @@ def main_modules():
                 sig.append("*")
         sig = ''.join(sig)
         sigs.add(''.join(sig))
-        count += 1
-    print("codes:", count)
+        _count += 1
+    print("codes:", _count)
 
     sigs = list(sigs)
     sigs.sort()
@@ -804,7 +950,7 @@ def main_comodules():
     space = SymplecticSpace(n)
 
     sigs = set()
-    count = 0
+    _count = 0
     for C in space.grassmannian(m):
         C2 = C.reshape(m, n, 2)
         #print(C2,'\n')
@@ -822,8 +968,8 @@ def main_comodules():
                 sig.append("*")
         sig = ''.join(sig)
         sigs.add(''.join(sig))
-        count += 1
-    print("codes:", count)
+        _count += 1
+    print("codes:", _count)
 
     sigs = list(sigs)
     sigs.sort()

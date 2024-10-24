@@ -74,9 +74,9 @@ class Matrix(object):
         self.p = p
         if p>0:
             self.A %= p
-        self.key = (self.p, self.A.tobytes())
-        self._hash = hash(self.key)
         self.shape = A.shape
+        self.key = (self.p, self.shape, self.A.tobytes())
+        self._hash = hash(self.key)
         #assert name != "?"
         assert name != ""
         if type(name) is str:
@@ -194,7 +194,7 @@ class Matrix(object):
 
     def __eq__(self, other):
         assert self.p == other.p
-        assert self.shape == other.shape
+        #assert self.shape == other.shape # too strict
         return self.key == other.key
 
     def __ne__(self, other):
