@@ -661,6 +661,8 @@ def main_interact():
     assert r_*_g == Matrix([[1,1],[0,0]])
     assert b_*_g == Matrix([[0,0],[1,1]])
 
+    #print(g_gg * (g_@I))
+
     G = mulclose([S,H])
     assert len(G) == 6
     for u in G:
@@ -690,11 +692,25 @@ def main_interact():
 #        #[b_bb, bb_b, b_, _b, swap])
 
     vs = [v.reshape(2,1) for v in nonzero_vectors(2)]
-    gen = list(G) + [swap] # + vs
-    for A in algebras:
+    #gen = list(G) + [swap] # + vs
+    gen = []
+#    for A in algebras:
+    for A in [red, green, blue]:
         gen += [A.unit, A.mul, A.counit, A.comul]
+    print()
+    print()
+    print()
+    for A in algebras:
+        if len(A.copyable) == 2:
+            continue
+        print("_"*79)
+        print(A)
+        for v in vs:
+            print(A.mul * (v@I) )
+            print()
 
-    found = set(gen)
+
+    return
 
     for mul in [g_gg, r_rr, b_bb]:
       for comul in [gg_g, rr_r, bb_b]:
@@ -702,7 +718,7 @@ def main_interact():
         #print(m)
         #print()
 
-    return
+    #return
     
     U = Matrix([
         [1,0,0,0],
@@ -717,7 +733,14 @@ def main_interact():
         [0,0,1,0],
     ])
     #search = [b_bb, bb_b, b_, _b]
-    search = [U]
+    #search = [U]
+    monoidal_search(gen, [S], 5)
+
+
+def monoidal_search(gen, search, maxdim=4):
+
+    found = set(gen)
+
     bdy = list(found)
     while bdy:
 
@@ -730,7 +753,7 @@ def main_interact():
             if a.shape[0] == b.shape[1]:
                 items.append(b*a)
             for c in items:
-                if c.shape[0]*c.shape[1] <= 2**4 and c not in found:
+                if c.shape[0]*c.shape[1] <= 2**maxdim and c not in found:
                     found.add(c)
                     _bdy.append(c)
         bdy = _bdy
