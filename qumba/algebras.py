@@ -536,7 +536,7 @@ class SCFA(object):
         s[0,i] = str(self.mul); i += dim*dim+1
         s[0,i] = str(self.counit); i += dim+1
         s[0,i] = str(self.comul); i += dim+1
-        s[0,i] = str(len(self.copyable))
+        s[0,i] = "(%s)"%(len(self.copyable))
         return str(s)
 
 
@@ -585,13 +585,13 @@ def main_interact():
     for A in algebras:
         cup = A.comul*A.unit
         cap = A.counit*A.mul
-        print(A)
-        print(cap, len(A.copyable))
-        print()
+        #print(A)
+        #print(cap, len(A.copyable))
+        #print()
         assert (I@cap)*(cup@I) == I
         assert (cap@I)*(I@cup) == I
 
-    return
+    #return
         
     g_gg = Matrix([
         [1,0,0,0],
@@ -604,9 +604,12 @@ def main_interact():
     ]) # red mul
 
     b_bb = Matrix([
-        [1,0,0,0],
-        [0,1,1,1],
+        [1,1,1,0],
+        [0,0,0,1],
     ]) # blue mul
+
+    for A in algebras:
+        print(A)
 
     green, = [A for A in algebras if A.mul == g_gg]
     red, = [A for A in algebras if A.mul == r_rr]
@@ -623,16 +626,18 @@ def main_interact():
     b_ = blue.unit
     _b = blue.counit
     bb_b = blue.comul
+
+    assert rr_r != bb_b
     
     #return
 
-    # interacting Hopf?
+    # interacting Hopf
     assert gg_g * r_ == r_@r_ 
     assert gg_g * b_ == b_@b_ 
     assert rr_r * g_ == g_@g_
-    assert rr_r * b_ != b_@b_ # wup
+    assert rr_r * b_ == b_@b_
     assert bb_b * g_ == g_@g_
-    assert bb_b * r_ != r_@r_ # wup
+    assert bb_b * r_ == r_@r_
 
     lhs = (gg_g * r_rr)
     rhs = (r_rr@r_rr) * (I@swap@I) * (gg_g@gg_g)
@@ -646,29 +651,24 @@ def main_interact():
     rhs = (b_bb@b_bb) * (I@swap@I) * (rr_r@rr_r)
     assert lhs == rhs
 
-    #return
+    assert r_*_r == Matrix([[0,1],[0,0]])
+    assert r_*_b == Matrix([[1,0],[0,0]])
+    assert b_*_b == Matrix([[0,0],[1,0]])
+    assert b_*_r == Matrix([[0,0],[0,1]])
 
-#    assert r_*_r == Matrix([[1,0],[0,0]])
-#    assert r_*_b == Matrix([[0,1],[0,0]])
-#    assert b_*_b == Matrix([[0,0],[0,1]])
-#    assert b_*_r == Matrix([[0,0],[1,0]])
-#
-#    assert g_*_r == Matrix([[1,0],[1,0]])
-#    assert g_*_b == Matrix([[0,1],[0,1]])
-#    assert r_*_g == Matrix([[1,1],[0,0]])
-#    assert b_*_g == Matrix([[0,0],[1,1]])
-
-    #return
+    assert g_*_b == Matrix([[1,0],[1,0]])
+    assert g_*_r == Matrix([[0,1],[0,1]])
+    assert r_*_g == Matrix([[1,1],[0,0]])
+    assert b_*_g == Matrix([[0,0],[1,1]])
 
     G = mulclose([S,H])
     assert len(G) == 6
     for u in G:
-        lhs = [g_gg, r_rr, b_bb]
-        rhs = [u*mul*(u@u) for mul in lhs]
-        #print([(lhs.index(mul) if mul in lhs else "?") for mul in rhs])
-            #print("g_gg -> r_rr")
-            #print(u)
-            #print()
+        muls = [g_gg, r_rr, b_bb]
+        lhs = [u*mul for mul in muls]
+        rhs = [mul*(u@u) for mul in muls]
+        idxs = [lhs.index(mul) for mul in rhs]
+        assert set(idxs) == {0, 1, 2}
 
     assert H*H==I
     assert H*g_gg == g_gg*(H@H)
@@ -680,15 +680,8 @@ def main_interact():
 
     u = S*H*S
     assert u*u == I
-    assert u*b_bb*(u@u) == b_bb
+    assert u*b_bb*(u@u) == g_gg
     assert u*r_rr*(u@u) == r_rr
-    assert u*g_gg*(u@u) != g_gg
-
-    lhs = r_rr 
-    rhs = H*b_bb*(H@H)
-    #print(lhs)
-    #print()
-    #print(rhs)
 
 #    gen = (
 #        list(G) + [swap] + 
@@ -696,16 +689,20 @@ def main_interact():
 #        [r_rr, rr_r, r_, _r])
 #        #[b_bb, bb_b, b_, _b, swap])
 
-    gen = list(G) + [swap]
+    vs = [v.reshape(2,1) for v in nonzero_vectors(2)]
+    gen = list(G) + [swap] # + vs
     for A in algebras:
         gen += [A.unit, A.mul, A.counit, A.comul]
 
     found = set(gen)
 
-    #for mul in [g_gg, r_rr, b_bb]:
-    #  for comul in [gg_g, rr_r, bb_b]:
-    #    print( (I@mul)*(comul@I) )
-    #    print()
+    for mul in [g_gg, r_rr, b_bb]:
+      for comul in [gg_g, rr_r, bb_b]:
+        m = (I@mul)*(comul@I)
+        #print(m)
+        #print()
+
+    return
     
     U = Matrix([
         [1,0,0,0],
@@ -713,7 +710,7 @@ def main_interact():
         [0,0,1,0],
         [0,1,0,0],
     ])
-    U = Matrix([
+    U1 = Matrix([
         [1,0,0,0],
         [0,1,0,0],
         [0,0,0,1],
@@ -733,7 +730,7 @@ def main_interact():
             if a.shape[0] == b.shape[1]:
                 items.append(b*a)
             for c in items:
-                if c.shape[0]*c.shape[1] <= 2**5 and c not in found:
+                if c.shape[0]*c.shape[1] <= 2**4 and c not in found:
                     found.add(c)
                     _bdy.append(c)
         bdy = _bdy
@@ -879,7 +876,8 @@ def main_modules():
 
     found = set()
     for unit, mul in find_algebras(a_dim):
-    #for unit, mul, _, _ in find_scfa(a_dim):
+    #for A in find_scfa(a_dim):
+        #unit, mul = A.unit, A.mul
         for act in find_modules(m_dim, unit, mul):
             lins = []
             #found.append((unit, mul, act))
@@ -899,7 +897,7 @@ def main_modules():
     m, n = 2, 4
     space = SymplecticSpace(n)
 
-    sigs = set()
+    sigs = {}
     _count = 0
     for C in space.grassmannian(m):
         C2 = C.reshape(m, n, 2)
@@ -917,14 +915,14 @@ def main_modules():
             else:
                 sig.append("*")
         sig = ''.join(sig)
-        sigs.add(''.join(sig))
+        sigs[sig] = sigs.get(sig, 0) + 1
         _count += 1
     print("codes:", _count)
 
-    sigs = list(sigs)
-    sigs.sort()
-    for i,sig in enumerate(sigs):
-        print(sig, i)
+    keys = list(sigs)
+    keys.sort()
+    for i,key in enumerate(keys):
+        print(key, i, sigs[key])
     
 
 def main_comodules():
