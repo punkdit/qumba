@@ -710,7 +710,7 @@ def main_interact():
             print()
 
 
-    return
+    #return
 
     for mul in [g_gg, r_rr, b_bb]:
       for comul in [gg_g, rr_r, bb_b]:
@@ -726,6 +726,11 @@ def main_interact():
         [0,0,1,0],
         [0,1,0,0],
     ])
+
+    a = U@I
+    b = I@U
+    print( a*b*a == b*a*b )
+
     U1 = Matrix([
         [1,0,0,0],
         [0,1,0,0],
@@ -734,7 +739,7 @@ def main_interact():
     ])
     #search = [b_bb, bb_b, b_, _b]
     #search = [U]
-    monoidal_search(gen, [S], 5)
+    #monoidal_search(gen, [S], 5)
 
 
 def monoidal_search(gen, search, maxdim=4):
@@ -769,6 +774,73 @@ def monoidal_search(gen, search, maxdim=4):
             break
 
     print([U in found for U in search])
+
+
+def main_hopf():
+    dim = argv.get("dim", 2)
+    swap = Matrix(get_swap(dim))
+    I = Matrix.identity(dim)
+
+    algebras = list(find_scfa(dim))
+    print("algebras:", len(algebras))
+
+    algebras.sort(key = lambda A : len(A.copyable))
+
+    algebras = [A for A in algebras if len(A.copyable)==dim]
+    #algebras = [A for A in algebras if len(A.copyable)]
+    names = {}
+    for i,A in enumerate(algebras):
+        n = len(A.copyable)
+        stem = "abcdefgh"[n]
+        names[i] = "%s%d"%(stem, i)
+
+    f = open("hopf_%d.dot"%dim, "w")
+    print("graph {", file=f)
+
+    # adjoint structure (zig-zag)
+    cup = I.reshape(dim*dim,1)
+    cap = cup.t
+    for i, A in enumerate(algebras):
+        cup = A.comul*A.unit
+        cap = A.counit*A.mul
+        #print(A)
+        #print(cap, len(A.copyable))
+        #print()
+        assert (I@cap)*(cup@I) == I
+        assert (cap@I)*(I@cup) == I
+
+        aa_a, a_aa = A.comul, A.mul
+        _a, a_ = A.counit, A.unit
+        for j, B in enumerate(algebras):
+            if A==B:
+                print(" ", end='')
+                continue
+            bb_b, b_bb = B.comul, B.mul
+            _b, b_ = B.counit, B.unit
+
+            if aa_a * b_ != b_@b_ or bb_b*a_ != a_@a_:
+                print(".", end='')
+                continue
+            
+            lhs = (aa_a * b_bb)
+            rhs = (b_bb@b_bb) * (I@swap@I) * (aa_a@aa_a)
+            if lhs != rhs:
+                print(".", end='')
+                continue
+
+            lhs = (bb_b * a_aa)
+            rhs = (a_aa@a_aa) * (I@swap@I) * (bb_b@bb_b)
+            if lhs != rhs:
+                print(".", end='')
+                continue
+
+            print("*", end='')
+            if i<j:
+                print("  %s -- %s;"%(names[i],names[j]), file=f)
+        print()
+    print("}", file=f)
+
+
 
 
 def css_get_wenum(code):
