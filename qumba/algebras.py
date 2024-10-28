@@ -545,12 +545,24 @@ def main():
     _count = 0
     freq = {}
     vs = nonzero_vectors(dim)
+    vs = [v.reshape(dim,1) for v in vs]
     I = Matrix.identity(dim)
     print(I, I.shape)
     for A in find_scfa(dim):
         _count += 1
-        print(A)
-        print()
+        div = True
+        for v in vs:
+            m = A.mul*(v@I)
+            if m*(~m) != I:
+                div = False
+                break
+        print(len(A.copyable), "*" if div else " ", end=" ")
+        if _count%16 == 0:
+            print(_count)
+        key = len(A.copyable), div # this should class'ify up to dim=4
+        freq[key] = freq.get(key, 0) + 1
+        #print(A)
+        #print()
         continue
 
         if 1:
