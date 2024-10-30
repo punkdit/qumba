@@ -145,6 +145,10 @@ class UMatrix(object):
         if A is None:
             A = numpy.empty(shape, dtype=object)
             A[:] = zero
+        if isinstance(A, Matrix):
+            A = A.A
+        if isinstance(A, numpy.ndarray) and A.dtype is numpy.int8:
+            A = A.astype(int)
         self.A = A = numpy.array(A, dtype=object)
         assert shape is None or shape == A.shape
         self.shape = A.shape

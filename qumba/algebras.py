@@ -504,12 +504,13 @@ def find_scfa(dim):
         Add( Or( (mul!=_mul) , (unit!=_unit) ) )
 
 
-def nonzero_vectors(dim):
+def all_vectors(dim, nonzero=True):
     vs = []
     for idxs in numpy.ndindex((2,)*dim):
         v = numpy.array(idxs)
         v = Matrix(v)
-        if v.sum():
+        v = v.reshape(dim, 1)
+        if not nonzero or v.sum():
             vs.append(v)
     return vs
 
@@ -525,26 +526,191 @@ class SCFA(object):
         self.mul = mul
         self.counit = counit
         self.comul = comul
-        vs = nonzero_vectors(dim)
+        vs = all_vectors(dim)
         self.copyable = [v for v in vs if comul*v==v@v]
+        self.key = (dim, unit, mul, counit, comul)
+        self.I = Matrix.identity(dim)
+
+    def __eq__(self, other):
+        return self.key == other.key
+
+    def __hash__(self):
+        return hash(self.key)
+
+    def act(self, g):
+        unit, mul, counit, comul = self.unit, self.mul, self.counit, self.comul
+        gi = ~g
+        unit = g*unit
+        mul = g*mul*(gi@gi)
+        counit = counit*gi
+        comul = (g@g)*comul*gi
+        return SCFA(self.dim, unit, mul, counit, comul)
 
     def __str__(self):
         s = SMap()
         dim = self.dim
         i = 0
-        s[0,i] = str(self.unit); i += 2
         s[0,i] = str(self.mul); i += dim*dim+1
-        s[0,i] = str(self.counit); i += dim+1
+        s[0,i] = str(self.unit); i += 2
         s[0,i] = str(self.comul); i += dim+1
+        s[0,i] = str(self.counit); i += dim+1
         s[0,i] = "(%s)"%(len(self.copyable))
         return str(s)
+
+    def __matmul__(A, B):
+        assert A.dim==B.dim
+        d = A.dim
+        unit = A.unit@B.unit
+        counit = A.counit@B.counit
+        swap = Matrix(get_swap(d))
+        perm = (A.I @ swap @ B.I) 
+        mul = (A.mul @ B.mul) * perm
+        comul = perm * (A.comul@B.comul)
+        return SCFA(d*d, unit, mul, counit, comul)
+        
+
+    @classmethod
+    def matrix(cls, d):
+        "d*d matrix algebra"
+        dd = d*d
+        I = Matrix.identity(d)
+        cup = I.reshape(dd, 1)
+        cap = I.reshape(1, dd)
+        mul = I@cap@I
+        comul = I@cup@I
+        return SCFA(dd, cup, mul, cap, comul)
+
+
+def main_matrix():
+    dim = argv.get("dim", 2)
+    vs = all_vectors(dim)
+    vs = [v.reshape(dim,1) for v in vs]
+    I = Matrix.identity(dim)
+    As = list(find_scfa(dim))
+    As.sort(key = lambda A: (len(A.copyable), A.mul))
+
+    M = SCFA.matrix(dim)
+    print(M)
+    print()
+    dd = dim**2
+
+    I = Matrix.identity(dd)
+    unit, mul, counit, comul = M.unit, M.mul, M.counit, M.comul
+    assert comul*mul == (mul@I)*(I@comul)
+    assert comul*mul == (I@mul)*(comul@I)
+    #print(mul*comul) # zero
+
+    for u in all_vectors(dd, False):
+        print(mul * (u@I))
+        print()
+
+
+    A = As[0] @ As[3]
+    #print(A)
+
+    solver = Solver()
+    Add = solver.add
+
+    g = UMatrix.unknown(dd, dd)
+    gi = UMatrix.unknown(dd, dd)
+    I = Matrix.identity(dd)
+    Add(g*gi==I)
+
+    #print(g*M.unit)
+    #print(UMatrix(A.unit.A.astype(int)))
+    #print(UMatrix(A.unit))
+
+    Add(UMatrix(A.unit) == g*M.unit )
+    Add(UMatrix(A.mul) == g*M.mul*(gi@gi) )
+    #Add(UMatrix(A.counit) == M.counit*gi )
+    #Add(UMatrix(A.comul) == (g@g)*M.comul*gi )
+
+    result = solver.check()
+    assert str(result) == "unsat" # wup
+    return
+
+    model = solver.model()
+    g = g.get_interp(model)
+
+    print(g)
+
+
+
+
+def main_orbit():
+    dim = argv.get("dim", 3)
+    vs = all_vectors(dim)
+    vs = [v.reshape(dim,1) for v in vs]
+    I = Matrix.identity(dim)
+    As = list(find_scfa(dim))
+    As.sort(key = lambda A: (len(A.copyable), A.mul))
+
+    from qumba.building import Algebraic
+    G = Algebraic.SL(dim)
+    print(len(G))
+
+    for A in As:
+        B = A.act(I)
+        assert B == A
+
+    for A in As:
+        H = []
+        for g in G:
+            B = A.act(g)
+            #print(B)
+            assert B in As
+            if A.act(g) == A:
+                H.append(g)
+        print(len(H), end=" ")
+    print()
+
+
+def main_latex():
+    dim = argv.get("dim", 2)
+    vs = all_vectors(dim, False)
+    I = Matrix.identity(dim)
+    As = list(find_scfa(dim))
+    As.sort(key = lambda A: (len(A.copyable), A.mul))
+
+    print()
+
+    """
+    \newcommand\T{\rule{0pt}{5.6ex}}       % Top strut
+    \newcommand\B{\rule[-4.2ex]{0pt}{0pt}} % Bottom strut
+    """
+
+    print(r"\hline")
+    for A in As:
+        ops = [A.mul, A.unit, A.comul, A.counit]
+        items = [r"\Field_4" if len(A.copyable)==0 else r"\Field_2^2"]
+        items += ["%s"%op.latex() for op in ops]
+        items = ["$%s$"%item for item in items]
+        row = ' & '.join(items)
+        print(row, r'\T\B \\')
+        print(r"\hline")
+
+    print('\n'*3)
+
+    for A in As:
+        items = [r"\Field_4" if len(A.copyable)==0 else r"\Field_2^2"]
+        ops = [A.mul*(v@I) for v in vs]
+        #ops.sort(key = lambda A : (A==I))
+        #ops.remove(I)
+        #ops.insert(1, I)
+        items += [m.latex() for m in ops]
+        items = ["$%s$"%item for item in items]
+        row = ' & '.join(items)
+        print(row, r'\T\B \\')
+        print(r"\hline")
+    print()
+
 
 
 def main():
     dim = argv.get("dim", 2)
     _count = 0
     freq = {}
-    vs = nonzero_vectors(dim)
+    vs = all_vectors(dim)
     vs = [v.reshape(dim,1) for v in vs]
     I = Matrix.identity(dim)
     print(I, I.shape)
@@ -556,12 +722,12 @@ def main():
             if m*(~m) != I:
                 div = False
                 break
-        print(len(A.copyable), "*" if div else " ", end=" ")
-        if _count%16 == 0:
-            print(_count)
+        #print(len(A.copyable), "*" if div else " ", end=" ")
+        #if _count%16 == 0:
+            #print(_count)
         key = len(A.copyable), div # this should class'ify up to dim=4
         freq[key] = freq.get(key, 0) + 1
-        #print(A)
+        #print(A.mul.latex())
         #print()
         continue
 
@@ -583,13 +749,15 @@ def main():
     print(freq)
 
 
-def main_interact():
+def main_bialgebra():
+    vs = all_vectors(2)
     swap = Matrix(get_swap(2))
     I = Matrix.identity(2)
     H = Matrix([[0,1],[1,0]])
     S = Matrix([[1,0],[1,1]])
 
     algebras = list(find_scfa(2))
+    algebras.sort(key = lambda A: (len(A.copyable), A.mul))
 
     # adjoint structure (zig-zag)
     cup = I.reshape(4,1)
@@ -623,6 +791,30 @@ def main_interact():
     for A in algebras:
         print(A)
 
+    A = algebras[0]
+    for v in vs:
+        lhs = A.comul*v
+        for u in vs:
+          for w in vs:
+            rhs = v@u
+            #print( lhs==rhs, end=" ")
+        #print()
+        #print(lhs)
+        #print("=/=")
+        #print(rhs)
+        #print()
+
+    for A in algebras:
+        cup = A.comul*A.unit
+        cap = A.counit*A.mul
+        #print(A)
+        #print(cap, len(A.copyable))
+        #print()
+        assert (I@cap)*(cup@I) == I
+        assert (cap@I)*(I@cup) == I
+
+    #return
+
     green, = [A for A in algebras if A.mul == g_gg]
     red, = [A for A in algebras if A.mul == r_rr]
     blue, = [A for A in algebras if A.mul == b_bb]
@@ -643,7 +835,7 @@ def main_interact():
     
     #return
 
-    # interacting Hopf
+    # bialgebra
     assert gg_g * r_ == r_@r_ 
     assert gg_g * b_ == b_@b_ 
     assert rr_r * g_ == g_@g_
@@ -703,7 +895,6 @@ def main_interact():
 #        [r_rr, rr_r, r_, _r])
 #        #[b_bb, bb_b, b_, _b, swap])
 
-    vs = [v.reshape(2,1) for v in nonzero_vectors(2)]
     #gen = list(G) + [swap] # + vs
     gen = []
 #    for A in algebras:
@@ -977,7 +1168,7 @@ def main_modules():
     m_dim = 2 # module dim is 2 for qubits
     a_dim = 2 # algebra dim
 
-    vs = nonzero_vectors(a_dim)
+    vs = all_vectors(a_dim)
     vs = [v.reshape(a_dim, 1) for v in vs]
     I = Matrix.identity(m_dim)
 
@@ -1037,7 +1228,7 @@ def main_comodules():
     m_dim = 2 # comodule dim is 2 for qubits
     a_dim = 2 # algebra dim
 
-    vs = nonzero_vectors(a_dim)
+    vs = all_vectors(a_dim)
     #vs = [v.reshape(a_dim, 1) for v in vs]
     I = Matrix.identity(m_dim)
 
