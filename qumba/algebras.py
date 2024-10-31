@@ -582,17 +582,17 @@ class SCFA(object):
 
 
 def main_matrix():
-    dim = argv.get("dim", 2)
-    vs = all_vectors(dim)
-    vs = [v.reshape(dim,1) for v in vs]
-    I = Matrix.identity(dim)
-    As = list(find_scfa(dim))
+    d = argv.get("d", 2)
+    vs = all_vectors(d)
+    vs = [v.reshape(d,1) for v in vs]
+    I = Matrix.identity(d)
+    As = list(find_scfa(d))
     As.sort(key = lambda A: (len(A.copyable), A.mul))
 
-    M = SCFA.matrix(dim)
+    M = SCFA.matrix(d)
     print(M)
     print()
-    dd = dim**2
+    dd = d**2
 
     I = Matrix.identity(dd)
     unit, mul, counit, comul = M.unit, M.mul, M.counit, M.comul
@@ -600,10 +600,31 @@ def main_matrix():
     assert comul*mul == (I@mul)*(comul@I)
     #print(mul*comul) # zero
 
-    for u in all_vectors(dd, False):
-        print(mul * (u@I))
+    #for u in all_vectors(dd, False):
+    #    print(mul * (u@I))
+    #    print()
+
+    #for u in all_vectors(d, False):
+    #  for v in all_vectors(d, False):
+    #    print(u @ v.t)
+    #    print()
+
+    A, B = As[0], As[3]
+
+    I = Matrix.identity(d)
+    ops = []
+    for A in As:
+      for u in all_vectors(d):
+        a = A.mul*(u@I)
+        ops.append(a)
+
+    G = mulclose(ops)
+    print(len(G))
+    for g in G:
+        print(g)
         print()
 
+    return
 
     A = As[0] @ As[3]
     #print(A)
