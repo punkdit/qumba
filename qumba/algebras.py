@@ -171,14 +171,19 @@ def main_rains():
     found.sort(key = lambda A : (len(A), tuple(A)))
     for A in found:
         print("|A| = ", len(A))
-        A.dump()
 
+        comm = True
         for a in A:
             assert conj(a) in A
             for b in A:
                 assert a+b in A
                 assert a*b in A
                 assert conj(a*b) == conj(b)*conj(a)
+                if a*b != b*a:
+                    comm = False
+        print("comm:", comm)
+        A.dump()
+
 
     for A in found:
         sig = ['.']*len(found)
