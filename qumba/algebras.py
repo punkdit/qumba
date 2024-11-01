@@ -974,7 +974,6 @@ def main_bialgebra():
 def monoidal_search(gen, search, maxdim=4):
 
     found = set(gen)
-
     bdy = list(found)
     while bdy:
 
@@ -1003,6 +1002,68 @@ def monoidal_search(gen, search, maxdim=4):
             break
 
     print([U in found for U in search])
+
+
+def main_spider():
+    vs = all_vectors(2)
+    swap = Matrix(get_swap(2))
+    I = Matrix.identity(2)
+    H = Matrix([[0,1],[1,0]])
+    S = Matrix([[1,0],[1,1]])
+
+    algebras = list(find_scfa(2))
+    algebras.sort(key = lambda A: (len(A.copyable), A.mul))
+
+    #A = algebras[0]
+    #print(A)
+
+    gen = [I]
+#    for A in [algebras[0], algebras[1]]:
+    for A in algebras:
+        gen += [A.mul, A.unit, A.comul, A.counit]
+    gen = set(gen)
+    M = monoidal_gen(gen)
+    print(len(M))
+
+    #for g in M:
+    #    print(g.shape, end=' ')
+    k = 2
+    I = Matrix.identity(2**k)
+
+    M = [g for g in M if g.shape==(2**k, 2**k)]
+    G = []
+    for g in M:
+        gi = ~g
+        if gi is None:
+            continue
+        #print('/')
+        #print(g*gi)
+        if g*gi == I:
+            G.append(g)
+    G = mulclose(G)
+    print("|G| =", len(G))
+
+
+def monoidal_gen(gen, maxdim=4):
+
+    found = set(gen)
+    bdy = list(found)
+    while bdy:
+
+        _bdy = []
+        for a in bdy:
+          for b in gen:
+            items = [a@b, b@a]
+            if a.shape[1] == b.shape[0]:
+                items.append(a*b)
+            if a.shape[0] == b.shape[1]:
+                items.append(b*a)
+            for c in items:
+                if c.shape[0]*c.shape[1] <= 2**maxdim and c not in found:
+                    found.add(c)
+                    _bdy.append(c)
+        bdy = _bdy
+    return found
 
 
 def main_hopf():

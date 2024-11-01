@@ -803,7 +803,7 @@ def find_residues():
 
         code = build_qr_code(n)
         if code is None:
-            #print()
+            assert (n%4) != 1
             continue
 
         print(n, n%4, n%8, code, end=" ")
@@ -970,11 +970,16 @@ def build_qr_code(n):
         H1 = H*op
         H = H.concatenate(H1)
 
+    #if 1: # check if we get GF(4) linear code
+    #    H = H.linear_independent()
+    #    op = reduce(mul, [space.H(i)*space.S(i) for i in range(n)])
+    #    H1 = H*op
+    #    U = H1.t.solve(H.t)
+    #    print(n%8, U is not None)
+
     A = H * F * H.t
     if A.sum() != 0:
         return None
-
-    #print(strop(code.H))
 
     H = H.linear_independent()
     code = QCode(H)
