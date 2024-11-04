@@ -577,6 +577,7 @@ class CSSCode(object):
         t = floor((d-1)/2).
         """
     
+        count = 0
         while 1:
             k = n-mx-mz
             assert k>=0
@@ -604,7 +605,9 @@ class CSSCode(object):
             dx,dz = C.bz_distance()
             if min(dx,dz) >= distance:
                 break
-            print('.', flush=True, end='')
+            count += 1
+            if count%16 == 0:
+                print('.', flush=True, end='')
         print() 
         return C
     
@@ -1139,26 +1142,16 @@ def test_distance():
 
 
 def css_sample():
-#    n = argv.get("n", 15)
-#    k = argv.get("k", 1)
-#    d = argv.get("d", 3)
-#    mx = argv.get("mx", (n-k)//2)
-#    mz = argv.get("mz", n-k-mx)
-#    k = n-mx-mz
-#    assert k>0
-
     n, k, d = argv.get("code", (7,1,3))
     mx = argv.get("mx", (n-k)//2)
     mz = argv.get("mz", n-k-mx)
 
     code = CSSCode.random(n, mx, mz, d)
-    #d0 = distance_z3_css(code)
-    #print(code, d0)
     
     from qumba.qcode import strop
     print()
     print(strop(code.to_qcode().H).replace(".","I"))
-    print(code, code.bz_distance())
+    print(code)
 
 
 def css_random():
