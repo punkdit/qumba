@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
-from time import time
+from time import time, sleep
 
 import pymongo
+from bson.objectid import ObjectId
 
 from qumba.qcode import strop
 from qumba.argv import argv
@@ -40,9 +41,13 @@ def add(code, force=False):
         "desc" : code.desc,
         "created" : int(time()), # is this UTC? I don't know. Do we care?
     })
+
+    if code.n < 100:
+        code.get_tp()
     for (k,v) in code.attrs.items():
         assert k not in data
         data[k] = v
+
     codes.insert_one(data)
     print("qumba.db.add: %s added." % str(code))
 
@@ -106,12 +111,15 @@ def get_codes():
             value = str(value)
         if value is not None:
             ns[attr] = value
+    for k,v in argv.argmap.items():
+        if k == "_id":
+            v = ObjectId(v)
+        if k not in ns:
+            ns[k] = v
+        #print(arg)
     if not ns:
-        return
+        return []
     print("query:", ns)
-    #for code in get(**ns):
-    #    yield code
-
     codes = list(get(**ns))
     codes.sort(key = lambda code : (code.k, code.d or 0))
     return codes
@@ -145,8 +153,8 @@ def query():
                 dx, dz = code.bz_distance()
                 print(dx, dz)
 
-        if argv.update:
-            update(code)
+        #if argv.update:
+        #    update(code)
 
 
 def test():
@@ -176,6 +184,55 @@ def dump():
     cursor = codes.find()
     for data in cursor:
         print(data)
+
+
+def normalize():
+    from qumba.qcode import QCode
+    n = 4
+    while n < 100:
+        query = {"n" : n}
+        cursor = codes.find(query)
+        count = 0
+        for data in cursor:
+            count += 1
+            attrs = {}
+            for k,v in data.items():
+                if k not in list("HTL"):
+                    attrs[k] = v
+            #print("qumba.db.get:", attrs)
+            #print(data)
+            code = QCode.fromstr(
+                data["H"],
+                data.get("T"),
+                data.get("L"),
+                **attrs)
+            print(code, end=" ", flush=True)
+            if count % 8 == 0:
+                print()
+            #print('\t', code.attrs)
+            code.is_gf4()
+            code.is_css()
+            code.is_selfdual()
+            data.update(code.attrs)
+            #print('\t', code.attrs)
+            d_set = {}
+            #d_unset = {}
+            #if 'sd' in data:
+            #    #del data['sd'] # rename as selfdual
+            #    d_unset = 
+            data["tp"] = code.get_tp()
+            #print(data)
+            key = {"_id":data["_id"]}
+            del data["_id"]
+            res = codes.update_one(key, {"$set":data})
+            #print(res)
+            #return
+        print()
+        sleep(1)
+        n += 1
+
+
+            
 
 
 def drop():

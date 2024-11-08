@@ -968,8 +968,21 @@ class QCode(object):
     def is_selfdual(self):
         tgt = self.apply_H()
         sd = self.is_equiv(tgt)
-        self.attrs["sd"] = sd
+        self.attrs["selfdual"] = sd
         return sd
+
+    def get_tp(self):
+        tp = "none"
+        if self.is_gf4():
+            tp = "gf4"
+        if self.is_css():
+            tp = "css"
+        if self.is_selfdual():
+            tp = "selfdual"
+        if self.is_selfdual() and self.is_css():
+            tp = "selfdualcss"
+        self.attrs["tp"] = tp
+        return tp
 
     def get_logical(self, other, check=False):
         if check:
