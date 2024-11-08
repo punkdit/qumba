@@ -1285,6 +1285,7 @@ def selfdual_random_slow():
     print(code, code.bz_distance())
     print(code.longstr())
 
+    write_to_db(code, "qumba.csscode.selfdual_random_slow")
 
 
 def selfdual_random():
@@ -1344,7 +1345,7 @@ def selfdual_random():
             if numpy.min(cols) == 0:
                 continue
             assert numpy.min(H.sum(1))-1 >= minweight
-            assert numpy.max(H.sum(1))-1 <= maxweight
+            assert numpy.max(H.sum(1))-1 <= (maxweight or n)
             #if numpy.min(H.sum(1)) == 6:
             #    continue
             #assert dot2(H, H.transpose()).sum() == 0
@@ -1365,6 +1366,7 @@ def selfdual_random():
 
     #N, gen = code.to_qcode().get_autos()
     #print(N)
+    write_to_db(code, "qumba.csscode.selfdual_random")
 
 
 def selfdual():
@@ -1454,12 +1456,26 @@ def selfdual():
             print("H =")
             print(shortstr(code.Hx))
             print(code.longstr())
+            write_to_db(code, "qumba.csscode.selfdual")
             break
 
         idx = backtrack()
         if idx is None:
             print("fini")
             break
+
+
+def write_to_db(code, desc):
+    print()
+    print("write to db?", end=" ", flush=True)
+    val = input()
+    if val=="y":
+        code = code.to_qcode()
+        code.desc = desc
+        from qumba import db
+        db.add(code)
+        print()
+
 
 
 

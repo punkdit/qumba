@@ -45,7 +45,7 @@ def add(code, force=False):
     if code.n < 100:
         code.get_tp()
     for (k,v) in code.attrs.items():
-        assert k not in data
+        assert k not in data, "%r found in %s"%(k,data)
         data[k] = v
 
     codes.insert_one(data)
