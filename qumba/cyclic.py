@@ -314,7 +314,11 @@ def main_gf4():
             print(strop(code.H))
         #print(code.longstr())
         #print()
-        search_qr(code)
+        if argv.search_qr:
+            search_qr(code)
+        if argv.store_db:
+            from qumba import db
+            db.add(code)
         continue
         L = tgt.get_logical(code)
         assert (L**n).is_identity()
@@ -982,7 +986,7 @@ def build_qr_code(n):
         return None
 
     H = H.linear_independent()
-    code = QCode(H)
+    code = QCode(H, cyclic=True)
 
     if code.n < 20:
         code.distance("z3")
@@ -1030,7 +1034,7 @@ def make_cyclic():
     A = H * F * H.t
     assert A.sum() == 0
     H = H.linear_independent()
-    code = QCode(H)
+    code = QCode(H, cyclic=True)
 
     print(code)
     print(strop(code.H))
@@ -1135,7 +1139,7 @@ def find_cyclic():
         h = h.linear_independent()
         if len(h) == n or len(h) == 0: # k==0
             continue
-        code = QCode(h)
+        code = QCode(h, cyclic=True)
 
         code.distance("z3")
 
