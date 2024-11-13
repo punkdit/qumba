@@ -17,6 +17,7 @@ db = client["qumba"]
 codes = db["codes"]
 
 def add(code, force=False):
+    code = code.to_qcode()
     ichar = "I"
     sep = " "
     data = {

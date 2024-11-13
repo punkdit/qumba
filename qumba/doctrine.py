@@ -4,7 +4,7 @@ from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
 from operator import add, mul, matmul
 
-from qumba.solve import kernel, dot2, normal_form, enum2
+from qumba.solve import kernel, dot2, normal_form, enum2, shortstr
 from qumba.clifford import Clifford, green, red, I, r2, half
 from qumba.qcode import QCode, strop, Matrix
 from qumba.construct import all_codes
@@ -267,10 +267,24 @@ def main_unwrap():
       print()
             
 
-def all_hypergraph_product():
+def distance(H):
+    if H.sum(0).min() == 0:
+        return 1
+    K = kernel(H)
+    k, n = K.shape
+    w = n
+    for bits in enum2(k):
+        U = dot2(bits, K)
+        w1 = U.sum()
+        if w1 and w1 < w:
+            w = w1
+    return int(w)
+
+
+def test_hypergraph_product():
     from qumba.csscode import CSSCode
     from qumba import construct
-    d = argv.get("d", 3)
+    d = argv.get("d", 4)
     #m, n = 4, 5 # --> [[41,1,4]] ...
     #m, n = 3,5 # --> [[34,4,3]] with weight 4,5 stabilizers
     #m, n = 3,4 # --> [[25,1,4]] with weight 3,5 stabilizers
@@ -281,13 +295,25 @@ def all_hypergraph_product():
     #m0, n0, m1, n1 = 3,4, 2,4 # --> None
     #m0, n0, m1, n1 = 3,4, 3,5 # --> [[29,2,3]] wt 3,4
     #m0, n0, m1, n1 = 2,3, 3,5 # --> [[21,2,3]] wt 3,4,5
-    m0, n0, m1, n1 = 4,5, 4,6 # --> 
-    codes0 = list(qchoose_2(n0, m0))
-    codes0 = [H for H in codes0 if H.sum(0).min()>0]
-    codes1 = list(qchoose_2(n1, m1))
-    codes1 = [H for H in codes1 if H.sum(0).min()>0]
+    #m0, n0, m1, n1 = 3,5, 3,5 # --> [[34, 4, 3]]
+    m0, n0, m1, n1 = 4,5, 4,6 # --> [[46, 2, 4]]
+
+    m0, n0, m1, n1 = 4,5, 4,5 # --> [[41, 1, 5]]
+
+    m0, n0, m1, n1 = 4,6, 4,6 # --> [[52, 4, 4]]
+    m0, n0, m1, n1 = 4,6, 4,7 # --> [[58, 6, 4]]
+    m0, n0, m1, n1 = 4,7, 4,7 # --> [[65, 9, 4]]
+    m0, n0, m1, n1 = 6,7, 6,7 # --> [[65, 9, 4]]
+
+    codes0 = [H for H in qchoose_2(n0, m0) if distance(H) >= d]
+    codes1 = [H for H in qchoose_2(n1, m1) if distance(H) >= d]
     print(len(codes0))
     print(len(codes1))
+    #return
+    print("dz:",max([distance(H) for H in codes0]))
+    print("dx:",max([distance(H) for H in codes1]))
+
+    desc = set()
     for H0 in codes0:
       #print(H0)
       #print(H0.sum(0))
@@ -295,16 +321,59 @@ def all_hypergraph_product():
         Hx, Hz = construct.hypergraph_product(H0, H1.transpose())
         code = CSSCode(Hx=Hx, Hz=Hz)
         print('.', end='', flush=True)
-        #dx, dz = code.distance()
-        dx = code.x_distance(d-1)
-        if dx <= d-1:
+        dx, dz = code.bz_distance()
+        if min(dx, dz) < d:
             continue
-        dz = code.z_distance(d-1)
-        if dz <= d-1:
+        key = str(code)
+        if key not in desc:
+            print()
+            print(code, distance(H0), distance(H1))
+            #print(code.longstr())
+            desc.add(key)
+
+
+def all_hypergraph_product():
+    from qumba.csscode import CSSCode
+    from qumba import construct
+
+    codes = []
+    for n in range(3, 9):
+      for m in range(1, n):
+        found = []
+        d = 1
+        for H in qchoose_2(n, m):
+            d1 = distance(H)
+            if d1==d:
+                found.append(H)
+            elif d1 > d:
+                found = [H]
+                d = d1
+        if d < 3:
             continue
+        found.sort(key = lambda H:H.sum())
+        codes.append(found[0])
+        print(n, m, len(found), d)
+        print([int(H.sum()) for H in found])
         print()
-        print(code, dx, dz)
-        print(code.longstr())
+
+    for H0 in codes:
+      #print(H0)
+      #print(H0.sum(0))
+      for H1 in codes:
+        Hx, Hz = construct.hypergraph_product(H0, H1.transpose())
+        dx = distance(H1)
+        dz = distance(H0)
+        code = CSSCode(Hx=Hx, Hz=Hz, dx=dx, dz=dz)
+        if code.n < 30:
+            dx, dz = code.bz_distance()
+            assert dx == distance(H1)
+            assert dz == distance(H0)
+        print(code)
+
+        if argv.store_db:
+            from qumba import db
+            code = code.to_qcode(desc="hypergraph_product")
+            db.add(code)
 
 
 if __name__ == "__main__":
