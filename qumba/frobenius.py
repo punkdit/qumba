@@ -3,6 +3,8 @@
 """
 Build _monoids/_comonoids/_frobenius etc. over F_2
 See: Carboni 1991
+
+see : qumba/algebras.py
 """
 
 import numpy

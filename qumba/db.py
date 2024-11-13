@@ -188,8 +188,12 @@ def dump():
 
 def normalize():
     from qumba.qcode import QCode
-    n = 4
-    while n < 100:
+    n = argv.n
+    if n is None:
+        ns = list(range(4, 100))
+    else:
+        ns = [n]
+    for n in ns:
         query = {"n" : n}
         cursor = codes.find(query)
         count = 0
@@ -227,6 +231,7 @@ def normalize():
             res = codes.update_one(key, {"$set":data})
             #print(res)
             #return
+            sleep(0.1)
         print()
         sleep(1)
         n += 1

@@ -542,9 +542,10 @@ class SCFA(object):
     def __hash__(self):
         return hash(self.key)
 
-    def act(self, g):
+    def act(self, g, gi=None):
         unit, mul, counit, comul = self.unit, self.mul, self.counit, self.comul
-        gi = ~g
+        if gi is None:
+            gi = ~g
         unit = g*unit
         mul = g*mul*(gi@gi)
         counit = counit*gi
@@ -663,17 +664,18 @@ def main_matrix():
 
 
 
-def main_orbit():
+def main_action():
     dim = argv.get("dim", 3)
     vs = all_vectors(dim)
     vs = [v.reshape(dim,1) for v in vs]
     I = Matrix.identity(dim)
     As = list(find_scfa(dim))
+    print("SCFA:", len(As))
     As.sort(key = lambda A: (len(A.copyable), A.mul))
 
     from qumba.building import Algebraic
     G = Algebraic.SL(dim)
-    print(len(G))
+    print("|G| =", len(G))
 
     for A in As:
         B = A.act(I)
@@ -687,7 +689,7 @@ def main_orbit():
             assert B in As
             if A.act(g) == A:
                 H.append(g)
-        print(len(H), end=" ")
+        print(len(H), end=" ", flush=True)
     print()
 
 
@@ -729,6 +731,42 @@ def main_latex():
         print(row, r'\T\B \\')
         print(r"\hline")
     print()
+
+
+
+def main_orbit():
+    from qumba.building import Algebraic
+    dim = argv.get("dim", 2)
+    G = Algebraic.SL(dim)
+    print("|G| =", len(G))
+    _count = 0
+    vs = all_vectors(dim)
+    I = Matrix.identity(dim)
+
+    gen = list(G.gen)
+    gen = [(g, ~g) for g in G.gen]
+
+    found = set()
+    for A in find_scfa(dim):
+        if A in found:
+            continue
+        orbit = {A}
+        bdy = list(orbit)
+        while bdy:
+            _bdy = []
+            for g,gi in gen:
+                for A in bdy:
+                    B = A.act(g, gi)
+                    if B not in orbit:
+                        orbit.add(B)
+                        _bdy.append(B)
+            bdy = _bdy
+        print(len(orbit), end=" ", flush=True)
+        found.update(orbit)
+        if len(found) == len(G):
+            break
+    print()
+    print(len(found))
 
 
 
