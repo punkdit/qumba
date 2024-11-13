@@ -337,7 +337,7 @@ def all_hypergraph_product():
     from qumba import construct
 
     codes = []
-    for n in range(3, 9):
+    for n in range(3, 7):
       for m in range(1, n):
         found = []
         d = 1
@@ -356,6 +356,7 @@ def all_hypergraph_product():
         print([int(H.sum()) for H in found])
         print()
 
+    count = 0
     for H0 in codes:
       #print(H0)
       #print(H0.sum(0))
@@ -364,16 +365,20 @@ def all_hypergraph_product():
         dx = distance(H1)
         dz = distance(H0)
         code = CSSCode(Hx=Hx, Hz=Hz, dx=dx, dz=dz)
+        if code.k == 0:
+            continue
         if code.n < 30:
             dx, dz = code.bz_distance()
             assert dx == distance(H1)
             assert dz == distance(H0)
         print(code)
+        count += 1
 
         if argv.store_db:
             from qumba import db
             code = code.to_qcode(desc="hypergraph_product")
             db.add(code)
+    print("found:", count)
 
 
 if __name__ == "__main__":
