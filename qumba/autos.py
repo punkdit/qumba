@@ -11,7 +11,7 @@ from random import shuffle, choice
 import numpy
 
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
-    rank, rand2, pseudo_inverse, kernel, direct_sum, zeros2, solve2, normal_form)
+    rank, rand2, pseudo_inverse, kernel, direct_sum, zeros2, solve2, normal_form, enum2)
 from qumba.qcode import QCode, SymplecticSpace
 from qumba import construct
 from qumba.argv import argv
@@ -160,6 +160,105 @@ def test():
     code = construct.get_10_2_3()
     gen = get_autos(code)
     assert len(gen) == 20
+
+
+def test_css():
+    H = parse("""
+    X....XX.XXX....X..XXXXX
+    .X...X.XX.XX.X..XXX.X.X
+    ..X....XXX..X.X.XXXX.XX
+    ...X....X.XX.XXXXX.XX.X
+    ....XXX..X.XX..XX.XXX.X
+    """) # [[23, 13, 3]]
+
+    H = parse("""
+    X.....XX.XX.XX...X...X..X
+    .X....X..X....X.XX.X..XXX
+    ..X...X.X..XX...XX..XXX..
+    ...X.....XXX.XXX.XXX.....
+    ....X..X....XXX.XXX.X..X.
+    .....XX.X.XXXX.XX...X....
+    """) # autos: 8
+
+    H = parse("""
+    X......XX.X.X..X.X..X.XXXX.
+    .X....XX.XXXX...X.X..X...XX
+    ..X...X.X.X..XXXX.X..XX...X
+    ...X.....XXXXX.....XXXX.XX.
+    ....X.X.X.XXX.X..XXX..X..X.
+    .....X...XXXX.XXX.X...XXX..
+    """)
+
+
+    #print(H)
+    from qumba.csscode import CSSCode
+    code = CSSCode(Hx=H, Hz=H)
+    code.bz_distance()
+    print(code)
+
+    m, n = H.shape
+    wenum = {i:[] for i in range(n+1)}
+    span = []
+    for u in enum2(m):
+        v = dot2(u, H)
+        d = v.sum()
+        wenum[d].append(v)
+        if d:
+            span.append(v)
+
+    print([len(wenum[i]) for i in range(n+1)])
+
+    #for d in range(1, n+1):
+    #    if wenum[d]:
+    #        break
+    #for v in wenum[d]:
+    #    print(shortstr(v))
+
+    from pynauty import Graph, autgrp
+    N = len(span)
+    graph = Graph(N+n)
+
+    colours = {d:[] for d in range(n+1)}
+    for idx, v in enumerate(span):
+        #print(idx, v, v.sum())
+        d = v.sum()
+        colours[d].append(idx)
+        for i in range(n):
+            if v[i]:
+                graph.connect_vertex(N+i, idx)
+    
+    labels = []
+    for d in range(n+1):
+        if colours[d]:
+            labels.append(colours[d])
+    labels.append(list(range(N, N+n)))
+    print([len(lbl) for lbl in labels])
+
+    labels = [set(l) for l in labels]
+
+    items = []
+    for l in labels:
+        items += list(l)
+    items.sort()
+    #print(items, N+n)
+    assert items == list(range(N+n))
+
+    graph.set_vertex_coloring(labels)
+
+    aut = autgrp(graph)
+    print(len(aut))
+    gen = aut[0]
+    order = int(aut[1])
+    print("autos:", order)
+    #for perm in gen:
+    #    print(perm)
+
+    for perm in gen:
+        f = [perm[i] - N for i in range(N, N+n)]
+        dode = code.apply_perm(f)
+        assert dode.is_equiv(code)
+    
+
 
 
 if __name__ == "__main__":
