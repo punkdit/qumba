@@ -1319,18 +1319,6 @@ def selfdual_random():
         found = []
         H = zeros2(m, n)
         H[:m, :m] = identity2(m)
-#        trial = 0
-#        while len(found) < 4 and trial < 100:
-#            row = len(found)
-#            idx = randint(0, M-1)
-#            H[row, m:] = uecs[idx]
-#            H1 = H[:row+1, :]
-#            if dot2(H1, H1.transpose()).sum() == 0:
-#                found.append(idx)
-#            trial += 1
-#        #assert len(found) == 4
-#        if len(found) < 4:
-#            continue
         trial = 0
         while len(found) < m and trial < 100:
             row = len(found)
@@ -1467,7 +1455,7 @@ def selfdual():
 
 def write_to_db(code, desc):
     print()
-    print("write to db?", end=" ", flush=True)
+    print("write to db (n)?", end=" ", flush=True)
     val = input()
     if val=="y":
         code = code.to_qcode()

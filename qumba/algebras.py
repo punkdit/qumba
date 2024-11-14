@@ -702,7 +702,7 @@ def main_latex():
 
     print()
 
-    """
+    r"""
     \newcommand\T{\rule{0pt}{5.6ex}}       % Top strut
     \newcommand\B{\rule[-4.2ex]{0pt}{0pt}} % Bottom strut
     """
