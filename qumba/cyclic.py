@@ -278,16 +278,19 @@ def main_gf4():
     gf4_linear = argv.get("gf4_linear", True)
     n = argv.get("n", 20)
     d = argv.get("d", 3)
+    found = set()
     for code in all_cyclic_gf4(n, d, gf4_linear):
         sd = code.is_selfdual()
         H = code.H
-        rws = [get_weight(h) for h in H.A]
+        rws = list(set([get_weight(h) for h in H.A]))
+        rws.sort()
+        rws = tuple(rws)
         if gf4_linear:
             assert code.is_gf4()
         tgt = code.apply_perm([(i+1)%n for i in range(n)])
         assert tgt.is_equiv(code)
         if code.k==0:
-            print(code)
+            print(code, "skipping")
             continue
         if sd and argv.distance:
             #print(strop(code.H))
@@ -305,6 +308,10 @@ def main_gf4():
             #d = distance_meetup(code, max_m=4, verbose=False)
             #print("distance_meetup(4):", d)
             code.d = distance_meetup(code, verbose=True)
+        key = (code.n, code.k, code.d, rws, sd)
+        if argv.filter and key in found:
+            continue
+        found.add(key)
         print(code, set(rws), 
             "*" if sd else "", 
             "gf4" if code.is_gf4() else "")
