@@ -1153,6 +1153,8 @@ def css_sample():
     print(strop(code.to_qcode().H).replace(".","I"))
     print(code)
 
+    write_to_db(code, "qumba.csscode.css_sample")
+
 
 def css_random():
     # probably not any better than css_sample ... ??

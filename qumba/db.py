@@ -252,6 +252,7 @@ if __name__ == "__main__":
     start_time = time()
 
     profile = argv.profile
+    show = argv.show
     name = argv.next() or "query"
     _seed = argv.get("seed")
     if _seed is not None:

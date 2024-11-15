@@ -171,7 +171,7 @@ def test_css():
     ....XXX..X.XX..XX.XXX.X
     """) # [[23, 13, 3]]
 
-    H = parse("""
+    _H = parse("""
     X.....XX.XX.XX...X...X..X
     .X....X..X....X.XX.X..XXX
     ..X...X.X..XX...XX..XXX..
@@ -180,7 +180,7 @@ def test_css():
     .....XX.X.XXXX.XX...X....
     """) # autos: 8
 
-    H = parse("""
+    _H = parse("""
     X......XX.X.X..X.X..X.XXXX.
     .X....XX.XXXX...X.X..X...XX
     ..X...X.X.X..XXXX.X..XX...X
@@ -188,6 +188,13 @@ def test_css():
     ....X.X.X.XXX.X..XXX..X..X.
     .....X...XXXX.XXX.X...XXX..
     """)
+
+    _H = parse("""
+    XXXX.X.XX..X...
+    XXX.X.XX..X...X
+    XX.X.XX..X...XX
+    X.X.XX..X...XXX
+    """) # [[15, 7, 3]] |G|=20160
 
 
     #print(H)
