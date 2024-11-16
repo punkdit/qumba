@@ -354,9 +354,42 @@ def test_linear():
     rel = (w_ @ I) * (I @ _b)
 
     rel = rel * Relation(Matrix.identity(2), zeros(2,0))
-    print(rel)
+    #print(rel)
+    #print( (w_@w_) * (_b@_b) )
 
-    print( (w_@w_) * (_b@_b) )
+    #print(w_ww * bb_b)
+    #print(ww_w * b_bb)
+    lhs = ww_w * w_ww
+
+    A = Matrix.parse("""
+    11..
+    .11.
+    ..11
+    """)
+    rhs = Relation(A[:,:2], A[:,2:])
+    assert lhs == rhs
+    assert lhs == Relation.white(2,2)
+
+    lhs = (I @ w_ww) * (bb_b @ I)
+    rhs = (b_bb @ I) * (I @ ww_w)
+    assert lhs == rhs
+
+    black = Relation.black
+    white = Relation.white
+    #print(white(3,0) @ black(0,1))
+    #print(black(1,0))
+
+    cup = white(2,0)
+    assert cup == black(2,0)
+
+    #print(lhs)
+    #print( (lhs @ I) * (I @ cup) )
+    #print( (I @ lhs) * (cup@I) )
+
+    assert cup @ b_ == Relation([[1,1,0],[0,0,1]], zeros(2,0))
+
+    op = (I @ w_ww @ I @ I) * (I @ I @ swap @ I) * (black(3,0) @ black(2,0))
+    assert op == Relation([[1,1,1,0],[0,1,0,1]], zeros(2,0))
 
 
 
@@ -417,6 +450,12 @@ def test_pascal():
 
     for row in rows:
         print([len(cell) for cell in row])
+
+    return
+    for row in rows:
+        for cell in row:
+            for rel in cell:
+                print(rel)
 
 
     
