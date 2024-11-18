@@ -169,7 +169,7 @@ def test_css():
     ..X....XXX..X.X.XXXX.XX
     ...X....X.XX.XXXXX.XX.X
     ....XXX..X.XX..XX.XXX.X
-    """) # [[23, 13, 3]]
+    """) # [[23, 13, 3]] |G|=21504 
 
     _H = parse("""
     X.....XX.XX.XX...X...X..X
@@ -194,13 +194,28 @@ def test_css():
     XXX.X.XX..X...X
     XX.X.XX..X...XX
     X.X.XX..X...XXX
-    """) # [[15, 7, 3]] |G|=20160
+    """) # [[15, 7, 3]] |G|=20160, is G=M_21=L_3(4) or G=Alt(8) ?
 
+    H = parse("""
+    1...........11...111.1.1
+    .1...........11...111.11
+    ..1.........1111.11.1...
+    ...1.........1111.11.1..
+    ....1.........1111.11.1.
+    .....1......11.11..11..1
+    ......1......11.11..11.1
+    .......1......11.11..111
+    ........1...11.111...11.
+    .........1..1.1.1..1.111
+    ..........1.1..1..11111.
+    ...........11...111.1.11
+    """) # Golay
 
     #print(H)
     from qumba.csscode import CSSCode
     code = CSSCode(Hx=H, Hz=H)
-    code.bz_distance()
+    if code.k:
+        code.bz_distance()
     print(code)
 
     m, n = H.shape
@@ -243,12 +258,17 @@ def test_css():
 
     labels = [set(l) for l in labels]
 
+    fix = labels[1].pop()
+    labels.insert(0, {fix})
+
     items = []
     for l in labels:
         items += list(l)
     items.sort()
     #print(items, N+n)
     assert items == list(range(N+n))
+    print(N+n, "vertices")
+
 
     graph.set_vertex_coloring(labels)
 

@@ -171,6 +171,28 @@ def all_cyclic_css(n):
         yield code
 
 
+def main_sd():
+    n = argv.get("n")
+    if n is None:
+        ns = list(range(64, 128))
+    else:
+        ns = [n]
+
+    for n in ns:
+      for v in all_cyclic_gf2(n):
+        H = numpy.array([numpy.array([v[(i+j)%n] for i in range(n)]) for j in range(n)])
+        if dot2(H, H.transpose()).sum():
+            #print("/", end="", flush=True)
+            continue
+        H = linear_independent(H)
+        code = QCode.build_css(H, H, cyclic=True)
+        if code.k == 0 or code.d_upper_bound <= 2:
+            continue
+        print(code)
+
+
+
+
 def unique(codes, min_d=3):
     from qumba.transversal import find_isomorphisms_css, find_isomorphisms
     def isomorphic_css(code, dode):
@@ -218,7 +240,7 @@ def unique(codes, min_d=3):
     print("\nfound:", len(set(found.values())), "of", len(set(found.keys())))
 
 
-def main_css():
+def main_all_css():
     min_d = argv.get("min_d", 3)
     #n = argv.get("n", 19)
     #for n in all_primes(100):
@@ -238,6 +260,25 @@ def main_css():
                 db.add(code)
         print()
 
+
+def main_css():
+    min_d = argv.get("min_d", 3)
+    n = argv.get("n", 15)
+    count = 0
+    for code in unique(all_cyclic_css(n), min_d):
+        code = code.to_css()
+        code.bz_distance()
+        code = code.to_qcode()
+        print(code.cssname, "*" if code.is_selfdual() else " ")
+        if argv.store_db:
+            from qumba import db
+            db.add(code)
+        count += 1
+        if count%6 == 0:
+            break
+    print()
+
+        
         
 
 
