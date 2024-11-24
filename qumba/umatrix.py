@@ -3,7 +3,7 @@
 sat / smt solving for unknown F_2 matrices, etc.
 """
 
-from functools import reduce
+from functools import reduce, cache
 from operator import add, matmul, mul
 from random import shuffle
 
@@ -267,8 +267,63 @@ class UMatrix(object):
             A[idx] = bool(value)
         A = Matrix(A)
         return A
+
+
+#@cache
+def get_wenum(H):
+    m, n = H.shape
+    wenum = {i:0 for i in range(n+1)}
+    for bits in numpy.ndindex((2,)*m):
+        #v = Matrix(bits)*H
+        v = numpy.dot(bits, H.A)%2
+        wenum[v.sum()] += 1
+    return tuple(wenum[i] for i in range(n+1))
+
+
         
         
+def test_selfdual():
+    solver = Solver()
+    add = solver.add
+
+    n = argv.get("n", 6)
+    m = n//2
+    
+    H = UMatrix.unknown(m,n)
+    H[:, :m] = Matrix.identity(m)
+    add(H*H.t == 0)
+
+    found = {}
+
+    count = 0
+    while 1:
+        result = solver.check()
+        if str(result) != "sat":
+            break
+
+        model = solver.model()
+        h = H.get_interp(model)
+        key = get_wenum(h)
+        if key not in found:
+            print(key)
+            found[key] = [h]
+        else:
+            found[key].append(h)
+
+        add(H != h)
+        count += 1
+
+    for key in found.keys():
+        print(key, "found:", len(found[key]))
+    found = [len(hs) for hs in found.values()]
+    print("count:", count, found)
+    # counts are:
+    # 1, 2, 6, 48, 720, 23040
+    # https://oeis.org/A003053
+    # could just use generators of O(n, F_2) to search this space
+
+
+
 def test():
     solver = Solver()
     add = solver.add
