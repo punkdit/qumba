@@ -3,6 +3,7 @@
 sat / smt solving for unknown F_2 matrices, etc.
 """
 
+from math import prod
 from functools import reduce, cache
 from operator import add, matmul, mul
 from random import shuffle
@@ -280,15 +281,104 @@ def get_wenum(H):
     return tuple(wenum[i] for i in range(n+1))
 
 
+def orthogonal_order(n): 
+    return (1 << (n//2)**2)*prod((1 << i)-1 for i in range(2, 2*((n-1)//2)+1, 2))
         
-        
-def test_selfdual():
+
+def gen_orthogonal(m):
+    N = orthogonal_order(m)
+    print(N)
+
     solver = Solver()
     add = solver.add
 
+    Im = Matrix.identity(m)
+    H = UMatrix.unknown(m,m)
+    add(H*H.t == Im)
+
+    found = set()
+    gen = []
+
+    while 1:
+        result = solver.check()
+        if str(result) != "sat":
+            break
+
+        model = solver.model()
+        g = H.get_interp(model)
+        yield g
+        add(H != g)
+        found.add(g)
+
+        gen.append(g)
+        G = mulclose(gen, verbose=True)
+        #print(len(G))
+        #bdy = []
+        for g in G:
+            if g in found:
+                continue
+            yield g
+            #bdy.append(g)
+            found.add(g)
+
+        if len(G) == N:
+            break
+        del G
+
+        # do we care...
+        #for g in bdy:
+        #    add(H != g)
+        #    found.add(g)
+
+def test_orthogonal():
+    m = 10
+    N = orthogonal_order(m)
+
+    count = 0
+    for g in gen_orthogonal(m):
+        count += 1
+    assert count==N
+
+    return
+    
+        
+def test_selfdual():
+
     n = argv.get("n", 6)
     m = n//2
-    
+
+    Im = Matrix.identity(m)
+
+    found = {}
+    count = 0
+    for g in gen_orthogonal(m):
+
+        h = Im.concatenate(g, axis=1)
+        assert (h*h.t).sum() == 0
+
+        key = get_wenum(h)
+        if key not in found:
+            print(key)
+            found[key] = 1
+        else:
+            found[key] += 1
+
+        count += 1
+
+    print()
+    for key in found.keys():
+        print(key, "found:", (found[key]))
+    print("count:", count)
+
+
+def old_test_selfdual():
+
+    n = argv.get("n", 6)
+    m = n//2
+
+    solver = Solver()
+    add = solver.add
+
     H = UMatrix.unknown(m,n)
     H[:, :m] = Matrix.identity(m)
     add(H*H.t == 0)
@@ -320,7 +410,6 @@ def test_selfdual():
     # counts are:
     # 1, 2, 6, 48, 720, 23040
     # https://oeis.org/A003053
-    # could just use generators of O(n, F_2) to search this space
 
 
 
