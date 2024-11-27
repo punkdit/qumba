@@ -21,6 +21,7 @@ from qumba.solve import (
     shortstr, shortstrx, eq2, dot2, compose2, rand2,
     pop2, insert2, append2, array2, zeros2, identity2, rank, linear_independent)
 from qumba.action import Perm
+from qumba.matrix import Matrix
 from qumba.argv import argv
 
 
@@ -1453,6 +1454,88 @@ def selfdual():
         if idx is None:
             print("fini")
             break
+
+
+def selfdual_z3():
+
+    n, k, d = argv.get("code", (7,1,3))
+
+    assert (n+k)%2 == 0
+    m = (n-k)//2
+
+    import z3
+    from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, sat, ForAll
+    from qumba.transversal import UMatrix
+
+    solver = Solver()
+    add = solver.add
+
+    #H = UMatrix.unknown(m,n)
+    #H[:, :m] = Matrix.identity(m)
+    #add(H*H.t == 0)
+
+    A = UMatrix.unknown(m, n-m)
+    Im = Matrix.identity(m)
+
+    Lx = UMatrix.unknown(k, n)
+    Lz = UMatrix.unknown(k, n)
+    Tz = Im.concatenate(Matrix.zeros((m, n-m)), axis=1)
+    Tx = UMatrix.unknown(m, n)
+    Tx[:, :m] = 0
+    Tx[:, m:] = A
+    #H = Im.concatenate(A, axis=1)
+    H = UMatrix.unknown(m, n)
+    H[:,:m] = Im
+    H[:,m:] = A
+
+    add(A*A.t == Im)
+    add(Lx*Tz.t == 0)
+    add(Lx*H.t == 0)
+    Ik = Matrix.identity(k)
+    add(Lx*Lz.t == Ik)
+    add(Tx*Lz.t == 0)
+    add(H*Lz.t == 0)
+
+    if 1:
+        # constrain code distance
+        L = UMatrix.unknown(1, n)
+        t_parity = (H*L.t == 0)
+        t_logical = (L*Lz.t != 0)
+        t_distance = Sum([If(L[0,i].v,1,0) for i in range(n)]) >= d
+        term = If(And(t_parity, t_logical),t_distance,True)
+        add(ForAll([L[0,i].v for i in range(n)], term))
+
+    while 1:
+    
+        result = solver.check()
+        if result != sat:
+            break
+        model = solver.model()
+
+        _A = A.get_interp(model)
+        H = Im.concatenate(_A, axis=1)
+        _Tx = Tx.get_interp(model)
+        _Tz = Tz
+        _Lx = Lx.get_interp(model)
+        _Lz = Lz.get_interp(model)
+
+        add(A != _A)
+
+        code = CSSCode(Hx=H, Hz=H, Lx=_Lx, Lz=_Lz, Tx=_Tx, Tz=_Tz)
+        #print(code.longstr())
+        d_x, d_z = code.bz_distance()
+        if d_x < d:
+            print(d_x, d_z)
+            #print(distance_meetup(code))
+            print("/", end='', flush=True)
+            #assert 0
+            continue
+
+        print()
+        print(code)
+        print(code.longstr())
+
+        break
 
 
 def write_to_db(code, desc):
