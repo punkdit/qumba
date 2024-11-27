@@ -13,6 +13,7 @@ import numpy
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum, zeros2, solve2, normal_form, enum2)
 from qumba.qcode import QCode, SymplecticSpace
+from qumba.action import mulclose
 from qumba import construct
 from qumba.argv import argv
 
@@ -169,7 +170,7 @@ def test_css():
     ..X....XXX..X.X.XXXX.XX
     ...X....X.XX.XXXXX.XX.X
     ....XXX..X.XX..XX.XXX.X
-    """) # [[23, 13, 3]] |G|=21504 
+    """) # [[23, 13, 3]] |G|=21504 , logicals = 129024 
 
     _H = parse("""
     X.....XX.XX.XX...X...X..X
@@ -180,23 +181,23 @@ def test_css():
     .....XX.X.XXXX.XX...X....
     """) # autos: 8
 
-    _H = parse("""
+    H = parse("""
     X......XX.X.X..X.X..X.XXXX.
     .X....XX.XXXX...X.X..X...XX
     ..X...X.X.X..XXXX.X..XX...X
     ...X.....XXXXX.....XXXX.XX.
     ....X.X.X.XXX.X..XXX..X..X.
     .....X...XXXX.XXX.X...XXX..
-    """)
+    """) # |G|=24, logicals = 144
 
     _H = parse("""
     XXXX.X.XX..X...
     XXX.X.XX..X...X
     XX.X.XX..X...XX
     X.X.XX..X...XXX
-    """) # [[15, 7, 3]] |G|=20160, is G=M_21=L_3(4) or G=Alt(8) ?
+    """) # [[15, 7, 3]] |G|=20160, is G=M_21=L_3(4) or G=Alt(8) ? logicals = 120960
 
-    H = parse("""
+    _H = parse("""
     1...........11...111.1.1
     .1...........11...111.11
     ..1.........1111.11.1...
@@ -209,7 +210,31 @@ def test_css():
     .........1..1.1.1..1.111
     ..........1.1..1..11111.
     ...........11...111.1.11
-    """) # Golay
+    """) # Golay |G|=244823040 G=M_24
+
+    _H = parse("""
+X.........XX.X.X.XXX.
+.X.........XXX.X...X.
+..X.........X.X..X.XX
+...X.....X.X.X.XX..XX
+....X....X.XX.X...X..
+.....X.......XX.XXXXX
+......X..XXX.XX...X.X
+.......X..X.X.XXX....
+........XXX..XXXXX...
+    """) # [[21, 3, 5]] |G| = 5760, logicals = 36
+
+    _H = parse("""
+XX.X.X...XXXX........
+X.X.X...XXXX........X
+.X.X...XXXX........XX
+X.X...XXXX........XX.
+.X...XXXX........XX.X
+X...XXXX........XX.X.
+...XXXX........XX.X.X
+..XXXX........XX.X.X.
+.XXXX........XX.X.X..
+    """) # [[21, 3, 5]] |G| = 120960 , logicals = 36
 
     #print(H)
     from qumba.csscode import CSSCode
@@ -240,6 +265,7 @@ def test_css():
     N = len(span)
     graph = Graph(N+n)
 
+    print("building...", end=" ", flush=True)
     colours = {d:[] for d in range(n+1)}
     for idx, v in enumerate(span):
         #print(idx, v, v.sum())
@@ -248,6 +274,7 @@ def test_css():
         for i in range(n):
             if v[i]:
                 graph.connect_vertex(N+i, idx)
+    print("done.")
     
     labels = []
     for d in range(n+1):
@@ -258,8 +285,8 @@ def test_css():
 
     labels = [set(l) for l in labels]
 
-    fix = labels[1].pop()
-    labels.insert(0, {fix})
+    #fix = labels[1].pop()
+    #labels.insert(0, {fix})
 
     items = []
     for l in labels:
@@ -269,9 +296,9 @@ def test_css():
     assert items == list(range(N+n))
     print(N+n, "vertices")
 
-
     graph.set_vertex_coloring(labels)
 
+    print("autgrp...")
     aut = autgrp(graph)
     print(len(aut))
     gen = aut[0]
@@ -280,10 +307,26 @@ def test_css():
     #for perm in gen:
     #    print(perm)
 
+    code = code.to_qcode()
+    ops = []
     for perm in gen:
         f = [perm[i] - N for i in range(N, N+n)]
         dode = code.apply_perm(f)
         assert dode.is_equiv(code)
+        L = dode.get_logical(code)
+        #print(L)
+        #print()
+        ops.append(L)
+
+    dode = code.apply_S()
+    ops.append(dode.get_logical(code))
+    assert dode.is_equiv(code)
+    dode = code.apply_H()
+    ops.append(dode.get_logical(code))
+    assert dode.is_equiv(code)
+
+    G = mulclose(ops, verbose=True)
+    print("|G| =", len(G))
     
 
 

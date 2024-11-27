@@ -1531,11 +1531,13 @@ def selfdual_z3():
             #assert 0
             continue
 
-        print()
-        print(code)
-        print(code.longstr())
-
         break
+
+    print()
+    print(code)
+    print(code.longstr())
+    write_to_db(code, "qumba.csscode.selfdual_z3")
+
 
 
 def write_to_db(code, desc):
