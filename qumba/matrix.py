@@ -427,6 +427,18 @@ class Matrix(object):
         E = E.reshape(2**m, 2**n)
         return E
 
+    def get_wenum(H):
+        m, n = H.shape
+        assert m < 32, ("%s is too big ??" % (2**m))
+        A = H.A
+        wenum = {i:0 for i in range(n+1)}
+        for bits in numpy.ndindex((2,)*m):
+            #v = Matrix(bits)*H
+            v = numpy.dot(bits, A)%2
+            wenum[v.sum()] += 1
+        return tuple(wenum[i] for i in range(n+1))
+
+
 
 def pushout(j, k, j1=None, k1=None):
     assert j.shape[1] == k.shape[1]

@@ -20,8 +20,6 @@ from qumba.action import mulclose, Group, Perm, mulclose_find
 from qumba.util import allperms
 from qumba import equ
 from qumba import construct 
-from qumba import autos
-from qumba.unwrap import unwrap, Cover
 from qumba.argv import argv
 
 
@@ -270,17 +268,6 @@ class UMatrix(object):
         return A
 
 
-#@cache
-def get_wenum(H):
-    m, n = H.shape
-    wenum = {i:0 for i in range(n+1)}
-    for bits in numpy.ndindex((2,)*m):
-        #v = Matrix(bits)*H
-        v = numpy.dot(bits, H.A)%2
-        wenum[v.sum()] += 1
-    return tuple(wenum[i] for i in range(n+1))
-
-
 def orthogonal_order(n): 
     return (1 << (n//2)**2)*prod((1 << i)-1 for i in range(2, 2*((n-1)//2)+1, 2))
         
@@ -356,7 +343,8 @@ def test_selfdual():
         h = Im.concatenate(g, axis=1)
         assert (h*h.t).sum() == 0
 
-        key = get_wenum(h)
+        #key = get_wenum(h)
+        key = h.get_wenum()
         if key not in found:
             print(key)
             found[key] = 1
