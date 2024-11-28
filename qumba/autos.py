@@ -191,7 +191,7 @@ def get_autos_selfdualcss(code):
         for i in range(n):
             if v[i]:
                 graph.connect_vertex(N+i, idx)
-    print("done.")
+    print(" done.")
     
     labels = []
     for d in range(n+1):
@@ -297,22 +297,69 @@ class Graph:
         directed = False # True is much slower ?!?!
         graph = Graph(N, directed)
 
+        print("Graph: |verts|=%d ... " % N, end="", flush=True)
+        adj = {i:[] for i in range(N)}
         for (i,j) in edges:
-            graph.connect_vertex(i, j)
+            adj[i].append(j)
+            #graph.connect_vertex(i, j)
+        graph.set_adjacency_dict(adj)
         #print(labels)
         labels = list(labels.values())
         #print(labels)
         graph.set_vertex_coloring(labels)
     
-        print("autgrp", N)
+        print("autgrp ...", end="", flush=True)
         aut = autgrp(graph)
+        print(" done")
         gen = aut[0]
         order = int(aut[1])
         return gen, order
 
 
+def _get_autos(code, span, keys):
+
+    n = code.n
+    graph = Graph()
+    v_bits = [graph.vert("q") for i in range(n)]
+    #for key, us in span.items():
+    #  for u in us:
+    for key in keys:
+      for u in span[key]:
+        #print(str(v).replace("\n ",""), wx, wz, wy)
+        v_check = graph.vert(colour=key)
+        for i in range(n):
+            if u[i] == 1:
+                graph.edge(v_check, v_bits[i], colour="X")
+            elif u[i] == 256:
+                graph.edge(v_check, v_bits[i], colour="Z")
+            elif u[i] == 257:
+                graph.edge(v_check, v_bits[i], colour="Y")
+            else:
+                assert u[i] == 0
+
+    #print(graph)
+    #graph.to_dot("code.dot")
+
+    gen, order = graph.get_autos()
+    #for f in gen:
+    #    print({i:j for (i,j) in enumerate(f)})
+    gen = [f[:n] for f in gen]
+
+    ops = []
+    for f in gen:
+        dode = code.apply_perm(f)
+        if not dode.is_equiv(code):
+            return None
+        L = dode.get_logical(code)
+        #print(L)
+        #print()
+        ops.append(L)
+
+    return gen, order, ops
+
 
 def get_autos(code):
+
     #assert code.tp == "selfdualcss"
     code = code.to_qcode()
     H = code.H.A
@@ -324,12 +371,9 @@ def get_autos(code):
     assert m < 30
 
     N = 2**m
+    print("get_autos...", end=" ", flush=True)
 
-    graph = Graph()
-    v_bits = [graph.vert("q") for i in range(n)]
-
-    span = []
-    labels = []
+    span = {}
     for u in enum2(m):
         u = numpy.array(u, dtype=numpy.int8)
         #print(u.dtype)
@@ -340,57 +384,59 @@ def get_autos(code):
         wx = int((u==1).sum())
         wz = int((u==256).sum())
         wy = int((u==257).sum())
-        #print(str(v).replace("\n ",""), wx, wz, wy)
-        idx = len(span)
-        v_check = graph.vert(colour=(wx, wz, wy))
-        for i in range(n):
-            if u[i] == 1:
-                graph.edge(v_check, v_bits[i], colour="X")
-            elif u[i] == 256:
-                graph.edge(v_check, v_bits[i], colour="Z")
-            elif u[i] == 257:
-                graph.edge(v_check, v_bits[i], colour="Y")
-            else:
-                assert u[i] == 0
-        span.append(v)
-        #labels.append((wx, wz, wy))
+        key = (wx, wz, wy)
+        span.setdefault(key, []).append(u)
 
-    #print(graph)
+    #for (key,value) in span.items():
+    #    print('\t', key, len(value) )
 
-    graph.to_dot("code.dot")
+    keys = list(span.keys())
+    keys.remove((0,0,0))
+    keys.sort(key = lambda k:sum(k))
+    #print(keys)
+    w = sum(keys[0])
+    #print(keys)
 
-    assert len(span) == N
+    print(N)
 
-    gen, order = graph.get_autos()
-    #for f in gen:
-    #    print({i:j for (i,j) in enumerate(f)})
-    gen = [f[:n] for f in gen]
-
-    print(order)
-
-    ops = []
-    for f in gen:
-        dode = code.apply_perm(f)
-        assert dode.is_equiv(code)
-        L = dode.get_logical(code)
-        #print(L)
-        #print()
-        ops.append(L)
-
-    return gen, ops
+    #last = 0
+    idx = 1
+    while idx <= len(keys):
+        #w_keys = [k for k in keys if sum(k)<=w]
+        w_keys = keys[:idx]
+        #if len(w_keys) > last:
+        result = _get_autos(code, span, w_keys)
+        if result is not None:
+            return result
+        #last = len(w_keys)
+        idx += 1
 
 
 def test():
-    for code in [
-        QCode.fromstr("XI IZ"),
-        construct.get_412(),
-        construct.get_713(),
-        #construct.reed_muller(), # too big??
-        construct.get_10_2_3(),
-    ]:
-        gen,ops = get_autos(code)
-        print(gen, len(gen))
 
+    from qumba import db
+    #for n in range(10, 18):
+    for n in range(10, 30):
+        for code in db.get(n=n, desc="codetables"):
+            if code.n - code.k > 22:
+                continue
+            print(code)
+            gen, order, ops = get_autos(code)
+            #print(gen, len(gen))
+            print("|G| =", order)
+            print()
+            
+    for code,N in [
+        (QCode.fromstr("XI IZ"), 1),
+        (QCode.fromstr("XX ZZ"), 2),
+        (construct.get_412(), 4),
+        (construct.get_713(), 168),
+        (construct.get_10_2_3(), 20),
+        (construct.reed_muller(), 322560),
+    ]:
+        gen, order, ops = get_autos(code)
+        assert order == N, order
+        #print(gen, len(gen))
 
 
 def test_css():
