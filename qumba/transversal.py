@@ -259,7 +259,55 @@ def find_isomorphisms(code, dode=None):
 
 find_autos = find_isomorphisms
 
-def find_isomorphisms_css(code, dode=None):
+def find_lw_css(code):
+    "find low-weight row vectors in the stabilizers"
+    code = code.to_css()
+
+    H = code.Hx
+    hx = list(find_lw(code.Hx))
+    hz = list(find_lw(code.Hz))
+    return hx, hz
+
+
+def find_lw(H):
+    "find low-weight row vectors in the row-span of H"
+    m, n = H.shape
+
+    ws = H.sum(1)
+
+    w = ws.min()
+
+    solver = Solver()
+    Add = solver.add
+
+    u = UMatrix.unknown(1, m)
+    
+    H = Matrix(H)
+    #print(H)
+
+    uH = u*H
+    #print(uH)
+
+    Add(Sum([If(uH[0,i].get(),1,0) for i in range(n)])==w)
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("result:", result)
+            break
+    
+        model = solver.model()
+        v = u.get_interp(model)
+
+        vH = v*H
+        assert vH.sum() == w
+        yield vH
+
+        Add(u != v)
+
+
+
+def find_isomorphisms_css(code, dode=None, ffinv=False):
 
     # find all automorphism permutations
 
@@ -287,6 +335,9 @@ def find_isomorphisms_css(code, dode=None):
 
     # permutation matrix
     P = UMatrix.unknown(n, n)
+
+    if ffinv:
+        Add( P == P.t )
 
     #for i in range(n):
     #    Add(Sum([If(P[i,j].get(),1,0) for j in range(n)])==1)
@@ -318,6 +369,9 @@ def find_isomorphisms_css(code, dode=None):
     Add( Rx*Hx == Jx*P )
     Add( Rz*Hz == Jz*P )
 
+    gen = []
+    found = set()
+
     while 1:
         result = solver.check()
         if result != z3.sat:
@@ -325,14 +379,25 @@ def find_isomorphisms_css(code, dode=None):
             break
     
         model = solver.model()
-        p = P.get_interp(model)
+        g = P.get_interp(model)
 
-        #assert (p*code).is_equiv(dode) # ... fix..
+        #assert (g*code).is_equiv(dode) # ... fix..
 
         #print(p)
-        yield p
+        gen.append(g)
 
-        Add(P != p) # could also add all generated perms
+        yield g
+        Add(P != g) # could instead add generated perms, see below->
+
+#        G = mulclose(gen, verbose=False)
+#        for g in G:
+#            if g not in found:
+#                yield g
+#                #print("\\", end='', flush=True)
+#                Add(P!=g)
+#                #print("/", end='', flush=True)
+#                found.add(g)
+#
 
 
 def find_autos_lc(code):

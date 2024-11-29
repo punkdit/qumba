@@ -411,19 +411,100 @@ def get_autos(code):
         #last = len(w_keys)
         idx += 1
 
+def get_isos(code, dode):
+    return []
+
+def is_iso(code, dode):
+    return False
+
+
+def get_autos_css(code):
+    from qumba.transversal import find_lw_css
+    code = code.to_css()
+
+    print("get_autos_css", code)
+
+    print("find_lw_css ... ", end="", flush=True)
+    hx, hz = find_lw_css(code)
+    wx = hx[0].sum()
+    wz = hz[0].sum()
+    print(wx, len(hx), "--", wz, len(hz))
+
+    hx = [h.A.reshape(code.n) for h in hx]
+    hz = [h.A.reshape(code.n) for h in hz]
+
+    span = {(wx,0,0):hx, (0,wz,0):hz}
+    result = _get_autos(code.to_qcode(), span, list(span.keys()))
+
+    return result
+
+
+def test_bring():
+    code = construct.get_bring()
+    code.bz_distance()
+    print(code)
+
+    result = get_autos_css(code)
+    assert result is not None
+    gen, order, ops = result
+    L = mulclose(ops, verbose=True)
+    print("|G| =", order, "logicals:", len(L))
+
+    from qumba.transversal import find_isomorphisms_css
+    code = code.to_qcode()
+    dode = code.get_dual()
+    for g in find_isomorphisms_css(code, dode, ffinv=True):
+        break
+    print(g)
+
+
 
 def test():
-
     from qumba import db
-    #for n in range(10, 18):
-    for n in range(10, 30):
+    for n in range(17, 28):
+        for code in db.get(n=n, css=True):
+            result = get_autos_css(code)
+            if result is not None:
+                gen, order, ops = result
+                L = mulclose(ops, verbose=True)
+                print("|G| =", order, "logicals:", len(L))
+            else:
+                print("fail")
+            print()
+
+    return
+
+    from qumba.construct import biplanar
+    #code = biplanar(6, 12)              # [[36, 8, 4]]      |G| = 144
+    #code = construct.biplanar(12, 12)   # [[72, 12, 6]]     |G| = 432
+    code = construct.biplanar(24, 6)    # [[72, 8, 6]]      |G| = 72
+    #code = construct.biplanar(18, 12)   # [[108, 8, 10]]    |G| = 108
+    #code = construct.biplanar(24, 12)   # [[144, 12, 12?]]  |G| = 144
+    code = construct.biplanar(30, 6)    # [[90, 8, 10]]     |G| = 90
+    code = construct.biplanar(30, 12)   # [[180, 8, ?]]     |G| = 90
+    code = construct.biplanar(60, 12)   # [[360, 12, ?]]    |G| = 180
+    code = construct.biplanar(48, 12)   # [[288, 12, 18?]]   |G| = 144
+    code = construct.biplanar(84, 12)   # [[504, 12, ?]]   |G| = 
+
+    return
+
+    from qumba.transversal import find_isomorphisms
+    for n in range(10, 18):
+    #for n in range(20, 30):
         for code in db.get(n=n, desc="codetables"):
-            if code.n - code.k > 22:
-                continue
+            #if code.n - code.k > 22:
+            #    continue
             print(code)
             gen, order, ops = get_autos(code)
             #print(gen, len(gen))
             print("|G| =", order)
+
+            count = 0
+            for g in find_isomorphisms(code):
+                print(".", end="", flush=True)
+                count += 1
+            assert count == order
+
             print()
             
     for code,N in [

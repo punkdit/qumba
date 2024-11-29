@@ -302,8 +302,10 @@ def biplanar(w=24, h=12):
         for key in op:
             Az[i, lookup[key]] = 1
 
-    code = CSSCode(Ax=Ax, Az=Az)
-    return code
+    w = dot2(Ax, Az.transpose()).sum()
+    if w==0:
+        code = CSSCode(Ax=Ax, Az=Az)
+        return code
 
 
 def classical_codes(n, m, distance=3):

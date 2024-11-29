@@ -393,12 +393,88 @@ def test_surface():
 
 
 def test_biplanar():
-    code = construct.biplanar()
+    from qumba.transversal import find_isomorphisms_css
+#    for (w,h) in [
+#        (24, 12),
+#    ]:
+    for w in range(6, 86, 6):
+      #for h in range(6, 50, 6):
+      for h in [6, 12]:
+        code = construct.biplanar(w, h)
+        if code is None or code.k==0:
+            continue
+        if code.n < 100:
+            code.bz_distance()
+        if code.d is not None and code.d < 3:
+            continue
+        print(w, h, code)
+        Hx, Hz = code.Hx, code.Hz
+
+        #count = 0
+        #for g in find_isomorphisms_css(code):
+        #    print(".", end='', flush=True)
+        #    count += 1
+        #print()
+        #print(count)
+
+        #return
+
+        #print(shortstr(code.Hx))
+        #print(Hx.sum(0))
+        #print(Hx.sum(1))
+        #print(shortstr(code.Lx))
+
+
+def test_fold():
+    from qumba.transversal import find_isomorphisms_css, find_lw_css
+    from qumba.action import Perm
+    from qumba.unwrap import wrap
+    #code = construct.biplanar(6, 12) # [[36, 8, 4]] --> [[18, 4, 3]]
+    #code = construct.biplanar(12, 12) # [[72, 12, 6]] --> [[36, 6, 6]]
+    code = construct.biplanar(18, 12) # [[108, 8, 10]] --> [[54, 4, 7<=d<=10]]
+    if code.n < 70:
+        code.bz_distance()
     print(code)
-    Hx, Hz = code.Hx, code.Hz
-    #print(shortstr(code.Hx))
-    #print(Hx.sum(0), Hx.sum(1))
-    #print(shortstr(code.Lx))
+
+    hx, hz = find_lw_css(code)
+    print(len(hx), len(hz))
+    return
+
+    dode = code.get_dual()
+
+    for g in find_isomorphisms_css(code, dode, ffinv=True):
+        perm = []
+        for i in range(code.n):
+            j = numpy.where(g[i])[0][0]
+            assert j != i
+            perm.append(j)
+        perm = Perm(perm, list(range(code.n)))
+        print(perm, "order =", perm.order())
+        if perm.is_identity():
+            continue
+        if (perm*perm).is_identity():
+            break
+        n = perm.order()
+        if n%2:
+            continue
+        perm = perm ** (n//2)
+        assert not perm.is_identity()
+        assert (perm*perm).is_identity()
+        for i in range(code.n):
+            if perm[i] == i:
+                break
+        else:
+            break
+
+    print("found:")
+    print(perm)
+    code = code.to_qcode()
+    dode = wrap(code, perm)
+    print(code)
+    print(dode)
+
+    print(dode.longstr())
+
 
 
 def test_clifford():
