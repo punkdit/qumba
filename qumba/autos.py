@@ -458,11 +458,32 @@ def test_bring():
     print(g)
 
 
+def test_logicals():
+    from qumba import db
+    _id = "6705229919cca60cf657a904"
+    code = list(db.get(_id = _id))[0]
+    print(code)
+    gen, order, ops = get_autos_css(code)
+    L = mulclose(ops, verbose=True)
+    print("|G| =", order, "logicals:", len(L))
+
+    space = SymplecticSpace(code.k)
+    for g in L:
+        name = space.get_name(g)
+        if len(name) == 1:
+            print(name)
+
 
 def test():
     from qumba import db
-    for n in range(17, 28):
-        for code in db.get(n=n, css=True):
+    n = argv.get("n")
+    d = argv.get("d")
+    ns = range(17, 28) if n is None else [n]
+    for n in ns:
+        kw = {"n":n, "css":True}
+        if d is not None:
+            kw["d"] = d
+        for code in db.get(**kw):
             result = get_autos_css(code)
             if result is not None:
                 gen, order, ops = result

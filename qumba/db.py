@@ -74,6 +74,10 @@ def get(**attrs):
     from qumba.qcode import QCode
     data = {}
     data.update(attrs)
+    for (k,v) in list(data.items()):
+        if k == "_id" and type(v) is str:
+            v = ObjectId(v)
+            data[k] = v
     cursor = codes.find(data)
     for data in cursor:
 #        code = QCode.fromstr(
