@@ -276,7 +276,7 @@ def test_search_clifford():
     #code = construct.get_toric(3,1) # [[10,2,3]]
     #code = construct.get_toric(4,2) # [[20,2,4]]
     code = construct.get_toric(3,3) # [[18,2,3]]
-    code = construct.get_toric(4,0) # [[16,2,4]]
+    #code = construct.get_toric(4,0) # [[16,2,4]]
     code.distance()
     print(code)
 

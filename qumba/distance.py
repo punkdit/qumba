@@ -9,7 +9,6 @@ import numpy
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     zeros2, rank, rand2, pseudo_inverse, kernel, direct_sum, span, array2)
 from qumba.qcode import QCode, SymplecticSpace, get_weight, fromstr
-from qumba.csscode import CSSCode, find_zx_duality
 from qumba.argv import argv
 
 

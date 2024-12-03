@@ -987,7 +987,7 @@ def distance_lower_bound_z3(Hx, Lx, d):
     add = solver.add
     v = [Bool("v%d"%i) for i in range(n)]
 
-    term = Sum([If(v[i],1,0) for i in range(n)]) <= d
+    term = Sum([If(v[i],1,0) for i in range(n)]) == d
     add(term)
 
     def check(hx):
@@ -1051,6 +1051,8 @@ def distance_z3_css(code, verbose=False):
         d_z += 1
     if verbose:
         print()
+    code.dx = d_x
+    code.dz = d_z
     return d_x, d_z
 
 

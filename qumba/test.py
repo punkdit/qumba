@@ -10,7 +10,7 @@ from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identit
     rank, rand2, pseudo_inverse, kernel, direct_sum)
 from qumba.qcode import QCode, SymplecticSpace, strop, Matrix, fromstr
 from qumba.csscode import CSSCode, find_logicals
-from qumba.autos import get_autos
+from qumba.autos import get_autos, get_autos_css
 from qumba import csscode, construct
 from qumba.construct import get_422, get_513, get_golay, get_10_2_3, reed_muller
 from qumba.action import mulclose, mulclose_hom, mulclose_find
@@ -385,15 +385,35 @@ def test_hgp():
 
 
 def test_surface():
-    for rows in [2,3,4]:
-        for cols in [2,3,4]:
+    #from qumba import db
+    for rows in range(2,8):
+        for cols in range(2,8):
             code = construct.get_surface(rows,cols)
-            d = code.get_distance()
-            assert d == min(rows, cols)
+            code = code.to_css()
+            #d = code.get_distance()
+            #if d is None:
+            dx,dz = code.bz_distance()
+            print(code, rows, cols)
+            #code = code.to_qcode()
+            #code.desc = "surface"
+            #db.add(code)
+
+
+def test_toric():
+    from qumba import csscode
+    for a in range(1,8):
+      for b in range(1,8):
+        if (a+b)%2 or a==b==1 or a>b:
+            continue
+        #code = construct.get_xzzx(a, b)
+        code = construct.get_toric(a, b)
+        print(code)
+        print()
 
 
 def test_biplanar():
     from qumba.transversal import find_isomorphisms_css
+    from qumba import csscode, db
 #    for (w,h) in [
 #        (24, 12),
 #    ]:
@@ -405,10 +425,18 @@ def test_biplanar():
             continue
         if code.n < 100:
             code.bz_distance()
+        #else:
+        #    csscode.distance_z3_css(code, verbose=True)
         if code.d is not None and code.d < 3:
             continue
         print(w, h, code)
-        Hx, Hz = code.Hx, code.Hz
+        #Hx, Hz = code.Hx, code.Hz
+        code = code.to_qcode()
+        code.desc = "bivariate bicycle"
+        db.add(code)
+        #print()
+        #return
+
 
         #count = 0
         #for g in find_isomorphisms_css(code):

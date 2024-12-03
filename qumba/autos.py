@@ -397,7 +397,7 @@ def get_autos(code):
     w = sum(keys[0])
     #print(keys)
 
-    print(N)
+    print("N=%d"%N)
 
     #last = 0
     idx = 1

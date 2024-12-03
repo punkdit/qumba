@@ -111,8 +111,9 @@ def get_713():
     return code
 
 
-def get_golay():
+def get_golay(n=24):
     # Golay code:
+    assert 12<=n<=24
     H = parse("""
     1...........11...111.1.1
     .1...........11...111.11
@@ -127,6 +128,8 @@ def get_golay():
     ..........1.1..1..11111.
     ...........11...111.1.11
     """)
+    m = 24-n
+    H = H[m:, m:]
     return QCode.build_css(H, H)
 
 
@@ -474,7 +477,7 @@ def get_xzzx(a, b=0):
 def get_toric(a, b=0):
     lookup, keys = make_torus(a, b)
     n = len(keys)
-    assert n%2 == 0
+    assert n%2 == 0, (a, b)
     rows = []
     for (i,j) in keys:
         row = ['.']*n
