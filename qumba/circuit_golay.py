@@ -13,24 +13,16 @@ import pickle
 import numpy
 
 from qumba import solve
-solve.int_scalar = numpy.int32 # qupy.solve
+#solve.int_scalar = numpy.int32 # qupy.solve
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum, row_reduce, zeros2)
 from qumba.qcode import QCode, SymplecticSpace, strop, fromstr
 from qumba.csscode import CSSCode, find_logicals
-from qumba import csscode, construct
 from qumba.action import mulclose, mulclose_hom, mulclose_find
-from qumba.unwrap import unwrap, unwrap_encoder
 from qumba.smap import SMap
 from qumba.argv import argv
-from qumba.unwrap import Cover
-from qumba import transversal
 from qumba.matrix import Matrix
-from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
-from qumba.syntax import Syntax
-from qumba.circuit import (Circuit, measure, barrier, send, vdump, variance,
-    parsevec, strvec, find_state, get_inverse, load_batch, send_idxs)
-from qumba.circuit_css import css_encoder, process
+from qumba import construct
 
 
 
@@ -91,13 +83,34 @@ def get_GL(n):
         #print(~A, "\n\n")
     return names
 
-def find_encoder(n, Hx, Hz):
-    print("find_encoder")
-    print("Hx")
-    print(Hx)
-    print("Hz")
-    print(Hz)
 
+class Circuit:
+    def __init__(self, ux, uz, g, parent=None):
+        self.ux = ux
+        self.uz = uz
+        self.g = g
+        self.parent = parent
+        if parent is not None:
+            self.size = parent.size + 1
+        else:
+            self.size = 0
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, i):
+        #print("__getitem__", i, self.size)
+        if i >= self.size:
+            raise IndexError
+        c = self
+        while i>0:
+            c = c.parent
+            i -= 1
+        return c.g
+
+
+
+def greedy_search(n, Hx, Hz):
     mx, mz = len(Hx), len(Hz)
 
     names = get_GL(n)
@@ -106,9 +119,6 @@ def find_encoder(n, Hx, Hz):
 
     Sx = get_span(Hx)
     Sz = get_span(Hz)
-
-    print("Sx:")
-    print(Sx,'\n')
 
     def get_overlap(Ux, Uz):
         score = [int((u+Sx).A.sum(1).min()) for u in Ux]+[int((u+Sz).A.sum(1).min()) for u in Uz]
@@ -124,8 +134,9 @@ def find_encoder(n, Hx, Hz):
 
         Ux = I[:mx, :]
         Uz = I[mx:mx+mz, :]
+        circuit = Circuit(Ux, Uz, I)
 
-        circuit = []
+        #circuit = []
         while Ux.t.solve(Hx.t) is None or Uz.t.solve(Hz.t) is None:
             #print()
             #print(Ux, "\n"+'-'*n)
@@ -152,28 +163,11 @@ def find_encoder(n, Hx, Hz):
             else:
                 print("fail")
                 break 
-# does not seem to help much..
-#            #ux, uz, g = choice(best)
-#
-#            if not best:
-#                print("X")
-#                break
-#
-#            best.sort(key = lambda item : item[4]) # does not seem to help much..
-#            #ux, uz, g = best[0][:3]
-#            #print([item[4] for item in best])
-#            #print(len(best))
-#            item = choice(best[:len(best)//2+1])
-#
-#            Ux = item[0]
-#            Uz = item[1]
-#            circuit.append(item[2])
-#            print((sum(item[3]), item[4]), end=" ")
-    
             print(sum(s), end=" ")
             Ux = ux
             Uz = uz
-            circuit.append(g)
+            #circuit.append(g)
+            circuit = Circuit(Ux, Uz, g, circuit)
 
             if len(circuit) > n**2:
                 #print()
@@ -185,8 +179,6 @@ def find_encoder(n, Hx, Hz):
             print("\nsuccess!", trial)
             print([names[g] for g in circuit], len(circuit))
             break
-    else:
-        print("fail")
 
 
 
@@ -228,7 +220,14 @@ def test():
     code = code.to_css()
     Hx = Matrix(code.Hx)
     Hz = Matrix(code.Hz)
-    find_encoder(n, Hx, Hz)
+
+    print("find_encoder")
+    print("Hx")
+    print(Hx)
+    print("Hz")
+    print(Hz)
+
+    greedy_search(n, Hx, Hz)
     
 
 def test_1():
