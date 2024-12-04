@@ -15,7 +15,7 @@ import numpy
 from qumba import solve
 solve.int_scalar = numpy.int32 # qupy.solve
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
-    rank, rand2, pseudo_inverse, kernel, direct_sum, row_reduce)
+    rank, rand2, pseudo_inverse, kernel, direct_sum, row_reduce, zeros2)
 from qumba.qcode import QCode, SymplecticSpace, strop, fromstr
 from qumba.csscode import CSSCode, find_logicals
 from qumba import csscode, construct
@@ -25,7 +25,7 @@ from qumba.smap import SMap
 from qumba.argv import argv
 from qumba.unwrap import Cover
 from qumba import transversal
-from qumba import clifford, matrix
+from qumba.matrix import Matrix
 from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
 from qumba.syntax import Syntax
 from qumba.circuit import (Circuit, measure, barrier, send, vdump, variance,
@@ -56,13 +56,182 @@ def gate_search(space, gates, target):
     #print("^", end='')
     return found
 
+def get_span(H):
+    n = H.shape[1]
+    wenum = {i:[] for i in range(n+1)}
+    for u in H.rowspan():
+        d = u.sum()
+        wenum[d].append(u)
+    for i in range(1, n+1):
+        if wenum[i]:
+            break
+    vs = [v.A[0,:] for v in wenum[i]]
+    hx = Matrix(vs)
+    return hx
 
-def find_encoder(space, H, gates):
+
+def get_GL(n):
+    # These generate GL(n)
+    # the (block) symplectic matrix for A in GL is:
+    # [[A,0],[0,A.t]]
+    I = Matrix.identity(n)
+    gates = []
+    names = {}
+    for i in range(n):
+      for j in range(n):
+        if i==j:
+            continue
+        A = identity2(n)
+        A[i,j] = 1
+        A = Matrix(A)
+        gates.append(A)
+        assert A*A == I
+        names[A] = "CX(%d,%d)"%(i,j)
+        #print(A, "\n")
+        #print(~A, "\n\n")
+    return names
+
+def find_encoder(n, Hx, Hz):
     print("find_encoder")
-    print(H)
+    print("Hx")
+    print(Hx)
+    print("Hz")
+    print(Hz)
+
+    mx, mz = len(Hx), len(Hz)
+
+    names = get_GL(n)
+    gates = list(names)
+    I = Matrix.identity(n)
+
+    Sx = get_span(Hx)
+    Sz = get_span(Hz)
+
+    print("Sx:")
+    print(Sx,'\n')
+
+    def get_overlap(Ux, Uz):
+        score = [int((u+Sx).A.sum(1).min()) for u in Ux]+[int((u+Sz).A.sum(1).min()) for u in Uz]
+        w = sum(score)
+        mean = w // len(score)
+        var = sum( [(i-mean)**2 for i in score] )
+        return score,var
+
+    #for trial in range(1000):
+    trial = 0
+    while 1:
+        trial += 1
+
+        Ux = I[:mx, :]
+        Uz = I[mx:mx+mz, :]
+
+        circuit = []
+        while Ux.t.solve(Hx.t) is None or Uz.t.solve(Hz.t) is None:
+            #print()
+            #print(Ux, "\n"+'-'*n)
+            #print(Uz, "\n"+'-'*n)
+    
+            score, var = get_overlap(Ux, Uz)
+
+            w = sum(score) + var
+            #print((w,var), end=' ')
+    
+            #best = []
+            shuffle(gates)
+            for g in gates:
+                ux = (g * Ux.t).t
+                uz = (g.t * Uz.t).t
+                s,var = get_overlap(ux, uz) # slow !
+                #if sum(s) < sum(score):
+                #    best.append( (ux, uz, g, s, var) )
+                #if max(s) == max(score) and sum(s) < sum(score):
+                #    break
+                if sum(s) < sum(score):
+                    #best.append((ux, uz, g))
+                    break
+            else:
+                print("fail")
+                break 
+# does not seem to help much..
+#            #ux, uz, g = choice(best)
+#
+#            if not best:
+#                print("X")
+#                break
+#
+#            best.sort(key = lambda item : item[4]) # does not seem to help much..
+#            #ux, uz, g = best[0][:3]
+#            #print([item[4] for item in best])
+#            #print(len(best))
+#            item = choice(best[:len(best)//2+1])
+#
+#            Ux = item[0]
+#            Uz = item[1]
+#            circuit.append(item[2])
+#            print((sum(item[3]), item[4]), end=" ")
+    
+            print(sum(s), end=" ")
+            Ux = ux
+            Uz = uz
+            circuit.append(g)
+
+            if len(circuit) > n**2:
+                #print()
+                #print(Ux,'\n------')
+                #print(Uz,'\n')
+                print("too big")
+                break
+        else:
+            print("\nsuccess!", trial)
+            print([names[g] for g in circuit], len(circuit))
+            break
+    else:
+        print("fail")
+
 
 
 def test():
+    code = construct.get_713()
+
+    code = construct.get_10_2_3()
+    # ['CX(6,9)', 'CX(7,1)', 'CX(5,3)', 'CX(8,7)', 'CX(4,8)',
+    # 'CX(9,3)', 'CX(7,0)', 'CX(1,9)', 'CX(6,2)', 'CX(4,6)',
+    # 'CX(6,0)', 'CX(3,0)', 'CX(5,4)', 'CX(5,7)', 'CX(5,0)'] 15
+
+    _code = construct.reed_muller() # fail
+
+    _code = QCode.fromstr("""
+    XXXX.X.XX..X...
+    XXX.X.XX..X...X
+    XX.X.XX..X...XX
+    X.X.XX..X...XXX
+    ZZZZ.Z.ZZ..Z...
+    ZZZ.Z.ZZ..Z...Z
+    ZZ.Z.ZZ..Z...ZZ
+    Z.Z.ZZ..Z...ZZZ
+    """) # [[15, 7, 3]] # fail
+
+    _code = QCode.fromstr("""
+    XXX....X.X.X
+    X.XX..X.XX..
+    XX..XXX....X
+    ..XX.XXX...X
+    XX..X...XXX.
+    ZZ..Z..ZZ..Z
+    Z.Z.....ZZZZ
+    ....ZZ.ZZZZ.
+    .ZZZ...Z..ZZ
+    ..Z.ZZZ...ZZ
+    """) # [[12, 2, 4]] # fail
+
+    n = code.n
+    code = code.to_css()
+    Hx = Matrix(code.Hx)
+    Hz = Matrix(code.Hz)
+    find_encoder(n, Hx, Hz)
+    
+
+def test_1():
 
     #code = construct.get_golay(23)
     code = construct.get_toric(2,2)
