@@ -7,7 +7,7 @@ warnings.filterwarnings('ignore')
 
 from random import shuffle, randint, choice
 from operator import add, matmul, mul
-from functools import reduce
+from functools import reduce, cache
 import pickle
 
 import numpy
@@ -91,9 +91,11 @@ class Circuit:
         self.g = g
         self.parent = parent
         if parent is not None:
+            parent.children.append(self)
             self.size = parent.size + 1
         else:
             self.size = 0
+        self.children = []
 
     def __len__(self):
         return self.size
@@ -106,7 +108,7 @@ class Circuit:
         while i>0:
             c = c.parent
             i -= 1
-        return c.g
+        return c
 
 
 
@@ -127,7 +129,6 @@ def greedy_search(n, Hx, Hz):
         var = sum( [(i-mean)**2 for i in score] )
         return score,var
 
-    #for trial in range(1000):
     trial = 0
     while 1:
         trial += 1
@@ -136,29 +137,16 @@ def greedy_search(n, Hx, Hz):
         Uz = I[mx:mx+mz, :]
         circuit = Circuit(Ux, Uz, I)
 
-        #circuit = []
         while Ux.t.solve(Hx.t) is None or Uz.t.solve(Hz.t) is None:
-            #print()
-            #print(Ux, "\n"+'-'*n)
-            #print(Uz, "\n"+'-'*n)
-    
             score, var = get_overlap(Ux, Uz)
 
             w = sum(score) + var
-            #print((w,var), end=' ')
-    
-            #best = []
             shuffle(gates)
             for g in gates:
                 ux = (g * Ux.t).t
                 uz = (g.t * Uz.t).t
                 s,var = get_overlap(ux, uz) # slow !
-                #if sum(s) < sum(score):
-                #    best.append( (ux, uz, g, s, var) )
-                #if max(s) == max(score) and sum(s) < sum(score):
-                #    break
                 if sum(s) < sum(score):
-                    #best.append((ux, uz, g))
                     break
             else:
                 print("fail")
@@ -170,9 +158,6 @@ def greedy_search(n, Hx, Hz):
             circuit = Circuit(Ux, Uz, g, circuit)
 
             if len(circuit) > n**2:
-                #print()
-                #print(Ux,'\n------')
-                #print(Uz,'\n')
                 print("too big")
                 break
         else:
@@ -181,45 +166,182 @@ def greedy_search(n, Hx, Hz):
             break
 
 
+def monte_search(n, Hx, Hz):
+    mx, mz = len(Hx), len(Hz)
+
+    names = get_GL(n)
+    gates = list(names)
+    I = Matrix.identity(n)
+
+    Sx = get_span(Hx)
+    Sz = get_span(Hz)
+
+    def get_overlap(Ux, Uz):
+        score = [int((u+Sx).A.sum(1).min()) for u in Ux]+[int((u+Sz).A.sum(1).min()) for u in Uz]
+        w = sum(score)
+        mean = w // len(score)
+        var = sum( [(i-mean)**2 for i in score] )
+        return score,var
+
+    Ux = I[:mx, :]
+    Uz = I[mx:mx+mz, :]
+    circuit = Circuit(Ux, Uz, I)
+
+    while Ux.t.solve(Hx.t) is None or Uz.t.solve(Hz.t) is None:
+        score, var = get_overlap(Ux, Uz)
+
+        for trial in range(len(gates)):
+            g = choice(gates)
+            ux = (g * Ux.t).t
+            uz = (g.t * Uz.t).t
+            s,var = get_overlap(ux, uz) # slow !
+            if sum(s) < sum(score):
+                print(sum(s), end=" ")
+                circuit = Circuit(ux, uz, g, circuit) # push
+                break
+        else:
+            N = len(circuit)
+            circuit = circuit[randint(1, N-1)]
+            print(".", end="", flush=True)
+
+        Ux = circuit.ux
+        Uz = circuit.uz
+
+    else:
+        print("\nsuccess!")
+        print([names[c.g] for c in circuit], len(circuit))
+
+
+class Tree:
+    def __init__(self, Ux, Uz, ggt, parent=None):
+        self.Ux = Ux
+        self.Uz = Uz
+        self.ggt = ggt
+        self.parent = parent
+        if parent is not None:
+            parent.children[ggt] = self
+            self.size = parent.size + 1
+        else:
+            self.size = 0
+        self.children = {}
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, i):
+        #print("__getitem__", i, self.size)
+        if i >= self.size:
+            raise IndexError
+        c = self
+        while i>0:
+            c = c.parent
+            i -= 1
+        return c
+
+    def act(self, ggt):
+        tree = self.children.get(ggt)
+        if tree is not None:
+            #print("!", end="")
+            return tree
+        g, gt = ggt
+        Ux, Uz = self.Ux*gt, self.Uz*g
+        return Tree(Ux, Uz, ggt, self)
+
+
+def tree_search(n, Hx, Hz):
+    mx, mz = len(Hx), len(Hz)
+    Hxt, Hzt = Hx.t, Hz.t
+
+    names = get_GL(n)
+    gates = [(g,g.t) for g in names]
+    I = Matrix.identity(n)
+
+    Sx = get_span(Hx)
+    Sz = get_span(Hz)
+
+    @cache
+    def get_overlap(Ux, Uz):
+        score = [int((u+Sx).A.sum(1).min()) for u in Ux]+[int((u+Sz).A.sum(1).min()) for u in Uz]
+        return sum(score)
+
+    Ux = I[:mx, :]
+    Uz = I[mx:mx+mz, :]
+    tree = Tree(Ux, Uz, I)
+
+    print("warmup...")
+    for ggt in gates:
+        child = tree.act(ggt)
+        for ggt in gates:
+            child.act(ggt)
+
+    while tree.Ux.t.solve(Hxt) is None or tree.Uz.t.solve(Hzt) is None:
+        score = get_overlap(tree.Ux, tree.Uz)
+
+        for trial in range(len(gates)):
+            ggt = choice(gates)
+            child = tree.act(ggt)
+            s = get_overlap(child.Ux, child.Uz) # slow !
+            if s < score:
+                #print(s, end=" ")
+                #tree = Tree(ux, uz, g, tree) # push
+                tree = child
+                break
+        else:
+            print(s, end=" ")
+            N = len(tree)
+            #tree = tree[randint(1, N-1)]
+            tree = tree[N-1]
+            print("[%d]"%len(tree), end=" ", flush=True)
+
+        assert len(tree) < n**2
+
+    else:
+        return [names[c.ggt[0]] for c in tree]
+
 
 def test():
-    code = construct.get_713()
 
-    code = construct.get_10_2_3()
-    # ['CX(6,9)', 'CX(7,1)', 'CX(5,3)', 'CX(8,7)', 'CX(4,8)',
-    # 'CX(9,3)', 'CX(7,0)', 'CX(1,9)', 'CX(6,2)', 'CX(4,6)',
-    # 'CX(6,0)', 'CX(3,0)', 'CX(5,4)', 'CX(5,7)', 'CX(5,0)'] 15
+    if argv.code == (7,1,3):
+        code = construct.get_713()
 
-    _code = construct.reed_muller() # fail
+    elif argv.code == (10,2,3):
+        code = construct.get_10_2_3()
 
-    _code = QCode.fromstr("""
-    XXXX.X.XX..X...
-    XXX.X.XX..X...X
-    XX.X.XX..X...XX
-    X.X.XX..X...XXX
-    ZZZZ.Z.ZZ..Z...
-    ZZZ.Z.ZZ..Z...Z
-    ZZ.Z.ZZ..Z...ZZ
-    Z.Z.ZZ..Z...ZZZ
-    """) # [[15, 7, 3]] # fail
+    elif argv.code == (16,6,4):
+        code = construct.reed_muller() # fail
 
-    _code = QCode.fromstr("""
-    XXX....X.X.X
-    X.XX..X.XX..
-    XX..XXX....X
-    ..XX.XXX...X
-    XX..X...XXX.
-    ZZ..Z..ZZ..Z
-    Z.Z.....ZZZZ
-    ....ZZ.ZZZZ.
-    .ZZZ...Z..ZZ
-    ..Z.ZZZ...ZZ
-    """) # [[12, 2, 4]] # fail
+    elif argv.code == (15, 7, 3):
+        code = QCode.fromstr("""
+        XXXX.X.XX..X...
+        XXX.X.XX..X...X
+        XX.X.XX..X...XX
+        X.X.XX..X...XXX
+        ZZZZ.Z.ZZ..Z...
+        ZZZ.Z.ZZ..Z...Z
+        ZZ.Z.ZZ..Z...ZZ
+        Z.Z.ZZ..Z...ZZZ
+        """) # [[15, 7, 3]] # fail
+    
+    elif argv.code == (12, 2, 4):
+        code = QCode.fromstr("""
+        XXX....X.X.X
+        X.XX..X.XX..
+        XX..XXX....X
+        ..XX.XXX...X
+        XX..X...XXX.
+        ZZ..Z..ZZ..Z
+        Z.Z.....ZZZZ
+        ....ZZ.ZZZZ.
+        .ZZZ...Z..ZZ
+        ..Z.ZZZ...ZZ
+        """) # [[12, 2, 4]] # fail
+    else:
+        return
 
     n = code.n
-    code = code.to_css()
-    Hx = Matrix(code.Hx)
-    Hz = Matrix(code.Hz)
+    css = code.to_css()
+    Hx = Matrix(css.Hx)
+    Hz = Matrix(css.Hz)
 
     print("find_encoder")
     print("Hx")
@@ -227,7 +349,33 @@ def test():
     print("Hz")
     print(Hz)
 
-    greedy_search(n, Hx, Hz)
+    #greedy_search(n, Hx, Hz)
+    #monte_search(n, Hx, Hz)
+    names = tree_search(n, Hx, Hz)
+
+    print()
+    print(names)
+
+    space = SymplecticSpace(n)
+    H = space.H
+    expr = tuple(names)
+
+    mx, mz = css.mx, css.mz
+    E = reduce(mul, [H(i) for i in range(mx, mx+mz)])
+    E = reduce(mul, [H(i) for i in range(mx)])
+    E = space.get_expr(expr) * E
+
+    dode = QCode.from_encoder(E, k=code.k)
+    dode.distance()
+    print(dode)
+#    print(dode.longstr())
+#    print()
+#
+#    print(code.longstr())
+#    print()
+#    print(code.H * space.F * dode.H.t)
+
+    print("is_equiv:", dode.is_equiv(code))
     
 
 def test_1():
