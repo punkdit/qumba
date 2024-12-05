@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 
+"""
+
+newer version: circuit_finder.py
+
+"""
+
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -90,6 +96,7 @@ def test_1():
 
 # ----------------------------------------------------------------------------
     
+
 def get_span(H):
     n = H.shape[1]
     wenum = {i:[] for i in range(n+1)}
@@ -384,9 +391,13 @@ class Graph:
                 child.prune(depth - 1)
 
     @cache
-    def get_overlap(self, Sx, Sz):
+    def get_overlap(self, Sx, Sz): # hotspot 
         Ux, Uz = self.Ux, self.Uz
-        score = sum([int((u+Sx).A.sum(1).min()) for u in Ux]+[int((u+Sz).A.sum(1).min()) for u in Uz])
+        score = 0
+        for u in Ux:
+            score += (u+Sx).A.sum(1).min()
+        for u in Uz:
+            score += (u+Sz).A.sum(1).min()
         return score
 
     def act(self, ggt):
@@ -646,6 +657,23 @@ def test():
     print("is_equiv:", dode.is_equiv(code))
     
 
+
+def sim():
+    ['CX(13,22)', 'CX(17,19)', 'CX(14,17)', 'CX(19,12)',
+'CX(13,16)', 'CX(16,11)', 'CX(14,11)', 'CX(12,13)', 'CX(15,18)',
+'CX(15,21)', 'CX(11,21)', 'CX(20,16)', 'CX(18,20)', 'CX(18,16)',
+'CX(21,14)', 'CX(16,15)', 'CX(18,13)', 'CX(13,17)', 'CX(12,11)',
+'CX(11,1)', 'CX(19,15)', 'CX(22,14)', 'CX(17,21)', 'CX(11,12)',
+'CX(21,5)', 'CX(15,13)', 'CX(19,14)', 'CX(21,17)', 'CX(15,5)',
+'CX(18,17)', 'CX(16,12)', 'CX(11,22)', 'CX(21,19)', 'CX(16,18)',
+'CX(15,8)', 'CX(12,3)', 'CX(13,20)', 'CX(17,22)', 'CX(19,17)',
+'CX(17,15)', 'CX(15,16)', 'CX(18,17)', 'CX(14,8)', 'CX(21,17)',
+'CX(21,20)', 'CX(21,19)', 'CX(12,19)', 'CX(20,18)', 'CX(3,12)',
+'CX(17,13)', 'CX(22,0)', 'CX(22,15)', 'CX(14,20)', 'CX(18,13)',
+'CX(3,22)', 'CX(14,10)', 'CX(18,16)', 'CX(13,19)', 'CX(17,20)',
+'CX(14,5)', 'CX(16,7)', 'CX(20,19)', 'CX(18,19)', 'CX(17,9)',
+'CX(13,2)', 'CX(19,4)', 'CX(15,20)', 'CX(15,6)', 'CX(18,3)',
+'CX(20,21)'] # 70
     
 
 if __name__ == "__main__":
