@@ -5,7 +5,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-from random import shuffle, randint, choice
+from random import shuffle, randint, choice, seed
 from operator import add, matmul, mul
 from functools import reduce, cache
 import pickle
@@ -48,6 +48,48 @@ def gate_search(space, gates, target):
     #print("^", end='')
     return found
 
+def test_1():
+
+    #code = construct.get_golay(23)
+    code = construct.get_toric(2,2)
+    n = code.n
+
+    H = code.H
+    print(code)
+    print(code.longstr())
+
+    space = code.space
+    E = code.get_encoder()
+    #print(E)
+
+    name = space.get_name(E)
+    print(name, len(name))
+
+    code = code.to_css()
+    #name = css_encoder(code.Hz)
+    #print(name, len(name))
+
+    E1 = space.get_expr(name)
+
+    print(E == E1)
+
+#    dode = QCode.from_encoder(E1, k=1)
+#    assert dode.is_css()
+#    dode = dode.to_css()
+#    dode.bz_distance()
+#    print(dode)
+
+    CX, H = space.CX, space.H
+    E1 = E #* H(3)*H(4)*H(5)
+
+    gates = [CX(i,j) for i in range(n) for j in range(n) if i!=j]
+    #gates += [H(i) for i in range(n)]
+
+
+    find_encoder(space, code.H, gates)
+
+# ----------------------------------------------------------------------------
+    
 def get_span(H):
     n = H.shape[1]
     wenum = {i:[] for i in range(n+1)}
@@ -83,6 +125,7 @@ def get_GL(n):
         #print(~A, "\n\n")
     return names
 
+# ----------------------------------------------------------------------------
 
 class Circuit:
     def __init__(self, ux, uz, g, parent=None):
@@ -211,6 +254,7 @@ def monte_search(n, Hx, Hz):
         print("\nsuccess!")
         print([names[c.g] for c in circuit], len(circuit))
 
+# ----------------------------------------------------------------------------
 
 class Tree:
     def __init__(self, Ux, Uz, ggt, parent=None):
@@ -259,7 +303,7 @@ def tree_search(n, Hx, Hz):
     Sx = get_span(Hx)
     Sz = get_span(Hz)
 
-    @cache
+    #@cache
     def get_overlap(Ux, Uz):
         score = [int((u+Sx).A.sum(1).min()) for u in Ux]+[int((u+Sz).A.sum(1).min()) for u in Uz]
         return sum(score)
@@ -282,21 +326,240 @@ def tree_search(n, Hx, Hz):
             child = tree.act(ggt)
             s = get_overlap(child.Ux, child.Uz) # slow !
             if s < score:
-                #print(s, end=" ")
+                print(s, end=" ")
                 #tree = Tree(ux, uz, g, tree) # push
                 tree = child
                 break
         else:
-            print(s, end=" ")
+            #print(s, end=" ")
             N = len(tree)
             #tree = tree[randint(1, N-1)]
             tree = tree[N-1]
-            print("[%d]"%len(tree), end=" ", flush=True)
+            #print("[%d]"%len(tree), end=" ", flush=True)
+            print(".", end=" ", flush=True)
 
         assert len(tree) < n**2
 
     else:
         return [names[c.ggt[0]] for c in tree]
+
+
+# ----------------------------------------------------------------------------
+
+
+class Graph:
+    def __init__(self, Ux, Uz, parent=None, ggt=None):
+        self.Ux = Ux
+        self.Uz = Uz
+        self.parent = parent
+        self.ggt = ggt
+        if parent is not None:
+            self.size = parent.size + 1
+        else:
+            self.size = 0
+        self.children = {}
+        self.scores = []
+        self.score = None
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, i):
+        #print("__getitem__", i, self.size)
+        if i >= self.size:
+            raise IndexError
+        c = self
+        while i>0:
+            c = c.parent
+            i -= 1
+        return c
+
+    def prune(self, depth):
+        assert depth >= 0
+        if depth == 0:
+            self.scores = []
+            self.children = {}
+        else:
+            for child in self.children.values():
+                child.prune(depth - 1)
+
+    @cache
+    def get_overlap(self, Sx, Sz):
+        Ux, Uz = self.Ux, self.Uz
+        score = sum([int((u+Sx).A.sum(1).min()) for u in Ux]+[int((u+Sz).A.sum(1).min()) for u in Uz])
+        return score
+
+    def act(self, ggt):
+        tree = self.children.get(ggt)
+        if tree is not None:
+            #print("!", end="")
+            return tree
+        g, gt = ggt
+        Ux, Uz = self.Ux*gt, self.Uz*g
+        graph = Graph(Ux, Uz, self, ggt)
+        self.children[ggt] = graph
+        return graph
+
+    def mark_end(self, score):
+        tree = self.parent
+        while tree is not None:
+            tree.scores.append(score)
+            tree = tree.parent
+
+    def playout(self, trials, gates, Sx, Sz):
+        tree = self
+
+        count = 0
+        while count < trials:
+            score = tree.get_overlap(Sx, Sz)
+            if score == 0:
+                print("success!")
+                return tree
+    
+            for _ in range(len(gates)):
+                ggt = choice(gates)
+                child = tree.act(ggt)
+                s = child.get_overlap(Sx, Sz)
+                if s < score:
+                    print(s, end=" ")
+                    tree = child
+                    break
+            else:
+                print(".", end=" ", flush=True)
+                print(score)
+                tree.mark_end(score)
+                tree = self
+                count += 1
+    
+            assert len(tree) < 1000
+
+
+
+def graph_search(n, Hx, Hz):
+    mx, mz = len(Hx), len(Hz)
+    Hxt, Hzt = Hx.t, Hz.t
+
+    names = get_GL(n)
+    gates = [(g,g.t) for g in names]
+    I = Matrix.identity(n)
+
+    Sx = get_span(Hx)
+    Sz = get_span(Hz)
+
+    Ux = I[:mx, :]
+    Uz = I[mx:mx+mz, :]
+    tree = Graph(Ux, Uz)
+    tree.get_overlap(Sx, Sz)
+
+    print("warmup...")
+    for ggt in gates:
+        child = tree.act(ggt)
+        child.get_overlap(Sx, Sz)
+        for ggt in gates:
+            t = child.act(ggt)
+            t.get_overlap(Sx, Sz)
+
+    while 1:
+        score = tree.get_overlap(Sx, Sz)
+        if score == 0:
+            break
+
+        for trial in range(len(gates)):
+            ggt = choice(gates)
+            child = tree.act(ggt)
+            s = child.get_overlap(Sx, Sz)
+            if s < score:
+                print(s, end=" ")
+                tree = child
+                break
+        else:
+            #print(s, end=" ")
+            N = len(tree)
+            #tree = tree[randint(1, N-1)]
+            tree = tree[N-1]
+            #print("[%d]"%len(tree), end=" ", flush=True)
+            print(".", end=" ", flush=True)
+
+        assert len(tree) < n**2
+
+    return [names[c.ggt[0]] for c in tree]
+
+
+def directed_search(n, Hx, Hz):
+
+    names = get_GL(n)
+    gates = [(g,g.t) for g in names]
+    I = Matrix.identity(n)
+
+    mx, mz = len(Hx), len(Hz)
+    Ux = I[:mx, :]
+    Uz = I[mx:mx+mz, :]
+
+    if argv.reverse:
+        Ux, Uz, Hx, Hz = Hx, Hz, Ux, Uz
+
+    Sx = get_span(Hx)
+    Sz = get_span(Hz)
+    root = Graph(Ux, Uz)
+
+    tree = root
+
+    while 1:
+        found = tree.playout(100, gates, Sx, Sz)
+        if found is not None:
+            tree = found
+            break
+    
+        children = [child for child in tree.children.values() if child.scores]
+        print("children:", len(children))
+        if len(children) < 10:
+            print("backtrack..")
+            tree = root
+            root.prune(4)
+            continue
+    
+        children.sort( key = lambda child : -sum(child.scores)/len(child.scores) )
+        tree = choice(children[:len(children)//2])
+    
+    result = [names[c.ggt[0]] for c in tree]
+    return list(reversed(result))
+
+
+def back_search(n, Hx, Hz):
+
+    names = get_GL(n)
+    gates = [(g,g.t) for g in names]
+    I = Matrix.identity(n)
+
+    mx, mz = len(Hx), len(Hz)
+    Ux = I[:mx, :]
+    Uz = I[mx:mx+mz, :]
+
+    # reverse
+    Ux, Uz, Hx, Hz = Hx, Hz, Ux, Uz
+
+    Sx = get_span(Hx)
+    Sz = get_span(Hz)
+    root = Graph(Ux, Uz)
+
+    tree = root
+
+    sols = []
+    for trial in range(argv.get("trials",100)):
+        found = tree.playout(1, gates, Sx, Sz)
+        if found is not None:
+            sols.append(found)
+            print("found:", len(found), "best:", min(len(s) for s in sols))
+            print()
+    
+    assert sols
+    sols.sort(key = len)
+    print([len(s) for s in sols])
+    tree = sols[0]
+    
+    result = [names[c.ggt[0]] for c in tree]
+    return list(reversed(result))
+
 
 
 def test():
@@ -335,6 +598,8 @@ def test():
         .ZZZ...Z..ZZ
         ..Z.ZZZ...ZZ
         """) # [[12, 2, 4]] # fail
+    elif argv.code == (23, 1, 7):
+        code = construct.get_golay(23)
     else:
         return
 
@@ -343,7 +608,6 @@ def test():
     Hx = Matrix(css.Hx)
     Hz = Matrix(css.Hz)
 
-    print("find_encoder")
     print("Hx")
     print(Hx)
     print("Hz")
@@ -351,10 +615,14 @@ def test():
 
     #greedy_search(n, Hx, Hz)
     #monte_search(n, Hx, Hz)
-    names = tree_search(n, Hx, Hz)
+    names = back_search(n, Hx, Hz)
 
     print()
-    print(names)
+    if names is None:
+        return
+
+    print()
+    print(names, len(names))
 
     space = SymplecticSpace(n)
     H = space.H
@@ -378,47 +646,6 @@ def test():
     print("is_equiv:", dode.is_equiv(code))
     
 
-def test_1():
-
-    #code = construct.get_golay(23)
-    code = construct.get_toric(2,2)
-    n = code.n
-
-    H = code.H
-    print(code)
-    print(code.longstr())
-
-    space = code.space
-    E = code.get_encoder()
-    #print(E)
-
-    name = space.get_name(E)
-    print(name, len(name))
-
-    code = code.to_css()
-    #name = css_encoder(code.Hz)
-    #print(name, len(name))
-
-    E1 = space.get_expr(name)
-
-    print(E == E1)
-
-#    dode = QCode.from_encoder(E1, k=1)
-#    assert dode.is_css()
-#    dode = dode.to_css()
-#    dode.bz_distance()
-#    print(dode)
-
-    CX, H = space.CX, space.H
-    E1 = E #* H(3)*H(4)*H(5)
-
-    gates = [CX(i,j) for i in range(n) for j in range(n) if i!=j]
-    #gates += [H(i) for i in range(n)]
-
-
-    find_encoder(space, code.H, gates)
-
-    
     
 
 if __name__ == "__main__":
