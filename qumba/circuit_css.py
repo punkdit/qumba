@@ -232,7 +232,7 @@ def process(code, samps, circuit):
             counts.remove(max(counts))
             for c in counts:
                 errors += c
-        print(bags)
+        print(str(bags)[:100]+" ...")
 
     print("shots:", shots)
     print("errors:", errors)

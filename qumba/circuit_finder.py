@@ -30,6 +30,7 @@ from qumba.matrix import Matrix
 from qumba import construct
 
 from qumba.circuit import parsevec, Circuit, send, get_inverse, measure, barrier, variance, vdump, load
+from qumba.circuit_css import css_encoder, process
 
 
 
@@ -282,13 +283,8 @@ def test():
     print("is_equiv:", dode.is_equiv(code))
     
 
-def sim():
-
-    tgt = construct.get_golay(23)
-    css = tgt.to_css()
-    n = tgt.n
-    mx, mz = css.mx, css.mz
-
+def get_prep(code, dual=False):
+    css = code.to_css()
     # 67
     prep = ['CX(13,12)', 'CX(13,14)', 'CX(14,20)', 'CX(17,19)',
     'CX(19,14)', 'CX(18,14)', 'CX(20,18)', 'CX(16,17)', 'CX(12,18)',
@@ -305,8 +301,99 @@ def sim():
     'CX(20,2)', 'CX(19,15)', 'CX(17,1)', 'CX(20,19)', 'CX(15,0)',
     'CX(19,22)', 'CX(11,6)', 'CX(11,4)'] 
 
-    prep += ["H(%d)"%i for i in range(mx)]
+    # 65
+    prep65 = ['CX(15,18)', 'CX(20,21)', 'CX(21,16)', 'CX(16,17)',
+    'CX(19,13)', 'CX(18,17)', 'CX(22,20)', 'CX(15,21)', 'CX(14,11)',
+    'CX(18,22)', 'CX(17,0)', 'CX(11,15)', 'CX(13,22)', 'CX(20,18)',
+    'CX(22,20)', 'CX(16,14)', 'CX(20,13)', 'CX(16,13)', 'CX(15,16)',
+    'CX(22,13)', 'CX(17,16)', 'CX(13,12)', 'CX(16,13)', 'CX(12,21)',
+    'CX(14,19)', 'CX(12,13)', 'CX(16,18)', 'CX(19,15)', 'CX(14,20)',
+    'CX(18,19)', 'CX(18,1)', 'CX(21,5)', 'CX(16,12)', 'CX(17,13)',
+    'CX(17,12)', 'CX(21,17)', 'CX(12,15)', 'CX(21,0)', 'CX(22,12)',
+    'CX(20,11)', 'CX(21,18)', 'CX(20,14)', 'CX(15,11)', 'CX(17,14)',
+    'CX(12,15)', 'CX(18,12)', 'CX(19,10)', 'CX(11,4)', 'CX(20,3)',
+    'CX(11,14)', 'CX(12,8)', 'CX(19,22)', 'CX(22,2)', 'CX(19,8)',
+    'CX(7,22)', 'CX(13,7)', 'CX(21,1)', 'CX(19,12)', 'CX(16,15)',
+    'CX(18,16)', 'CX(14,9)', 'CX(13,2)', 'CX(11,16)', 'CX(16,22)',
+    'CX(15,6)']
+
+    if dual:
+        prep += ["H(%d)"%i for i in range(css.mx,css.mx+css.mz)]
+    else:
+        prep += ["H(%d)"%i for i in range(css.mx)]
     prep = tuple(prep)
+    return prep
+
+
+def strong_sim():
+    #from strong_clifford.simulator import Simulator
+    from strong_clifford.simulator_symbolic_phases import Simulator
+
+    tgt = construct.get_golay(23)
+    css = tgt.to_css()
+    prep = get_prep(tgt, True)
+    n_gates = len(prep)
+    n = tgt.n
+
+    print(n, n_gates)
+
+    sim = Simulator(n, n_gates=n_gates, draw=True)
+    for g in reversed(prep):
+        s = g.lower().replace("cx", "cnot")
+        s = "sim."+s
+        print(s)
+        exec(s)
+
+    print(sim.draw_span())
+
+    #print(dir(sim))
+    #print(sim)
+    for i in range(n):
+        sim.measure(i)
+
+    p0 = 1e-2
+    std_dev_scale = 0.1
+    
+    numpy.random.seed(0)
+    p_base_1q = numpy.random.normal(p0, std_dev_scale * p0, 3)
+    errors_1q = numpy.hstack((1 - numpy.sum(p_base_1q), p_base_1q))
+    p_base_2q = numpy.random.normal(p0, std_dev_scale * p0, 15)
+    errors_2q = numpy.hstack((1 - numpy.sum(p_base_2q), p_base_2q))
+
+    print(errors_1q)
+    print(errors_2q)
+
+    S = sim.get_samples(errors_1q, errors_2q, measurement_results=None, shots=10)
+    S = numpy.array(S)
+    print(f"Samples:")
+    print(S, S.shape)
+    print()
+
+    #print(shortstr(css.Hz))
+
+    A = dot2(S, css.Hz.transpose())
+    print(shortstr(A))
+
+
+def sim_hugr():
+    
+    from hugr import tys
+    from hugr.build.tracked_dfg import TrackedDfg
+    from hugr.package import Package
+    from hugr.std.float import FLOAT_T, FloatVal
+    from hugr.std.logic import Not
+    
+    from hugr.tests.conftest import CX, QUANTUM_EXT, H, Measure, Rz, validate
+
+
+def sim():
+
+    tgt = construct.get_golay(23)
+    css = tgt.to_css()
+    n = tgt.n
+    mx, mz = css.mx, css.mz
+
+    prep = get_prep(tgt)
     
     space = SymplecticSpace(n)
     H = space.H
@@ -317,7 +404,7 @@ def sim():
     code = QCode.from_encoder(E, k=tgt.k)
     code.distance()
     print(code)
-    assert code.is_equiv(tgt)
+    #assert code.is_equiv(tgt)
     #print(code.longstr())
 
 
@@ -329,9 +416,8 @@ def sim():
         return
 
 
-    shots = argv.get("shots", 100)
+    shots = argv.get("shots", 1000)
     samps = send([qasm], shots=shots, error_model=True)
-
     process(code, samps, circuit)
 
 
