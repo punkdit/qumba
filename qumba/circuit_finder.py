@@ -29,6 +29,11 @@ from qumba.argv import argv
 from qumba.matrix import Matrix
 from qumba import construct
 
+from qumba.circuit import parsevec, Circuit, send, get_inverse, measure, barrier, variance, vdump, load
+
+
+
+
 
 # ----------------------------------------------------------------------------
     
@@ -274,19 +279,64 @@ def test():
     dode = QCode.from_encoder(E, k=code.k)
     dode.distance()
     print(dode)
-#    print(dode.longstr())
-#    print()
-#
-#    print(code.longstr())
-#    print()
-#    print(code.H * space.F * dode.H.t)
-
     print("is_equiv:", dode.is_equiv(code))
     
 
+def sim():
+
+    tgt = construct.get_golay(23)
+    css = tgt.to_css()
+    n = tgt.n
+    mx, mz = css.mx, css.mz
+
+    # 67
+    prep = ['CX(13,12)', 'CX(13,14)', 'CX(14,20)', 'CX(17,19)',
+    'CX(19,14)', 'CX(18,14)', 'CX(20,18)', 'CX(16,17)', 'CX(12,18)',
+    'CX(22,21)', 'CX(22,15)', 'CX(15,14)', 'CX(11,21)', 'CX(14,20)',
+    'CX(20,12)', 'CX(16,13)', 'CX(18,13)', 'CX(20,21)', 'CX(14,17)',
+    'CX(21,16)', 'CX(13,22)', 'CX(20,15)', 'CX(15,14)', 'CX(17,11)',
+    'CX(16,12)', 'CX(21,11)', 'CX(12,14)', 'CX(22,19)', 'CX(12,19)',
+    'CX(14,7)', 'CX(12,20)', 'CX(15,13)', 'CX(20,4)', 'CX(18,13)',
+    'CX(13,21)', 'CX(17,22)', 'CX(13,10)', 'CX(11,20)', 'CX(11,22)',
+    'CX(18,19)', 'CX(11,21)', 'CX(19,16)', 'CX(21,1)', 'CX(22,14)',
+    'CX(12,16)', 'CX(18,17)', 'CX(14,15)', 'CX(17,5)', 'CX(20,12)',
+    'CX(16,13)', 'CX(14,2)', 'CX(16,10)', 'CX(1,21)', 'CX(14,22)',
+    'CX(12,3)', 'CX(19,18)', 'CX(20,14)', 'CX(16,8)', 'CX(18,9)',
+    'CX(20,2)', 'CX(19,15)', 'CX(17,1)', 'CX(20,19)', 'CX(15,0)',
+    'CX(19,22)', 'CX(11,6)', 'CX(11,4)'] 
+
+    prep += ["H(%d)"%i for i in range(mx)]
+    prep = tuple(prep)
+    
+    space = SymplecticSpace(n)
+    H = space.H
+
+    #E = reduce(mul, [H(i) for i in range(mx)])
+    E = space.get_expr(prep) 
+
+    code = QCode.from_encoder(E, k=tgt.k)
+    code.distance()
+    print(code)
+    assert code.is_equiv(tgt)
+    #print(code.longstr())
 
 
-# ['CX(14,20)', 'CX(12,13)', 'CX(14,15)', 'CX(14,11)', 'CX(16,19)', 'CX(22,19)', 'CX(21,18)', 'CX(18,14)', 'CX(13,22)', 'CX(19,13)', 'CX(17,16)', 'CX(12,16)', 'CX(12,18)', 'CX(16,13)', 'CX(16,21)', 'CX(22,12)', 'CX(15,11)', 'CX(17,11)', 'CX(14,17)', 'CX(19,22)', 'CX(21,19)', 'CX(17,12)', 'CX(15,21)', 'CX(19,21)', 'CX(13,18)', 'CX(20,12)', 'CX(20,16)', 'CX(15,13)', 'CX(11,19)', 'CX(16,15)', 'CX(19,14)', 'CX(16,20)', 'CX(16,22)', 'CX(22,12)', 'CX(11,12)', 'CX(17,11)', 'CX(22,12)', 'CX(15,21)', 'CX(19,20)', 'CX(14,19)', 'CX(20,10)', 'CX(20,11)', 'CX(13,16)', 'CX(22,17)', 'CX(18,22)', 'CX(21,7)', 'CX(1,19)', 'CX(12,8)', 'CX(12,13)', 'CX(9,19)', 'CX(20,7)', 'CX(18,0)', 'CX(11,2)', 'CX(20,21)', 'CX(13,9)', 'CX(16,22)', 'CX(17,11)', 'CX(20,19)', 'CX(2,17)', 'CX(14,4)', 'CX(11,6)', 'CX(11,15)', 'CX(20,15)', 'CX(16,2)', 'CX(15,1)', 'CX(22,3)', 'CX(11,17)', 'CX(19,22)', 'CX(16,5)'] 69
+    c = measure + barrier + prep
+    circuit = Circuit(n)
+    qasm = circuit.run_qasm(c)
+    if argv.showqasm:
+        print(qasm)
+        return
+
+
+    shots = argv.get("shots", 100)
+    samps = send([qasm], shots=shots, error_model=True)
+
+    process(code, samps, circuit)
+
+
+
+    
 
     
 
