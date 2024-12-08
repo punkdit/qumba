@@ -186,6 +186,15 @@ def back_search(n, Hx, Hz):
     Sz = get_span(Hz)
     root = Graph(Ux, Uz)
 
+    def get_name(name):
+        for ggt in gates:
+            if names[ggt[0]] == name:
+                return ggt
+
+    if argv.pre:
+        root = root.act(get_name("CX(0,1)"))
+        root = root.act(get_name("CX(2,3)"))
+
     tree = root
 
     sols = []
@@ -195,6 +204,30 @@ def back_search(n, Hx, Hz):
             sols.append(found)
             print("found:", len(found), "best:", min(len(s) for s in sols))
             print()
+
+#    for trial in range(argv.get("trials",100)):
+#        found = tree.playout(10, gates, Sx, Sz)
+#        if found is None:
+#            continue
+#        sols.append(found)
+#
+#        print("found:", len(found))
+#        print()
+#
+#        #t = found[len(found)//2]
+#        t = found[len(found)//3]
+#        for _ in range(10):
+#            t2 = t.playout(10, gates, Sx, Sz)
+#
+#            if t2 is not None:
+#                sols.append(t2)
+#                print("found:", len(t2))
+#
+#        print("best:", min(len(s) for s in sols))
+#        print()
+#
+#        tree.prune(2)
+
     
     assert sols
     sols.sort(key = len)
