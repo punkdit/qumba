@@ -20,7 +20,7 @@ import numpy
 from qumba import solve
 #solve.int_scalar = numpy.int32 # qupy.solve
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
-    rank, rand2, pseudo_inverse, kernel, direct_sum, row_reduce, zeros2)
+    rank, rand2, pseudo_inverse, kernel, direct_sum, row_reduce, zeros2, solve2)
 from qumba.qcode import QCode, SymplecticSpace, strop, fromstr
 from qumba.csscode import CSSCode, find_logicals
 from qumba.action import mulclose, mulclose_hom, mulclose_find
@@ -358,54 +358,137 @@ def get_prep(code, dual=False):
     return prep
 
 
+
+def get_code():
+    if argv.golay:
+        tgt = construct.get_golay(23)
+        prep = get_prep(tgt, True)
+    elif argv.steane:
+        tgt = construct.get_713()
+        css = tgt.to_css()
+        prep = ['CX(3,5)', 'CX(5,2)', 'CX(5,4)', 'CX(5,6)', 'CX(6,0)',
+            'CX(4,3)', 'CX(3,6)', 'CX(6,2)', 'CX(4,1)']
+        prep += ["H(%d)"%i for i in range(css.mx,css.mx+css.mz)]
+        prep = tuple(prep)
+    else:
+        assert 0
+    return tgt, prep
+
+
+
 def strong_sim():
     #from strong_clifford.simulator import Simulator
     from strong_clifford.simulator_symbolic_phases import Simulator
 
-    tgt = construct.get_golay(23)
+    tgt, prep = get_code()
+
     css = tgt.to_css()
-    prep = get_prep(tgt, True)
     n_gates = len(prep)
     n = tgt.n
 
     print(n, n_gates)
 
     sim = Simulator(n, n_gates=n_gates, draw=True)
+
+    def H(i):
+        #print("H", i)
+        sim.h(i)
+        sim.pauli_error_1(i)
+    def CX(i, j):
+        #print("CX", i, j)
+        sim.cnot(i, j)
+        sim.pauli_error_2((i, j))
+
     for g in reversed(prep):
-        s = g.lower().replace("cx", "cnot")
-        s = "sim."+s
-        print(s)
-        exec(s)
+        exec(str(g))
 
     print(sim.draw_span())
+    print()
+    #print(tgt.longstr())
 
-    #print(dir(sim))
-    #print(sim)
     for i in range(n):
         sim.measure(i)
 
-    p0 = 1e-2
+    p0 = 1e-3
     std_dev_scale = 0.1
     
-    numpy.random.seed(0)
-    p_base_1q = numpy.random.normal(p0, std_dev_scale * p0, 3)
+    #numpy.random.seed(0)
+    #p_base_1q = numpy.random.normal(p0, std_dev_scale * p0, 3)
+    p_base_1q = [3e-5]*3
     errors_1q = numpy.hstack((1 - numpy.sum(p_base_1q), p_base_1q))
-    p_base_2q = numpy.random.normal(p0, std_dev_scale * p0, 15)
+    #p_base_2q = numpy.random.normal(p0, std_dev_scale * p0, 15)
+    p_base_2q = [1e-3]*15
     errors_2q = numpy.hstack((1 - numpy.sum(p_base_2q), p_base_2q))
 
     print(errors_1q)
     print(errors_2q)
 
-    S = sim.get_samples(errors_1q, errors_2q, measurement_results=None, shots=10)
-    S = numpy.array(S)
-    print(f"Samples:")
-    print(S, S.shape)
-    print()
-
     #print(shortstr(css.Hz))
 
-    A = dot2(S, css.Hz.transpose())
-    print(shortstr(A))
+    #   For example, the steane code.
+    #   After measurement we have 7 bits of data u_x.
+    #   You apply the parity check matrix H_z to get 3 bits of syndrome data v=H_z*u_x.
+    #   Then you apply the destabilizers T_x, which gives w_x = u_x + v*T_x.
+    #   The decoder needs to take v and predict the logical which is L_z*w_x.
+    #   To build a lookup table you run this experiment in simulation
+    #   many times, and record for each v how many times each
+    #   logical operator L_z*w_x is seen. Then when decoding
+    #   you pick the one that was seen in training the most: argmax.
+
+    N = argv.get("N", 128)
+    u_x = sim.get_samples(errors_1q, errors_2q, measurement_results=None, shots=N)
+    u_x = numpy.array(u_x)
+    #print(f"Samples:")
+    #print(shortstr(u_x), u_x.shape)
+    #print()
+
+    v_syn = dot2(u_x, css.Hz.transpose())
+    #print(shortstr(v_syn), v_syn.shape)
+    #print()
+    v_x = dot2(v_syn, css.Tx)
+
+    #print(shortstr(v_x), v_x.shape)
+
+    w_x = (u_x + v_x) % 2
+    #print(shortstr(w_x), w_x.shape)
+    #print()
+
+    #print(css.Lx.transpose())
+    #print(shortstr(w_x.transpose()))
+
+    LxHx = numpy.concatenate((css.Lx, css.Hx))
+
+    A = solve2(LxHx.transpose(), w_x.transpose())
+    assert A is not None
+    A = A[:css.k, :] # logical correction
+    #print(shortstr(A), A.shape)
+    #print()
+    #print(v_syn.shape)
+
+    lookup = {}
+    for i in range(N):
+        key = v_syn[i].tobytes()
+        a = tuple(A[:, i])
+        lookup.setdefault(key, []).append(a)
+        #print(shortstr(v_syn[i]), a)
+
+    print("lookup:", len(lookup))
+    succ = 0
+    for k,v in lookup.items():
+        vc = list(set(v))
+        if len(vc) > 1:
+            a, b = vc
+            va, vb = v.count(a), v.count(b)
+            #print("%d(%d,%d)"%(len(v), va, vb), a, b, end=" ")
+            #print("*")
+            vc = max(va, vb)
+            succ += vc
+        else:
+            succ += len(v)
+    print()
+    print("error:", 1 - succ / N)
+
+
 
 
 def sim_hugr():
