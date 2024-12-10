@@ -13,7 +13,7 @@ import numpy
 from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum, zeros2, solve2, normal_form, enum2)
 from qumba.qcode import QCode, SymplecticSpace
-from qumba.action import mulclose
+from qumba.action import mulclose, mulclose_hom
 from qumba import construct
 from qumba.argv import argv
 
@@ -450,12 +450,54 @@ def test_bring():
     L = mulclose(ops, verbose=True)
     print("|G| =", order, "logicals:", len(L))
 
-    from qumba.transversal import find_isomorphisms_css
+    # find module structure:
+    mgen = []
     code = code.to_qcode()
-    dode = code.get_dual()
-    for g in find_isomorphisms_css(code, dode, ffinv=True):
-        break
-    print(g)
+    space = code.space
+    H = code.H
+    for g in gen:
+    
+        p = space.get_perm(g)
+        dode = p.t*code
+        assert code != dode
+        assert code.is_equiv(dode)
+
+        assert dode.H == H*p
+    
+        J = dode.H
+        Ht, Jt = H.t, J.t
+    
+        A = Ht.solve(Jt)
+        assert A is not None
+        #print(A, A.shape)
+        assert Ht * A == Jt
+        At = A.t
+        assert At*H == J
+        mgen.append(At)
+
+    gen = [code.space.get_perm(f) for f in gen]
+    hom = mulclose_hom(gen, mgen, verbose=True)
+    print("hom:", len(hom))
+    G = mulclose(gen)
+    for g in G:
+      for h in G:
+        assert hom[g*h] == hom[g]*hom[h]
+
+    for g in gen:
+        assert H*g == hom[g]*H
+
+    for g in G:
+      for h in G:
+        ab = hom[g] + hom[h]
+        assert H*g + H*h == H*(g+h)
+
+    if 0:
+        from qumba.transversal import find_isomorphisms_css
+        code = code.to_qcode()
+        dode = code.get_dual()
+        for g in find_isomorphisms_css(code, dode, ffinv=True):
+            break
+        print(g)
 
 
 def test_logicals():
