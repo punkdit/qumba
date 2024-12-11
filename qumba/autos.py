@@ -144,7 +144,7 @@ def slow_get_isos(src, tgt):
 
 
 def slow_is_iso(code, dode):
-    for iso in get_isos(code, dode):
+    for iso in slow_get_isos(code, dode):
         return True
     return False
 
@@ -516,7 +516,7 @@ def test_logicals():
             print(name)
 
 
-def test():
+def test_css_db():
     from qumba import db
     n = argv.get("n")
     d = argv.get("d")
@@ -535,8 +535,90 @@ def test():
                 print("fail")
             print()
 
-    return
 
+def test():
+    from qumba import db
+    n = argv.get("n", 15)
+    k = argv.get("k", 7)
+    d = argv.get("d")
+    kw = {"n":n, "k":k}
+    if d is not None:
+        kw["d"] = d
+
+    codes = list(db.get(**kw))
+    assert codes
+
+#    for code in codes:
+#        print(code)
+#
+#        result = get_autos(code)
+#        if result is None:
+#            print("fail")
+#        else:
+#            gen, order, ops = result
+#            print("order:", order)
+#
+
+    N = len(codes)
+    print("codes:", N)
+
+    for code in codes:
+        code.wenum = code.H.get_wenum()
+        print(code.wenum)
+
+    code = codes[0]
+    space = code.space
+    h, s = space.H(), space.S()
+    LC = mulclose([h, s])
+    assert len(LC) == 6
+
+    i = 0
+    while i < len(codes):
+        code = codes[i]
+        j = i+1
+        while j < len(codes):
+            dode = codes[j]
+            if code.wenum != dode.wenum:
+                j += 1
+                continue
+            for g in LC:
+                eode = g*codes[j]
+                if code.is_equiv(eode): # or slow_is_iso(code, eode):
+                    codes.pop(j)
+                    break
+            else:
+                j += 1
+        i += 1
+    
+    print("codes:", len(codes))
+    i = 0
+    while i < len(codes):
+        print("iso", i)
+        code = codes[i]
+        j = i+1
+        while j < len(codes):
+            dode = codes[j]
+            if code.wenum != dode.wenum:
+                j += 1
+                continue
+            for g in LC:
+                eode = g*codes[j]
+                if slow_is_iso(code, eode):
+                    print("pop", j)
+                    codes.pop(j)
+                    break
+                else:
+                    print(".", end="", flush=True)
+            else:
+                print("not iso", j)
+                j += 1
+
+        i += 1
+        print("codes:", len(codes))
+    
+
+
+def test_biplanar():
     from qumba.construct import biplanar
     #code = biplanar(6, 12)              # [[36, 8, 4]]      |G| = 144
     #code = construct.biplanar(12, 12)   # [[72, 12, 6]]     |G| = 432

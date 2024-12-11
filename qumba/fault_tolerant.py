@@ -298,6 +298,7 @@ def test_search_clifford():
 
 
 def search_clifford(code, gates):
+    "search for logical clifford on code"
     d = code.d
     assert d is not None
 
