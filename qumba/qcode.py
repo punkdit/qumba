@@ -984,6 +984,13 @@ class QCode(object):
         self.attrs["tp"] = tp
         return tp
 
+    @cache
+    def is_cyclic(self):
+        n = self.n
+        perm = [(i+1)%n for i in range(n)]
+        code = self.space.get_perm(perm)*self
+        return code.is_equiv(self)
+
     def get_logical(self, other, check=False):
         if check:
             assert self.is_equiv(other)

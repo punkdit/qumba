@@ -129,7 +129,7 @@ def slow_get_isos(src, tgt):
 
       if not stack:
           break
-      #print(stack)
+      #print("slow_get_isos:", stack)
       #gen.append(stack)
       yield list(stack)
       #if len(gen) > 4000:
@@ -535,29 +535,94 @@ def test_css_db():
                 print("fail")
             print()
 
-
-def test():
+def get_codes():
     from qumba import db
     n = argv.get("n", 15)
-    k = argv.get("k", 7)
+    k = argv.get("k")
     d = argv.get("d")
-    kw = {"n":n, "k":k}
+    kw = {"n":n}
     if d is not None:
         kw["d"] = d
+    if k is not None:
+        kw["k"] = k
 
+    print(kw)
     codes = list(db.get(**kw))
+    return codes
+
+
+def test_cyclic():
+    
+    codes = get_codes()
     assert codes
 
+    N = len(codes)
+    print("codes:", N)
+
+    #for code in codes:
+    #    code.wenum = code.H.get_wenum()
+    #    print(code.wenum)
+
+    code = codes[0]
+    n = code.n
+
+    space = code.space
+    h, s = space.H(), space.S()
+    #LC = mulclose([h, s])
+    LC = [space.get_identity(), h, s, h*s, s*h, h*s*h]
+    assert len(LC) == 6
+
+    gl = []
+    for i in range(1, n):
+        perm = [(j*i)%n for j in range(n)]
+        if len(set(perm)) != n:
+            continue
+        perm[0], perm[1] = perm[:2]
+        g = space.get_perm(perm)
+        gl.append(g)
+        #print(perm)
+
+#    for _ in range(5):
+#        perm = list(range(n))
+#        shuffle(perm)
+#        g = space.get_perm(perm)
+#        gl.append(g)
+
+    for code in codes:
+        if not code.is_cyclic():
+            continue
+        print(code)
+        gen = []
+        for g in gl:
+            dode = g*code
+            print(".*"[dode.is_cyclic()], end="", flush=True)
+            if dode.is_equiv(code):
+                print("/", end="", flush=True)
+            assert slow_is_iso(dode, code)
+        print()
+
+#            for h in LC:
+#                eode = h*dode
+#                print(".*"[eode.is_equiv(code)], end="", flush=True)
+#            print(" ", end="")
+#        print()
+
 #    for code in codes:
-#        print(code)
-#
-#        result = get_autos(code)
-#        if result is None:
-#            print("fail")
-#        else:
-#            gen, order, ops = result
-#            print("order:", order)
-#
+#        for g in LC:
+#            dode = g*code
+#            isos = slow_get_isos(dode, code)
+#            try:
+#                f = isos.__next__()
+#                print("*", end="", flush=True)
+#            except StopIteration:
+#                print(".", end="", flush=True)
+#        print()
+
+
+
+def test_autos():
+    codes = get_codes()
+    assert codes
 
     N = len(codes)
     print("codes:", N)
