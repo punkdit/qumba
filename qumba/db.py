@@ -5,7 +5,6 @@ from time import time, sleep
 import pymongo
 from bson.objectid import ObjectId
 
-from qumba.qcode import strop
 from qumba.argv import argv
 
 #client = pymongo.MongoClient("mongodb://localhost:27017/")
@@ -17,6 +16,7 @@ db = client["qumba"]
 codes = db["codes"]
 
 def add(code, force=False):
+    from qumba.qcode import strop
     code = code.to_qcode()
     ichar = "I"
     sep = " "
@@ -54,6 +54,7 @@ def add(code, force=False):
 
 
 def delete(code):
+    from qumba.qcode import strop
     ichar = "I"
     sep = " "
     data = {

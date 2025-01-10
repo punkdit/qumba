@@ -308,6 +308,10 @@ def codes_id(_id):
     return html
 
 
+if __name__=="__main__":
+    app.run()
+
+
 
 
 
