@@ -696,9 +696,12 @@ def test_biplanar():
     code = construct.biplanar(48, 12)   # [[288, 12, 18?]]   |G| = 144
     code = construct.biplanar(84, 12)   # [[504, 12, ?]]   |G| = 
 
-    return
+
+def test():
 
     from qumba.transversal import find_isomorphisms
+    from qumba import db
+
     for n in range(10, 18):
     #for n in range(20, 30):
         for code in db.get(n=n, desc="codetables"):
