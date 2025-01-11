@@ -268,7 +268,7 @@ def codes():
         _id = item["_id"]
         name = item["name"]
         #tds = ["<td>%s</td>"%fld for fld in [str(_id), name]]
-        tp = item["tp"]
+        tp = item.get("tp", "")
         tp = tp if tp!="none" else ""
         tds = ['<td><a href="%s">%s</a> %s</td>'%("/codes/%s"%_id, name, tp)]
         rows.append("<tr> %s </tr>" % " ".join(tds))
