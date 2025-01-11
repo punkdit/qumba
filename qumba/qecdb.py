@@ -6,6 +6,10 @@ python -m flask --app qecdb run --debug
 
 """
 
+from datetime import datetime
+
+is_dev = True
+
 from flask import Flask, render_template, redirect, url_for, request
 
 app = Flask(__name__)
@@ -246,7 +250,7 @@ def codes():
     count = db.codes.count_documents(query)
     cursor = db.codes.find(query)
     cursor.sort("n")
-    limit = 5
+    limit = 10
     cursor = cursor[:limit]
 
     if count>1:
@@ -283,23 +287,28 @@ def codes():
 def codes_id(_id):
     res = db.codes.find_one({"_id":ObjectId(_id)})
 
+    if res is None:
+        return main_html.replace("BODY", "code %s not found"%_id)
+
     r = '<a href="../codes/">start again...</a>'
     r += "<h2>Code:</h2>"
 
     keys = list(res.keys())
     skeys = """
         name n k d d_lower_bound d_upper_bound dx dz desc created
-        cssname css gf4 selfdual tp H T L
+        cssname css gf4 selfdual tp H T L _id
     """.strip().split()
     keys.sort(key = lambda k : (skeys.index(k) if k in skeys else 999))
 
     rows = []
     for key in keys:
-        if key == "_id":
-            continue
+        #if key == "_id":
+        #    continue
         value = res[key]
         if key in "HTL":
             value = "<tt>%s</tt>"%value.replace(" ", "<br>")
+        elif key == "created":
+            value = datetime.fromtimestamp(value)
         tds = '<td>%s</td> <td>%s</td>' % (key, value)
         rows.append("<tr> %s </tr>" % tds)
     r += "<table>%s</table>"%("\n".join(rows),)
@@ -316,6 +325,8 @@ if __name__=="__main__":
     # do we need this?
     #from werkzeug.middleware.proxy_fix import ProxyFix
     #app.wsgi_app = ProxyFix( app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+    is_dev = False
 
     #app.run()
     import eventlet

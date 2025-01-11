@@ -11,7 +11,7 @@ from qumba.argv import argv
 user,passwd = argv.user, argv.passwd
 if user is None:
     user,passwd = open("qumba_creds.txt").read().split()
-client = pymongo.MongoClient("mongodb://%s:%s@arrowtheory.com:27017"%(user,passwd))
+client = pymongo.MongoClient("mongodb://%s:%s@qecdb.org:27017"%(user,passwd))
 db = client["qumba"]
 codes = db["codes"]
 
@@ -69,6 +69,24 @@ def delete(code):
     print("qumba.db.delete:", code)
     res = codes.delete_one(data)
     print(res)
+
+
+def rm():
+    while 1:
+        _id = argv.next()
+        if _id is None:
+            break
+        v = ObjectId(_id)
+        data = {"_id":v}
+        print(data)
+        res = codes.find_one(data)
+        print(res)
+        print("remove? ", end="", flush=True)
+        arg = input()
+        if arg.strip() == "y":
+            res = codes.delete_one(data)
+            print(res)
+
 
 
 def get(**attrs):
