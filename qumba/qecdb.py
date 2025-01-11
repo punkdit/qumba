@@ -59,7 +59,7 @@ padding: 5px;
 """
 
 form_html = """
-<form action="/codes" method="post">
+<form action="/codes" method="get">
   <div class="container">
     <b>name:</b>
     <input type="text" placeholder="[[17,1,5]]" name="name" size="10" />
@@ -149,7 +149,7 @@ def html_form(form={}):
     s = '\n'.join(f.render(form) for f in layout)
     s += '\n<button type="submit">Search</button>'
     s = """
-    <form action="/codes" method="post">
+    <form action="../codes/" method="post">
     <div class="container">
     %s
     </div>
@@ -173,7 +173,11 @@ def html_search(results="", form={}):
 
 @app.route("/")
 def main():
-    return html_search(form={"css":"on"})
+    #return html_search(form={"css":"on"})
+    html = "<h2>QEC database</h2>"
+    html += '<a href="https://qecdb.org/codes/">codes</a>'
+    html = main_html.replace("BODY", html)
+    return html
 
 
 def parse_name(name):
@@ -279,7 +283,7 @@ def codes():
 def codes_id(_id):
     res = db.codes.find_one({"_id":ObjectId(_id)})
 
-    r = '<a href="/codes">start again...</a>'
+    r = '<a href="../codes/">start again...</a>'
     r += "<h2>Code:</h2>"
 
     keys = list(res.keys())
@@ -309,7 +313,15 @@ def codes_id(_id):
 
 
 if __name__=="__main__":
-    app.run()
+    # do we need this?
+    #from werkzeug.middleware.proxy_fix import ProxyFix
+    #app.wsgi_app = ProxyFix( app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+    #app.run()
+    import eventlet
+    from eventlet import wsgi
+    wsgi.server(eventlet.listen(("127.0.0.1", 5000)), app)
+
 
 
 
