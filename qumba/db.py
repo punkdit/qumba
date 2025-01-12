@@ -114,7 +114,7 @@ def get(**attrs):
         for k,v in data.items():
             if k not in list("HTL"):
                 attrs[k] = v
-        print("qumba.db.get:", attrs)
+        #print("qumba.db.get:", attrs)
         code = QCode.fromstr(
             data["H"],
             data.get("T"),
@@ -261,7 +261,191 @@ def normalize():
         n += 1
 
 
+def prune_slow():
+    n = argv.get("n", 15)
+    k = argv.get("k")
+    d = argv.get("d")
+
+    attrs = {"n":n}
+    if k is not None:
+        attrs["k"] = k
+    if d is not None:
+        attrs["d"] = d
+    print(attrs)
+    codes = list(get(**attrs))
+    print("codes:", len(codes))
+    #return
+    remove = prune_z3(codes)
+    prune_remove(remove)
+
+
+def prune_slow(codes):
+    from qumba.autos import get_iso
+
+    remove = []
+    i = 0
+    while i < len(codes):
+        code = codes[i]
+        j = i+1
+        while j < len(codes):
+            dode = codes[j]
+            if dode.tp != code.tp:
+                j += 1
+                continue
+            f = get_iso(code, dode)
+            if f is not None:
+                print("dup[%d,%d]"%( i, j))
+                codes.pop(j)
+                remove.append( dode )
+                break
+            else:
+                j += 1
+                print(".", end="", flush=True)
+        i += 1
+        print(len(codes), end=" ", flush=True)
+
+    if remove:
+        print("remove:", len(remove))
+    else:
+        print()
+    return remove
+
+
+
+def prune_z3(codes):
+    from qumba.transversal import find_isomorphisms
+
+    remove = []
+    i = 0
+    while i < len(codes):
+        code = codes[i]
+        j = i+1
+        while j < len(codes):
+            dode = codes[j]
+            if dode.tp != code.tp:
+                j += 1
+                continue
+            for f in find_isomorphisms(code, dode):
+                print("dup[%d,%d]"%( i, j))
+                codes.pop(j)
+                remove.append( dode )
+                break
+            else:
+                j += 1
+                print(".", end="", flush=True)
+        i += 1
+        print(len(codes), end=" ", flush=True)
+
+    if remove:
+        print("remove:", len(remove))
+    else:
+        print()
+    return remove
+
+
+def prune_remove(remove):
+    if not remove:
+        return
+    print()
+    print("to remove:")
+    for code in remove:
+        print(code, code._id)
+    print("delete %d codes (y)? "%len(remove), end="", flush=True)
+    yesno = input()
+    if yesno == "y" or not yesno:
+        for code in remove:
+            delete(code)
+
             
+
+def prune():
+    from qumba.transversal import find_isomorphisms
+    n = argv.get("n", 15)
+    k = argv.get("k")
+    d = argv.get("d")
+
+    attrs = {"n":n}
+    if k is not None:
+        attrs["k"] = k
+    if d is not None:
+        attrs["d"] = d
+    print(attrs)
+    codes = list(get(**attrs))
+    print("codes:", len(codes))
+    #return
+
+    lookup = {}
+    for code in codes:
+        H = code.H
+        w = H.get_wenum()
+        print(code, code.tp, w)
+        #print(H)
+        lookup.setdefault(w, []).append(code)
+    keys = list(lookup.keys())
+    keys.sort()
+
+    remove = []
+    for key in keys:
+        codes = lookup[key]
+        print(key, len(codes))
+        remove += prune_z3(codes)
+
+    prune_remove(remove)
+
+
+def prune_sparse():
+    from qumba.transversal import find_isomorphisms, find_lw
+    n = argv.get("n", 23)
+    assert n is not None
+    k = argv.get("k")
+    d = argv.get("d")
+
+    attrs = {"n":n}
+    if k is not None:
+        attrs["k"] = k
+    if d is not None:
+        attrs["d"] = d
+    print(attrs)
+    codes = list(get(**attrs))
+    print("codes:", len(codes))
+    #return
+
+    codes = [code for code in codes if code.d]
+    ds = set(code.d for code in codes)
+    ds = list(ds)
+    ds.sort()
+
+    remove = []
+    for d in ds:
+        print("distance:", d)
+        lookup = {}
+        for code in codes:
+            if code.d != d:
+                continue
+            w = 1
+            while w < n:
+                #print("w =", w)
+                vecs = list(find_lw(code.H, w))
+                if vecs:
+                    break
+                w += 1
+            assert vecs
+            key = (w, len(vecs))
+            print(code, key)
+            #print([str(v) for v in vecs])
+    
+            lookup.setdefault(key, []).append(code)
+        keys = list(lookup.keys())
+        keys.sort()
+    
+        for key in keys:
+            codes = lookup[key]
+            print(key, len(codes))
+            #remove += prune_z3(codes)
+            remove += prune_slow(codes)
+    
+    prune_remove(remove)
+
 
 
 def drop():

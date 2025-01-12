@@ -7,6 +7,7 @@ find automorphisms of QCode's that permute the qubits.
 from time import time
 start_time = time()
 from random import shuffle, choice
+from functools import cache
 
 import numpy
 
@@ -287,8 +288,29 @@ class Graph:
         return "Graph(%s, %s)"%(self.verts, self.edges)
     __repr__ = __str__
 
-    def get_autos(self):
-        from pynauty import Graph, autgrp
+    @classmethod
+    def from_span(cls, n, span, keys):
+        graph = Graph()
+        v_bits = [graph.vert("q") for i in range(n)]
+        #for key, us in span.items():
+        #  for u in us:
+        for key in keys:
+          for u in span[key]:
+            #print(str(v).replace("\n ",""), wx, wz, wy)
+            v_check = graph.vert(colour=key)
+            for i in range(n):
+                if u[i] == 1:
+                    graph.edge(v_check, v_bits[i], colour="X")
+                elif u[i] == 256:
+                    graph.edge(v_check, v_bits[i], colour="Z")
+                elif u[i] == 257:
+                    graph.edge(v_check, v_bits[i], colour="Y")
+                else:
+                    assert u[i] == 0
+        return graph
+
+    def get_nauty(self):
+        from pynauty import Graph
         verts, edges = self.verts, self.edges
         N = len(verts)
         labels = {k:set() for k in set(verts)}
@@ -307,7 +329,11 @@ class Graph:
         labels = list(labels.values())
         #print(labels)
         graph.set_vertex_coloring(labels)
-    
+        return graph
+
+    def get_autos(self):
+        from pynauty import autgrp
+        graph = self.get_nauty()
         print("autgrp ...", end="", flush=True)
         aut = autgrp(graph)
         print(" done")
@@ -315,27 +341,26 @@ class Graph:
         order = int(aut[1])
         return gen, order
 
+    def get_isomorphism(self, other):
+        import pynauty
+        lhs = self.get_nauty()
+        rhs = other.get_nauty()
+        if not pynauty.isomorphic(lhs, rhs):
+            return None
+        # See https://github.com/pdobsan/pynauty/issues/31
+        f = pynauty.canon_label(lhs) # lhs--f-->C
+        g = pynauty.canon_label(rhs) # rhs--g-->C
+        iso = [None]*len(f)
+        for i in range(len(f)):
+            iso[f[i]] = g[i]
+        return iso
+
 
 def _get_autos(code, span, keys):
 
     n = code.n
-    graph = Graph()
-    v_bits = [graph.vert("q") for i in range(n)]
-    #for key, us in span.items():
-    #  for u in us:
-    for key in keys:
-      for u in span[key]:
-        #print(str(v).replace("\n ",""), wx, wz, wy)
-        v_check = graph.vert(colour=key)
-        for i in range(n):
-            if u[i] == 1:
-                graph.edge(v_check, v_bits[i], colour="X")
-            elif u[i] == 256:
-                graph.edge(v_check, v_bits[i], colour="Z")
-            elif u[i] == 257:
-                graph.edge(v_check, v_bits[i], colour="Y")
-            else:
-                assert u[i] == 0
+
+    graph = Graph.from_span(n, span, keys)
 
     #print(graph)
     #graph.to_dot("code.dot")
@@ -358,7 +383,11 @@ def _get_autos(code, span, keys):
     return gen, order, ops
 
 
-def get_autos(code):
+#def _get_isos(tgt, src):
+
+
+@cache
+def get_spankeys(code, maxw=None):
 
     #assert code.tp == "selfdualcss"
     code = code.to_qcode()
@@ -370,8 +399,11 @@ def get_autos(code):
     #H = H.reshape(m, n, 2)
     assert m < 30
 
+    if maxw is None:
+        maxw = 3*nn
+
     N = 2**m
-    print("get_autos...", end=" ", flush=True)
+    print("get_spankeys...", end=" ", flush=True)
 
     span = {}
     for u in enum2(m):
@@ -385,20 +417,65 @@ def get_autos(code):
         wz = int((u==256).sum())
         wy = int((u==257).sum())
         key = (wx, wz, wy)
-        span.setdefault(key, []).append(u)
+        if wx+wz+wy <= maxw:
+            span.setdefault(key, []).append(u)
 
     #for (key,value) in span.items():
     #    print('\t', key, len(value) )
 
     keys = list(span.keys())
     keys.remove((0,0,0))
-    keys.sort(key = lambda k:sum(k))
+    keys.sort(key = lambda k:(sum(k),k))
     #print(keys)
     w = sum(keys[0])
     #print(keys)
 
-    print("N=%d"%N)
+    print("N=%d"%N, "keys:", len(keys))
+    return span, keys
 
+
+
+def get_iso(code, dode):
+    if (code.n,code.k) != (dode.n,dode.k):
+        return
+
+    n = code.n
+    maxw = n//2
+    spankeys = get_spankeys(code, maxw)
+    tpankeys = get_spankeys(dode, maxw)
+
+    span,keys = spankeys
+    if keys != tpankeys[1]:
+        print(str(keys)[:50], "!=")
+        print(str(tpankeys[1])[:50])
+        return
+
+    tpan,_ = tpankeys
+
+    idx = 1
+    while idx <= len(keys):
+        w_keys = keys[:idx]
+
+        graph = Graph.from_span(n, span, w_keys)
+        hraph = Graph.from_span(n, tpan, w_keys)
+
+        f = hraph.get_isomorphism(graph)
+        if f is None:
+            print("not")
+            return
+        f = f[:n]
+
+        eode = code.space.get_perm(f)*code
+        if eode.is_equiv(dode):
+            print("iso")
+            return f
+        idx += 1
+
+
+
+
+def get_autos(code):
+    span, keys = get_spankeys(code)
     #last = 0
     idx = 1
     while idx <= len(keys):
@@ -412,11 +489,10 @@ def get_autos(code):
         idx += 1
 
 def get_isos(code, dode):
-    return []
+    assert 0, "fix me"
 
 def is_iso(code, dode):
-    return False
-
+    return get_iso(code, dode) is not None
 
 def get_autos_css(code):
     from qumba.transversal import find_lw_css
@@ -814,6 +890,49 @@ X...XXXX........XX.X.
     print(code)
 
     get_autos_selfdualcss(code)
+
+
+
+def test_iso():
+    code = QCode.fromstr("""
+    XZZZIIIIIIZIIIZIIZXYYZIZ
+    ZYZIIZZIIIZZZZZZZZXYIYXY
+    ZZYZZIZIZZIIIZZIZIZZYZZI
+    IZZYZZIZIZZIIIZZIZIZZYZZ
+    ZZZIXIIIZIIZZZZZIZXZXZIX
+    IIZIIYZZZIZZZIIIIIXIXYIZ
+    ZZIIZZXZZZZZIIZIZZYYYXIY
+    ZZZIZZZYIIZIIIIIIIZIYXIX
+    IIZIIIIIXZZIIZZZZIYYYXYZ
+    ZZIIZZZIIXIZZZIZIIYXIYZI
+    IZZIIZZZIIXIZZZIZIIYXIYZ
+    ZZZIZZIZZIZXZIIZZIYZIXYI
+    IZZZIZZIZZIZXZIIZZIYZIXY
+    ZIZZIIZIZIZZIXZZIIZYYIXI
+    IZIZZIIZIZIZZIXZZIIZYYIX
+    IZZZZIZZIZIZZIZYIZYXXXXZ
+    ZZZIIIZZZIIIIIZZXZXXZXZZ
+    ZIZIZZZZZZZIZZZZIYXYZZZX
+    """)
+    assert code.n == 24
+    assert code.k == 6
+
+    #gen, order, ops = get_autos(code)
+    #print(order)
+
+    n = code.n
+    idxs = list(range(n))
+    shuffle(idxs)
+    #for i in range(0,n,2):
+    #    idxs[i+1] = i
+    #    idxs[i] = i+1
+    #idxs = [(i+1)%n for i in range(n)]
+    dode = code.space.get_perm(idxs)*code
+
+    f = get_iso(code, dode)
+    assert f is not None
+
+
 
 
 

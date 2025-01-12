@@ -269,13 +269,13 @@ def find_lw_css(code):
     return hx, hz
 
 
-def find_lw(H):
+def find_lw(H, w=None):
     "find low-weight row vectors in the row-span of H"
     m, n = H.shape
 
-    ws = H.sum(1)
-
-    w = ws.min()
+    if w is None:
+        ws = H.sum(1)
+        w = ws.min()
 
     solver = Solver()
     Add = solver.add
