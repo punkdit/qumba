@@ -435,20 +435,21 @@ def get_spankeys(code, maxw=None):
 
 
 
-def get_iso(code, dode):
+def get_iso(code, dode, maxw=None):
     if (code.n,code.k) != (dode.n,dode.k):
-        return
+        return False
 
     n = code.n
-    maxw = n//2
+    if maxw is None:
+        maxw = n//2
     spankeys = get_spankeys(code, maxw)
     tpankeys = get_spankeys(dode, maxw)
 
     span,keys = spankeys
     if keys != tpankeys[1]:
-        print(str(keys)[:50], "!=")
-        print(str(tpankeys[1])[:50])
-        return
+        #print(str(keys)[:50], "!=")
+        #print(str(tpankeys[1])[:50])
+        return False
 
     tpan,_ = tpankeys
 
@@ -457,12 +458,15 @@ def get_iso(code, dode):
         w_keys = keys[:idx]
 
         graph = Graph.from_span(n, span, w_keys)
+        if len(graph.verts) > 10000:
+            break
+
         hraph = Graph.from_span(n, tpan, w_keys)
 
         f = hraph.get_isomorphism(graph)
         if f is None:
             print("not")
-            return
+            return False
         f = f[:n]
 
         eode = code.space.get_perm(f)*code
@@ -470,6 +474,9 @@ def get_iso(code, dode):
             print("iso")
             return f
         idx += 1
+
+    # We don't know if these are iso
+    return None
 
 
 
@@ -523,8 +530,12 @@ def test_bring():
     result = get_autos_css(code)
     assert result is not None
     gen, order, ops = result
+    assert order == 120
+    #return
+
     L = mulclose(ops, verbose=True)
     print("|G| =", order, "logicals:", len(L))
+
 
     # find module structure:
     mgen = []
@@ -895,24 +906,24 @@ X...XXXX........XX.X.
 
 def test_iso():
     code = QCode.fromstr("""
-    XZZZIIIIIIZIIIZIIZXYYZIZ
-    ZYZIIZZIIIZZZZZZZZXYIYXY
-    ZZYZZIZIZZIIIZZIZIZZYZZI
-    IZZYZZIZIZZIIIZZIZIZZYZZ
-    ZZZIXIIIZIIZZZZZIZXZXZIX
-    IIZIIYZZZIZZZIIIIIXIXYIZ
-    ZZIIZZXZZZZZIIZIZZYYYXIY
-    ZZZIZZZYIIZIIIIIIIZIYXIX
-    IIZIIIIIXZZIIZZZZIYYYXYZ
-    ZZIIZZZIIXIZZZIZIIYXIYZI
-    IZZIIZZZIIXIZZZIZIIYXIYZ
-    ZZZIZZIZZIZXZIIZZIYZIXYI
-    IZZZIZZIZZIZXZIIZZIYZIXY
-    ZIZZIIZIZIZZIXZZIIZYYIXI
-    IZIZZIIZIZIZZIXZZIIZYYIX
-    IZZZZIZZIZIZZIZYIZYXXXXZ
-    ZZZIIIZZZIIIIIZZXZXXZXZZ
-    ZIZIZZZZZZZIZZZZIYXYZZZX
+    XZZZ......Z...Z..ZXYYZ.Z
+    ZYZ..ZZ...ZZZZZZZZXY.YXY
+    ZZYZZ.Z.ZZ...ZZ.Z.ZZYZZ.
+    .ZZYZZ.Z.ZZ...ZZ.Z.ZZYZZ
+    ZZZ.X...Z..ZZZZZ.ZXZXZ.X
+    ..Z..YZZZ.ZZZ.....X.XY.Z
+    ZZ..ZZXZZZZZ..Z.ZZYYYX.Y
+    ZZZ.ZZZY..Z.......Z.YX.X
+    ..Z.....XZZ..ZZZZ.YYYXYZ
+    ZZ..ZZZ..X.ZZZ.Z..YX.YZ.
+    .ZZ..ZZZ..X.ZZZ.Z..YX.YZ
+    ZZZ.ZZ.ZZ.ZXZ..ZZ.YZ.XY.
+    .ZZZ.ZZ.ZZ.ZXZ..ZZ.YZ.XY
+    Z.ZZ..Z.Z.ZZ.XZZ..ZYY.X.
+    .Z.ZZ..Z.Z.ZZ.XZZ..ZYY.X
+    .ZZZZ.ZZ.Z.ZZ.ZY.ZYXXXXZ
+    ZZZ...ZZZ.....ZZXZXXZXZZ
+    Z.Z.ZZZZZZZ.ZZZZ.YXYZZZX
     """)
     assert code.n == 24
     assert code.k == 6
@@ -923,16 +934,22 @@ def test_iso():
     n = code.n
     idxs = list(range(n))
     shuffle(idxs)
-    #for i in range(0,n,2):
-    #    idxs[i+1] = i
-    #    idxs[i] = i+1
-    #idxs = [(i+1)%n for i in range(n)]
     dode = code.space.get_perm(idxs)*code
 
     f = get_iso(code, dode)
     assert f is not None
 
+    from qumba.transversal import find_wenum
 
+    span, keys = get_spankeys(code)
+    print(keys[:20])
+
+    for w in keys[:4]:
+        found = []
+        for h in find_wenum(code.H, *w):
+            found.append(h)
+        assert len(span[w]) == len(found)
+        print(w, len(found))
 
 
 

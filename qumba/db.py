@@ -281,6 +281,7 @@ def prune_slow():
 
 def prune_slow(codes):
     from qumba.autos import get_iso
+    maxw = argv.maxw
 
     remove = []
     i = 0
@@ -292,8 +293,8 @@ def prune_slow(codes):
             if dode.tp != code.tp:
                 j += 1
                 continue
-            f = get_iso(code, dode)
-            if f is not None:
+            f = get_iso(code, dode, maxw)
+            if f:
                 print("dup[%d,%d]"%( i, j))
                 codes.pop(j)
                 remove.append( dode )

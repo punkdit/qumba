@@ -10,7 +10,7 @@ from random import shuffle
 import numpy
 
 import z3
-from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, ForAll
+from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, ForAll, PbEq
 
 from qumba.qcode import QCode, SymplecticSpace, fromstr, shortstr, strop
 from qumba.matrix import Matrix, scalar
@@ -288,7 +288,9 @@ def find_lw(H, w=None):
     uH = u*H
     #print(uH)
 
-    Add(Sum([If(uH[0,i].get(),1,0) for i in range(n)])==w)
+    #Add(Sum([If(uH[0,i].get(),1,0) for i in range(n)])==w)
+
+    Add( PbEq([(uH[0,i].get(), True) for i in range(n)], w) )
 
     while 1:
         result = solver.check()
@@ -304,6 +306,46 @@ def find_lw(H, w=None):
         yield vH
 
         Add(u != v)
+
+
+def find_wenum(H, wx, wz, wy):
+    "find weight=(wx,wz,wy) row vectors in the row-span of H"
+    m, nn = H.shape
+    assert nn%2 == 0
+    n = nn//2
+
+    solver = Solver()
+    Add = solver.add
+
+    u = UMatrix.unknown(1, m)
+    H = Matrix(H)
+    uH = u*H
+    uH = uH[0, :]
+    #Add(Sum([If(uH[0,i].get(),1,0) for i in range(n)])==w)
+    #Add( PbEq([(uH[0,i].get(), True) for i in range(n)], w) )
+
+    row = [uH[i].get() for i in range(nn)]
+    xs = [And(row[2*i], Not(row[2*i+1])) for i in range(n)]
+    zs = [And(Not(row[2*i]), (row[2*i+1])) for i in range(n)]
+    ys = [And((row[2*i]), (row[2*i+1])) for i in range(n)]
+    Add(PbEq([(item,True) for item in xs], wx))
+    Add(PbEq([(item,True) for item in zs], wz))
+    Add(PbEq([(item,True) for item in ys], wy))
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("result:", result)
+            break
+    
+        model = solver.model()
+        v = u.get_interp(model)
+
+        vH = v*H
+        yield vH
+
+        Add(u != v)
+
 
 
 
