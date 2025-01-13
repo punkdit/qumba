@@ -355,11 +355,22 @@ def prune_remove(remove):
     print("to remove:")
     for code in remove:
         print(code, code._id)
-    print("delete %d codes (y)? "%len(remove), end="", flush=True)
-    yesno = input()
-    if yesno == "y" or not yesno:
-        for code in remove:
-            delete(code)
+
+    while 1:
+        print("delete %d codes (y/n)? "%len(remove), end="", flush=True)
+        yesno = input()
+        if yesno == "y":
+            break
+        if yesno == "n":
+            return
+    #for code in remove:
+    #    delete(code)
+    query = {"$or":[{"_id":ObjectId(code._id)} for code in remove]}
+    res = codes.delete_many(query)
+    print(res)
+    #found = codes.find(query)
+    #for res in found:
+    #    print(res)
 
             
 
@@ -449,6 +460,83 @@ def prune_sparse():
             #remove += prune_z3(codes)
             remove += prune_slow(codes)
     
+    prune_remove(remove)
+
+
+def prune_cyclic():
+    from qumba.action import mulclose
+    n = argv.get("n", 15)
+    assert n is not None
+    k = argv.get("k")
+    d = argv.get("d")
+
+    attrs = {"n":n}
+    if k is not None:
+        attrs["k"] = k
+    if d is not None:
+        attrs["d"] = d
+    print(attrs)
+    codes = list(get(**attrs))
+    print("codes:", len(codes))
+    #return
+
+    codes = [code for code in codes if code.is_cyclic()]
+    print("cyclic:", len(codes))
+    if not codes:
+        return
+
+    space = codes[0].space
+
+    perms = [space.get_identity()]
+    for a in range(1,n):
+        found = set( (a**i)%n for i in range(n) )
+        if len(found) != n-1:
+            continue
+        cycle = []
+        for i in range(n-1):
+            cycle.append( (a**i)%n )
+        perm = [0] + [None]*(n-1)
+        for i in range(n-1):
+            perm[cycle[i]] = cycle[(i+1)%(n-1)]
+        p = space.get_perm(perm)
+        perms.append(p)
+
+    S, H = space.get_S(), space.get_H()
+    G = mulclose([S,H])
+    assert len(G) == 6
+    gates = [p*g for g in G for p in perms]
+    print("G:", len(gates))
+
+    remove = []
+
+    i = 0
+    while i < len(codes):
+        code = codes[i]
+        j = i+1
+        while j < len(codes):
+            dode = codes[j]
+            if dode.tp != code.tp or dode.name != code.name:
+                j += 1
+                continue
+            for p in gates:
+                if (p*code).is_equiv(dode):
+                    print("dup[%d,%d]"%( i, j))
+                    codes.pop(j)
+                    remove.append( dode )
+                    break
+            else:
+                j += 1
+                print(".", end="", flush=True)
+        i += 1
+        print(len(codes), end=" ", flush=True)
+
+    if remove:
+        print("remove:", len(remove))
+    else:
+        print()
+
+
+
     prune_remove(remove)
 
 

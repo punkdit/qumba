@@ -1252,6 +1252,51 @@ def test_galois():
             print("not found")
 
     
+def main_galois():
+    code = QCode.fromstr("""
+    XIIXIXXIIXXXXXIIIXXIXXXIXIXIIII
+    IIXIXXIIXXXXXIIIXXIXXXIXIXIIIIX
+    IXIXXIIXXXXXIIIXXIXXXIXIXIIIIXI
+    XIXXIIXXXXXIIIXXIXXXIXIXIIIIXII
+    IXXIIXXXXXIIIXXIXXXIXIXIIIIXIIX
+    ZZZIIZZIZZZZZIZIIIZIIZIZIZZIIII
+    ZZIIZZIZZZZZIZIIIZIIZIZIZZIIIIZ
+    ZIIZZIZZZZZIZIIIZIIZIZIZZIIIIZZ
+    IIZZIZZZZZIZIIIZIIZIZIZZIIIIZZZ
+    IZZIZZZZZIZIIIZIIZIZIZZIIIIZZZI
+    """)
+
+    assert code.is_cyclic()
+    print(code)
+    n = code.n
+    space = code.space
+
+    gl = list(range(1, n))
+    gens = []
+    for a in gl:
+        found = set( (a**i)%n for i in range(n) )
+        if len(found) == n-1:
+            gens.append(a)
+
+    print("gens:", gens)
+
+
+    for a in gens:
+        cycle = []
+        for i in range(n-1):
+            cycle.append( (a**i)%n )
+
+        perm = [0] + [None]*(n-1)
+        for i in range(n-1):
+            perm[cycle[i]] = cycle[(i+1)%(n-1)]
+        #print(perm)
+
+        P = space.get_perm(perm)
+        dode = P*code
+        print(dode.is_equiv(code), dode.is_cyclic())
+
+
+
 
 
 def test_cyclotomic():
