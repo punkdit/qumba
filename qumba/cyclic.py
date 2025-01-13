@@ -35,6 +35,27 @@ from qumba.smap import SMap
 from qumba.util import all_primes
 
 
+def get_cyclic_perms(n):
+    """compute GL(1,Z/n) this is the Galois group
+    of the n-th cyclotomic integers"""
+    space = SymplecticSpace(n)
+    gl = set()
+    for i in range(1, n):
+        for j in range(1, n):
+            if (i*j)%n == 1:
+                gl.add(i)
+                gl.add(j)
+    gl = list(gl)
+    gl.sort()
+    perms = []
+    for i in gl:
+        #print(i, i%3, i%5)
+        perm = [(j*i)%n for j in range(n)]
+        p = space.get_perm(perm)
+        perms.append(p)
+    return perms
+
+
 def all_cyclic_gf4(n, dmin=1, gf4_linear=True):
     F = GF(4)
     z2 = F.gen()
@@ -1295,6 +1316,35 @@ def main_galois():
         dode = P*code
         print(dode.is_equiv(code), dode.is_cyclic())
 
+
+def main_galois_15():
+    code = QCode.fromstr("""
+    XIXIIXXIXXXIIII
+    IXIIXXIXXXIIIIX
+    XIIXXIXXXIIIIXI
+    IIXXIXXXIIIIXIX
+    IXXIXXXIIIIXIXI
+    ZZZZIZIZZIIZIII
+    ZZZIZIZZIIZIIIZ
+    ZZIZIZZIIZIIIZZ
+    ZIZIZZIIZIIIZZZ
+    """)
+    assert code.is_cyclic()
+    print(code)
+
+    n = code.n
+    space = code.space
+
+    gen = []
+    for p in get_cyclic_perms(n):
+        dode = p*code
+        assert dode.is_cyclic()
+        if code.is_equiv(dode):
+            L = code.get_logical(dode)
+            #print(L, "\n")
+            gen.append(L)
+    G = mulclose(gen)
+    print("G:", len(G))
 
 
 

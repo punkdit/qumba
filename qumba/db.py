@@ -464,6 +464,7 @@ def prune_sparse():
 
 
 def prune_cyclic():
+    from qumba.cyclic import get_cyclic_perms
     from qumba.action import mulclose
     n = argv.get("n", 15)
     assert n is not None
@@ -487,19 +488,24 @@ def prune_cyclic():
 
     space = codes[0].space
 
-    perms = [space.get_identity()]
-    for a in range(1,n):
-        found = set( (a**i)%n for i in range(n) )
-        if len(found) != n-1:
-            continue
-        cycle = []
-        for i in range(n-1):
-            cycle.append( (a**i)%n )
-        perm = [0] + [None]*(n-1)
-        for i in range(n-1):
-            perm[cycle[i]] = cycle[(i+1)%(n-1)]
-        p = space.get_perm(perm)
-        perms.append(p)
+#    perms = [space.get_identity()]
+#    for a in range(1,n):
+#        found = set( (a**i)%n for i in range(n) )
+#        if len(found) != n-1:
+#            continue
+#        cycle = []
+#        for i in range(n-1):
+#            cycle.append( (a**i)%n )
+#        perm = [0] + [None]*(n-1)
+#        for i in range(n-1):
+#            perm[cycle[i]] = cycle[(i+1)%(n-1)]
+#        p = space.get_perm(perm)
+#        perms.append(p)
+
+    perms = get_cyclic_perms(n)
+    for code in codes:
+        for p in perms:
+            assert (p*code).is_cyclic()
 
     S, H = space.get_S(), space.get_H()
     G = mulclose([S,H])
