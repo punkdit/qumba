@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 from time import time, sleep
 
 import pymongo
@@ -11,7 +12,10 @@ from qumba.argv import argv
 user,passwd = argv.user, argv.passwd
 if user is None:
     user,passwd = open("qumba_creds.txt").read().split()
-client = pymongo.MongoClient("mongodb://%s:%s@qecdb.org:27017"%(user,passwd))
+if os.environ.get("LOCALDB"):
+    client = pymongo.MongoClient()
+else:
+    client = pymongo.MongoClient("mongodb://%s:%s@qecdb.org:27017"%(user,passwd))
 db = client["qumba"]
 codes = db["codes"]
 
