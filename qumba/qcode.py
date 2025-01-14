@@ -21,7 +21,6 @@ from qumba.solve import (
     span, intersect, rank, enum2, shortstrx, identity2, eq2, pseudo_inverse)
 from qumba.matrix import Matrix, flatten
 from qumba.symplectic import SymplecticSpace, symplectic_form
-from qumba.syntax import Syntax
 from qumba.argv import argv
 from qumba.smap import SMap
 
@@ -255,7 +254,9 @@ class QCode(object):
         T = None
         L = css_to_symplectic(Lx, Lz) if Lx is not None else None
         J = css_to_symplectic(Jx, Jz) if Jx is not None else None
-        return QCode(H, T, L, J, **kw)
+        code = QCode(H, T, L, J, **kw)
+        code.get_destabilizers()
+        return code
 
     @classmethod
     def build_gauge(cls, J, **kw):
@@ -829,6 +830,7 @@ class QCode(object):
         return E
 
     def get_encoder_name(code, verbose=False):
+        from qumba.syntax import Syntax
         s = Syntax()
         code = code.normal_form()
         n = code.n

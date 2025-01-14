@@ -43,29 +43,39 @@ stems.sort( key = lambda stem : int(stem.split("_")[0]) )
 
 for stem in stems:
     print(stem)
+    n,k,d = stem.split("_")
+    d = int(d)
 
     C1 = numpy.load(path+stem+'_C1.npy')
     C2 = numpy.load(path+stem+'_C2.npy')
 
     H = numpy.concatenate((C1,C2))
 
+    if H.shape[1] > 500:
+        break
+
     Hz = C1
     Hx = kernel(C2)
     assert dot2(Hz, Hx.transpose()).sum() == 0
 
-    #if C1.shape[1]>32:
-    #    break
-
     code = CSSCode(Hx=Hx, Hz=Hz)
+    #code.d = d
+    #code.bz_distance()
     print(code)
-    print(distance_z3(code))
-    dump_transverse(code.Hx, code.Lx)
-    print("Hx =")
-    print(shortstr(code.Hx))
-    print("Hz =")
-    print(shortstr(code.Hz))
-    print()
 
+    #print(distance_z3(code))
+    dump_transverse(code.Hx, code.Lx)
+    #print("Hx =")
+    #print(shortstr(code.Hx))
+    #print("Hz =")
+    #print(shortstr(code.Hz))
+    #print()
+
+    if 0:
+        code = code.to_qcode(desc="CSS-T")
+        code.d = d
+        from qumba import db
+        db.add(code)
 
 
 print("done.\n")

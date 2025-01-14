@@ -53,6 +53,7 @@ def add(code, force=False):
         assert k not in data, "%r found in %s"%(k,data)
         data[k] = v
 
+    #print(data)
     codes.insert_one(data)
     print("qumba.db.add: %s added." % str(code))
 
@@ -488,20 +489,6 @@ def prune_cyclic():
 
     space = codes[0].space
 
-#    perms = [space.get_identity()]
-#    for a in range(1,n):
-#        found = set( (a**i)%n for i in range(n) )
-#        if len(found) != n-1:
-#            continue
-#        cycle = []
-#        for i in range(n-1):
-#            cycle.append( (a**i)%n )
-#        perm = [0] + [None]*(n-1)
-#        for i in range(n-1):
-#            perm[cycle[i]] = cycle[(i+1)%(n-1)]
-#        p = space.get_perm(perm)
-#        perms.append(p)
-
     perms = get_cyclic_perms(n)
     for code in codes:
         for p in perms:
@@ -515,31 +502,48 @@ def prune_cyclic():
 
     remove = []
 
+    mul = {}
+
     i = 0
     while i < len(codes):
         code = codes[i]
+        src = [p*code for p in gates]
         j = i+1
         while j < len(codes):
             dode = codes[j]
-            if dode.tp != code.tp or dode.name != code.name:
+            #if dode.tp != code.tp or dode.name != code.name:
+            if (dode.n,dode.k) != (code.n,code.k):
                 j += 1
                 continue
-            for p in gates:
-                if (p*code).is_equiv(dode):
-                    print("dup[%d,%d]"%( i, j))
-                    codes.pop(j)
-                    remove.append( dode )
+#            for p in gates:
+#                key = (p, code)
+#                eode = mul.get(key)
+#                if eode is None:
+#                    eode = p*code
+#                    mul[key] = eode
+            if dode.is_css() and not code.is_css():
+                print("[css]", end="", flush=True)
+                j += 1
+                continue
+            if dode.is_gf4() and not code.is_gf4():
+                print("[gf4]", end="", flush=True)
+                j += 1
+                continue
+            for eode in src:
+                if eode.is_equiv(dode):
+                    print("dup[%d,%d]"%( i, j), end="", flush=True)
+                    codes.pop(j) 
+                    remove.append( dode ) # <-------- remove the dode
                     break
             else:
                 j += 1
                 print(".", end="", flush=True)
         i += 1
-        print(len(codes), end=" ", flush=True)
+        print("(%s)"%len(codes), end=" ", flush=True)
 
+    print()
     if remove:
         print("remove:", len(remove))
-    else:
-        print()
 
 
 
