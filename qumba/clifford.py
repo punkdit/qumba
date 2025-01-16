@@ -25,11 +25,12 @@ from qumba.solve import zeros2, identity2
 from qumba.action import mulclose, mulclose_names, mulclose_find
 from qumba.argv import argv
 
-if argv.sage:
+if argv.sage or 1:
     # much faster for big matrices
     print("using qumba.matrix_sage")
     from qumba.matrix_sage import Matrix
 else:
+    # BROKEN
     print("using qumba.matrix_numpy")
     from qumba.matrix_numpy import Matrix
 
@@ -344,6 +345,7 @@ def tpow(v, n, one=matrix([[1]])):
     return reduce(matmul, [v]*n) if n>0 else one
 
 
+@cache
 def green(m, n, phase=0):
     # m legs <--- n legs
     assert phase in [0, 1, 2, 3]
@@ -353,6 +355,7 @@ def green(m, n, phase=0):
         for i in range(dim)])
     return G
 
+@cache
 def red(m, n, phase=0):
     # m legs <--- n legs
     assert phase in [0, 1, 2, 3]
@@ -1065,6 +1068,154 @@ def test_higher():
     M = I1.direct_sum(Sx)
     assert M*M == c2.get_CNOT()
 
+
+def graph_state(A):
+
+    A = numpy.array(A, dtype=int)
+    n = len(A)
+    assert n>1
+    A = A + A.transpose()
+    A = numpy.clip(A, 0, 1)
+    assert numpy.all(A==A.transpose())
+    assert A.min() in [0,1]
+    assert A.max() in [0,1]
+
+    #print("graph_state")
+    #print(A)
+
+    lhs = reduce(matmul, [green(1, A[i].sum()) for i in range(n)])
+    links = []
+    for i in range(n):
+      for j in range(i+1, n):
+        if A[i,j]==0:
+            continue
+        links.append((i,j))
+
+    legs = []
+    N = 0
+    for i in range(n):
+        leg = []
+        for j in range(A[i].sum()):
+            leg.append(N)
+            N += 1
+        legs.append(leg)
+
+    #print("legs:", legs)
+    #print("links:", links)
+    idxs = []
+    for (i,j) in links:
+        #ii,jj = (legs[i].pop(0), legs[j].pop(0))
+        idxs.append(legs[i].pop(0))
+        idxs.append(legs[j].pop(0))
+    #print(idxs)
+    idxs = list(enumerate(idxs))
+    #print(idxs)
+    idxs.sort(key = lambda idx:idx[1])
+    #print(idxs)
+    perm = [idx[0] for idx in idxs]
+    #print(perm)
+
+    c = Clifford(N)
+    P = c.get_P(*perm)
+
+    assert N%2 == 0, N
+    cup = (H@I) * green(2,0)
+    assert green(2,0) == red(2,0)
+    state = reduce(matmul, [cup]*(N//2))
+    state = P*state
+    assert lhs.shape == (2**n, 2**N)
+    state = lhs*state
+
+    #print(state.shape)
+
+    return state
+    
+
+def graph_op(m, n, A):
+    A = numpy.array(A, dtype=int)
+    mn = m+n
+    assert A.shape == (mn, mn)
+
+    idxs = list(range(m)) + list(reversed(range(m, mn)))
+    #print(idxs)
+    #print(A)
+    A = A[idxs, :]
+    A = A[:, idxs]
+    #print(A)
+
+    u = graph_state(A)
+
+    cap = green(0, 2)
+    for i in range(n):
+        #print(u.shape)
+        u = u @ I
+        #print(u.shape)
+        op = Clifford(mn-i-1).I @ cap
+        #print(op.shape)
+        u = op * u
+
+    assert u.shape == (2**m, 2**n)
+    return u
+        
+        
+
+
+def test_graph_state():
+
+    # See:
+    # https://arxiv.org/abs/1902.03178
+    # eq (11)
+
+    n = 4
+    A = numpy.zeros((n,n), dtype=int)
+    A[0,1] = 1
+    A[0,2] = 1
+    A[1,3] = 1
+    
+    phi = graph_state(A)
+
+    c = Clifford(n)
+    X, Z = c.X, c.Z
+
+    for op in [
+        X(0)*Z(1)*Z(2),
+        X(1)*Z(0)*Z(3),
+        X(2)*Z(0),
+        X(3)*Z(1),
+    ]:
+        assert op*phi == phi
+
+    return
+
+    op = graph_op(2, 2, A)
+
+    assert graph_op(1,1,[[0,1],[1,0]]) == H
+
+    n = 2
+    nn = 2*n
+    A = numpy.zeros((nn,nn), dtype=int)
+    A[0,3] = 1
+    A[1,2] = 1
+    op = graph_op(2,2,A)
+    assert op*op == I@I
+    assert op == (H@H)*Clifford(2).P(1,0)
+    A0 = A
+
+    A = numpy.zeros((nn,nn), dtype=int)
+    A[0,2] = 1
+    #A[0,3] = 1
+    A[1,3] = 1
+    #print(A + A.transpose())
+    op = graph_op(2,2,A)
+
+    print( op*op.dagger() == I@I)
+    print( op == H@H)
+    assert op == (H@H)*Clifford(2).P(1,0)
+    print("op:")
+    print(op)
+    print(op == Clifford(2).CNOT(1,0) * (H@H))
+
+    print(graph_state(A) == graph_state(A0))
 
 
 def test():
