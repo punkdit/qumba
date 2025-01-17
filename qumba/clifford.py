@@ -1100,6 +1100,9 @@ def graph_state(A):
             N += 1
         legs.append(leg)
 
+    #if N==0:
+    #    return lhs # <------------- return
+
     #print("legs:", legs)
     #print("links:", links)
     idxs = []
@@ -1113,20 +1116,36 @@ def graph_state(A):
     idxs.sort(key = lambda idx:idx[1])
     #print(idxs)
     perm = [idx[0] for idx in idxs]
-    #print(perm)
+    #print("perm:", perm)
+    iperm = [{perm[i]:i for i in range(N)}[j] for j in range(N)]
+    #print("iperm:", iperm)
 
-    c = Clifford(N)
-    P = c.get_P(*perm)
+    if N>0:
+        c = Clifford(N)
+        P = c.get_P(*iperm)
+    
+        assert N%2 == 0, N
+        cup = (H@I) * green(2,0)
+        assert green(2,0) == red(2,0)
+        state = reduce(matmul, [cup]*(N//2))
+        state = P*state
+        assert lhs.shape == (2**n, 2**N)
+        state = lhs*state
+    else:
+        state = lhs
 
-    assert N%2 == 0, N
-    cup = (H@I) * green(2,0)
-    assert green(2,0) == red(2,0)
-    state = reduce(matmul, [cup]*(N//2))
-    state = P*state
-    assert lhs.shape == (2**n, 2**N)
-    state = lhs*state
-
-    #print(state.shape)
+    if 0:
+        # normalize
+        #print(state.shape)
+        r = (state.dagger()*state).M[0,0]
+        w = 1
+        while r > 1:
+            assert int(r)%2 == 0
+            r //= 2
+            w *= ir2
+        #print(bits)
+        state = w*state
+        assert (state.dagger()*state).M[0,0] == 1
 
     return state
     
@@ -1167,15 +1186,16 @@ def test_graph_state():
     # eq (11)
 
     n = 4
+
+    c = Clifford(n)
+    X, Z = c.X, c.Z
+
     A = numpy.zeros((n,n), dtype=int)
     A[0,1] = 1
     A[0,2] = 1
     A[1,3] = 1
     
-    phi = graph_state(A)
-
-    c = Clifford(n)
-    X, Z = c.X, c.Z
+    u = graph_state(A)
 
     for op in [
         X(0)*Z(1)*Z(2),
@@ -1183,13 +1203,57 @@ def test_graph_state():
         X(2)*Z(0),
         X(3)*Z(1),
     ]:
-        assert op*phi == phi
+        assert op*u == u
 
-    return
+    #print("\n\ntest:")
 
-    op = graph_op(2, 2, A)
+    A[:] = 0
+    A[0,3] = A[1,2] = 1
+    u = graph_state(A)
+    #print(u)
+    for op in [
+        X(0)*Z(3),
+        X(1)*Z(2),
+        X(2)*Z(1),
+        X(3)*Z(0),
+    ]:
+        #print(op.shape)
+        assert op*u == u
 
-    assert graph_op(1,1,[[0,1],[1,0]]) == H
+
+    # ---------------------------------------
+
+    n = 4
+    c = Clifford(n)
+    X, Z = c.X, c.Z
+    A = numpy.zeros((n,n), dtype=int)
+    idxs = [(i,j) for i in range(n) for j in range(i+1,n)]
+    N = len(idxs)
+    for bits in numpy.ndindex((2,)*N):
+        A[:] = 0
+        for i in range(N):
+            if bits[i]:
+                A[idxs[i]] = 1
+        if A.sum()>3:
+            continue
+        A = A+A.transpose()
+        #print(A)
+        u = graph_state(A)
+        #print(u.shape)
+        for i in range(n):
+            op = X(i)
+            for j in range(n):
+                if A[i,j]:
+                    op = op*Z(j)
+            #if op*u == u:
+                #print(".",end="",flush=True)
+            #else:
+                #print("*",end="",flush=True)
+            assert op*u==u
+        #assert (u.dagger()*u).M[0,0] == 1 # FAIL XXX
+
+
+def test_graph_op():
 
     n = 2
     nn = 2*n
@@ -1203,19 +1267,28 @@ def test_graph_state():
 
     A = numpy.zeros((nn,nn), dtype=int)
     A[0,2] = 1
-    #A[0,3] = 1
     A[1,3] = 1
-    #print(A + A.transpose())
+    op = graph_op(2,2,A)
+    assert op==H@H
+
+    A = numpy.zeros((nn,nn), dtype=int)
+    A[0,2] = 1
+    A[0,3] = 1
+    A[1,3] = 1
     op = graph_op(2,2,A)
 
-    print( op*op.dagger() == I@I)
+    assert op*op.dagger() == I@I, "fix this phase... arghhh?!?!"
+
+    print( op*op.dagger() )
     print( op == H@H)
-    assert op == (H@H)*Clifford(2).P(1,0)
     print("op:")
     print(op)
-    print(op == Clifford(2).CNOT(1,0) * (H@H))
-
-    print(graph_state(A) == graph_state(A0))
+    z = 2*op.M[0,0]
+    print(z, z**2)
+    rhs = Clifford(2).CNOT(0,1) * (H@H)
+    print("rhs:")
+    print(rhs)
+    print(z*rhs == op)
 
 
 def test():
