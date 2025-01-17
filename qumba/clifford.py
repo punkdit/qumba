@@ -1069,7 +1069,7 @@ def test_higher():
     assert M*M == c2.get_CNOT()
 
 
-def graph_state(A):
+def graph_state(A, normalize=False):
 
     A = numpy.array(A, dtype=int)
     n = len(A)
@@ -1134,8 +1134,7 @@ def graph_state(A):
     else:
         state = lhs
 
-    if 0:
-        # normalize
+    if normalize:
         #print(state.shape)
         r = (state.dagger()*state).M[0,0]
         w = 1
@@ -1150,7 +1149,7 @@ def graph_state(A):
     return state
     
 
-def graph_op(m, n, A):
+def graph_op(m, n, A, normalize=True):
     A = numpy.array(A, dtype=int)
     mn = m+n
     assert A.shape == (mn, mn)
@@ -1174,6 +1173,17 @@ def graph_op(m, n, A):
         u = op * u
 
     assert u.shape == (2**m, 2**n)
+
+    if normalize:
+        v = u.dagger()
+        r = (u*v).M[0,0]
+        w = 1
+        while r != 1:
+            w *= r2
+            r *= 2
+        assert r==1, (r, w)
+        u = w*u
+
     return u
         
         
@@ -1238,7 +1248,7 @@ def test_graph_state():
             continue
         A = A+A.transpose()
         #print(A)
-        u = graph_state(A)
+        u = graph_state(A, normalize=True)
         #print(u.shape)
         for i in range(n):
             op = X(i)
@@ -1250,7 +1260,7 @@ def test_graph_state():
             #else:
                 #print("*",end="",flush=True)
             assert op*u==u
-        #assert (u.dagger()*u).M[0,0] == 1 # FAIL XXX
+        assert (u.dagger()*u).M[0,0] == 1 
 
 
 def test_graph_op():
@@ -1263,6 +1273,7 @@ def test_graph_op():
     op = graph_op(2,2,A)
     assert op*op == I@I
     assert op == (H@H)*Clifford(2).P(1,0)
+    assert op*op.dagger() == I@I, "non-unitary "
     A0 = A
 
     A = numpy.zeros((nn,nn), dtype=int)
@@ -1270,25 +1281,17 @@ def test_graph_op():
     A[1,3] = 1
     op = graph_op(2,2,A)
     assert op==H@H
+    assert op*op.dagger() == I@I, "non-unitary "
 
     A = numpy.zeros((nn,nn), dtype=int)
     A[0,2] = 1
     A[0,3] = 1
     A[1,3] = 1
     op = graph_op(2,2,A)
+    assert op*op.dagger() == I@I, "non-unitary "
 
-    assert op*op.dagger() == I@I, "fix this phase... arghhh?!?!"
-
-    print( op*op.dagger() )
-    print( op == H@H)
-    print("op:")
-    print(op)
-    z = 2*op.M[0,0]
-    print(z, z**2)
     rhs = Clifford(2).CNOT(0,1) * (H@H)
-    print("rhs:")
-    print(rhs)
-    print(z*rhs == op)
+    assert op == rhs
 
 
 def test():
