@@ -1135,6 +1135,7 @@ def graph_state(A, normalize=False):
         state = lhs
 
     if normalize:
+        # HACK THIS:
         #print(state.shape)
         r = (state.dagger()*state).M[0,0]
         w = 1
@@ -1175,6 +1176,7 @@ def graph_op(m, n, A, normalize=True):
     assert u.shape == (2**m, 2**n)
 
     if normalize:
+        # HACK THIS:
         v = u.dagger()
         r = (u*v).M[0,0]
         w = 1
@@ -1220,7 +1222,7 @@ def test_graph_state():
     A[:] = 0
     A[0,3] = A[1,2] = 1
     u = graph_state(A)
-    #print(u)
+    #print(u.dagger()*u) # == 4 arghh?!?!
     for op in [
         X(0)*Z(3),
         X(1)*Z(2),

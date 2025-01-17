@@ -442,6 +442,145 @@ def test_clifford_pairs():
     print()
                 
 
+def test():
+
+    from qumba.matrix import Matrix
+    from qumba.umatrix import UMatrix, Solver, If, Not, And, Or
+    from z3 import PbLe
+
+    code = construct.get_10_2_3()
+    space = code.space
+    n = code.n
+    nn = 2*n
+
+    print(code)
+
+    E = code.get_encoder()
+    print("E:")
+    print(E, E.shape)
+    print()
+
+    H = code.H
+    print("H:")
+    print(H.t, H.shape)
+    print()
+
+    L = code.L
+    print("L:")
+    print(L.t, L.shape)
+    print()
+
+    M = []
+    for i in range(code.m):
+        u = [0]*nn
+        u[2*i] = 1
+        M.append(u)
+    M = Matrix(M).t
+    EM = E*M
+    #print(EM, EM.shape)
+    assert EM == H.t
+
+    L = code.L
+    print(L, L.shape)
+    rows = []
+    kk = 2*code.k
+    ldxs = list(Matrix(list(i)) for i in numpy.ndindex((2,)*kk) if sum(i))
+    assert len(ldxs) == 2**kk-1
+    logops = []
+    for idx in numpy.ndindex((2,)*code.m):
+        idx = Matrix(idx)
+        for ldx in ldxs:
+            l = idx*H + ldx*L
+            d = l.sum()  # CSS weight only FIX
+            assert d>=code.d
+            if d==code.d:
+                logops.append(l)
+                #print(l)
+
+    print("logops:", len(logops))
+
+    def dump_ft(E):
+        #for i in range(2*code.n):
+        for i in range(1,2*code.n,2):
+            u = E[:,i]
+            print(u, end=" ")
+            for l in logops:
+                lu = Matrix(l.A * u.A)
+                c = lu.sum() or "." #if lu==u else "."
+                print(c, end="")
+            print(" ", i)
+
+    dump_ft(E)
+    #print(code.longstr())
+    print()
+
+    #return
+
+    solver = Solver()
+    add = solver.add
+
+    m = code.m
+    U = UMatrix.unknown(*E.shape)
+    V = UMatrix.unknown(m,m)
+    W = UMatrix.unknown(m,m)
+    add(V*W==Matrix.identity(m))
+    add(U*M == H.t*V) # todo: loosen this
+    add(U.t*space.F*U == space.F)
+
+    for i in range(1,2*code.m,2):
+    #for i in range(1,2*code.n,2):
+        print(i, end=" ")
+        u = U[:,i]
+        #print(u, end=" ")
+        for l in logops:
+            lu = UMatrix(l.A * u.A)
+            #c = lu.sum() if lu==u else "."
+            #print(c, end="")
+            #print(lu==u, end=" ")
+            items = list(lu)
+            #print(lu==u)
+            #add(If(lu==u, PbLe(items,2)))
+            #items = [lu!=0 
+            items = [item.get() for item in items] # if str(item)!="0"]
+            #print(items)
+            #PbLe(items, 2)
+            #item = items[0].get()
+            #print(item, type(item))
+            #add(If(lu==u, Not(And(*[item for item in items])), True))
+            #add(Not(And(*[item for item in items])))
+            add(PbLe([(i,True) for i in items], 1))
+        #print(i)
+
+    print()
+    print("solve:")
+    count = 0
+    while 1:
+        result = solver.check()
+        print(result)
+        if str(result) != "sat":
+            break
+        count += 1
+    
+        model = solver.model()
+        U1 = U.get_interp(model)
+        V1 = V.get_interp(model)
+        W1 = W.get_interp(model)
+        print()
+        print(U1)
+        print()
+        assert (V1*W1) == Matrix.identity(m)
+        dump_ft(U1)
+
+        add(U != U1)
+    
+        dode = QCode.from_encoder(U1, k=code.k)
+        assert (dode.is_equiv(code))
+
+        print(dode.longstr())
+        #print(".", end='', flush=True)
+        break
+
+    #print(count)
 
 
 
