@@ -448,7 +448,8 @@ def test():
     from qumba.umatrix import UMatrix, Solver, If, Not, And, Or
     from z3 import PbLe
 
-    code = construct.get_10_2_3()
+    #code = construct.get_surface(3,3)
+    code = construct.get_512()
     space = code.space
     n = code.n
     nn = 2*n
@@ -527,8 +528,8 @@ def test():
     add(U*M == H.t*V) # todo: loosen this
     add(U.t*space.F*U == space.F)
 
-    for i in range(1,2*code.m,2):
-    #for i in range(1,2*code.n,2):
+    #for i in range(1,2*code.m,2):
+    for i in range(1,2*code.n,2):
         print(i, end=" ")
         u = U[:,i]
         #print(u, end=" ")

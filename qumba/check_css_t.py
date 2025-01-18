@@ -8,12 +8,12 @@ git clone git@github.com:RodrigoSanJose/Cyclic-CSS-T.git
 
 import os
 import numpy
-import CSSLO
 from qumba.csscode import CSSCode, distance_z3
 from qumba.solve import rank, dot2, shortstr, kernel
 
 
 def dump_transverse(Hx, Lx, t=3):
+    import CSSLO
     SX,LX,SZ,LZ = CSSLO.CSSCode(Hx, Lx)
     #CSSLO.CZLO(SX, LX)
     N = 1<<t
@@ -25,57 +25,93 @@ def dump_transverse(Hx, Lx, t=3):
     #return zList
 
 
-path = "Cyclic-CSS-T/Matrices/"
-names = os.listdir(path)
+def main_cyclic():
+    path = "Cyclic-CSS-T/Matrices/"
+    names = os.listdir(path)
+    
+    names = [n for n in names if n.endswith(".npy")]
+    names.sort()
+    #print(names)
+    
+    stems = []
+    for name in names:
+        if "C1" in name:
+            stem = name.split("_C1")[0]
+            stems.append(stem)
+    
+    #print(stems)
+    stems.sort( key = lambda stem : int(stem.split("_")[0]) )
+    
+    for stem in stems:
+        print(stem)
+        n,k,d = stem.split("_")
+        d = int(d)
+    
+        C1 = numpy.load(path+stem+'_C1.npy')
+        C2 = numpy.load(path+stem+'_C2.npy')
+    
+        H = numpy.concatenate((C1,C2))
+    
+        if H.shape[1] > 500:
+            break
+    
+        Hz = C1
+        Hx = kernel(C2)
+        assert dot2(Hz, Hx.transpose()).sum() == 0
+    
+        code = CSSCode(Hx=Hx, Hz=Hz)
+        #code.d = d
+        #code.bz_distance()
+        print(code)
+    
+        #print(distance_z3(code))
+        dump_transverse(code.Hx, code.Lx)
+        #print("Hx =")
+        #print(shortstr(code.Hx))
+        #print("Hz =")
+        #print(shortstr(code.Hz))
+        #print()
+    
+        if 0:
+            code = code.to_qcode(desc="CSS-T")
+            code.d = d
+            from qumba import db
+            db.add(code)
 
-names = [n for n in names if n.endswith(".npy")]
-names.sort()
-#print(names)
 
-stems = []
-for name in names:
-    if "C1" in name:
-        stem = name.split("_C1")[0]
-        stems.append(stem)
+def main_asym():
+    name = "AsymptoticallygoodCSST-Data.txt"
+    f = open(name)
+    Hx = Hz = rows = None
+    for line in f:
+        line = line.strip()
+        #print(line)
+        if "H_x" in line:
+            rows = Hx = []
+            continue
+        elif "H_z" in line:
+            rows = Hz = []
+            continue
+        elif "[" in line and rows is not None:
+            for c in " []":
+                line = line.replace(c, "")
+            line = [int(i) for i in line]
+            rows.append(line)
+            continue
+        elif Hx is None or Hz is None:
+            continue
+        Hx = numpy.array(Hx)
+        Hz = numpy.array(Hz)
+        code = CSSCode(Hx=Hx, Hz=Hz)
+        print(code)
+        print(code.Hx)
+        print(code.Lx)
+        dump_transverse(code.Hx, code.Lx)
+        rows = Hx = Hz = None
+        return
 
-#print(stems)
-stems.sort( key = lambda stem : int(stem.split("_")[0]) )
-
-for stem in stems:
-    print(stem)
-    n,k,d = stem.split("_")
-    d = int(d)
-
-    C1 = numpy.load(path+stem+'_C1.npy')
-    C2 = numpy.load(path+stem+'_C2.npy')
-
-    H = numpy.concatenate((C1,C2))
-
-    if H.shape[1] > 500:
-        break
-
-    Hz = C1
-    Hx = kernel(C2)
-    assert dot2(Hz, Hx.transpose()).sum() == 0
-
-    code = CSSCode(Hx=Hx, Hz=Hz)
-    #code.d = d
-    #code.bz_distance()
-    print(code)
-
-    #print(distance_z3(code))
-    dump_transverse(code.Hx, code.Lx)
-    #print("Hx =")
-    #print(shortstr(code.Hx))
-    #print("Hz =")
-    #print(shortstr(code.Hz))
-    #print()
-
-    if 0:
-        code = code.to_qcode(desc="CSS-T")
-        code.d = d
-        from qumba import db
-        db.add(code)
+#main_cyclic()
+main_asym()
 
 
 print("done.\n")
