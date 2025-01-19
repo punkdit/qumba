@@ -145,6 +145,19 @@ def get_10_2_3():
     ZZ.....Z.Z
     """, d=3)
 
+def get_913():
+    return QCode.fromstr("""
+    XXIXXIXXI
+    XIXXIXXIX
+    ZIIZIIIII
+    IIZIIIIIZ
+    IZIIIIIZI
+    ZIIIIIZII
+    IIIIIZIIZ
+    IIIIZIIZI
+    """)
+    
+
 
 def get_512():
     return QCode.fromstr("""

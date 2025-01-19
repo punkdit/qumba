@@ -11,7 +11,7 @@ from random import shuffle
 import numpy
 
 import z3
-from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, ForAll
+from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, ForAll, PbEq, PbLe, PbGe
 
 from qumba.qcode import QCode, SymplecticSpace, fromstr, shortstr, strop
 from qumba.matrix import Matrix, scalar
