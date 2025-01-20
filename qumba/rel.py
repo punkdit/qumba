@@ -37,6 +37,8 @@ def normalize(left, right, truncate=True):
 
 
 class Relation(object):
+    """ A linear relation
+    """
 
     def __init__(self, left, right=None, p=2):
         left = Matrix.promote(left)
@@ -62,6 +64,30 @@ class Relation(object):
     @property
     def nf(self): # normal form
         return self.__class__(self.left, self.right)
+
+    def get_left(self, r):
+        r = Matrix.promote(r)
+        if len(r.shape)==1:
+            n = len(r)
+            r = r.reshape(1, n)
+        left, right = self.left, self.right
+        assert r.shape[1] == right.shape[1]
+        A = right.intersect(r)
+        f = right.t.solve(A.t).t
+        l = f*left
+        return l
+    __call__ = get_left
+
+    def get_right(self, l):
+        if len(l.shape)==1:
+            n = len(l)
+            l = l.reshape(1, n)
+        left, right = self.left, self.right
+        assert l.shape[1] == left.shape[1]
+        A = left.intersect(l)
+        f = left.t.solve(A.t).t
+        l = f*right
+        return l
 
     @classmethod
     def identity(cls, n, p=2):
@@ -229,6 +255,45 @@ class Lagrangian(Relation):
 
 
 zeros = lambda a,b : Matrix.zeros((a,b))
+
+if 1:
+    # make some globals
+
+    I = Lagrangian.identity(2)
+    h = Lagrangian([[0,1],[1,0]])
+    b_ = Lagrangian([[0,1]], zeros(1,0))
+    b1 = Lagrangian([[1,0],[1,1]])
+    w1 = h*b1*h
+    b1_ = b1*b_
+    w1_ = h*b1_
+    w_ = w1 * w1_
+    _b1 = b1_.op
+    _b = b_.op
+    _w1 = w1_.op
+    _w = w_.op
+
+    swap = Lagrangian.get_swap()
+    
+    bb_b = Lagrangian([
+        [1,0,0,0],
+        [0,0,1,0],
+        [0,1,0,1],
+    ], [
+        [1,0],
+        [1,0],
+        [0,1],
+    ])
+
+    assert swap*bb_b == bb_b
+
+    b_bb = bb_b.op
+    ww_w = (h@h) * bb_b * h
+    w_ww = ww_w.op
+
+    cnot = (I @ b_bb) * (ww_w @ I) 
+    assert cnot * cnot.op == I@I # invertible
+    assert cnot == (w_ww@I)*(I@bb_b)
+
 
 def all_linear(tgt, src):
     for idxs in numpy.ndindex((2,)*(tgt*src)):
@@ -805,7 +870,148 @@ def test_code():
                 print(me2)
                 print()
 
+
+class Module:
+    def __init__(self, n):
+        self.space = SymplecticSpace(n)
+        self.n = n
+
+    def get_identity(self):
+        I = self.space.get_identity()
+        return Lagrangian(I)
+
+    # Argggh, why is this transposed : XXX
+    def CX(self, i, j):
+        CX = self.space.CX(i, j)
+        CX = Lagrangian(CX.t)
+        return CX
+
+    def CZ(self, i, j):
+        CZ = self.space.CZ(i, j)
+        CZ = Lagrangian(CZ.t)
+        return CZ
+
+    def S(self, i):
+        S = self.space.S(i)
+        S = Lagrangian(S.t)
+        return S
+
+    def H(self, i):
+        H = self.space.H(i)
+        H = Lagrangian(H.t)
+        return H
+
+    def X(self, i):
+        nn = 2*self.n
+        x = [0]*nn
+        x[2*i] = 1
+        x = Matrix(x).reshape(1, nn)
+        return x
+
+    def Z(self, i):
+        nn = 2*self.n
+        z = [0]*nn
+        z[2*i+1] = 1
+        z = Matrix(z).reshape(1, nn)
+        return z
+
+    def Y(self, i):
+        nn = 2*self.n
+        y = [0]*nn
+        y[2*i+1] = 1
+        y = Matrix(y).reshape(1, nn)
+        return y
+
             
+def css_prep(code):
+    css = code.to_css()
+    #print(css.longstr())
+    n = code.n
+
+    b_ancilla = reduce(matmul, [I]*n+[b_])
+    w_ancilla = reduce(matmul, [I]*n+[w_])
+
+    prep = Module(n).get_identity()
+
+    ancilla = Module(n + 1)
+    for i in range(css.mx):
+        measure = ancilla.get_identity()
+        for j in range(n):
+            if css.Hx[i,j]:
+                measure = measure * ancilla.CX(n, j)
+        measure = w_ancilla.op * measure * w_ancilla
+        prep = measure*prep
+    for i in range(css.mz):
+        measure = ancilla.get_identity()
+        for j in range(n):
+            if css.Hz[i,j]:
+                measure = measure * ancilla.CX(j, n)
+        measure = b_ancilla.op * measure * b_ancilla
+        prep = measure*prep
+
+    return prep
+
+
+def test_prep():
+
+    module = Module(2)
+    assert cnot == module.CX(0,1)
+    assert w1@I == module.S(0)
+    assert I@h == module.H(1)
+
+    # ------------------------------------------------------------------------
+
+    code = QCode.fromstr("ZZZ")
+    prep = css_prep(code)
+
+    #print("prep =")
+    #print(prep.nf)
+
+    assert( (prep*prep.op) != Module(3).get_identity() )
+
+    n = code.n
+    module = Module(n)
+    for i in range(n):
+        x = module.X(i)
+        l = prep(x)
+        assert len(l) == 0
+
+        x = Lagrangian(x, zeros(1,0))
+        px = prep*x # ??
+
+        z = module.Z(i)
+        l = prep(z)
+        assert len(l) == 1
+
+        z = Lagrangian(z, zeros(1,0))
+        pz = prep*z # ??
+
+    # ------------------------------------------------------------------------
+
+    code = QCode.fromstr("ZZZ XXI IXX")
+    prep = css_prep(code)
+
+    code = construct.get_713()
+    prep = css_prep(code)
+
+    print(prep)
+
+    n = code.n
+    module = Module(n)
+    for i in range(n):
+        x = module.X(i)
+        l = prep(x)
+        assert len(l) == 0
+
+        z = module.Z(i)
+        l = prep(z)
+        assert len(l) == 0
+
+        for j in range(i+1, n):
+            x = module.X(i) + module.X(j)
+            l = prep(x)
+            assert len(l) == 0
+
 
 
 def test():
@@ -842,7 +1048,7 @@ if __name__ == "__main__":
         fn = eval(fn)
         fn()
 
-    print("finished in %.3f seconds.\n"%(time() - start_time))
+    print("\nfinished in %.3f seconds.\n"%(time() - start_time))
 
 
 

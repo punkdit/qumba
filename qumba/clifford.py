@@ -1296,6 +1296,19 @@ def test_graph_op():
     assert op == rhs
 
 
+def test_prep():
+    g2, r2 = Z, X
+    assert g2 == green(1,1,2)
+    g_, _g = green(1, 0), green(0,1)
+    r_, _r = red(1, 0), red(0,1)
+
+    assert (r2*g_ == g_)
+    assert (g2*g_ != g_)
+
+    print(g2*g_)
+    print(r2*r_)
+
+
 def test():
     test_clifford()
     test_clifford3()

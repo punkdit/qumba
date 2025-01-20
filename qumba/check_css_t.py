@@ -110,8 +110,49 @@ def main_asym():
         rows = Hx = Hz = None
         return
 
+def main_code():
+    from qumba.qcode import QCode
+    # list(lins_db.db.keys()) [(4, 8, 8), (3, 3, 6), (4, 3, 4),]
+    code = QCode.fromstr("""
+.XXX.XXX...X.XXXXX.X...XXX......
+X...X...XXX.X.....X.XXX...XXXXXX
+X......X..X..XX....XX........X..
+.XX.X.X.X.............XX.......X
+...X.X..........X.X......X.XX.X.
+.X.X.X..XX....XX...XXX.XX...XXXX
+..XX....XXXX.X..X..X..XXX.XXXX..
+.ZZZ.ZZZ...Z.ZZZZZ.Z...ZZZ......
+Z...Z...ZZZ.Z.....Z.ZZZ...ZZZZZZ
+.ZZ.Z.Z.Z.............ZZ.......Z
+...Z.Z..........Z.Z......Z.ZZ.Z.
+.Z.Z.Z..ZZ....ZZ...ZZZ.ZZ...ZZZZ
+..ZZ....ZZZZ.Z..Z..Z..ZZZ.ZZZZ..
+.......Z.....ZZ....Z............
+.........Z..Z........Z....Z.....
+....Z...Z.............Z........Z
+...Z.Z..........Z........Z......
+...Z.Z........Z....Z............
+.......Z...Z.Z...Z..............
+..Z...Z.........Z........Z......
+Z.........Z.......Z........Z....
+........Z...................Z.ZZ
+..ZZ.......Z.Z..Z..Z...ZZ.......
+.Z......Z..............Z.......Z
+Z......Z......Z.....Z...........
+............Z..Z.Z...Z..........
+..Z.....Z.............ZZ........
+Z...Z.ZZ....Z....ZZ......Z......
+    """)
+    Hs = open("Hs.out").read()
+    code = QCode.fromstr(Hs)
+    print(code)
+    css = code.to_css()
+    print(css.bz_distance())
+    dump_transverse(css.Hx, css.Lx)
+
 #main_cyclic()
-main_asym()
+#main_asym()
+main_code()
 
 
 print("done.\n")

@@ -191,6 +191,10 @@ class UMatrix(object):
             assert 0, other
         return UMatrix(A)
 
+    def prod(self, other):
+        A = self.A * other.A
+        return UMatrix(A)
+
     def __ne__(self, other):
         terms = []
         #print("__ne__")
