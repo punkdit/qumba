@@ -247,6 +247,19 @@ def bravyi49():
     #from qumba.diego import dump
     #dump(code)
 
+def test_49_1_5():
+    import json
+    from pytket import Circuit
+
+    # Load the circuit from a JSON files#
+    with open('49_1_5.json', 'r') as f:
+        data = json.load(f)
+    circuit = Circuit.from_dict(data) 
+
+    print(circuit)
+    print(circuit.n_qubits)
+    #for op in entire_circuit:
+    #    print(op)
 
 
 
