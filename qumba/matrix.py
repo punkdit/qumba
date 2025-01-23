@@ -135,6 +135,7 @@ class Matrix(object):
     def identity(cls, n, p=DEFAULT_P):
         A = numpy.identity(n, dtype=scalar)
         return Matrix(A, p, name="I")
+    get_identity = identity
 
     @classmethod
     def zeros(cls, shape, p=DEFAULT_P):

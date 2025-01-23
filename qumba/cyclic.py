@@ -20,7 +20,8 @@ from sage.all_cmdline import (FiniteField, CyclotomicField, latex, block_diagona
     PolynomialRing, GF, factor)
 from sage import all_cmdline
 
-from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
+from qumba.solve import (parse, shortstr, linear_independent,
+    eq2, dot2, identity2, solve,
     zeros2, rank, rand2, pseudo_inverse, kernel, direct_sum, span)
 from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr, strop
 from qumba import construct
@@ -167,6 +168,77 @@ def all_cyclic_gf2(n):
             continue 
         gen = numpy.array([int(a[k]) for k in range(n)], dtype=int)
         yield gen
+
+
+def is_cyclic_gf2(H):
+    m, n = H.shape
+    idxs = [(i+1)%n for i in range(n)]
+    J = H[:, idxs]
+    return solve(H.transpose(), J.transpose()) is not None
+
+def is_iso_gf2(H, J):
+    if H.shape != J.shape:
+        return False
+    A = solve(H.transpose(), J.transpose())
+    Ai = solve(J.transpose(), H.transpose())
+    assert (A is None) == (Ai is None)
+    return A is not None
+
+        
+def main_cyclic_gf2():
+    n = argv.get("n", 17)
+
+    gens = get_cyclic_perms(n)
+    gens = [g[::2,::2] for g in gens]
+    print("gens:", len(gens))
+
+    rows = []
+    for i in range(n):
+        row = [0]*n
+        row[(i+1)%n] = 1
+        rows.append(row)
+    C = Matrix(rows)
+    #print(C)
+    #for g in gens:
+    #    print(C*g == g*C)
+    #return
+
+    vs = list(all_cyclic_gf2(n))    
+    N = len(vs)
+    Hs = [
+        numpy.array([numpy.array([v[(i+j)%n] for i in range(n)]) 
+        for j in range(n)]) for v in vs ]
+    Hs = [linear_independent(H) for H in Hs]
+    print("Hs:", N)
+    for H0 in Hs:
+        h = H0[0]
+        print(shortstr(h), H0.shape, h.sum())
+
+    found = set()
+    for g in gens:
+        rows = []
+        for H in Hs:
+            J = dot2(H, g)
+            assert is_cyclic_gf2(J)
+            row = [int(is_iso_gf2(J, H1)) for H1 in Hs]
+            rows.append(row)
+        P = Matrix(rows)
+        if P not in found:
+            print(P.is_identity(), (P*P).is_identity(), (P*P.t).is_identity())
+            print()
+        found.add(P)
+    #found = list(found)
+    print("found:", len(found))
+
+    #G = mulclose(found)
+    #assert len(G) == len(found)
+    G = found
+
+    for g in G:
+      for h in G:
+        assert g*h in G
+        assert g*h == h*g, "non-abelian ???!"
+        
 
 
 def all_cyclic_css(n):

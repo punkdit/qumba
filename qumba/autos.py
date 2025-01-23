@@ -218,10 +218,9 @@ def get_autos_selfdualcss(code):
 
     print("autgrp...")
     aut = autgrp(graph)
-    print(len(aut))
     gen = aut[0]
     order = int(aut[1])
-    print("autos:", order)
+    print("physical autos:", order)
     #for perm in gen:
     #    print(perm)
 
@@ -235,6 +234,9 @@ def get_autos_selfdualcss(code):
         #print(L)
         #print()
         ops.append(L)
+
+    G = mulclose(ops, verbose=True)
+    print("|G| =", len(G))
 
     dode = code.apply_S()
     ops.append(dode.get_logical(code))

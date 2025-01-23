@@ -18,7 +18,7 @@ from qumba import qcode
 from qumba.qcode import QCode, SymplecticSpace
 from qumba.isomorph import Tanner, search
 from qumba.solve import (
-    shortstr, shortstrx, eq2, dot2, compose2, rand2,
+    shortstr, shortstrx, eq2, dot2, compose2, rand2, enum2,
     pop2, insert2, append2, array2, zeros2, identity2, rank, linear_independent)
 from qumba.action import Perm
 from qumba.matrix import Matrix
@@ -1458,6 +1458,16 @@ def selfdual():
             break
 
 
+def selfdual_wenum(H):
+    m, n = H.shape
+    wenum = [0]*(n+1)
+    for u in enum2(m):
+        v = dot2(u, H)
+        d = v.sum()
+        wenum[d] += 1
+    return tuple(wenum)
+
+
 def selfdual_z3():
 
     n, k, d = argv.get("code", (7,1,3))
@@ -1523,7 +1533,7 @@ def selfdual_z3():
 
         add(A != _A)
 
-        code = CSSCode(Hx=H, Hz=H, Lx=_Lx, Lz=_Lz, Tx=_Tx, Tz=_Tz)
+        code = CSSCode(Hx=H.A, Hz=H.A, Lx=_Lx.A, Lz=_Lz.A, Tx=_Tx.A, Tz=_Tz.A)
         #print(code.longstr())
         d_x, d_z = code.bz_distance()
         if d_x < d:
@@ -1533,10 +1543,11 @@ def selfdual_z3():
             #assert 0
             continue
 
+        print(code)
+        print("wenum:", selfdual_wenum(code.Hx))
         break
 
-    print()
-    print(code)
+    #print()
     print(code.longstr())
     write_to_db(code, "qumba.csscode.selfdual_z3")
 
