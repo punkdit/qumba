@@ -17,6 +17,8 @@ class Algebra:
 
 
 def main():
+    # this sequence is Euler totient function phi(n) = |GL(1,Z/n)|
+    # https://oeis.org/A000010
     #n = argv.get("n", 12)
     for n in range(2, 20):
         count = find(n)
@@ -26,7 +28,24 @@ def main():
         print(n, len(gens))
 
 
-def find(n):
+def main_weak():
+    n = argv.get("n", 7)
+
+    A = find(n, False)
+    print(len(A))
+
+    A = set(A)
+    for a in A:
+      for b in A:
+        assert a*b in A
+
+    n2 = n**2
+    vs = [v.reshape(n2) for v in A]
+    vs = Matrix(vs)
+    print(len(vs), vs.rank())
+
+
+def find(n, strict=True, verbose=False):
     #print("find(%s)"%n)
     n2 = n**2
 
@@ -66,12 +85,21 @@ def find(n):
 
     add( P*unit == unit )
     add( mul*(P@P) == P*mul )
-    add( P*P.t == I )
-    for i in range(n):
-        add( PbEq([(P[i,j].get(),True) for j in range(n)], 1) )
 
-    #print("solver", end='', flush=True)
+    if strict:
+        add( P*P.t == I )
+        for i in range(n):
+            add( PbEq([(P[i,j].get(),True) for j in range(n)], 1) )
+    else:
+        # isomorphism
+        U = UMatrix.unknown(n,n)
+        add(P*U == I)
+        #add(U*P == I)
+
+    #if verbose:
+    #    print("solver", end='', flush=True)
     count = 0
+    items = []
     while 1:
         result = solver.check()
         if str(result) != "sat":
@@ -80,9 +108,19 @@ def find(n):
         model = solver.model()
         p = P.get_interp(model)
         add(P != p)
-        #print(".", end="", flush=True)
-        count += 1
 
+        if not strict:
+            items.append(p)
+        if verbose:
+            #print(".", end="", flush=True)
+            print(p)
+            print()
+        count += 1
+    if verbose:
+        print()
+
+    if not strict:
+        return items
     return count
 
 
