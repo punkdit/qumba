@@ -177,6 +177,11 @@ def find_sy():
     print(u * E)
     
 
+def show():
+    for n in range(1, 6):
+      for m in range(n+1):
+        print(len(grassmannian(n,m)), end=" ", flush=True)
+      print()
 
 
 def test():

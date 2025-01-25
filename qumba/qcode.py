@@ -189,8 +189,8 @@ class QCode(object):
             assert T.shape == (self.m, nn)
         if check:
             self.check()
-        if self.d is None and self.n < 10:
-            self.get_distance()
+            if self.d is None and self.n < 10:
+                self.get_distance()
         self.name = name
         self.desc = desc
         self.attrs = attrs # serialize these attrs
@@ -944,6 +944,23 @@ class QCode(object):
 
     @cache
     def is_css(self):
+        H = self.H.A
+        n = self.n
+        xs = zeros2(1, 2*n)
+        xs[0, ::2] = 1
+        Hx = H*xs
+        if solve2(H.transpose(), Hx.transpose()) is None:
+            css = False
+        else:
+            zs = zeros2(1, 2*n)
+            zs[0, ::2] = 1
+            Hz = H*zs
+            css = solve2(H.transpose(), Hz.transpose()) is not None
+        #assert css == self.is_css_slow()
+        self.attrs["css"] = css
+        return css
+
+    def is_css_slow(self):
         "check for transversal CNOT"
         n = self.n
         src = self + self
