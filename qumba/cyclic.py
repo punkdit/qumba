@@ -184,6 +184,16 @@ def is_iso_gf2(H, J):
     assert (A is None) == (Ai is None)
     return A is not None
 
+
+def count_cyclic_gf2():
+    # TODO: submit to OEIS
+    # 1,2,3,2,3,4,7,2,7,4,3,4,3,8,31,2,7,8,3,4,63,4,7,4,7,4,15,8,3,
+    for n in range(1, 30):
+        vs = list(all_cyclic_gf2(n))    
+        N = len(vs)
+        print("%d,"%N, end="", flush=True)
+    print()
+
         
 def main_cyclic_gf2():
     n = argv.get("n", 17)
@@ -210,6 +220,8 @@ def main_cyclic_gf2():
         for j in range(n)]) for v in vs ]
     Hs = [linear_independent(H) for H in Hs]
     print("Hs:", N)
+
+
     for H0 in Hs:
         h = H0[0]
         print(shortstr(h), H0.shape, h.sum())

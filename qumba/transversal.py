@@ -2059,8 +2059,9 @@ def test_lw():
     """)
     n = code.n
     css = code.to_css()
-    Hx = Matrix(css.Hx)
-    wenum = Hx.get_wenum()
+    H = Matrix(css.Hx)
+    Lx = Matrix(css.Lx)
+    wenum = H.get_wenum()
     #print([(idx,wenum[idx]) for idx in range(64)])
 
     perms = get_cyclic_perms(n)
@@ -2068,9 +2069,12 @@ def test_lw():
     G = []
     for g in perms:
         g = Matrix(g[::2, ::2])
-        H1 = Hx*g
-        if H1.t.solve(Hx.t) is not None:
+        H1 = H*g
+        if H1.t.solve(H.t) is not None:
             G.append(g)
+        #L1 = Lx*g
+        #if L1.t.solve(Lx.t) is not None:
+        #    G.append(g)
     print(len(G))
     for g in G:
       for h in G:
@@ -2079,10 +2083,7 @@ def test_lw():
     G = mulclose([g]+G)
     print(len(G))
 
-    Lx = Matrix(css.Lx)
-    #print(Lx)
-
-    HL = Hx.concatenate(Lx)
+    HL = H.concatenate(Lx)
 
     count = 0
     logops = []
@@ -2094,13 +2095,16 @@ def test_lw():
     print(count)
     L = Matrix(logops)
     print(L.shape)
-    print(L.A.sum(0))
-    print(L.A.sum(1))
+    #print(L.A.sum(0))
+    #print(L.A.sum(1))
+    print(L.rank())
+    print((H.concatenate(L)).rank() - len(H))
+    assert H.rank() == len(H)
 
     remain = set(logops)
     orbits = []
     while remain:
-        print(len(remain))
+        #print(len(remain))
         op = iter(remain).__next__()
         orbit = []
         for g in G:
@@ -2109,9 +2113,19 @@ def test_lw():
                 remain.remove(u)
                 orbit.append(u)
         orbits.append(orbit)
-        print("orbit:", len(orbit))
-    print([len(o) for o in orbits])
 
+    orbits.sort(key = len)
+    for orbit in orbits:
+        print("orbit:", len(orbit))
+        L1 = Matrix(orbit)
+        print("rank:", (H.concatenate(L1)).rank() - len(H))
+
+    o = orbits[0] + orbits[1]
+    L1 = Matrix(o)
+    print("rank 21+63:", (H.concatenate(L1)).rank() - len(H))
+    o = orbits[0] + orbits[1] + orbits[2]
+    L1 = Matrix(o)
+    print("rank 21+63+189:", (H.concatenate(L1)).rank() - len(H))
 
 
 
