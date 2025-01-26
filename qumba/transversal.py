@@ -2041,6 +2041,79 @@ def find_css():
     print(code.longstr())
 
 
+def test_lw():
+    from qumba.cyclic import get_cyclic_perms
+    code = QCode.fromstr("""
+    XXXIIIIXIIXIIIXXIXXIIXIXXIXIXXXIXXXXIIXXIIIXIXIXIIXXXXXXIXIIIII
+    ZZZIIIIZIIZIIIZZIZZIIZIZZIZIZZZIZZZZIIZZIIIZIZIZIIZZZZZZIZIIIII
+    XXIIIIXIIXIIIXXIXXIIXIXXIXIXXXIXXXXIIXXIIIXIXIXIIXXXXXXIXIIIIIX
+    ZZIIIIZIIZIIIZZIZZIIZIZZIZIZZZIZZZZIIZZIIIZIZIZIIZZZZZZIZIIIIIZ
+    XIIIIXIIXIIIXXIXXIIXIXXIXIXXXIXXXXIIXXIIIXIXIXIIXXXXXXIXIIIIIXX
+    ZIIIIZIIZIIIZZIZZIIZIZZIZIZZZIZZZZIIZZIIIZIZIZIIZZZZZZIZIIIIIZZ
+    IIIIXIIXIIIXXIXXIIXIXXIXIXXXIXXXXIIXXIIIXIXIXIIXXXXXXIXIIIIIXXX
+    IIIIZIIZIIIZZIZZIIZIZZIZIZZZIZZZZIIZZIIIZIZIZIIZZZZZZIZIIIIIZZZ
+    IIIXIIXIIIXXIXXIIXIXXIXIXXXIXXXXIIXXIIIXIXIXIIXXXXXXIXIIIIIXXXI
+    IIIZIIZIIIZZIZZIIZIZZIZIZZZIZZZZIIZZIIIZIZIZIIZZZZZZIZIIIIIZZZI
+    IIXIIXIIIXXIXXIIXIXXIXIXXXIXXXXIIXXIIIXIXIXIIXXXXXXIXIIIIIXXXII
+    IIZIIZIIIZZIZZIIZIZZIZIZZZIZZZZIIZZIIIZIZIZIIZZZZZZIZIIIIIZZZII
+    """)
+    n = code.n
+    css = code.to_css()
+    Hx = Matrix(css.Hx)
+    wenum = Hx.get_wenum()
+    #print([(idx,wenum[idx]) for idx in range(64)])
+
+    perms = get_cyclic_perms(n)
+    print(len(perms))
+    G = []
+    for g in perms:
+        g = Matrix(g[::2, ::2])
+        H1 = Hx*g
+        if H1.t.solve(Hx.t) is not None:
+            G.append(g)
+    print(len(G))
+    for g in G:
+      for h in G:
+        assert g*h in G
+    g = Matrix.perm([(i+1)%n for i in range(n)])
+    G = mulclose([g]+G)
+    print(len(G))
+
+    Lx = Matrix(css.Lx)
+    #print(Lx)
+
+    HL = Hx.concatenate(Lx)
+
+    count = 0
+    logops = []
+    for l in find_lw(HL, 3):
+        if l[0,0]:
+            print(l)
+        logops.append(l[0])
+        count += 1
+    print(count)
+    L = Matrix(logops)
+    print(L.shape)
+    print(L.A.sum(0))
+    print(L.A.sum(1))
+
+    remain = set(logops)
+    orbits = []
+    while remain:
+        print(len(remain))
+        op = iter(remain).__next__()
+        orbit = []
+        for g in G:
+            u = op*g
+            if u in remain:
+                remain.remove(u)
+                orbit.append(u)
+        orbits.append(orbit)
+        print("orbit:", len(orbit))
+    print([len(o) for o in orbits])
+
+
+
 
 
 

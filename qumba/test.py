@@ -2108,7 +2108,9 @@ def test_doctrine_gf4():
     d = 0
     for n in range(argv.get("n0", 1), argv.get("n1", 5)):
       print("n=%s"%n, end=" ")
-      for k in range(n+1):
+      #for k in range(n+1):
+      for m in range(n+1):
+        k = n-m
         if (n+k)%2:
             print(".", end=" ", flush=True)
             continue
@@ -2192,6 +2194,7 @@ def all_css(n, m):
         codes += list(all_css_mxz(n,mx,mz))
     return codes
 
+
 def test_all_css():
     for n in range(argv.get("n0", 1), argv.get("n1", 5)):
       print("n=%s"%n, end=" ")
@@ -2243,7 +2246,6 @@ def test_doctrine_csssd():
         print(count, end=" ", flush=True)
       print()
 
-
 def test_sd():
     from bruhat.algebraic import qchoose_2
     d = 0
@@ -2268,6 +2270,43 @@ def test_sd():
         print(count, end=" ", flush=True)
       print()
 
+
+def all_sd(n,m):
+    from bruhat.algebraic import qchoose_2
+    count = 0
+    for H in qchoose_2(n,m):
+        if dot2(H, H.transpose()).sum() == 0:
+            yield H
+
+
+def is_triorthogonal(H):
+    # check triorthogonal
+    m, n = H.shape
+    for i in range(m):
+     for j in range(i+1, m):
+        #if (H[i]*H[j]).sum() % 2:
+        #    return False
+        Hij = H[i]*H[j]
+        #if Hij.sum()==0:
+        #    return True
+        for k in range(j+1, m):
+          if (Hij*H[k]).sum() % 2:
+            return False
+    return True
+
+
+def test_triorthogonal():
+    for n in range(argv.get("n0", 1), argv.get("n1", 7)):
+      print("n=%s"%n, end=" ")
+      for m in range(0,n,1):
+        Hs = list(all_sd(n,m))
+        count = 0
+        for H in all_sd(n,m):
+            if is_triorthogonal(H):
+                count += 1
+        print("%4s"%(count or "."), end=" ", flush=True)
+      print()
+        
 
 
 
