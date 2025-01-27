@@ -294,6 +294,8 @@ def main_sd():
         if code.k == 0 or code.d_upper_bound <= 2:
             continue
         print(code)
+        if argv.show:
+            print(code.longstr())
 
 
 

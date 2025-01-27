@@ -31,7 +31,7 @@ def main():
 def main_weak():
     n = argv.get("n", 7)
 
-    A = find(n, False)
+    A = find(n, False, True)
     print(len(A))
 
     A = set(A)

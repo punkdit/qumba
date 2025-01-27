@@ -2041,6 +2041,91 @@ def find_css():
     print(code.longstr())
 
 
+def test_cyclic():
+    from qumba.solve import zeros2
+
+    code = QCode.fromstr("""
+    X..XX.X.XXXX...
+    ..XX.X.XXXX...X
+    .XX.X.XXXX...X.
+    XX.X.XXXX...X..
+    Z..ZZ.Z.ZZZZ...
+    ..ZZ.Z.ZZZZ...Z
+    .ZZ.Z.ZZZZ...Z.
+    ZZ.Z.ZZZZ...Z..
+    """)
+    #code = construct.get_713()
+    assert code.is_cyclic()
+    n = code.n
+    nn = 2*n
+    space = SymplecticSpace(n)
+    F = space.F
+
+    solver = Solver()
+    Add = solver.add
+
+    css = code.to_css()
+    mx, mz = css.mx, css.mz
+    Hx = Matrix(css.Hx)
+    Hz = Matrix(css.Hz)
+
+    U = UMatrix.unknown(n,n)
+    V = UMatrix.unknown(n,n)
+    Add(U*V.t == Matrix.get_identity(n)) # V == (U^-1)^T
+
+    Mx = UMatrix.unknown(mx,mx)
+    #Mxi = UMatrix.unknown(mx,mx)
+    #Add(Mx*Mxi == Matrix.get_identity(mx))
+    Add(Hx*U.t == Mx*Hx)
+
+    Mz = UMatrix.unknown(mz,mz)
+    #Mzi = UMatrix.unknown(mz,mz)
+    #Add(Mz*Mzi == Matrix.get_identity(mz))
+    Add(Hz*V.t == Mz*Hz)
+
+    P = Matrix.perm([(i+1)%n for i in range(n)])
+    Add(P*U == U*P)
+
+    print("solver...")
+
+    count = 0
+    gen = []
+    while 1:
+        result = solver.check()
+        if str(result) != "sat":
+            break
+    
+        model = solver.model()
+        _U = U.get_interp(model)
+        _V = V.get_interp(model)
+    
+        #print(_U)
+        #print()
+        gen.append(_U)
+        Add(U != _U)
+        count += 1
+    
+        U2 = zeros2(nn,nn)
+        U2[0:nn:2, 0:nn:2] = _U
+        U2[1:nn:2, 1:nn:2] = _V
+        U2 = Matrix(U2)
+    
+        assert space.is_symplectic(U2)
+        #print(U2)
+    
+        dode = U2*code
+        assert dode.is_equiv(code)
+        print(".", end="", flush=True)
+
+
+    print("count:", count)
+
+    G = mulclose(gen, verbose=True)
+    print(len(G))
+
+
+
+
 def test_lw():
     from qumba.cyclic import get_cyclic_perms
     code = QCode.fromstr("""
