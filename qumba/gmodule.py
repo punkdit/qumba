@@ -5,7 +5,7 @@ from qumba.solve import zeros2
 
 from qumba.argv import argv
 from qumba.matrix import Matrix
-from qumba.umatrix import UMatrix, Solver, PbEq
+from qumba.umatrix import UMatrix, Solver, PbEq, PbLe
 from qumba.cyclic import get_cyclic_perms
 from qumba.qcode import QCode, SymplecticSpace
 from qumba.action import mulclose
@@ -13,18 +13,18 @@ from qumba.transversal import find_lw
 from qumba import construct
 
 
-class Algebra:
-    def __init__(self, mul, unit):
-        self.mul = mul
-        self.unit = unit
+#class Algebra:
+#    def __init__(self, mul, unit):
+#        self.mul = mul
+#        self.unit = unit
 
 
-def main():
+def main_totient():
     # this sequence is Euler totient function phi(n) = |GL(1,Z/n)|
     # https://oeis.org/A000010
     #n = argv.get("n", 12)
     for n in range(2, 20):
-        count = find(n)
+        count = len(list(find_homs(n, True)))
         gens = get_cyclic_perms(n)
         #print("gens:", len(gens))
         assert count == len(gens)
@@ -34,7 +34,7 @@ def main():
 def main_weak():
     n = argv.get("n", 7)
 
-    A = find(n, False, True)
+    A = list(find_homs(n, False, verbose=True))
     print(len(A))
 
     A = set(A)
@@ -48,8 +48,8 @@ def main_weak():
     print(len(vs), vs.rank())
 
 
-def find(n, strict=True, verbose=False):
-    #print("find(%s)"%n)
+def find_homs(n, strict, rw=None, verbose=False):
+    #print("find_homs(%s)"%n)
     n2 = n**2
 
     mul = zeros2(n, n2)
@@ -99,6 +99,10 @@ def find(n, strict=True, verbose=False):
         add(P*U == I)
         #add(U*P == I)
 
+    if rw is not None:
+        for i in range(n):
+            add( PbLe([(P[i,j].get(),True) for j in range(n)], rw) )
+
     #if verbose:
     #    print("solver", end='', flush=True)
     count = 0
@@ -112,8 +116,7 @@ def find(n, strict=True, verbose=False):
         p = P.get_interp(model)
         add(P != p)
 
-        if not strict:
-            items.append(p)
+        yield p
         if verbose:
             #print(".", end="", flush=True)
             print(p)
@@ -122,14 +125,21 @@ def find(n, strict=True, verbose=False):
     if verbose:
         print()
 
-    if not strict:
-        return items
-    return count
+
+def css_to_sp(U, V=None):
+    nn = 2*len(U)
+    if V is None:
+        V = (~U).t
+    U2 = zeros2(nn,nn)
+    U2[0:nn:2, 0:nn:2] = U
+    U2[1:nn:2, 1:nn:2] = V
+    U2 = Matrix(U2)
+    return U2
 
 
 
 
-def test_cyclic():
+def main_cyclic():
     from qumba.solve import zeros2
 
     code = QCode.fromstr("""
@@ -142,12 +152,34 @@ def test_cyclic():
     .ZZ.Z.ZZZZ...Z.
     ZZ.Z.ZZZZ...Z..
     """)
-    code = construct.get_713()
+    #code = construct.get_713()
+
     assert code.is_cyclic()
     n = code.n
     nn = 2*n
     space = SymplecticSpace(n)
     F = space.F
+
+    count = 0
+    for U in find_homs(n, False, 1):
+        count += 1
+        print()
+        print(U)
+        U2 = css_to_sp(U)
+        assert space.is_symplectic(U2)
+        dode = U2*code
+        assert dode.is_css()
+        assert dode.is_cyclic()
+        e = dode.is_equiv(code)
+        d = dode.to_css().bz_distance()
+        print(dode, e, d)
+        #print("/."[e], end="", flush=True)
+    print()
+    print(count)
+    #gens = get_cyclic_perms(n)
+    #print(len(gens))
+
+    return
 
     solver = Solver()
     Add = solver.add
@@ -180,23 +212,23 @@ def test_cyclic():
     gen = []
     while 1:
         result = solver.check()
-        if str(result) != "sat":
+        result = str(result)
+        if result == "unsat":
             break
+        elif result == "unknown":
+            return
     
         model = solver.model()
         _U = U.get_interp(model)
         _V = V.get_interp(model)
     
-        #print(_U)
-        #print()
+        print(_U)
+        print()
         gen.append(_U)
         Add(U != _U)
         count += 1
-    
-        U2 = zeros2(nn,nn)
-        U2[0:nn:2, 0:nn:2] = _U
-        U2[1:nn:2, 1:nn:2] = _V
-        U2 = Matrix(U2)
+
+        U2 = css_to_sp(_U, _V)
     
         assert space.is_symplectic(U2)
         #print(U2)
@@ -213,8 +245,8 @@ def test_cyclic():
 
 
 
-
-def test_lw():
+def main_lw():
+    # [[63,51,3]]
     code = QCode.fromstr("""
     XXXIIIIXIIXIIIXXIXXIIXIXXIXIXXXIXXXXIIXXIIIXIXIXIIXXXXXXIXIIIII
     ZZZIIIIZIIZIIIZZIZZIIZIZZIZIZZZIZZZZIIZZIIIZIZIZIIZZZZZZIZIIIII

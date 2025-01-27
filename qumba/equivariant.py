@@ -97,6 +97,71 @@ def find_equivariant(X):
         yield code
 
 
+def find_equivariant_sd(X):
+    G = X.G
+    n = len(X)
+    print("find_equivariant_sd", n)
+
+    perms = []
+    for g in G:
+        send = X(g)
+        items = send.items # Coset's
+        lookup = dict((v,k) for (k,v) in enumerate(items))
+        send = {i:lookup[send[items[i]]] for i in range(len(items))}
+        assert len(send) == n
+        perms.append(send)
+
+    solver = Solver()
+    Add = solver.add
+
+    h = UMatrix.unknown(n)
+
+    # we have a transitive G action, so we can fix the 0 bit:
+    h[0] = 1
+
+    H = [[h[g[i]] for i in range(n)] for g in perms]
+    H = UMatrix(H)
+
+    c = H * h.t
+    Add(c==0)
+
+    weight = lambda h : Sum([If(h[i].get(),1,0) for i in range(1, n)])+1
+    row_weight = argv.get("row_weight")
+    print("row_weight:", row_weight)
+    if row_weight is not None:
+        Add(weight(h) <= row_weight)
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("unsat")
+            return
+    
+        model = solver.model()
+        _h = h.get_interp(model)
+
+        #Add(hx != _hx)
+        #Add(hz != _hz)
+    
+        #hx = Hx[0]
+        #print("hx:", _hx)
+        #print("hz:", _hz)
+    
+        Hx = Matrix([[_h[g[i]] for i in range(n)] for g in perms])
+        for _h in Hx:
+            Add(h != _h)
+        Hx = Hx.linear_independent()
+        Hz = Hx
+    
+        code = csscode.CSSCode(Hx=Hx.A, Hz=Hz.A)
+        if code.k == 0:
+            print(".", end="", flush=True)
+            continue
+
+        code.bz_distance()
+        yield code
+
+
 def fail_search_equivarant(X):
     G = X.G
     n = len(X)
@@ -451,11 +516,15 @@ def test_equivariant():
 #        X = G.action_subgroup(H)
     show = argv.show
 
+    find = find_equivariant
+    if argv.sd:
+        find = find_equivariant_sd
+
     found = {}
     for X in Xs:
         count = 0
-        for code in unique_css(find_equivariant(X), found=found):
-            print(code, end="\t")
+        for code in unique_css(find(X), found=found):
+            print(code, end="\t", flush=True)
             count += 1
             if count % 6 == 0:
                 print()

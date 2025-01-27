@@ -77,6 +77,9 @@ class Clifford:
     def CNOT(self, i=0, j=1):
         return Circuit(self.n, ("CNOT", i, j))
 
+    def CZ(self, i=0, j=1):
+        return Circuit(self.n, ("CZ", i, j))
+
 
 
 
@@ -102,13 +105,21 @@ def test():
     c = Clifford(2)
     I, X0, Z0, H0, S0 = c.I(), c.X(0), c.Z(0), c.H(0), c.S(0)
     X1, Z1, H1, S1 = c.X(1), c.Z(1), c.H(1), c.S(1)
+    CX, CZ = c.CNOT, c.CZ
     CNOT = c.CNOT(0, 1)
 
     assert CNOT != I
     assert CNOT*CNOT == I
 
-    G = mulclose([S0, S1, H0, H1, CNOT], verbose=True)
-    print(len(G))
+    #G = mulclose([S0, S1, H0, H1, CNOT], verbose=True)
+    #print(len(G))
+
+    # from Bravyi, Maslov:
+    lhs = CX(1,0)*H0*CX(1,0)
+    rhs = CZ(0,1)*H0*CZ(0,1)*Z1
+    assert lhs == rhs
+
+
 
 
 if __name__ == "__main__":
