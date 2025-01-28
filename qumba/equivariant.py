@@ -5,7 +5,7 @@ _looking for transversal logical clifford operations
 
 from functools import reduce
 from operator import add, matmul, mul
-from random import shuffle
+from random import shuffle, choice
 
 import numpy
 
@@ -23,7 +23,8 @@ from qumba import autos
 from qumba.unwrap import unwrap, Cover
 from qumba.argv import argv
 from qumba.umatrix import UMatrix
-
+from qumba.lin import zeros2
+from qumba.csscode import CSSCode
 
 
 def find_equivariant(X):
@@ -544,8 +545,81 @@ def two_block():
 
     G = get_group()
     print(G)
+    perms = list(G)
+    perms.sort(key = str)
+    lookup = {p:i for (i,p) in enumerate(perms)}
 
     n = len(G)
+
+    def left(g):
+        L = zeros2(n,n)
+        for i in range(n):
+            h = g*perms[i]
+            j = lookup[h]
+            L[i,j] = 1
+        return Matrix(L)
+
+    def right(g):
+        R = zeros2(n,n)
+        for i in range(n):
+            h = perms[i]*g
+            j = lookup[h]
+            R[i,j] = 1
+        return Matrix(R)
+
+    for g in G:
+      for h in G:
+        L = left(g)
+        R = right(h)
+        assert L*R == R*L
+
+#    for g in G:
+#        print(left(g),'\n')
+    lb = [left(g) for g in G]
+    rb = [right(g) for g in G]
+
+    found = set()
+    w = argv.get("w", 2)
+    while 1:
+        ll = list(lb)
+        shuffle(ll)
+        L = reduce(add, ll[:w])
+        #print(L)
+
+        rr = list(rb)
+        shuffle(rr)
+        R = reduce(add, rr[:w])
+        #print(R)
+
+        assert L*R == R*L
+
+        #L = L.linear_independent()
+        #R = R.linear_independent()
+
+        Hx = L.concatenate(R, axis=1)
+        #print(Hx, Hx.shape)
+
+        Hz = R.t.concatenate(L.t, axis=1)
+        #print(Hz, Hz.shape)
+
+        Hx = Hx.linear_independent()
+        Hz = Hz.linear_independent()
+
+        code = CSSCode(Hx=Hx.A, Hz=Hz.A, check=True)
+        if code.k == 0:
+            continue
+        code.bz_distance()
+        if code.dx <= 2 or code.dz <= 2:
+            continue
+
+        s = str(code)
+        if s not in found:
+            print(s)
+            #print(Hx)
+            print(Hx.sum(1))
+            found.add(s)
+
+        #break
 
 
 

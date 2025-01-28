@@ -286,9 +286,10 @@ class Matrix(object):
     def sum(self, axis=None):
         A = self.A
         B = A.sum(axis=axis, dtype=numpy.int64)
-        if axis is None:
-            return B
-        return Matrix(B) # ??
+        #if axis is None:
+        #    return B
+        #return Matrix(B) # ??
+        return B
 
     def kernel(self):
         K = kernel(self.A)
