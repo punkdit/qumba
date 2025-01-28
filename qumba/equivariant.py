@@ -25,6 +25,7 @@ from qumba.argv import argv
 from qumba.umatrix import UMatrix
 from qumba.lin import zeros2
 from qumba.csscode import CSSCode
+from qumba import unwrap
 
 
 def find_equivariant(X):
@@ -578,16 +579,24 @@ def two_block():
     lb = [left(g) for g in G]
     rb = [right(g) for g in G]
 
+    idxs = list(range(len(G)))
+
     found = set()
     w = argv.get("w", 2)
     while 1:
-        ll = list(lb)
-        shuffle(ll)
+
+        shuffle(idxs)
+        ll = [lb[i] for i in idxs]
+        shuffle(idxs)
+        rr = [rb[i] for i in idxs]
+
+        #ll = list(lb)
+        #shuffle(ll)
         L = reduce(add, ll[:w])
         #print(L)
 
-        rr = list(rb)
-        shuffle(rr)
+        #rr = list(rb)
+        #shuffle(rr)
         R = reduce(add, rr[:w])
         #print(R)
 
@@ -606,6 +615,7 @@ def two_block():
         Hz = Hz.linear_independent()
 
         code = CSSCode(Hx=Hx.A, Hz=Hz.A, check=True)
+        #print(code)
         if code.k == 0:
             continue
         code.bz_distance()
@@ -619,7 +629,23 @@ def two_block():
             print(Hx.sum(1))
             found.add(s)
 
-        #break
+        code = code.to_qcode()
+        n = code.n
+        dode = code.apply_H()
+        f = list(range(n//2, n)) + list(range(n//2))
+        #for i in range(n//2):
+            #f.append(i)
+        dode = dode.apply_perm(f)
+        if not dode.is_equiv(code):
+            continue
+
+        perm = Perm(f, list(range(n)))
+        cover = unwrap.Cover.fromzx(code, perm)
+        print(code)
+        print(cover.base)
+        print(cover.base.longstr())
+
+        break
 
 
 
