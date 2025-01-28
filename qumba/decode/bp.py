@@ -11,7 +11,7 @@ from random import *
 import numpy
 import numpy.random as ra
 
-from qumba.solve import shortstr, dot2, solve, array2, linear_independent, rank
+from qumba.lin import shortstr, dot2, solve, array2, linear_independent, rank
 from qumba.argv import argv
 
 

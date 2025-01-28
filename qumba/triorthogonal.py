@@ -18,7 +18,7 @@ from qumba.csscode import CSSCode
 from qumba.matrix import Matrix
 from qumba.qcode import QCode
 from qumba import construct
-from qumba.solve import zeros2, parse
+from qumba.lin import zeros2, parse
 
 
 def dump_transverse(Hx, Lx, t=3):

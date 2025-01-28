@@ -14,7 +14,7 @@ from math import prod
 
 import numpy
 
-from qumba.solve import zeros2, solve
+from qumba.lin import zeros2, solve
 from qumba.smap import SMap
 from qumba.matrix import Matrix, DEFAULT_P, pullback
 from qumba.symplectic import SymplecticSpace

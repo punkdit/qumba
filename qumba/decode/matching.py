@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from qumba.solve import dot2
+from qumba.lin import dot2
 
 
 class MatchingDecoder(object):

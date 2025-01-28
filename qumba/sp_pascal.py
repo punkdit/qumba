@@ -23,7 +23,7 @@ from collections import namedtuple
 import numpy
 
 from qumba.argv import argv
-from qumba.solve import parse, shortstr, rank, shortstrx, zeros2, dot2
+from qumba.lin import parse, shortstr, rank, shortstrx, zeros2, dot2
 from qumba.util import cross, allperms
 from qumba.smap import SMap
 

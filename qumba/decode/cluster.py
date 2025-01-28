@@ -8,8 +8,8 @@ import time
 import numpy
 import numpy.random as ra
 
-from qumba import solve
-from qumba.solve import shortstrx, shortstr, array2
+from qumba import lin
+from qumba.lin import shortstrx, shortstr, array2
 from qumba.decode import dynamic
 from qumba.tool import write
 

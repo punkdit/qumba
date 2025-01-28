@@ -1391,7 +1391,7 @@ def test_cube():
 
 
 def get_edge_code(cx):
-    from qumba.solve import (parse, rank, row_reduce, shortstr, normal_form,
+    from qumba.lin import (parse, rank, row_reduce, shortstr, normal_form,
         kernel, eq2, zeros2, intersect, dot2)
 
     #print("get_edge_code")

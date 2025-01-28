@@ -10,7 +10,7 @@ from operator import add, mul, matmul
 
 import numpy
 
-from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
+from qumba.lin import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum, zeros2, solve2, normal_form)
 from qumba.matrix import Matrix
 from qumba.qcode import QCode, SymplecticSpace, strop

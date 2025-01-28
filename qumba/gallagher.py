@@ -5,8 +5,8 @@ from random import shuffle
 import numpy
 
 from qumba.csscode import CSSCode
-from qumba import solve
-from qumba.solve import zeros2, identity2, dot2, shortstr, parse
+from qumba import lin
+from qumba.lin import zeros2, identity2, dot2, shortstr, parse
 from qumba.argv import argv
 
 write = lambda *arg : print(*arg, end="", flush=True)
@@ -15,7 +15,7 @@ write = lambda *arg : print(*arg, end="", flush=True)
 def classical_distance(H, max_dist=0):
     n = H.shape[1]
     dist = n
-    K = solve.kernel(H)
+    K = lin.kernel(H)
     K = numpy.array(K)
     Kt = K.transpose()
     for u in numpy.ndindex((2,)*K.shape[0]):
@@ -49,7 +49,7 @@ def make_gallagher(r, n, l, m, distance=0, verbose=False):
             H[(r//l)*i:(r//l)*(i+1), :] = H2
             shuffle(idxs)
             H2 = H2[:, idxs]
-        Hli = solve.linear_independent(H)
+        Hli = lin.linear_independent(H)
         k = Hli.shape[0] - Hli.shape[1]
         assert k <= 24, "ummm, too big? k = %d" % k
         if distance is None:
@@ -121,17 +121,17 @@ def hypergraph_product(H1, H2):
     Lx = None
     Lz = None
 
-    L1 = solve.kernel(H1)
+    L1 = lin.kernel(H1)
     L1t = L1.transpose()
     #print("H1:", H1.shape)
 
-    L2 = solve.kernel(H2)
+    L2 = lin.kernel(H2)
     L2t = L2.transpose()
 
     Lzt = None
 
     if 0:
-        S1t = solve.pseudo_inverse(L1)
+        S1t = lin.pseudo_inverse(L1)
         S1 = S1t.transpose()
         print("L1:", L1.shape)
         print("S1t:", S1t.shape)
@@ -173,7 +173,7 @@ def hypergraph_product(H1, H2):
     if 0:
         print("H2.transpose()")
         print(H2.transpose())
-        L2 = solve.kernel(H2.transpose())
+        L2 = lin.kernel(H2.transpose())
         L2t = L2.transpose()
     
         print("L2:")
@@ -2022,7 +2022,7 @@ def get_code(name, **kw):
     if H1 is None:
         return
 
-    H1 = H1.astype(solve.int_scalar)
+    H1 = H1.astype(lin.int_scalar)
 
     n = H1.shape[1]
     k = n-H1.shape[0]
@@ -2032,14 +2032,14 @@ def get_code(name, **kw):
     print("[%d, %d, %s]" % (n, k, d))
     girth = find_girth(H1)
     print("girth =", girth)
-    print("rank =", solve.rank(H1))
+    print("rank =", lin.rank(H1))
     #print(repr(H1))
     H2 = H1.transpose()
     Hx, Hz, Lx, Lz = hypergraph_product(H1, H2)
 
-    P = solve.get_reductor(Hz)
+    P = lin.get_reductor(Hz)
     Lz = dot2(P, Lz.transpose()).transpose()
-    Lz = solve.linear_independent(Lz)
+    Lz = lin.linear_independent(Lz)
 
     check = argv.check
     build = argv.build
@@ -2061,9 +2061,9 @@ def get_code(name, **kw):
         #print("Lz:")
         #print(shortstr(Lz))
     
-        A = solve.solve(code.Lz.transpose(), Lz.transpose())
+        A = lin.solve(code.Lz.transpose(), Lz.transpose())
         assert A is not None
-        A = solve.solve(Lz.transpose(), code.Lz.transpose())
+        A = lin.solve(Lz.transpose(), code.Lz.transpose())
         assert A is not None
 
     return code

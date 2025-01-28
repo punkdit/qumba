@@ -15,8 +15,8 @@ import numpy, sys
 numpy.set_printoptions(threshold=sys.maxsize)
 from numpy import zeros, dot, concatenate
 
-from qumba import solve 
-from qumba.solve import (
+from qumba import lin 
+from qumba.lin import (
     array2, zeros2, shortstr, dot2, solve2, linear_independent, row_reduce, kernel,
     span, intersect, rank, enum2, shortstrx, identity2, eq2, pseudo_inverse)
 from qumba.matrix import Matrix, flatten
@@ -32,7 +32,7 @@ def parse(s):
     s = s.replace("I", "0")
     for c in "[],":
         s = s.replace(c, '')
-    return solve.parse(s)
+    return lin.parse(s)
 
 
 def fromstr(Hs):

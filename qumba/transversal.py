@@ -1558,7 +1558,7 @@ def test_822_state_prep():
 
 def test_hexagons():
     "how do dehn twists act on hexagons?"
-    from qumba.solve import (
+    from qumba.lin import (
         parse, rank, array2, zeros2, 
         shortstr, linear_independent, intersect,
         dot2,

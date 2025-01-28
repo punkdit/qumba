@@ -7,7 +7,7 @@ from operator import add
 import numpy
 import numpy.random as ra
 
-from qumba.solve import shortstr, zeros2, array2, dot2, parse, linear_independent, solve, rank
+from qumba.lin import shortstr, zeros2, array2, dot2, parse, linear_independent, solve, rank
 from qumba.argv import argv
 
 from qumba import construct

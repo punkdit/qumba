@@ -6,7 +6,7 @@ from functools import reduce, cache
 
 import numpy
 
-from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
+from qumba.lin import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum)
 from qumba.qcode import QCode, SymplecticSpace, strop, Matrix, fromstr
 from qumba.csscode import CSSCode, find_logicals
@@ -676,7 +676,7 @@ def test_spider():
     CNOT = s2.get_CNOT()
     CZ = s2.get_CZ()
 
-    from qumba.solve import shortstr
+    from qumba.lin import shortstr
     from qumba.clifford import Clifford, Matrix, K, r2
     c2 = Clifford(2)
     c4 = Clifford(4)

@@ -1172,7 +1172,7 @@ def main_hopf():
 
 
 def css_get_wenum(code):
-    from qumba.solve import dot2
+    from qumba.lin import dot2
     css = code.to_css()
     Hz = css.Hz
     Lz = css.Lz

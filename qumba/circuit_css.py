@@ -11,9 +11,9 @@ import pickle
 
 import numpy
 
-from qumba import solve
-solve.int_scalar = numpy.int32 # qupy.solve
-from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
+from qumba import lin
+lin.int_scalar = numpy.int32 # qupy.lin
+from qumba.lin import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum, row_reduce)
 from qumba.qcode import QCode, SymplecticSpace, strop, fromstr
 from qumba.csscode import CSSCode, find_logicals

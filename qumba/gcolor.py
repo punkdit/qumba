@@ -11,8 +11,8 @@ from random import randint, shuffle
 
 import numpy
 
-from qumba.solve import zeros2, shortstr, dot2, parse, array2, shortstrx
-from qumba.solve import find_logops, span, eq2, linear_independent, rank, solve
+from qumba.lin import zeros2, shortstr, dot2, parse, array2, shortstrx
+from qumba.lin import find_logops, span, eq2, linear_independent, rank, solve
 from qumba.argv import argv
     
 from qumba.csscode import CSSCode

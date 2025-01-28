@@ -536,6 +536,18 @@ def test_equivariant():
     
 
 
+def two_block():
+    """
+    Construct two-block group algebra codes
+    # ref: https://arxiv.org/abs/2306.16400
+    """
+
+    G = get_group()
+    print(G)
+
+    n = len(G)
+
+
 
 if __name__ == "__main__":
     from time import time

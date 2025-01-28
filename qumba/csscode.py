@@ -13,11 +13,11 @@ from numpy.linalg import lstsq
 from numpy import concatenate as cat
 dot = numpy.dot
 
-from qumba import solve
+from qumba import lin
 from qumba import qcode
 from qumba.qcode import QCode, SymplecticSpace
 from qumba.isomorph import Tanner, search
-from qumba.solve import (
+from qumba.lin import (
     shortstr, shortstrx, eq2, dot2, compose2, rand2, enum2,
     pop2, insert2, append2, array2, zeros2, identity2, rank, linear_independent)
 from qumba.action import Perm
@@ -314,10 +314,10 @@ class CSSCode(object):
         Hx, Hz = self.Hx, self.Hz
         if eq2(Hx, Hz):
             return True
-        A = solve.solve(Hx.transpose(), Hz.transpose())
+        A = lin.solve(Hx.transpose(), Hz.transpose())
         if A is None:
             return False
-        A = solve.solve(Hz.transpose(), Hx.transpose())
+        A = lin.solve(Hz.transpose(), Hx.transpose())
         if A is None:
             return False
         return True
@@ -359,7 +359,7 @@ class CSSCode(object):
 
         #print "build_stab"
         #print shortstr(Gx)
-        #vs = solve.kernel(Gx)
+        #vs = lin.kernel(Gx)
         #vs = list(vs)
         #print "kernel Gx:", len(vs)
     
@@ -367,22 +367,22 @@ class CSSCode(object):
     
         if Hz is None:
             A = dot2(Gx, Gz.transpose())
-            vs = solve.kernel(A)
+            vs = lin.kernel(A)
             vs = list(vs)
             #print "kernel GxGz^T:", len(vs)
             Hz = zeros2(len(vs), n)
             for i, v in enumerate(vs):
                 Hz[i] = dot2(v.transpose(), Gz) 
-        Hz = solve.linear_independent(Hz)
+        Hz = lin.linear_independent(Hz)
     
         if Hx is None:
             A = dot2(Gz, Gx.transpose())
-            vs = solve.kernel(A)
+            vs = lin.kernel(A)
             vs = list(vs)
             Hx = zeros2(len(vs), n)
             for i, v in enumerate(vs):
                 Hx[i] = dot2(v.transpose(), Gx)
-        Hx = solve.linear_independent(Hx)
+        Hx = lin.linear_independent(Hx)
 
         if check:
             check_commute(Hz, Hx)
@@ -390,29 +390,29 @@ class CSSCode(object):
             check_commute(Hx, Gz)
 
         #Gxr = numpy.concatenate((Hx, Gx))
-        #Gxr = solve.linear_independent(Gxr)
+        #Gxr = lin.linear_independent(Gxr)
         #print(Hx.shape)
         #assert rank(Hx) == len(Hx)
         #assert eq2(Gxr[:len(Hx)], Hx)
         #Gxr = Gxr[len(Hx):]
 
-        Px = solve.get_reductor(Hx).transpose()
+        Px = lin.get_reductor(Hx).transpose()
         Gxr = dot2(Gx, Px)
-        Gxr = solve.linear_independent(Gxr)
+        Gxr = lin.linear_independent(Gxr)
     
         #Gzr = numpy.concatenate((Hz, Gz))
-        #Gzr = solve.linear_independent(Gzr)
+        #Gzr = lin.linear_independent(Gzr)
         #assert eq2(Gzr[:len(Hz)], Hz)
         #Gzr = Gzr[len(Hz):]
 
-        Pz = solve.get_reductor(Hz).transpose()
+        Pz = lin.get_reductor(Hz).transpose()
         Gzr = dot2(Gz, Pz)
-        Gzr = solve.linear_independent(Gzr)
+        Gzr = lin.linear_independent(Gzr)
     
         if Lx is None:
-            Lx = solve.find_logops(Gz, Hx)
+            Lx = lin.find_logops(Gz, Hx)
         if Lz is None:
-            Lz = solve.find_logops(Gx, Hz)
+            Lz = lin.find_logops(Gx, Hz)
 
         print('\n')
 
@@ -421,7 +421,7 @@ class CSSCode(object):
         assert len(Gxr)==len(Gzr)
         kr = len(Gxr)
         V = dot2(Gxr, Gzr.transpose())
-        U = solve.solve(V, identity2(kr))
+        U = lin.solve(V, identity2(kr))
         assert U is not None
         Gzr = dot2(U.transpose(), Gzr)
 
@@ -450,8 +450,8 @@ class CSSCode(object):
             _write = lambda *args : None
     
         _write('li:')
-        self.Hx = Hx = solve.linear_independent(Hx)
-        self.Hz = Hz = solve.linear_independent(Hz)
+        self.Hx = Hx = lin.linear_independent(Hx)
+        self.Hz = Hz = lin.linear_independent(Hz)
     
         mz, n = Hz.shape
         mx, nx = Hx.shape
@@ -466,7 +466,7 @@ class CSSCode(object):
     
         if Lz is None:
             _write('find_logops(Lz):')
-            Lz = solve.find_logops(Hx, Hz, verbose=verbose)
+            Lz = lin.find_logops(Hx, Hz, verbose=verbose)
             #print shortstr(Lz)
             #_write(len(Lz))
 
@@ -479,7 +479,7 @@ class CSSCode(object):
         # Find Lx --------------------------
         if Lx is None:
             _write('find_logops(Lx):')
-            Lx = solve.find_logops(Hz, Hx, verbose=verbose)
+            Lx = lin.find_logops(Hz, Hx, verbose=verbose)
 
         assert len(Lx)==k
 
@@ -490,7 +490,7 @@ class CSSCode(object):
 
         U = dot2(Lz, Lx.transpose())
         I = identity2(k)
-        A = solve.solve(U, I)
+        A = lin.solve(U, I)
         assert A is not None, "problem with logops: %s"%(U,)
         #assert eq2(dot2(U, A), I)
         #assert eq2(dot2(Lz, Lx.transpose(), A), I)
@@ -510,7 +510,7 @@ class CSSCode(object):
             B = zeros2(mx+k, mx)
             B[:mx] = identity2(mx)
     
-            Tz_t = solve.solve(U, B)
+            Tz_t = lin.solve(U, B)
             Tz = Tz_t.transpose()
             assert len(Tz) == mx
     
@@ -526,7 +526,7 @@ class CSSCode(object):
     
             B = zeros2(n, mz)
             B[:mz] = identity2(mz)
-            Tx_t = solve.solve(U, B)
+            Tx_t = lin.solve(U, B)
             Tx = Tx_t.transpose()
     
             _write('\n')
@@ -592,7 +592,7 @@ class CSSCode(object):
             #print(shortstr(Hz))
             if rank(Hz) < mz:
                 continue
-            kern = numpy.array(solve.kernel(Hz))
+            kern = numpy.array(lin.kernel(Hz))
             #print("kern:", kern.shape)
     
             Hx = zeros2(mx, n)
@@ -664,10 +664,10 @@ class CSSCode(object):
             return False
         if self.d is not None and other.d is not None and self.d != other.d:
             return False
-        A = solve.solve(self.Hx.transpose(), other.Hx.transpose())
+        A = lin.solve(self.Hx.transpose(), other.Hx.transpose())
         if A is None:
             return False
-        A = solve.solve(self.Hz.transpose(), other.Hz.transpose())
+        A = lin.solve(self.Hz.transpose(), other.Hz.transpose())
         if A is None:
             return False
         return True
@@ -807,9 +807,9 @@ class CSSCode(object):
         return code
 
     def x_distance(self, min_d=1):
-        Lx = [v for v in solve.span(self.Lx) if v.sum()]
+        Lx = [v for v in lin.span(self.Lx) if v.sum()]
         dx = self.n
-        for u in solve.span(self.Hx):
+        for u in lin.span(self.Hx):
             for v in Lx:
                 w = (u+v)%2
                 d = w.sum()
@@ -820,9 +820,9 @@ class CSSCode(object):
         return dx
 
     def z_distance(self, min_d=1):
-        Lz = [v for v in solve.span(self.Lz) if v.sum()]
+        Lz = [v for v in lin.span(self.Lz) if v.sum()]
         dz = self.n
-        for u in solve.span(self.Hz):
+        for u in lin.span(self.Hz):
             for v in Lz:
                 w = (u+v)%2
                 d = w.sum()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from qumba.solve import parse
+from qumba.lin import parse
 
 
 lattices = [

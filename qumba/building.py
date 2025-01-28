@@ -24,9 +24,9 @@ from math import prod
 
 import numpy
 
-from qumba.solve import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
+from qumba.lin import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
     kernel, span)
-from qumba.solve import int_scalar as scalar
+from qumba.lin import int_scalar as scalar
 from qumba.action import mulclose
 from qumba.matrix import Matrix, DEFAULT_P
 from qumba.argv import argv

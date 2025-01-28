@@ -7,7 +7,7 @@ from operator import add
 
 import numpy
 
-from qumba.solve import (parse, shortstr, linear_independent, eq2, dot2, identity2,
+from qumba.lin import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     zeros2, rank, rand2, pseudo_inverse, kernel, direct_sum, span)
 from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr
 from qumba.csscode import CSSCode, find_zx_duality

@@ -15,11 +15,11 @@ from math import prod
 import numpy
 
 from qumba.default_p import DEFAULT_P
-from qumba.solve import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
+from qumba.lin import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
     kernel, span, pseudo_inverse, rank, row_reduce, linear_independent, rand2, parse,
     normal_form,)
-from qumba.solve import int_scalar as scalar
-from qumba import solve
+from qumba.lin import int_scalar as scalar
+from qumba import lin
 from qumba.action import mulclose
 from qumba.decode.network import TensorNetwork
 
@@ -301,7 +301,7 @@ class Matrix(object):
     __invert__ = pseudo_inverse
 
     def solve(self, other):
-        A = solve.solve(self.A, other.A)
+        A = lin.solve(self.A, other.A)
         return Matrix(A) if A is not None else None
 
     def where(self):
@@ -448,14 +448,14 @@ def pushout(j, k, j1=None, k1=None):
     if j1 is not None:
         J1 = j1.A
         K1 = k1.A
-        JJ, KK, F = solve.pushout(J, K, J1, K1)
+        JJ, KK, F = lin.pushout(J, K, J1, K1)
         jj = Matrix(JJ)
         kk = Matrix(KK)
         f = Matrix(F)
         return jj, kk, f
 
     else:
-        JJ, KK = solve.pushout(J, K)
+        JJ, KK = lin.pushout(J, K)
         jj = Matrix(JJ)
         kk = Matrix(KK)
         return jj, kk

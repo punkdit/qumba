@@ -10,7 +10,7 @@ from qumba.argv import argv
 from qumba.qcode import QCode, strop
 from qumba.csscode import distance_z3
 from qumba.symplectic import SymplecticSpace
-from qumba.solve import shortstr, linear_independent, dot2, solve
+from qumba.lin import shortstr, linear_independent, dot2, solve
 from qumba.action import mulclose_find
 from qumba.transversal import Solver, UMatrix, And, Or, one, Sum, If
 

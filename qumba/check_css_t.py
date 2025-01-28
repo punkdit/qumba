@@ -9,7 +9,7 @@ git clone git@github.com:RodrigoSanJose/Cyclic-CSS-T.git
 import os
 import numpy
 from qumba.csscode import CSSCode, distance_z3
-from qumba.solve import rank, dot2, shortstr, kernel
+from qumba.lin import rank, dot2, shortstr, kernel
 
 
 def dump_transverse(Hx, Lx, t=3):
@@ -110,7 +110,7 @@ def main_asym():
         rows = Hx = Hz = None
         return
 
-def main_code():
+def main_code_lins():
     from qumba.qcode import QCode
     # list(lins_db.db.keys()) [(4, 8, 8), (3, 3, 6), (4, 3, 4),]
     code = QCode.fromstr("""
@@ -146,6 +146,14 @@ Z...Z.ZZ....Z....ZZ......Z......
     Hs = open("Hs.out").read()
     code = QCode.fromstr(Hs)
     print(code)
+    css = code.to_css()
+    print(css.bz_distance())
+    dump_transverse(css.Hx, css.Lx)
+
+def main_code():
+    from qumba.qcode import QCode
+    code = QCode.fromstr("""
+    """)
     css = code.to_css()
     print(css.bz_distance())
     dump_transverse(css.Hx, css.Lx)

@@ -21,7 +21,7 @@ from sage.all_cmdline import (FiniteField, CyclotomicField, latex, block_diagona
     PolynomialRing)
 from sage import all_cmdline 
 
-from qumba.solve import zeros2, identity2
+from qumba.lin import zeros2, identity2
 from qumba.action import mulclose, mulclose_names, mulclose_find
 from qumba.argv import argv
 

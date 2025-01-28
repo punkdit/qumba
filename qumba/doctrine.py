@@ -4,7 +4,7 @@ from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
 from operator import add, mul, matmul
 
-from qumba.solve import kernel, dot2, normal_form, enum2, shortstr
+from qumba.lin import kernel, dot2, normal_form, enum2, shortstr
 from qumba.clifford import Clifford, green, red, I, r2, half
 from qumba.qcode import QCode, strop, Matrix
 from qumba.construct import all_codes

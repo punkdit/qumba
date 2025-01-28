@@ -17,8 +17,8 @@ gc.enable()
 #gc.set_debug(gc.DEBUG_LEAK)
 
 
-from qumba import solve
-from qumba.solve import shortstr, shortstrx, eq2, dot2, array2, zeros2
+from qumba import lin
+from qumba.lin import shortstr, shortstrx, eq2, dot2, array2, zeros2
 #from qumba.tree import Tree
 from qumba.tool import write
 

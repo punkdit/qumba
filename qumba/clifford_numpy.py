@@ -19,7 +19,7 @@ cache = lru_cache(maxsize=None)
 
 import numpy
 
-from qumba.solve import zeros2, identity2, shortstr
+from qumba.lin import zeros2, identity2, shortstr
 from qumba.action import mulclose
 from qumba.argv import argv
 

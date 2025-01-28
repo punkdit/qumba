@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 #import numpy
-from qumba.solve import zeros2
+from qumba.lin import zeros2
 
 from qumba.argv import argv
 from qumba.matrix import Matrix
