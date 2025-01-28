@@ -5,7 +5,7 @@ from qumba.solve import zeros2
 
 from qumba.argv import argv
 from qumba.matrix import Matrix
-from qumba.umatrix import UMatrix, Solver, PbEq, PbLe
+from qumba.umatrix import UMatrix, Solver, PbEq, PbLe, PbGe
 from qumba.cyclic import get_cyclic_perms
 from qumba.qcode import QCode, SymplecticSpace
 from qumba.action import mulclose
@@ -242,6 +242,150 @@ def main_cyclic():
 
     G = mulclose(gen, verbose=True)
     print(len(G))
+
+
+def main_20():
+    H = Matrix.parse("""
+    1........1.11.1111..
+    .1.......1..11..1111
+    ..1.......11.11.111.
+    ...1......1.1111.1.1
+    ....1....11.1...1111
+    .....1...1.1..1111.1
+    ......1...11.1.1111.
+    .......1.1.1......1.
+    ........1.1.11111..1
+    """)
+
+    print(H.shape)
+    m, n = H.shape
+    assert (H*H.t).sum() == 0
+
+    solver = Solver()
+    add = solver.add
+
+    U = UMatrix.unknown(n,n)
+    for i in range(n):
+        add( PbEq([(U[i,j].get(),True) for j in range(n)], 1) )
+        add( U[i,i] == False ) # fixed-point free
+    #for i in range(n):
+    #    #add( PbGe([(U[i,j].get(),True) for j in range(n)], 1) )
+    #    add( PbLe([(U[i,j].get(),True) for j in range(n)], 3) )
+    #    add( PbLe([(U[j,i].get(),True) for j in range(n)], 3) )
+    #    add( U[i,i] == True )
+
+    I = Matrix.get_identity(n)
+    #add(U*U.t == I)
+    add(U*U == I) # involution
+
+    #Ui = UMatrix.unknown(n,n)
+    #add(U*Ui == I)
+
+    Im = Matrix.get_identity(m)
+    Um = UMatrix.unknown(m,m)
+    Vm = UMatrix.unknown(m,m)
+    add(Um*Vm == Im)
+    
+    add(H*U.t == Um*H)
+    #add(H*Ui == Vm*H)
+
+    code = QCode.build_css(H,H)
+    space = code.space
+
+    print(code.is_cyclic())
+
+    ops = [space.get_S(), space.get_H()]
+    assert len(mulclose(ops)) == 6
+
+    #CX = space.CX(6,3)
+    #A = CX[::2, ::2]
+    #print(A)
+    #assert CX == css_to_sp(A)
+    #return
+
+    def get_pairs(U):
+        pairs = []
+        for i in range(n):
+          for j in range(i+1,n):
+            if U[i,j]:
+                assert U[j,i]
+                pairs.append((i,j))
+        return pairs
+
+    gen = set()
+    for g in ops:
+        dode = g*code
+        l = dode.get_logical(code)
+        gen.add(l)
+        print(l, l.shape)
+        print(SymplecticSpace(2).get_name(l))
+
+    #print(code.longstr())
+
+    count = 0
+    while 1:
+        
+        result = solver.check()
+        result = str(result)
+        if result == "unsat":
+            break
+        elif result == "unknown":
+            return
+    
+        model = solver.model()
+        U1 = U.get_interp(model)
+        add(U != U1)
+
+        #print(U1)
+        #print()
+
+        #U1 = U1 + I
+        #if U1.rank() != n:
+        #    print("/")
+        #    continue
+        #print("+")
+
+        E = css_to_sp(U1)
+        assert space.is_symplectic(E)
+
+        V1 = Um.get_interp(model)
+        assert ~V1*V1 == Im
+
+        dode = E*code
+        #print(dode.longstr())
+        assert dode.is_equiv(code)
+
+        l = dode.get_logical(code)
+        if l not in gen:
+            gen.add(l)
+            G = mulclose(gen)
+            print(len(G))
+
+        count += 1
+        #print(".", end="", flush=True)
+        pairs = get_pairs(U1)
+        print(pairs)
+        op = space.get_identity()
+        for (i,j) in pairs:
+            op = op*space.CZ(i,j)
+            #op = op*space.CX(i,j)
+            #op = op*space.SWAP(i,j)
+        dode = op*code
+        assert dode.is_equiv(code)
+
+        l = dode.get_logical(code)
+        if l not in gen:
+            gen.add(l)
+            G = mulclose(gen)
+            print(len(G))
+            return
+
+        #break
+
+    print()
+
+    print(count)
+    
 
 
 
