@@ -12,10 +12,12 @@ import numpy
 import z3
 from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, ForAll
 
+from bruhat.action import mulclose, Group, Perm, mulclose_find
+
 from qumba.qcode import QCode, SymplecticSpace, fromstr, shortstr, strop
 from qumba.matrix import Matrix, scalar
 from qumba import csscode
-from qumba.action import mulclose, Group, Perm, mulclose_find
+#from qumba.action import mulclose, Group, Perm, mulclose_find
 from qumba.util import allperms
 from qumba import equ
 from qumba import construct 
@@ -537,22 +539,6 @@ def test_equivariant():
         #print("found:", count)
     
 
-def test_two_block():
-    G = get_group()
-    w = argv.get("w", 2)
-    print(G)
-    for code in two_block(G, w):
-        print(code)
-
-def all_two_block():
-    from bruhat.small_groups import groups
-    w = argv.get("w", 4)
-    for G in groups:
-        print(len(G), G.desc)
-        for code in two_block(G, w):
-            print("\t%s"%code)
-
-
 def two_block(G, w=2):
     """
     Construct two-block group algebra codes
@@ -661,6 +647,79 @@ def two_block(G, w=2):
             print(cover.base.longstr())
     
             break
+
+
+def test_two_block():
+    G = get_group()
+    w = argv.get("w", 2)
+    print(G)
+    for code in two_block(G, w):
+        print(code)
+
+
+def all_two_block():
+    from bruhat.small_groups import groups
+    w = argv.get("w", 4)
+    for G in groups:
+        print(len(G), G.desc)
+        for code in two_block(G, w):
+            print("\t%s"%code)
+
+
+def test_bimodule():
+    G = Group.symmetric(3)
+    print(G)
+
+    Hs = G.subgroups()
+    print(len(Hs))
+
+#    from bruhat.biset import Biset
+#    for H in Hs:
+#      for J in Hs:
+#        X = Biset.cayley(G, H, J)
+#        print(X)
+
+    for H in Hs:
+        X = G.action_subgroup(H)
+        if len(H) == 1:
+            break
+    print(X)
+
+    items = list(X.items)
+    items.sort(key = str)
+    lookup = {p:i for (i,p) in enumerate(items)}
+    n = len(items)
+
+    def left(g):
+        L = zeros2(n,n)
+        for i,x in enumerate(items):
+            y = X(g)[x]
+            j = lookup[y]
+            L[i,j] = 1
+        return Matrix(L)
+
+    def right(g):
+        return left(~g)
+
+#    for g in G:
+#        print(left(g))
+#        print()
+#
+#    return
+#
+#    def right(g):
+#        R = zeros2(n,n)
+#        for i in range(n):
+#            h = perms[i]*g
+#            j = lookup[h]
+#            R[i,j] = 1
+#        return Matrix(R)
+
+    for g in G:
+      for h in G:
+        L = left(g)
+        R = right(h)
+        assert L*R == R*L
 
 
 
