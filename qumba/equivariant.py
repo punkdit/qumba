@@ -537,15 +537,28 @@ def test_equivariant():
         #print("found:", count)
     
 
+def test_two_block():
+    G = get_group()
+    w = argv.get("w", 2)
+    print(G)
+    for code in two_block(G, w):
+        print(code)
 
-def two_block():
+def all_two_block():
+    from bruhat.small_groups import groups
+    w = argv.get("w", 4)
+    for G in groups:
+        print(len(G), G.desc)
+        for code in two_block(G, w):
+            print("\t%s"%code)
+
+
+def two_block(G, w=2):
     """
     Construct two-block group algebra codes
     # ref: https://arxiv.org/abs/2306.16400
     """
 
-    G = get_group()
-    print(G)
     perms = list(G)
     perms.sort(key = str)
     lookup = {p:i for (i,p) in enumerate(perms)}
@@ -582,8 +595,8 @@ def two_block():
     idxs = list(range(len(G)))
 
     found = set()
-    w = argv.get("w", 2)
-    while 1:
+    #while 1:
+    for trial in range(100):
 
         shuffle(idxs)
         ll = [lb[i] for i in idxs]
@@ -624,28 +637,30 @@ def two_block():
 
         s = str(code)
         if s not in found:
-            print(s)
+            #print(s)
             #print(Hx)
-            print(Hx.sum(1))
+            #print(Hx.sum(1))
             found.add(s)
+            yield code
 
-        code = code.to_qcode()
-        n = code.n
-        dode = code.apply_H()
-        f = list(range(n//2, n)) + list(range(n//2))
-        #for i in range(n//2):
-            #f.append(i)
-        dode = dode.apply_perm(f)
-        if not dode.is_equiv(code):
-            continue
-
-        perm = Perm(f, list(range(n)))
-        cover = unwrap.Cover.fromzx(code, perm)
-        print(code)
-        print(cover.base)
-        print(cover.base.longstr())
-
-        break
+        if 0:
+            code = code.to_qcode()
+            n = code.n
+            dode = code.apply_H()
+            f = list(range(n//2, n)) + list(range(n//2))
+            #for i in range(n//2):
+                #f.append(i)
+            dode = dode.apply_perm(f)
+            if not dode.is_equiv(code):
+                continue
+    
+            perm = Perm(f, list(range(n)))
+            cover = unwrap.Cover.fromzx(code, perm)
+            print(code)
+            print(cover.base)
+            print(cover.base.longstr())
+    
+            break
 
 
 
