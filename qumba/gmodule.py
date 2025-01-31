@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 #import numpy
-from qumba.lin import zeros2
+from qumba.lin import zeros2, identity2
 
 from qumba.argv import argv
 from qumba.matrix import Matrix
@@ -475,6 +475,41 @@ def main_lw():
     L1 = Matrix(o)
     print("rank 21+63+189:", (H.concatenate(L1)).rank() - len(H))
 
+
+def main_cnot():
+    n, m = argv.get("n", 3), argv.get("m", 2)
+    
+    A = zeros2(m, n)
+    for i in range(m):
+        A[i, n-m+i] = 1
+    A = Matrix(A)
+
+    gen = []
+    for i in range(n):
+      for j in range(n):
+        if i==j:
+            continue
+        g = identity2(n)
+        g[i,j] = 1
+        g = Matrix(g)
+        gen.append(g)
+
+    found = set([A])
+    bdy = list(found)
+
+    while bdy:
+        print(len(bdy), end=",", flush=True)
+        _bdy = []
+        for g in gen:
+            for A in bdy:
+                B = A*g
+                B = B.normal_form()
+                if B not in found:
+                    _bdy.append(B)
+                    found.add(B)
+        bdy = _bdy
+    print()
+    print(len(found))
 
 
 
