@@ -486,6 +486,92 @@ def search_equivariant():
         print()
 
 
+
+def make_two_block(L, R):
+    Hx = L.concatenate(R, axis=1)
+    Hz = R.t.concatenate(L.t, axis=1)
+    Hx = Hx.linear_independent()
+    Hz = Hz.linear_independent()
+    code = CSSCode(Hx=Hx.A, Hz=Hz.A, check=True)
+    return code
+
+
+def search_hecke():
+    # build equivariant CSS codes from hecke operators.
+    Hs = None
+    Xs = None
+    n = None
+
+    G = get_group()
+
+    n = argv.get("n", n or len(G))
+    print("|G| =", len(G))
+
+    Hs = [H for H in G.conjugacy_subgroups() if len(H)<len(G)]
+    #Hs = [H for H in G.subgroups()]
+    Hs.sort(key = len)
+    print("indexes:", [len(G)//len(H) for H in Hs])
+    Xs = [G.action_subgroup(H) for H in Hs]
+    print("|Xs| =", len(Xs))
+
+    #for X in Xs:
+    #Y = Xs[16]
+
+    for X in Xs:
+
+        n = len(X)
+        space = SymplecticSpace(n)
+
+        if len(X) == len(G):
+            continue
+
+        if len(X) > 40:
+            continue
+
+        Ms = set()
+        for M in X.hecke(X):
+            M = M.astype(scalar)
+            M = Matrix(M)
+            #M = M.row_reduce()
+            Ms.add(M)
+        print(len(X), len(Ms))
+
+        Ms = list(Ms)
+        Ms.sort(key = lambda M: (len(str(M)), str(M)))
+        #for M in Ms:
+        #    print((M==M.t), (M.t in Ms), end=' ')
+        #print()
+        #continue
+
+        idxs = list(range(len(Ms)))
+        found = set()
+        for wa in [1,2]:
+         for wb in [1,2]:
+          for trial in range(1000):
+            shuffle(Ms)
+            L = reduce(add, Ms[0:wa])
+            R = reduce(add, Ms[wa:wa+wb])
+
+            if L*R != R*L:
+                continue
+
+            css = make_two_block(L, R)
+            if css.k == 0:
+                continue
+            css.bz_distance()
+            if css.d < 3:
+                #print(".", end=" ", flush=True)
+                continue
+            s = str(css)
+            if s not in found:
+                print(s)
+                found.add(s)
+                print(Matrix(css.Hx), css.Hx.sum(1)[0], css.Hx.sum(0)[0], wa, wb)
+            #print(css, end=" ", flush=True)
+            #print("\n"+strop(css.to_qcode().H))
+        print()
+
+
 def test_equivariant():
     # find equivariant CSS codes
 
@@ -580,24 +666,18 @@ def two_block(G, w=2):
 
     idxs = list(range(len(G)))
 
+    trials = argv.get("trials", 100)
+
     found = set()
     #while 1:
-    for trial in range(100):
+    for trial in range(trials):
 
         shuffle(idxs)
         ll = [lb[i] for i in idxs]
         shuffle(idxs)
         rr = [rb[i] for i in idxs]
-
-        #ll = list(lb)
-        #shuffle(ll)
         L = reduce(add, ll[:w])
-        #print(L)
-
-        #rr = list(rb)
-        #shuffle(rr)
         R = reduce(add, rr[:w])
-        #print(R)
 
         assert L*R == R*L
 
@@ -667,7 +747,7 @@ def all_two_block():
 
 
 def test_bimodule():
-    G = Group.symmetric(3)
+    G = Group.symmetric(4)
     print(G)
 
     Hs = G.subgroups()
@@ -676,14 +756,58 @@ def test_bimodule():
 #    from bruhat.biset import Biset
 #    for H in Hs:
 #      for J in Hs:
-#        X = Biset.cayley(G, H, J)
-#        print(X)
+#        X = Biset.double_coset(G, H, J)
+#        print(X, len(H), len(J), len(X.items))
+#        m = len(G) // len(H)
+#        n = len(G) // len(J)
+#        lookup = {(i//m, i%m):x for (i,x) in enumerate(X.items)}
+#        for g in G:
+#            
+#
+#    return
 
     for H in Hs:
         X = G.action_subgroup(H)
         if len(H) == 1:
             break
-    print(X)
+
+    for H in Hs:
+
+        #if not H.is_cyclic():
+        #    continue
+
+        G_H = G.left_cosets(H)
+        X = G.left_action(G_H, H)
+
+        #H_G = G.right_cosets(H)
+        H_G = G_H
+        Y = G.right_action(H_G, H)
+
+        print(len(H), H.is_cyclic(), end=" ")
+        print(set(G_H) == set(H_G))
+
+#        assert len(G_H) == len(H_G)
+#        n = len(G_H)
+#        for g in G:
+#            L = zeros2(n,n)
+#            for i,x in enumerate(G_H):
+#                y = X(g)[x]
+#                j = G_H.index(y)
+#                L[i,j] = 1
+#            L = Matrix(L)
+#
+#            for h in G:
+#                R = zeros2(n,n)
+#                for i,x in enumerate(H_G):
+#                    y = Y(h)[x]
+#                    j = H_G.index(y)
+#                    R[i,j] = 1
+#                R = Matrix(R)
+#                print(int(L*R==R*L), end="")
+#            print()
+
+
+    return
 
     items = list(X.items)
     items.sort(key = str)
@@ -699,7 +823,7 @@ def test_bimodule():
         return Matrix(L)
 
     def right(g):
-        return left(~g)
+        return left(~g).t
 
 #    for g in G:
 #        print(left(g))
