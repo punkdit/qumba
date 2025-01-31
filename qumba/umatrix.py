@@ -4,7 +4,7 @@ sat / smt solving for unknown F_2 matrices, etc.
 """
 
 from math import prod
-from functools import reduce, cache
+from functools import reduce
 from operator import add, matmul, mul
 from random import shuffle
 
@@ -17,7 +17,7 @@ from qumba.qcode import QCode, SymplecticSpace, fromstr, shortstr, strop
 from qumba.matrix import Matrix, scalar
 from qumba import csscode
 from qumba.action import mulclose, Group, Perm, mulclose_find
-from qumba.util import allperms
+from qumba.util import allperms, cache
 from qumba import equ
 from qumba import construct 
 from qumba.argv import argv

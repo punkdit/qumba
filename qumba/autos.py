@@ -7,7 +7,6 @@ find automorphisms of QCode's that permute the qubits.
 from time import time
 start_time = time()
 from random import shuffle, choice
-from functools import cache
 
 import numpy
 
@@ -16,6 +15,7 @@ from qumba.lin import (parse, shortstr, linear_independent, eq2, dot2, identity2
 from qumba.qcode import QCode, SymplecticSpace
 from qumba.action import mulclose, mulclose_hom
 from qumba import construct
+from qumba.util import cache
 from qumba.argv import argv
 
 
