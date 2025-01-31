@@ -28,6 +28,7 @@ from qumba.umatrix import UMatrix
 from qumba.lin import zeros2
 from qumba.csscode import CSSCode
 from qumba import unwrap
+from qumba.util import choose
 
 
 def find_equivariant(X):
@@ -401,6 +402,7 @@ def get_group():
     else:
         return
 
+    G.desc = "?"
     return G
 
 
@@ -499,15 +501,106 @@ def make_two_block(Lx, Rx, Lz=None, Rz=None):
     return code
 
 
-def search_hecke():
-    # build equivariant CSS codes from hecke operators.
-    Hs = None
-    Xs = None
-    n = None
+#def search_random_hecke(Ms, wa, wb):
 
-    G = get_group()
 
-    n = argv.get("n", n or len(G))
+def find_hecke_random(Ms):
+    Ms = list(Ms)
+    if Ms[0].shape[1] > 40:
+        return
+    print("find_hecke_random", len(Ms), Ms[0].shape)
+
+    idxs = list(range(len(Ms)))
+    found = set()
+    trials = argv.get("trials", 100)
+    #ws = [(wa,wb) for wa in range(1,7) for wb in range(wa,7)]
+    if argv.wa and argv.wb:
+        ws = [(argv.wa, argv.wb)]
+    for (wa,wb) in ws:
+      trial = 0
+      while trial < trials:
+        trial += 1
+        if wa+wb>len(Ms):
+            break
+        shuffle(Ms)
+        L = reduce(add, Ms[0:wa])
+        R = reduce(add, Ms[wa:wa+wb])
+        if L[0].sum() + R[0].sum() > 12:
+            return # <------------------------ return <<<<<----
+
+        if L*R.t != R*L.t:
+            continue
+
+        css = make_two_block(L, R, R, L)
+        if css.k == 0:
+            continue
+        if argv.k and css.k != argv.k:
+            continue
+        css.bz_distance() # <--- half the time spent here
+        if css.d < 3:
+            #print(".", end=" ", flush=True)
+            continue
+        trials = max(trials, 10000) # more !
+        s = str(css)
+        if s not in found:
+            found.add(s)
+            #print(Matrix(css.Hx), css.Hx.sum(1)[0], css.Hx.sum(0)[0], wa, wb)
+            rws = css.Hx.sum(1)
+            cws = css.Hx.sum(0)
+            print("\t"+s, "\trw=%d, cw=%d, wa=%d, wb=%d"%(
+                numpy.max(rws), numpy.max(cws), wa, wb))
+                #css.Hx.sum(1)[0], css.Hx.sum(0)[0], wa, wb))
+
+
+def find_hecke_exhaustive(Ms):
+    Ms = list(Ms)
+    if Ms[0].shape[1] > 40:
+        return
+    shuffle(Ms)
+    print("find_hecke_exhaustive", len(Ms), Ms[0].shape)
+
+    idxs = list(range(len(Ms)))
+    found = set()
+    trials = argv.get("trials", 100)
+    #ws = [(wa,wb) for wa in range(1,7) for wb in range(wa,7)]
+    if argv.wa and argv.wb:
+        ws = [(argv.wa, argv.wb)]
+    M0 = Ms[0]
+    for (wa,wb) in ws:
+      for Ls in choose(Ms[1:], wa-1):
+       for Rs in choose(Ms[1:], wb-1):
+        
+        L = reduce(add, Ls+(M0,))
+        R = reduce(add, Rs+(M0,))
+        if L[0].sum() + R[0].sum() > 12:
+            return # <------------------------ return <<<<<----
+
+        if L*R.t != R*L.t:
+            continue
+
+        css = make_two_block(L, R, R, L)
+        if css.k == 0:
+            continue
+        if argv.k and css.k != argv.k:
+            continue
+        css.bz_distance() # <--- half the time spent here
+        if css.d < 3:
+            #print(".", end=" ", flush=True)
+            continue
+        trials = max(trials, 10000) # more !
+        s = str(css)
+        if s not in found:
+            found.add(s)
+            #print(Matrix(css.Hx), css.Hx.sum(1)[0], css.Hx.sum(0)[0], wa, wb)
+            rws = css.Hx.sum(1)
+            cws = css.Hx.sum(0)
+            print("\t"+s, "\trw=%d, cw=%d, wa=%d, wb=%d"%(
+                numpy.max(rws), numpy.max(cws), wa, wb))
+                #css.Hx.sum(1)[0], css.Hx.sum(0)[0], wa, wb))
+
+
+def search_hecke(G):
+    n = argv.get("n", len(G))
     print("|G| =", len(G))
 
     Hs = [H for H in G.conjugacy_subgroups() if len(H)<len(G)]
@@ -520,59 +613,32 @@ def search_hecke():
     #for X in Xs:
     #Y = Xs[16]
 
+    #Xs = [X for X in Xs if len(X) <= 40]
+
     for X in Xs:
-
-        n = len(X)
-        space = SymplecticSpace(n)
-
-        if len(X) == len(G):
-            continue
-
-        if len(X) > 40:
-            continue
-
+      for Y in Xs:
         Ms = set()
-        for M in X.hecke(X):
+        for M in X.hecke(Y):
             M = M.astype(scalar)
             M = Matrix(M)
-            #M = M.row_reduce()
             Ms.add(M)
-        print(len(X), len(Ms))
+        if argv.exhaustive:
+            find_hecke_exhaustive(Ms)
+        else:
+            find_hecke_random(Ms)
 
-        Ms = list(Ms)
-        Ms.sort(key = lambda M: (len(str(M)), str(M)))
-        #for M in Ms:
-        #    print((M==M.t), (M.t in Ms), end=' ')
-        #print()
-        #continue
 
-        idxs = list(range(len(Ms)))
-        found = set()
-        for wa in [1,2]:
-         for wb in [1,2]:
-          for trial in range(100):
-            shuffle(Ms)
-            L = reduce(add, Ms[0:wa])
-            R = reduce(add, Ms[wa:wa+wb])
+def test_hecke():
+    G = get_group()
 
-            if L*R.t != R*L.t:
-                continue
+    if G is None:
+        from bruhat.small_groups import groups
+    else:
+        groups = [G]
 
-            css = make_two_block(L, R, R, L)
-            if css.k == 0:
-                continue
-            css.bz_distance()
-            if css.d < 3:
-                #print(".", end=" ", flush=True)
-                continue
-            s = str(css)
-            if s not in found:
-                print(s)
-                found.add(s)
-                print(Matrix(css.Hx), css.Hx.sum(1)[0], css.Hx.sum(0)[0], wa, wb)
-            #print(css, end=" ", flush=True)
-            #print("\n"+strop(css.to_qcode().H))
-        print()
+    for G in groups:
+        print(len(G), G.desc)
+        search_hecke(G)
 
 
 def test_equivariant():
