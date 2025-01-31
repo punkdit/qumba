@@ -487,9 +487,12 @@ def search_equivariant():
 
 
 
-def make_two_block(L, R):
-    Hx = L.concatenate(R, axis=1)
-    Hz = R.t.concatenate(L.t, axis=1)
+def make_two_block(Lx, Rx, Lz=None, Rz=None):
+    Hx = Lx.concatenate(Rx, axis=1)
+    if Lz is None:
+        Lz = Rx.t
+        Rz = Lx.t
+    Hz = Lz.concatenate(Rz, axis=1)
     Hx = Hx.linear_independent()
     Hz = Hz.linear_independent()
     code = CSSCode(Hx=Hx.A, Hz=Hz.A, check=True)
@@ -547,15 +550,15 @@ def search_hecke():
         found = set()
         for wa in [1,2]:
          for wb in [1,2]:
-          for trial in range(1000):
+          for trial in range(100):
             shuffle(Ms)
             L = reduce(add, Ms[0:wa])
             R = reduce(add, Ms[wa:wa+wb])
 
-            if L*R != R*L:
+            if L*R.t != R*L.t:
                 continue
 
-            css = make_two_block(L, R)
+            css = make_two_block(L, R, R, L)
             if css.k == 0:
                 continue
             css.bz_distance()
