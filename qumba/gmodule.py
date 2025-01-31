@@ -487,7 +487,7 @@ def main_cnot():
     gen = []
     for i in range(n):
       for j in range(n):
-        if i==j:
+        if i<=j:
             continue
         g = identity2(n)
         g[i,j] = 1
@@ -498,7 +498,11 @@ def main_cnot():
     bdy = list(found)
 
     while bdy:
-        print(len(bdy), end=",", flush=True)
+        #print(bin(len(bdy)), end=",", flush=True)
+        s = bin(len(bdy))
+        s = s.replace("0b","")
+        s = s.replace("0",".")
+        print(s.rjust(30))
         _bdy = []
         for g in gen:
             for A in bdy:
@@ -510,6 +514,10 @@ def main_cnot():
         bdy = _bdy
     print()
     print(len(found))
+    found = list(found)
+    found.sort(key=str)
+    #for g in found:
+    #    print(g, g.shape)
 
 
 
