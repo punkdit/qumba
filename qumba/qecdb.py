@@ -139,7 +139,7 @@ def html_form(form={}):
     s = '\n'.join(f.render(form) for f in layout)
     s += '\n<p><button type="submit">Search</button></p>'
     s = """
-    <form action="../codes/" method="post">
+    <form action="../codes/" method="get">
     %s
     </form>
     """ %s
@@ -184,8 +184,8 @@ def parse_name(name):
 @app.route('/codes/', methods=['POST', 'GET'])
 def codes():
     error = None
-    if request.method != 'POST':
-        return html_search(form={"css":"on"})
+    #if request.method != 'POST':
+    #    return html_search(form={"css":"on"})
 
     query = {}
 
@@ -194,8 +194,15 @@ def codes():
 #        name = parse_name(name)
 #        query["name"] = name
 
+    print("request.form:", request.form)
+    print("request.args:", request.args)
+    form = request.args
+
+    if request.method == "POST" or not form:
+        return html_search(form={"css":"on"})
+
     for attr in "nkd":
-        value = request.form[attr]
+        value = form.get(attr, "")
         value = value.strip()
         if not value:
             continue
@@ -222,15 +229,15 @@ def codes():
         else:
             assert 0, "wup: %s"%value
 
-    css = request.form.get("css")
-    gf4 = request.form.get("gf4")
-    selfdual = request.form.get("selfdual")
+    css = form.get("css")
+    gf4 = form.get("gf4")
+    selfdual = form.get("selfdual")
 
     if css: query["css"] = True
     if gf4: query["gf4"] = True
     if selfdual: query["selfdual"] = True
 
-    desc = request.form.get("desc")
+    desc = form.get("desc")
     if desc:
         query["desc"] = desc
 
@@ -280,7 +287,7 @@ def codes():
     r += "<table>%s</table>"%("\n".join(rows),)
     r = "<p> %s </p>"%r
 
-    s = html_search(r, request.form)
+    s = html_search(r, form)
 
     #print(s)
 
