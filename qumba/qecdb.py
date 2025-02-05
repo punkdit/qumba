@@ -256,7 +256,7 @@ def codes():
     items = list(cursor)
     def fn(item):
         n,k,d = item["n"], item["k"], item["d"]
-        tp = item["tp"]
+        tp = item.get("tp")
         return n,k,d,tp
     items.sort(key = fn)
 
