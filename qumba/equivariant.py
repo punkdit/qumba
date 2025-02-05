@@ -402,7 +402,7 @@ def get_group():
     else:
         return
 
-    G.desc = "?"
+    G.desc = G.name
     return G
 
 
@@ -694,7 +694,34 @@ def test_equivariant():
         #print("found:", count)
     
 
-def two_block(G, w=2):
+def sample_two_block(lb, rb, wa, wb, trials=None):
+
+    assert len(lb) == len(rb)
+    idxs = list(range(len(lb)))
+    for trial in range(trials):
+
+        shuffle(idxs)
+        ll = [lb[i] for i in idxs]
+        shuffle(idxs)
+        rr = [rb[i] for i in idxs]
+        L = reduce(add, ll[:wa])
+        R = reduce(add, rr[:wb])
+
+        yield L, R
+
+
+def search_two_block(lb, rb, lw, rw, trials=None):
+    assert len(lb) == len(rb)
+    idxs = list(range(len(lb)))
+    for Ls in choose(lb[1:], lw-1):
+      L = reduce(add, Ls+(lb[0],))
+      for Rs in choose(rb[1:], rw-1):
+        R = reduce(add, Rs+(rb[0],))
+        yield L,R
+        
+
+
+def two_block(G, wa=2, wb=2, rand=True):
     """
     Construct two-block group algebra codes
     # ref: https://arxiv.org/abs/2306.16400
@@ -733,86 +760,144 @@ def two_block(G, w=2):
     lb = [left(g) for g in G]
     rb = [right(g) for g in G]
 
-    idxs = list(range(len(G)))
-
     trials = argv.get("trials", 100)
-
     found = set()
-    #while 1:
-    for trial in range(trials):
 
-        shuffle(idxs)
-        ll = [lb[i] for i in idxs]
-        shuffle(idxs)
-        rr = [rb[i] for i in idxs]
-        L = reduce(add, ll[:w])
-        R = reduce(add, rr[:w])
+    fn = sample_two_block
+    if argv.search:
+        fn = search_two_block
+    #print(fn)
 
-        assert L*R == R*L
-
-        #L = L.linear_independent()
-        #R = R.linear_independent()
+    for (L,R) in fn(lb, rb, wa, wb, trials):
+        #assert L*R == R*L
 
         Hx = L.concatenate(R, axis=1)
-        #print(Hx, Hx.shape)
-
         Hz = R.t.concatenate(L.t, axis=1)
-        #print(Hz, Hz.shape)
-
         Hx = Hx.linear_independent()
         Hz = Hz.linear_independent()
 
-        code = CSSCode(Hx=Hx.A, Hz=Hz.A, check=True)
-        #print(code)
+        code = CSSCode(Hx=Hx.A, Hz=Hz.A, check=False, build=False)
         if code.k == 0:
             continue
+        if argv.k and argv.k != code.k:
+            continue
+
         code.bz_distance()
         if code.dx <= 2 or code.dz <= 2:
             continue
 
         s = str(code)
-        if s not in found:
-            #print(s)
-            #print(Hx)
-            #print(Hx.sum(1))
-            found.add(s)
+        if s in found:
+            continue
+        found.add(s)
+        if is_connected(Hx, Hz):
+
             yield code
 
-        if 0:
-            code = code.to_qcode()
-            n = code.n
-            dode = code.apply_H()
-            f = list(range(n//2, n)) + list(range(n//2))
-            #for i in range(n//2):
-                #f.append(i)
-            dode = dode.apply_perm(f)
-            if not dode.is_equiv(code):
-                continue
-    
-            perm = Perm(f, list(range(n)))
-            cover = unwrap.Cover.fromzx(code, perm)
-            print(code)
-            print(cover.base)
-            print(cover.base.longstr())
-    
-            break
 
 
-def test_two_block():
+def is_connected(Hx, Hz):
+    #print("is_connected")
+    Hx = Hx.normal_form()
+    Hz = Hz.normal_form()
+    m, n = Hx.shape
+
+    #print(Hx)
+
+    if Hx[0,0] == 0 and Hz[0,0] == 0:
+        return False
+
+    bdy = [0]
+    rows = set(bdy)
+    while len(bdy):
+        _bdy = []
+        for i0 in bdy:
+            #h = Hx[i0]
+          for h in [Hx[i0], Hz[i0]]:
+            for (j,) in h.where():
+                #print(j)
+                for i1, in Hx[:,j].where():
+                    #print('\t', i1)
+                    if i1 not in rows:
+                        rows.add(int(i1))
+                        _bdy.append(i1)
+        bdy = _bdy
+    #print(rows)
+    return len(rows) == m
+
+
+def main_two_block():
     G = get_group()
-    w = argv.get("w", 2)
-    print(G)
-    for code in two_block(G, w):
-        print(code)
+    if G is None:
+        from bruhat.small_groups import groups
+    else:
+        groups = [G]
 
+    w = argv.get("w")
+    wa = argv.get("wa", w)
+    wb = argv.get("wb", w)
 
-def all_two_block():
-    from bruhat.small_groups import groups
-    w = argv.get("w", 4)
+    if wa is None:
+        ws = []
+        for w in range(4, 9):
+            for wa in range(2,w//2+1):
+                wb = w-wa
+                if wa<=wb:
+                    ws.append((wa,wb))
+    else:
+        ws = [(wa,wb)]
+
+    def is_better(code, other):
+        return code.d > other.d
+    
     for G in groups:
-        print(len(G), G.desc)
-        for code in two_block(G, w):
-            print("\t%s"%code)
+        if len(G) < 9:
+            continue
+
+        for (wa,wb) in ws:
+            print(G.desc, wa, wb)
+            best = {} 
+            for code in two_block(G, wa, wb):
+                print("\t", code)
+                #print(strop(code.to_qcode().H))
+                key = (code.n, code.k)
+                other = best.get(key)
+                if other is None or is_better(code, other):
+                    best[key] = code
+        
+            if not best:
+                continue # <------- 
+
+            print("\tbest:")
+            keys = list(best.keys())
+            keys.sort()
+            for key in keys:
+                print("\t", best[key])
+            #print()
+    
+            if argv.store_db:
+                for code in best.values():
+                    from qumba.db import add
+                    code = code.to_qcode(G=G.desc, desc="2BGA")
+                    add(code)
+
+
+    if 0:
+        code = code.to_qcode()
+        n = code.n
+        dode = code.apply_H()
+        f = list(range(n//2, n)) + list(range(n//2))
+        #for i in range(n//2):
+            #f.append(i)
+        dode = dode.apply_perm(f)
+        if not dode.is_equiv(code):
+            return
+
+        perm = Perm(f, list(range(n)))
+        cover = unwrap.Cover.fromzx(code, perm)
+        print(code)
+        print(cover.base)
+        print(cover.base.longstr())
 
 
 def test_bimodule():

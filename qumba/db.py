@@ -76,7 +76,7 @@ def delete(code):
     print(res)
 
 
-def rm():
+def remove():
     while 1:
         _id = argv.next()
         if _id is None:

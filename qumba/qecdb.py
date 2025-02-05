@@ -30,8 +30,8 @@ input {
 button {
   background-color: #04AA6D;
   color: white;
-  padding: 14px 20px;
-  margin: 8px 0;
+  padding: 6px 6px;
+  margin: 6px 0;
   border: none;
   cursor: pointer;
   width: 100px;
@@ -41,10 +41,6 @@ button:hover {
   opacity: 0.8;
 }
 
-.container {
-  padding: 16px;
-}
-
 table {
   border-collapse: collapse;
   border: 1px solid;
@@ -52,43 +48,14 @@ table {
 
 td {
   border: 1px solid;
-    padding: 5px;
+  padding: 5px;
 }
 
 tr {
-padding: 5px;
+  padding: 5px;
 }
 
 </style>
-"""
-
-form_html = """
-<form action="/codes" method="get">
-  <div class="container">
-    <b>name:</b>
-    <input type="text" placeholder="[[17,1,5]]" name="name" size="10" />
-
-    <b>n:</b>
-    <input type="text" placeholder="17" name="n" size="5" />
-
-    <b>k:</b>
-    <input type="text" placeholder="1" name="k" size="5" />
-
-    <b>d:</b>
-    <input type="text" placeholder="5" name="d" size="5" />
-
-    <b>css:</b>
-    <input type="checkbox" name="css" checked />
-
-    <b>gf4:</b>
-    <input type="checkbox" name="gf4" />
-
-    <b>self-dual:</b>
-    <input type="checkbox" name="selfdual" />
-
-    <button type="submit">Search</button>
-  </div>
-</form>
 """
 
 main_html = """
@@ -128,35 +95,52 @@ class Input:
             args += ' checked '
         s = "<b>%s:</b><input %s />"%(self.longname, args)
         return s
+
 class Checkbox(Input):
     def render(self, form={}):
         args = 'type="checkbox" name="%s" ' % (self.name,)
         value = form.get(self.name)
-        print("Checkbox", self.name, value)
+        #print("Checkbox", self.name, value)
         if value=="on" or self.checked: 
             args += ' checked '
         s = "<b>%s:</b><input %s />"%(self.longname, args)
         return s
+
+class Select(Input):
+    def __init__(self, name, items):
+        self.items = [""] + items.split("/")
+        self.name = name
+    def render(self, form={}):
+        value = form.get(self.name)
+        print("Select:", value)
+        items = ' '.join('<option value="%s" %s>%s</option>' % (
+            item, "selected" if item==value else "", item) 
+            for item in self.items)
+        s = '<b>%s:</b><select name="%s">%s</select>' % (
+            self.name,
+            self.name,
+            items)
+        return s
     
 
 layout = [
-    Input("name", "name", 10, "eg. [[17,1,5]]"),
+    #Input("name", "name", 10, "eg. [[17,1,5]]"),
     Input("n",    "n",     6, "eg. 12-20"),
     Input("k",    "k",     6, ),
     Input("d",    "d",     6, "eg. >=4"),
     Checkbox("css", "css"),
     Checkbox("gf4", "gf4"),
     Checkbox("self-dual", "selfdual"),
+    Select("desc", 
+    "toric/2BGA/codetables/triorthogonal/CSS-T/bivariate bicycle/hypergraph_product"),
 ]
 
 def html_form(form={}):
     s = '\n'.join(f.render(form) for f in layout)
-    s += '\n<button type="submit">Search</button>'
+    s += '\n<p><button type="submit">Search</button></p>'
     s = """
     <form action="../codes/" method="post">
-    <div class="container">
     %s
-    </div>
     </form>
     """ %s
     return s
@@ -179,7 +163,8 @@ def html_search(results="", form={}):
 def main():
     #return html_search(form={"css":"on"})
     html = "<h2>QEC database</h2>"
-    html += '<a href="https://qecdb.org/codes/">codes</a>'
+    #html += '<a href="https://qecdb.org/codes/">codes</a>'
+    html += '<a href="codes">codes</a>'
     html = main_html.replace("BODY", html)
     return html
 
@@ -204,10 +189,11 @@ def codes():
 
     query = {}
 
-    name = request.form["name"]
-    if name:
-        name = parse_name(name)
-        query["name"] = name
+#    name = request.form["name"]
+#    if name:
+#        name = parse_name(name)
+#        query["name"] = name
+
     for attr in "nkd":
         value = request.form[attr]
         value = value.strip()
@@ -244,13 +230,17 @@ def codes():
     if gf4: query["gf4"] = True
     if selfdual: query["selfdual"] = True
 
+    desc = request.form.get("desc")
+    if desc:
+        query["desc"] = desc
+
     print(query)
 
     #res = db.codes.find_one(query)
     count = db.codes.count_documents(query)
     cursor = db.codes.find(query)
     cursor.sort("n")
-    limit = 10
+    limit = 100
     cursor = cursor[:limit]
 
     if count>1:
@@ -263,15 +253,30 @@ def codes():
     if count > limit:
         r += "<p>showing first %s:</p>"%limit
 
+    items = list(cursor)
+    def fn(item):
+        n,k,d = item["n"], item["k"], item["d"]
+        tp = item["tp"]
+        return n,k,d,tp
+    items.sort(key = fn)
+
+    COLS = 4
+
     rows = []
-    for item in cursor:
+    idx = 0
+    row = []
+    for item in items:
         _id = item["_id"]
         name = item["name"]
-        #tds = ["<td>%s</td>"%fld for fld in [str(_id), name]]
         tp = item.get("tp", "")
         tp = tp if tp!="none" else ""
-        tds = ['<td><a href="%s">%s</a> %s</td>'%("/codes/%s"%_id, name, tp)]
-        rows.append("<tr> %s </tr>" % " ".join(tds))
+        td = '<td><a href="%s">%s</a> %s</td>'%("/codes/%s"%_id, name, tp)
+        row.append(td)
+        if len(row) == COLS:
+            rows.append("<tr> %s </tr>" % " ".join(row))
+            row = []
+    if row:
+        rows.append("<tr> %s </tr>" % " ".join(row))
     r += "<table>%s</table>"%("\n".join(rows),)
     r = "<p> %s </p>"%r
 
