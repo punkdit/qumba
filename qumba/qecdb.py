@@ -132,7 +132,7 @@ layout = [
     Checkbox("gf4", "gf4"),
     Checkbox("self-dual", "selfdual"),
     Select("desc", 
-    "toric/2BGA/codetables/triorthogonal/CSS-T/bivariate bicycle/hypergraph_product"),
+    "toric/2BGA/codetables/triorthogonal/CSS-T/bivariate bicycle/hypergraph_product/hyperbolic_2d"),
 ]
 
 def html_form(form={}):

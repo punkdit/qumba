@@ -19,7 +19,7 @@ else:
 db = client["qumba"]
 codes = db["codes"]
 
-def add(code, force=False):
+def add(code, force=False, dummy=False):
     from qumba.qcode import strop
     code = code.to_qcode()
     ichar = "I"
@@ -53,9 +53,11 @@ def add(code, force=False):
         assert k not in data, "%r found in %s"%(k,data)
         data[k] = v
 
-    #print(data)
-    codes.insert_one(data)
-    print("qumba.db.add: %s added." % str(code))
+    if dummy:
+        print(data)
+    else:
+        codes.insert_one(data)
+        print("qumba.db.add: %s added." % str(code))
 
 
 def delete(code):
