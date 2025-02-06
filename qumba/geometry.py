@@ -155,7 +155,7 @@ def main():
 
     start_idx = argv.get("start_idx", 1)
     stop_idx = argv.get("stop_idx", None)
-    shape = argv.get("shape", (6,6))
+    shape = argv.get("shape", (5,5))
     index = argv.get("index", 1000)
     if shape not in lins_db.db:
         print("lins_db.build_db...", end='', flush=True)
@@ -176,7 +176,7 @@ def main():
         if code is None or code.k == 0:
             continue
     
-        if code.n > 100:
+        if code.n > 140:
             break
 
         code.bz_distance()
@@ -186,7 +186,10 @@ def main():
             continue
 
         #found.append(code)
-        key = code.n, code.k
+        if argv.all:
+            key = code.n, code.k, code.dx, code.dz
+        else:
+            key = code.n, code.k
         other = best.get(key)
         if other is None or other.d < code.d:
             best[key] = code
@@ -204,11 +207,15 @@ def main():
     for code in best.values():
         print(code)
     
-    if argv.store_db:
+    #if argv.store_db:
+    print()
+    print("write to db (n)?", end=" ", flush=True)
+    val = input()
+    if val=="y":
         from qumba.db import add
-        for code in found:
-            code = code.to_qcode(homogeneous=True, desc="hyperbolic_2d", shape=str(key))
-            add(code)
+        for code in best.values():
+            code = code.to_qcode(homogeneous=True, desc="hyperbolic_2d", shape=str(shape))
+            add(code, dummy=False)
 
 
 

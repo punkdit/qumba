@@ -47,7 +47,7 @@ def add(code, force=False, dummy=False):
         "created" : int(time()), # is this UTC? I don't know. Do we care?
     })
 
-    if code.n < 100:
+    if code.n < 1000:
         code.get_tp()
     for (k,v) in code.attrs.items():
         assert k not in data, "%r found in %s"%(k,data)
