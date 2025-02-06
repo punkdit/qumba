@@ -123,18 +123,25 @@ def build(shape, index):
         print("bodis=%d, faces=%d, edges=%d, verts=%d"%(
             len(bodis), len(faces), len(edges), len(verts)))
 
-    Hx = Hz = None
-    Jx = Jz = None
-    code = None
+    if argv.selfdual:
+        #H = get_adj(faces, verts) # ?
+        H = get_adj(verts, faces)
+        #print(H.shape)
 
-    #if argv.homology == 1:
-    Hz = get_adj(faces, edges)
-    Hx = get_adj(verts, edges)
-    #print("Hx:")
-    #print(shortstr(Hx), Hx.shape)
+        H = linear_independent(H)
+        Hx = Hz = H
 
-    Hx = linear_independent(Hx)
-    Hz = linear_independent(Hz)
+    else:
+    
+        #if argv.homology == 1:
+        Hz = get_adj(faces, edges)
+        Hx = get_adj(verts, edges)
+        #print("Hx:")
+        #print(shortstr(Hx), Hx.shape)
+    
+        Hx = linear_independent(Hx)
+        Hz = linear_independent(Hz)
+
 
     A = dot2(Hx, Hz.transpose())
     #print("chain condition:", A.sum() == 0)
