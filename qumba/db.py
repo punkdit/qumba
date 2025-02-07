@@ -212,10 +212,16 @@ def load_codetables():
 
 
 def dump():
+    assert 0, "no"
     cursor = codes.find()
     for data in cursor:
         print(data)
 
+
+def drop():
+    assert 0, "no"
+    codes.drop()
+    
 
 def normalize():
     from qumba.qcode import QCode
@@ -552,11 +558,34 @@ def prune_cyclic():
     prune_remove(remove)
 
 
+def find_small():
+    print("find_small()")
+    from qumba import construct
+    from qumba.qcode import SymplecticSpace, strop
+    from qumba.action import mulclose
+    from qumba.util import allperms
+    n = argv.get("n", 4)
+    space = SymplecticSpace(n)
+    gen = []
+    for perm in allperms(tuple(range(n))):
+        g = space.get_perm(perm)
+        gen.append(g)
+    for i in range(n):
+        gen.append( space.S(i) )
+        gen.append( space.H(i) )
+    #G = mulclose(gen)
+    #print(len(G))
+    #found = []
+    found = {}
+    for code in construct.all_codes(5,1,3):
+        #print(strop(code.H))
+        w = code.H.get_wenum()
+        print(code, w)
+        found.setdefault(w, []).append(code)
+    for key in found:
+        print(key, len(found[key]))
 
-def drop():
-    assert 0, "no"
-    codes.drop()
-    
+
 
 
 if __name__ == "__main__":
