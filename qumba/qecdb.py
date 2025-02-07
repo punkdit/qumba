@@ -163,8 +163,8 @@ def html_search(results="", form={}):
 def main():
     #return html_search(form={"css":"on"})
     html = "<h2>QEC database</h2>"
-    #html += '<a href="https://qecdb.org/codes/">codes</a>'
-    html += '<a href="codes">codes</a>'
+    html += '<a href="https://qecdb.org/codes/">codes</a>'
+    #html += '<a href="codes">codes</a>' # sends to http://127.0.0.1:5000/codes/
     html = main_html.replace("BODY", html)
     return html
 
