@@ -133,17 +133,18 @@ class Checkbox(Input):
         return s
 
 class Select(Input):
-    def __init__(self, name, items):
+    def __init__(self, longname, name, items):
         self.items = [""] + items.split("/")
+        self.longname = longname
         self.name = name
     def render(self, form={}):
         value = form.get(self.name)
-        print("Select:", value)
+        #print("Select:", value)
         items = ' '.join('<option value="%s" %s>%s</option>' % (
             item, "selected" if item==value else "", item) 
             for item in self.items)
         s = '<b>%s:</b><select name="%s">%s</select>' % (
-            self.name,
+            self.longname,
             self.name,
             items)
         return s
@@ -157,7 +158,7 @@ layout = [
     Checkbox("css", "css"),
     Checkbox("gf4", "gf4"),
     Checkbox("self-dual", "selfdual"),
-    Select("desc", 
+    Select("family", "desc", 
     "toric/2BGA/codetables/triorthogonal/CSS-T/bivariate bicycle/hypergraph_product/hyperbolic_2d"),
 ]
 
