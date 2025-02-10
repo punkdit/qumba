@@ -148,23 +148,39 @@ class Select(Input):
             self.name,
             items)
         return s
+class Para:
+    def render(self,form={}):
+        return "<p>"
+class EndPara:
+    def render(self,form={}):
+        return "</p>"
+class SearchButton:
+    def render(self,form={}):
+        return '<button type="submit">Search</button>'
     
 
 layout = [
-    #Input("name", "name", 10, "eg. [[17,1,5]]"),
-    Input("n",    "n",     6, "eg. 12-20"),
-    Input("k",    "k",     6, ),
-    Input("d",    "d",     6, "eg. >=4"),
-    Checkbox("css", "css"),
-    Checkbox("gf4", "gf4"),
-    Checkbox("self-dual", "selfdual"),
-    Select("family", "desc", 
+    #Para(),
+        #Input("name", "name", 10, "eg. [[17,1,5]]"),
+        Input("n",    "n",     6, "eg. 12-20"),
+        Input("k",    "k",     6, ),
+        Input("d",    "d",     6, "eg. >=4"),
+    #EndPara(),
+    #Para(),
+        #Checkbox("css", "css"),
+        #Checkbox("gf4", "gf4"),
+        #Checkbox("self-dual", "selfdual"),
+        Select("type", "tp", "css/gf4/selfdual"),
+        Select("family", "desc", 
     "toric/2BGA/codetables/triorthogonal/CSS-T/bivariate bicycle/hypergraph_product/hyperbolic_2d"),
+    #EndPara(),
+    SearchButton(),
 ]
 
 def html_form(form={}):
-    s = '\n'.join(f.render(form) for f in layout)
-    s += '\n<p><button type="submit">Search</button></p>'
+    items = [f.render(form) for f in layout]
+    #items.append('<p><button type="submit">Search</button></p>')
+    s = '\n'.join(items)
     s = """
     <form action="../codes/" method="get">
     %s
@@ -232,7 +248,8 @@ def codes():
     form = request.args
 
     if request.method == "POST" or not form:
-        return html_search(form={"css":"on"})
+        #return html_search(form={"css":"on"})
+        return html_search(form={})
 
     for attr in "nkd":
         value = form.get(attr, "")
@@ -262,13 +279,21 @@ def codes():
         else:
             assert 0, "wup: %s"%value
 
-    css = form.get("css")
-    gf4 = form.get("gf4")
-    selfdual = form.get("selfdual")
+#    css = form.get("css")
+#    gf4 = form.get("gf4")
+#    selfdual = form.get("selfdual")
+#
+#    if css: query["css"] = True
+#    if gf4: query["gf4"] = True
+#    if selfdual: query["selfdual"] = True
 
-    if css: query["css"] = True
-    if gf4: query["gf4"] = True
-    if selfdual: query["selfdual"] = True
+    tp = form.get("tp")
+    if tp == "gf4":
+        query["gf4"] = True
+    if tp == "css":
+        query["css"] = True
+    if tp == "selfdual":
+        query["selfdual"] = True
 
     desc = form.get("desc")
     if desc:
