@@ -355,30 +355,44 @@ def codes():
 
 @app.route("/codes/<_id>")
 def codes_id(_id):
-    res = db.codes.find_one({"_id":ObjectId(_id)})
+    result = db.codes.find_one({"_id":ObjectId(_id)})
 
-    if res is None:
+    if result is None:
         return body_html.replace("BODY", "code %s not found"%_id)
 
     r = '<a href="../codes/">start again...</a>'
     r += "<h2>Code:</h2>"
 
-    keys = list(res.keys())
+    keys = list(result.keys())
     skeys = """
         name n k d d_lower_bound d_upper_bound dx dz desc created
-        cssname css gf4 selfdual tp H T L _id
+        cssname css gf4 selfdual tp G homogeneous shape H T L _id
     """.strip().split()
     keys.sort(key = lambda k : (skeys.index(k) if k in skeys else 999))
+
+    d = result.get("d")
+    d_lower_bound = result.get("d_lower_bound")
+    d_upper_bound = result.get("d_upper_bound")
+    dx = result.get("dx")
+    dz = result.get("dz")
+
+    if d is not None:
+        if d_lower_bound == d:
+            keys.remove("d_lower_bound")
+        if d_upper_bound == d:
+            keys.remove("d_upper_bound")
 
     rows = []
     for key in keys:
         #if key == "_id":
         #    continue
-        value = res[key]
+        value = result[key]
         if key in "HTL":
             value = "<tt>%s</tt>"%value.replace(" ", "<br>")
         elif key == "created":
             value = datetime.fromtimestamp(value)
+        if key == "desc":
+            key = "family" # TODO fix in db
         tds = '<td>%s</td> <td>%s</td>' % (key, value)
         rows.append("<tr> %s </tr>" % tds)
     r += "<table>%s</table>"%("\n".join(rows),)

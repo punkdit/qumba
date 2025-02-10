@@ -14,7 +14,7 @@ from qumba.autos import get_autos, get_autos_css
 from qumba import csscode, construct
 from qumba.construct import get_422, get_513, get_golay, get_10_2_3, reed_muller
 from qumba.action import mulclose, mulclose_hom, mulclose_find
-from qumba.util import cross
+from qumba.util import cross, allperms
 from qumba.symplectic import Building
 from qumba.unwrap import unwrap, unwrap_encoder, Cover
 from qumba.smap import SMap
@@ -2308,6 +2308,92 @@ def test_triorthogonal():
       print()
         
 
+def find_613():
+    from qumba import construct
+    from qumba.qcode import strop
+    found = {}
+    for code in construct.all_codes(6,1,3):
+        w = code.H.get_wenum()
+        found.setdefault(w, []).append(code)
+    for key in found:
+        print(key, len(found[key]))
+        code = found[key][0]
+        print(strop(code.H))
+
+def test_613():
+    # see find_613 above
+    codes = []
+    for s in [
+        'XZ.X.Y\n.XZX.X\nZ.XX.Z\n....Z.\nZZZZ..',
+        'XZ.XXY\n.XZX.X\nZ.XX.Z\nZ...Z.\nZZZZ..',
+        'YZ.X.Y\n.XZX.X\nZ.XX.Z\n....Z.\nZZZZ..',
+        'YZ.XXY\n.XZX.X\nZ.XX.Z\nZ...Z.\nZZZZ..',
+        'XZ.XXX\n.XZX.Y\nZ.XX.Z\nZ...Z.\nZZZZ..',
+        'XZ.X.Y\n.XZXXX\nZ.XX.Z\n.Z..Z.\nZZZZ..',
+        'XZ.XXY\n.XZXXX\nZ.XXXZ\nZZZ.Z.\nZZZZ..',
+        'YZ.X.Y\n.YZX.X\nZ.YX.Z\n....Z.\nZZZZ..',
+        'YZ.XXY\n.YZX.X\nZ.YX.Z\nZ...Z.\nZZZZ..',
+        'YZ..XZ\n.XZZXY\nZ.XZXX\n...X.Z\nZZZ.Z.',
+        'XZ..XY\n.XZZXX\nZ.XZXZ\n...X.Y\nZZZ.Z.',
+        'YZ..XY\n.XZZXX\nZ.XZXZ\n...X.Y\nZZZ.Z.',
+        'YZ.ZXX\n.XZ.XY\nZ.XZXZ\n...X.Y\nZZZ.Z.',
+        'YZ..XY\n.YZZXX\nZ.YZXZ\n...X.Y\nZZZ.Z.',
+        'XZ.ZXY\n.XZZXX\nZ.XZXZ\nZZZXX.\nZZZZZ.',
+        'YZ.ZXY\n.XZZXX\nZ.XZXZ\nZZZXX.\nZZZZZ.',
+        'Y.ZZXX\nZX.ZXY\n.ZXZXZ\nZZZXX.\nZZZZZ.',
+        'Y...X.\n.XZ.XY\n..XZXX\n.Z.XXZ\nZZZZZ.',
+        'YZ..XY\n.YZZXX\nZ.YZXZ\n...Y.Y\nZZZ.Z.',
+    ]:
+        code = QCode.fromstr(s)
+        codes.append(code)
+
+    n = 6
+    space = SymplecticSpace(n)
+    perms = []
+    for perm in allperms(tuple(range(n))):
+        g = space.get_perm(perm)
+        perms.append(g)
+    assert len(perms) == 720
+
+    gen = []
+    for i in range(n):
+        gen.append( space.S(i) )
+        gen.append( space.H(i) )
+    LC = mulclose(gen)
+    assert len(LC) == 6**n
+
+    lookup = {code.H.get_wenum():code for code in codes}
+    LC.remove(space.get_identity())
+
+    i = 0
+    while i < len(codes):
+        code = codes[i]
+        print(code, i, len(codes))
+        for g in LC:
+            d = g*code
+            w = d.H.get_wenum()
+            e = lookup[w]
+            if e is code:
+                continue
+            if e not in codes:
+                continue
+            iso = d.get_isomorphism(e)
+            if iso is None:
+                continue
+            j = codes.index(e)
+            if j > i:
+                print("pop", j)
+                codes.pop(j)
+            if i==len(codes):
+                break
+        i += 1
+
+    print("codes:", len(codes))
+    for code in codes:
+        print(code)
+        print(strop(code.H))
+
+    assert len(codes) == 2
 
 
 
