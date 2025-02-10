@@ -18,7 +18,8 @@ from qumba.csscode import CSSCode
 from qumba.matrix import Matrix
 from qumba.qcode import QCode
 from qumba import construct
-from qumba.lin import zeros2, parse
+from qumba.lin import zeros2, parse, array2, pseudo_inverse, dot2, eq2, kernel, rand2, shortstr, linear_independent
+from qumba.util import choose, cross
 
 
 def dump_transverse(Hx, Lx, t=3):
@@ -260,6 +261,293 @@ def test_49_1_5():
     print(circuit.n_qubits)
     #for op in entire_circuit:
     #    print(op)
+
+
+
+def is_morthogonal(G, m):
+    k = len(G)
+    if m==1:
+        for v in G:
+            if v.sum()%2 != 0:
+                return False
+        return True
+    if m>2 and not is_morthogonal(G, m-1):
+        return False
+    items = list(range(k))
+    for idxs in choose(items, m):
+        v = G[idxs[0]]
+        for idx in idxs[1:]:
+            v = v * G[idx]
+        if v.sum()%2 != 0:
+            return False
+    return True
+
+
+def strong_morthogonal(G, m):
+    k = len(G)
+    assert m>=1
+    if m==1:
+        for v in G:
+            if v.sum()%2 != 0:
+                return False
+        return True
+    if not strong_morthogonal(G, m-1):
+        return False
+    items = list(range(k))
+    for idxs in choose(items, m):
+        v = G[idxs[0]]
+        for idx in idxs[1:]:
+            v = v * G[idx]
+        if v.sum()%2 != 0:
+            return False
+    return True
+
+
+
+def find_triorthogonal(m, k):
+    # Bravyi, Haah, 1209.2426v1 sec IX.
+    # https://arxiv.org/pdf/1209.2426.pdf
+
+    verbose = argv.get("verbose")
+    #m = argv.get("m", 6) # _number of rows
+    #k = argv.get("k", None) # _number of odd-weight rows
+
+    # these are the variables N_x
+    xs = list(cross([(0, 1)]*m))
+
+    maxweight = argv.maxweight
+    minweight = argv.get("minweight", 1)
+
+    xs = [x for x in xs if minweight <= sum(x)]
+    if maxweight:
+        xs = [x for x in xs if sum(x) <= maxweight]
+
+    N = len(xs)
+
+    lhs = []
+    rhs = []
+
+    # bi-orthogonality
+    for a in range(m):
+      for b in range(a+1, m):
+        v = zeros2(N)
+        for i, x in enumerate(xs):
+            if x[a] == x[b] == 1:
+                v[i] = 1
+        if v.sum():
+            lhs.append(v)
+            rhs.append(0)
+
+    # tri-orthogonality
+    for a in range(m):
+      for b in range(a+1, m):
+       for c in range(b+1, m):
+        v = zeros2(N)
+        for i, x in enumerate(xs):
+            if x[a] == x[b] == x[c] == 1:
+                v[i] = 1
+        if v.sum():
+            lhs.append(v)
+            rhs.append(0)
+
+#    # dissallow columns with weight <= 1
+#    for i, x in enumerate(xs):
+#        if sum(x)<=1:
+#            v = zeros2(N)
+#            v[i] = 1
+#            lhs.append(v)
+#            rhs.append(0)
+
+    if k is not None:
+      # constrain to k _number of odd-weight rows
+      assert 0<=k<m
+      for a in range(m):
+        v = zeros2(N)
+        for i, x in enumerate(xs):
+          if x[a] == 1:
+            v[i] = 1
+        lhs.append(v)
+        if a<k:
+            rhs.append(1)
+        else:
+            rhs.append(0)
+
+    A = array2(lhs)
+    rhs = array2(rhs)
+    #print(shortstr(A))
+
+    B = pseudo_inverse(A)
+    soln = dot2(B, rhs)
+    if not eq2(dot2(A, soln), rhs):
+        print("no solution")
+        return
+    if verbose:
+        print("soln:")
+        print(shortstr(soln))
+
+    soln.shape = (N, 1)
+    rhs.shape = A.shape[0], 1
+
+    K = array2(list(kernel(A)))
+    #print(K)
+    #print( dot2(A, K.transpose()))
+    #sols = []
+    #for v in span(K):
+    best = None
+    density = 1.0
+    size = 99*N
+    trials = argv.get("trials", 102400)
+    #print("trials:", trials)
+    count = 0
+    #for trial in range(trials):
+    while 1:
+        u = rand2(len(K), 1)
+        v = dot2(K.transpose(), u)
+        #print(v)
+        v = (v+soln)%2
+        assert eq2(dot2(A, v), rhs)
+
+        if v.sum() > size:
+            continue
+        size = v.sum()
+
+        Gt = []
+        for i, x in enumerate(xs):
+            if v[i]:
+                Gt.append(x)
+        if not Gt:
+            continue
+        Gt = array2(Gt)
+        G = Gt.transpose()
+        assert is_morthogonal(G, 3)
+        if G.shape[1]<m:
+            continue
+
+        if 0 in G.sum(1):
+            continue
+
+        if argv.strong_morthogonal and not strong_morthogonal(G, 3):
+            continue
+
+        #print(shortstr(G))
+#        for g in G:
+#            print(shortstr(g), g.sum())
+#        print()
+
+        yield G
+
+        _density = float(G.sum()) / (G.shape[0]*G.shape[1])
+        #if best is None or _density < density:
+        if best is None or G.shape[1] <= size:
+            best = G
+            size = G.shape[1]
+            density = _density
+
+        if 0:
+            #sols.append(G)
+            Gx = even_rows(G)
+            assert is_morthogonal(Gx, 3)
+            if len(Gx)==0:
+                continue
+            GGx = array2(list(span(Gx)))
+            assert is_morthogonal(GGx, 3)
+
+        count += 1
+
+    print("found %d solutions" % count)
+
+#    if best is None:
+#        return
+#
+#    G = best
+#    #print(shortstr(G))
+#
+#    for g in G:
+#        print(shortstr(g), g.sum())
+#    print()
+#    print("density:", density)
+#    print("shape:", G.shape)
+#
+#    G = linear_independent(G)
+#    for g in G:
+#        print(shortstr(g), g.sum())
+#
+#    if 0:
+#        A = list(span(G))
+#        print(strong_morthogonal(A, 1))
+#        print(strong_morthogonal(A, 2))
+#        print(strong_morthogonal(A, 3))
+#
+#    #G = [row for row in G if row.sum()%2 == 0]
+#    return array2(G)
+#
+#    #print(shortstr(dot2(G, G.transpose())))
+#
+#    if 0:
+#        B = pseudo_inverse(A)
+#        v = dot2(B, rhs)
+#        print("B:")
+#        print(shortstr(B))
+#        print("v:")
+#        print(shortstr(v))
+#        assert eq2(dot2(B, v), rhs)
+
+
+def main():
+
+    m = argv.get("m", 6)
+    k = argv.get("k", 1)
+
+    found = set()
+    for G in find_triorthogonal(m, k):
+
+        G = Matrix(G)
+    
+        #print("G:")
+        #print(G)
+    
+        if 0:
+            j = 0
+            while j < G.shape[1]:
+                gj = G[:,j]
+                #print(gj, gj.sum())
+                if G[:, j].sum() == 1:
+                    #print("puncture", j)
+                    G = G.puncture(j)
+                else:
+                    j += 1
+        
+        G = G.linear_independent()
+        
+        m, n = G.shape
+    
+        idxs = [i for i in range(m) if G[i].sum()%2]
+        G1 = G[idxs, :] # odd weight
+        #print(G1, G1.shape)
+    
+        idxs = [i for i in range(m) if G[i].sum()%2==0]
+        G0 = G[idxs, :] # even weight
+        #print(G0, G0.shape)
+        #print()
+    
+        Hx = G0
+        Hz = G.kernel()
+    
+        #print(Hx.shape, Hz.shape)
+    
+        code = QCode.build_css(Hx, Hz)
+        s = str(code)
+        if s in found:
+            continue
+        print(s)
+        found.add(s)
+
+        if code.d < 3:
+            continue
+    
+        print(G, G.shape)
+        code = code.to_css()
+        dump_transverse(code.Hx, code.Lx)
 
 
 

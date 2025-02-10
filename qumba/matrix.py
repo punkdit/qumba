@@ -357,10 +357,10 @@ class Matrix(object):
         P = A*A.pseudo_inverse()
         return P
 
-#    def reshape(self, shape):
-#        A = self.A.view()
-#        A.shape = shape
-#        return Matrix(A)
+    def puncture(A, i):
+        A0 = A[:, :i]
+        A1 = A[:, i+1:]
+        return A0.concatenate(A1, axis=1)
 
     def to_spider(self, scalar=int, verbose=True):
         from qumba.decode import network
