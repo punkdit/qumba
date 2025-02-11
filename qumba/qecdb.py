@@ -320,7 +320,7 @@ def codes():
 
     items = list(cursor)
     def fn(item):
-        n,k,d = item["n"], item["k"], item["d"]
+        n,k,d = item["n"], item["k"], (item["d"] or 99999)
         tp = item.get("tp")
         return n,k,d,tp
     items.sort(key = fn)
