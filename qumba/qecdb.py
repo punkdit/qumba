@@ -366,9 +366,13 @@ def codes_id(_id):
     keys = list(result.keys())
     skeys = """
         name n k d d_lower_bound d_upper_bound dx dz desc created
-        cssname css gf4 selfdual tp G homogeneous shape H T L _id
+        cssname css gf4 selfdual tp G homogeneous shape 
     """.strip().split()
     keys.sort(key = lambda k : (skeys.index(k) if k in skeys else 999))
+    for key in "H T L _id".split():
+        if key in keys:
+            keys.remove(key)
+            keys.append(key)
 
     d = result.get("d")
     d_lower_bound = result.get("d_lower_bound")

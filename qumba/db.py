@@ -145,6 +145,8 @@ def get_codes():
     for k,v in argv.argmap.items():
         if k == "_id":
             v = ObjectId(v)
+        if k == "attr" or k == "value" or k == "user" or k == "passwd":
+            continue
         if k not in ns:
             ns[k] = v
         #print(arg)
@@ -186,6 +188,18 @@ def query():
 
         #if argv.update:
         #    update(code)
+
+def update():
+    print("update")
+    attr = argv.attr
+    value = argv.value
+    assert attr
+    assert value
+    for code in get_codes():
+        print(code, "_id=%s"%code._id)
+        key = {"_id":code._id}
+        res = codes.update_one(key, {"$set":{attr:value}})
+        print(res)
 
 
 def test():
