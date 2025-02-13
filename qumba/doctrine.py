@@ -5,11 +5,11 @@ cache = lru_cache(maxsize=None)
 from operator import add, mul, matmul
 
 from qumba.lin import kernel, dot2, normal_form, enum2, shortstr
-from qumba.clifford import Clifford, green, red, I, r2, half
-from qumba.qcode import QCode, strop, Matrix
+from qumba.qcode import QCode, strop, Matrix, SymplecticSpace
 from qumba.construct import all_codes
 from qumba.unwrap import unwrap
 from qumba.argv import argv
+from qumba import construct
 
 from bruhat.algebraic import qchoose_2
 
@@ -35,6 +35,7 @@ def find_css(n, mx, mz):
 
 @cache
 def get_transversal_CZ(n):
+    from qumba.clifford import Clifford
     assert n%2 == 0
     c = Clifford(n)
     op = reduce(mul, [c.CZ(2*i, 2*i+1) for i in range(n//2)])
@@ -43,6 +44,7 @@ def get_transversal_CZ(n):
 
 @cache
 def get_transversal_HHSwap(n):
+    from qumba.clifford import Clifford
     assert n%2 == 0
     c = Clifford(n)
     op = reduce(mul, [c.SWAP(2*i, 2*i+1) for i in range(n//2)])
@@ -381,6 +383,310 @@ def all_hypergraph_product():
     print("found:", count)
 
 
+
+
+
+@cache
+def get_SH(n):
+    space = SymplecticSpace(n)
+    SH = space.get_SH()
+    return SH.t
+
+@cache
+def get_H(n):
+    space = SymplecticSpace(n)
+    H = space.get_H()
+    return H.t
+
+def test_doctrine_gf4():
+    d = 0
+    for n in range(argv.get("n0", 1), argv.get("n1", 5)):
+      print("n=%s"%n, end=" ", flush=True)
+      #for k in range(n+1):
+      for m in range(n+1):
+        k = n-m
+        if (n+k)%2:
+            print(".", end=" ", flush=True)
+            continue
+        count = 0
+        for code in construct.all_codes(n, k, d):
+            #if code.is_gf4():
+            H1 = code.H * get_SH(n)
+            dode = QCode(H1, check=False)
+            if code.is_equiv(dode):
+                count += 1
+        print(count, end=" ", flush=True)
+      print()
+
+
+
+
+def test_doctrine_css():
+    # https://oeis.org/A302595
+    d = 0
+    for n in range(argv.get("n0", 1), argv.get("n1", 5)):
+      print("n=%s"%n, end=" ", flush=True)
+      for k in range(n+1):
+        count = 0
+        found = []
+        for code in construct.all_codes(n, k, d):
+            if not code.is_css():
+                continue
+            #assert code.is_css_slow()
+            count += 1
+            #for dode in found:
+            #    assert not dode.is_equiv(code) # yes these are unique
+            found.append(code)
+        print(count, end=" ", flush=True)
+      print()
+
+
+def test_doctrine_css_ssd():
+    A = Matrix([[1,1],[0,0]])
+    d = 0
+    for n in range(argv.get("n0", 1), argv.get("n1", 5)):
+      at = SymplecticSpace(n).get(A).t
+      print("n=%s"%n, end=" ", flush=True)
+      for k in range(n+1):
+        count = 0
+        for code in construct.all_codes(n, k, d):
+            if not code.is_css():
+                continue
+            H = code.H
+            J = H*at
+            if H.t.solve(J.t) is None:
+                continue
+            count += 1
+        print(count, end=" ", flush=True)
+      print()
+
+
+def test_doctrine_sd():
+    A = Matrix([[0,1],[1,0]])
+    d = 0
+    for n in range(argv.get("n0", 1), argv.get("n1", 5)):
+      at = SymplecticSpace(n).get(A).t
+      print("n=%s"%n, end=" ", flush=True)
+      for k in range(n+1):
+        count = 0
+        for code in construct.all_codes(n, k, d):
+            H = code.H
+            J = H*at
+            if H.t.solve(J.t) is None:
+                continue
+            count += 1
+        print(count, end=" ", flush=True)
+      print()
+
+def test_doctrine_sd_scss():
+    A = Matrix([[0,1],[1,0]])
+    B = Matrix([[1,0],[1,0]])
+    d = 0
+    for n in range(argv.get("n0", 1), argv.get("n1", 5)):
+      at = SymplecticSpace(n).get(A).t
+      bt = SymplecticSpace(n).get(B).t
+      print("n=%s"%n, end=" ", flush=True)
+      for k in range(n+1):
+        count = 0
+        for code in construct.all_codes(n, k, d):
+            H = code.H
+            J = H*at
+            if H.t.solve(J.t) is None:
+                continue
+            J = H*bt
+            if H.t.solve(J.t) is None:
+                continue
+            count += 1
+        print(count, end=" ", flush=True)
+      print()
+
+
+def main_sd_scss():
+    A = Matrix([[0,1],[1,0]])
+    B = Matrix([[1,0],[1,0]])
+    n = argv.get("n", 5)
+    k = argv.get("k", 1)
+    d = argv.get("d", 2)
+
+    at = SymplecticSpace(n).get(A).t
+    bt = SymplecticSpace(n).get(B).t
+    print("search: [[%d, %d, %d]]"%(n, k, d))
+    for code in construct.all_codes(n, k, d):
+        H = code.H
+        J = H*at
+        if H.t.solve(J.t) is None:
+            continue
+        J = H*bt
+        if H.t.solve(J.t) is None:
+            continue
+
+        print(code)
+        print(code.longstr())
+
+
+
+def test_qchoose_2():
+    from bruhat.algebraic import qchoose_2
+    for n in range(argv.get("n0", 1), argv.get("n1", 5)):
+      for k in range(n+1):
+        count = len(list(qchoose_2(n,n-k)))
+        print(count, end=" ", flush=True)
+      print()
+
+
+def all_css_mxz(n, mx, mz):
+    from bruhat.algebraic import qchoose_2
+    for Hx in qchoose_2(n, mx):
+        assert len(Hx) == mx
+        K = kernel(Hx)
+        for Mz in qchoose_2(K.shape[0], mz):
+            #print(Mz)
+            Hz = dot2(Mz, K)
+            assert len(Hz) == mz
+            #print(Hz)
+            #assert dot2(Hx, Hz.transpose()).sum() == 0
+            code = QCode.build_css(Hx, Hz)
+            assert code.k == n-mx-mz
+            yield code
+
+@cache
+def all_qchoose_2(n, m):
+    from bruhat.algebraic import qchoose_2
+    return list(qchoose_2(n,m))
+
+def choose_css(n, mx, mz):
+    Hxs = all_qchoose_2(n, mx)
+    Hzs = all_qchoose_2(n, mz)
+    #print("all_css")
+    for Hx in Hxs:
+      for Hz in Hzs:
+        if dot2(Hx, Hz.transpose()).sum() == 0:
+            code = QCode.build_css(Hx, Hz)
+            yield code
+
+def all_css(n, m):
+    codes = []
+    for mx in range(m+1):
+        mz = m-mx
+        assert mx+mz == m, (mx,mz,n)
+        #codes += list(choose_css(n,mx,mz))
+        codes += list(all_css_mxz(n,mx,mz))
+    return codes
+
+
+def test_all_css():
+    for n in range(argv.get("n0", 1), argv.get("n1", 5)):
+      print("n=%s"%n, end=" ")
+      for k in range(n+1):
+        m = n-k
+        codes = all_css(n,m)
+        count = len(codes)
+        print(count, end=" ", flush=True)
+      print()
+            
+
+
+def test_doctrine_sd():
+    d = 0
+    for n in range(argv.get("n0", 1), argv.get("n1", 5)):
+      print("n=%s"%n, end=" ")
+      for k in range(n+1):
+        if (n+k)%2:
+            print(".", end=" ", flush=True)
+            continue
+        count = 0
+        for code in construct.all_codes(n, k, d):
+            if not code.is_css():
+                continue
+            H1 = code.H * get_H(n)
+            dode = QCode(H1, check=False)
+            if code.is_equiv(dode):
+                count += 1
+        print(count, end=" ", flush=True)
+      print()
+
+
+def test_doctrine_csssd():
+    d = 0
+    for n in range(argv.get("n0", 1), argv.get("n1", 5)):
+      print("n=%s"%n, end=" ")
+      for k in range(n+1):
+        if (n+k)%2:
+            print(".", end=" ", flush=True)
+            continue
+        count = 0
+        for code in all_css(n,n-k):
+            H1 = code.H * get_H(n)
+            dode = QCode(H1, check=False)
+            if code.is_equiv(dode):
+                count += 1
+                #print()
+                #print(strop(code.H))
+        print(count, end=" ", flush=True)
+      print()
+
+def test_sd():
+    from bruhat.algebraic import qchoose_2
+    d = 0
+    for n in range(argv.get("n0", 1), argv.get("n1", 5)):
+      print("n=%s"%n, end=" ")
+      for k in range(n+1):
+        if (n+k)%2:
+            print(".", end=" ", flush=True)
+            continue
+        m = (n-k)//2
+        count = 0
+        for H in qchoose_2(n,m):
+            assert H.shape == (m,n)
+            if dot2(H, H.transpose()).sum() == 0:
+                code = QCode.build_css(H, H)
+                assert code.n == n
+                assert code.k == k, (str(code), n, k)
+                code.get_distance()
+                #if code.k and code.d>1:
+                #    print(code)
+                count += 1
+        print(count, end=" ", flush=True)
+      print()
+
+
+def all_sd(n,m):
+    from bruhat.algebraic import qchoose_2
+    count = 0
+    for H in qchoose_2(n,m):
+        if dot2(H, H.transpose()).sum() == 0:
+            yield H
+
+
+def is_triorthogonal(H):
+    # check triorthogonal
+    m, n = H.shape
+    for i in range(m):
+     for j in range(i+1, m):
+        #if (H[i]*H[j]).sum() % 2:
+        #    return False
+        Hij = H[i]*H[j]
+        #if Hij.sum()==0:
+        #    return True
+        for k in range(j+1, m):
+          if (Hij*H[k]).sum() % 2:
+            return False
+    return True
+
+
+def test_triorthogonal():
+    for n in range(argv.get("n0", 1), argv.get("n1", 7)):
+      print("n=%s"%n, end=" ")
+      for m in range(0,n,1):
+        Hs = list(all_sd(n,m))
+        count = 0
+        for H in all_sd(n,m):
+            if is_triorthogonal(H):
+                count += 1
+        print("%4s"%(count or "."), end=" ", flush=True)
+      print()
+        
+
 if __name__ == "__main__":
     from time import time
     start_time = time()
@@ -394,8 +700,6 @@ if __name__ == "__main__":
         fn()
 
     print("finished in %.3f seconds.\n"%(time() - start_time))
-
-
 
 
 
