@@ -12,7 +12,7 @@ warnings.filterwarnings('ignore')
 
 from random import shuffle, randint, choice, seed
 from operator import add, matmul, mul
-from functools import reduce, cache
+from functools import reduce
 import pickle
 
 import numpy
@@ -28,6 +28,7 @@ from qumba.smap import SMap
 from qumba.argv import argv
 from qumba.matrix import Matrix
 from qumba import construct
+from qumba.util import cache
 
 from qumba.circuit import parsevec, Circuit, send, get_inverse, measure, barrier, variance, vdump, load
 from qumba.circuit_css import css_encoder, process
@@ -56,7 +57,7 @@ def get_span(H):
 def get_GL(n):
     # These generate GL(n)
     # the (block) symplectic matrix for A in GL is:
-    # [[A,0],[0,A.t]]
+    # [[A,0],[0,A.t]] when A*A==I
     I = Matrix.identity(n)
     gates = []
     names = {}
@@ -104,6 +105,11 @@ class Graph:
             i -= 1
         return c
 
+    def destroy(self):
+        for child in self.children.values():
+            child.destroy()
+        self.__dict__.clear()
+
     def prune(self, depth):
         assert depth >= 0
         if depth == 0:
@@ -113,7 +119,7 @@ class Graph:
             for child in self.children.values():
                 child.prune(depth - 1)
 
-    @cache
+    #@cache # eats memory?
     def get_overlap(self, Sx, Sz): # hotspot 
         Ux, Uz = self.Ux, self.Uz
         score = 0
@@ -141,6 +147,7 @@ class Graph:
             tree = tree.parent
 
     def playout(self, trials, gates, Sx, Sz):
+        print("playout")
         tree = self
 
         count = 0
@@ -155,19 +162,81 @@ class Graph:
                 child = tree.act(ggt)
                 s = child.get_overlap(Sx, Sz)
                 if s < score:
-                    print(s, end=" ")
+                    print(s, end=" ", flush=True)
                     tree = child
                     break
             else:
-                print(".", end=" ", flush=True)
-                print(score)
+                #print(".", end=" ", flush=True)
+                #print(score)
+                print("/")
                 tree.mark_end(score)
                 tree = self
                 count += 1
     
             assert len(tree) < 1000
 
+    def playout_hard(self, trials, gates, Sx, Sz):
+        print("playout_hard")
+        tree = self
 
+        count = 0
+        while count < trials:
+            score = tree.get_overlap(Sx, Sz)
+            if score == 0:
+                print("success!")
+                return tree
+    
+            if score < 10 or 1:
+                shuffle(gates)
+                for ggt in gates:
+                    child = tree.act(ggt)
+                    s = child.get_overlap(Sx, Sz)
+                    if s < score:
+                        print(s, end=" ", flush=True)
+                        tree = child
+                        break
+                else:
+                    if s < 0:
+                        print("<<", end=" ")
+                        tree = tree[randint(5,len(tree)//2)]
+                    else:
+                        print("/")
+                        tree.mark_end(score)
+                        tree = self
+                        count += 1
+
+            else:
+                for _ in range(len(gates)):
+                    ggt = choice(gates)
+                    child = tree.act(ggt)
+                    s = child.get_overlap(Sx, Sz)
+                    if s < score:
+                        print(s, end=" ", flush=True)
+                        tree = child
+                        break
+                else:
+                    print("/")
+                    tree.mark_end(score)
+                    tree = self
+                    count += 1
+    
+            assert len(tree) < 1000
+
+
+import resource
+
+def setMemoryLimit(n_bytes):
+    """ Force Python to raise an exception when it uses more than
+    n_bytes bytes of memory.
+    """
+    if n_bytes <= 0: return
+    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    resource.setrlimit(resource.RLIMIT_AS, (n_bytes, hard))
+    soft, hard = resource.getrlimit(resource.RLIMIT_DATA)
+    if n_bytes < soft*1024:
+        resource.setrlimit(resource.RLIMIT_DATA, (n_bytes, hard))
+
+setMemoryLimit(10000*1024*1024)
 
 def back_search(n, Hx, Hz):
 
@@ -198,12 +267,35 @@ def back_search(n, Hx, Hz):
     tree = root
 
     sols = []
-    for trial in range(argv.get("trials",100)):
-        found = tree.playout(1, gates, Sx, Sz)
-        if found is not None:
-            sols.append(found)
-            print("found:", len(found), "best:", min(len(s) for s in sols))
-            print()
+    import gc
+
+    if argv.hard:
+
+        tree.destroy()
+        tree = Graph(Ux, Uz)
+        trial = 0
+        #while not sols:
+        while trial < 40:
+            gc.collect()
+            #print(len(gc.garbage))
+            trial += 1
+            found = tree.playout_hard(1, gates, Sx, Sz)
+            if found is not None:
+                sols.append(found)
+                print("found:", len(found), "best:", min(len(s) for s in sols))
+                print()
+
+    else:
+
+        trial = 0
+        while trial < argv.get("trials",100) or not sols:
+            trial += 1
+            found = tree.playout(1, gates, Sx, Sz)
+            if found is not None:
+                sols.append(found)
+                print("found:", len(found), "best:", min(len(s) for s in sols))
+                print()
+            tree.prune(0)
 
 #    for trial in range(argv.get("trials",100)):
 #        found = tree.playout(10, gates, Sx, Sz)
@@ -228,8 +320,10 @@ def back_search(n, Hx, Hz):
 #
 #        tree.prune(2)
 
-    
-    assert sols
+    if not sols:
+        return 
+
+
     sols.sort(key = len)
     print([len(s) for s in sols])
     tree = sols[0]
@@ -277,18 +371,35 @@ def test():
         """) # [[12, 2, 4]] # fail
     elif argv.code == (23, 1, 7):
         code = construct.get_golay(23)
+    elif argv.code == (63, 51, 3):
+        # [[63,51,3]]
+        code = QCode.fromstr("""
+    XXXIIIIXIIXIIIXXIXXIIXIXXIXIXXXIXXXXIIXXIIIXIXIXIIXXXXXXIXIIIII
+    ZZZIIIIZIIZIIIZZIZZIIZIZZIZIZZZIZZZZIIZZIIIZIZIZIIZZZZZZIZIIIII
+    XXIIIIXIIXIIIXXIXXIIXIXXIXIXXXIXXXXIIXXIIIXIXIXIIXXXXXXIXIIIIIX
+    ZZIIIIZIIZIIIZZIZZIIZIZZIZIZZZIZZZZIIZZIIIZIZIZIIZZZZZZIZIIIIIZ
+    XIIIIXIIXIIIXXIXXIIXIXXIXIXXXIXXXXIIXXIIIXIXIXIIXXXXXXIXIIIIIXX
+    ZIIIIZIIZIIIZZIZZIIZIZZIZIZZZIZZZZIIZZIIIZIZIZIIZZZZZZIZIIIIIZZ
+    IIIIXIIXIIIXXIXXIIXIXXIXIXXXIXXXXIIXXIIIXIXIXIIXXXXXXIXIIIIIXXX
+    IIIIZIIZIIIZZIZZIIZIZZIZIZZZIZZZZIIZZIIIZIZIZIIZZZZZZIZIIIIIZZZ
+    IIIXIIXIIIXXIXXIIXIXXIXIXXXIXXXXIIXXIIIXIXIXIIXXXXXXIXIIIIIXXXI
+    IIIZIIZIIIZZIZZIIZIZZIZIZZZIZZZZIIZZIIIZIZIZIIZZZZZZIZIIIIIZZZI
+    IIXIIXIIIXXIXXIIXIXXIXIXXXIXXXXIIXXIIIXIXIXIIXXXXXXIXIIIIIXXXII
+    IIZIIZIIIZZIZZIIZIZZIZIZZZIZZZZIIZZIIIZIZIZIIZZZZZZIZIIIIIZZZII
+    """)
     else:
         return
 
     n = code.n
+    print(code)
     css = code.to_css()
     Hx = Matrix(css.Hx)
     Hz = Matrix(css.Hz)
 
-    print("Hx")
-    print(Hx)
-    print("Hz")
-    print(Hz)
+    #print("Hx")
+    #print(Hx)
+    #print("Hz")
+    #print(Hz)
 
     #greedy_search(n, Hx, Hz)
     #monte_search(n, Hx, Hz)

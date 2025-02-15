@@ -169,7 +169,10 @@ def check(code):
 
 def query():
     for code in get_codes():
-        print(code, "_id=%s"%code._id)
+        #print(code, "_id=%s"%code._id)
+        url = "https://qecdb.org/codes/%s"%code._id
+        print(code, url)
+
 
         if argv.show:
             print(code.longstr())

@@ -475,6 +475,8 @@ def test_doctrine_sd():
             if H.t.solve(J.t) is None:
                 continue
             count += 1
+            #print()
+            #print(code.longstr())
         print(count, end=" ", flush=True)
       print()
 
@@ -586,7 +588,7 @@ def test_all_css():
             
 
 
-def test_doctrine_sd():
+def test_doctrine_css_sd():
     d = 0
     for n in range(argv.get("n0", 1), argv.get("n1", 5)):
       print("n=%s"%n, end=" ")

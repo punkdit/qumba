@@ -6,8 +6,7 @@ stabilizer codes & symplectic geometry
 import string, os
 from random import randint, choice, random
 from time import sleep, time
-from functools import reduce, lru_cache
-cache = lru_cache(maxsize=None)
+from functools import reduce
 from operator import add
 import json
 
@@ -23,6 +22,7 @@ from qumba.matrix import Matrix, flatten
 from qumba.symplectic import SymplecticSpace, symplectic_form
 from qumba.argv import argv
 from qumba.smap import SMap
+from qumba.util import cache
 
 
 

@@ -7,8 +7,7 @@ matrix groups over Z/pZ.
 
 
 from random import shuffle, choice
-from functools import reduce, lru_cache
-cache = lru_cache(maxsize=None)
+from functools import reduce
 from operator import add, mul
 from math import prod
 

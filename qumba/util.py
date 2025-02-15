@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from functools import lru_cache
-cache = lru_cache(maxsize=None)
+cache = lru_cache(maxsize=10)
 
 
 

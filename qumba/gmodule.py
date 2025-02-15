@@ -407,18 +407,20 @@ def main_lw():
     """)
     n = code.n
     css = code.to_css()
-    H = Matrix(css.Hx)
+    Hx = Matrix(css.Hx)
+    Hz = Matrix(css.Hz)
     Lx = Matrix(css.Lx)
-    wenum = H.get_wenum()
+    Lz = Matrix(css.Lz)
+    wenum = Hx.get_wenum()
     #print([(idx,wenum[idx]) for idx in range(64)])
 
     perms = get_cyclic_perms(n)
-    print(len(perms))
+    print("perms:", len(perms))
     G = []
     for g in perms:
         g = Matrix(g[::2, ::2])
-        H1 = H*g
-        if H1.t.solve(H.t) is not None:
+        H1 = Hx*g
+        if H1.t.solve(Hx.t) is not None:
             G.append(g)
         #L1 = Lx*g
         #if L1.t.solve(Lx.t) is not None:
@@ -429,25 +431,37 @@ def main_lw():
         assert g*h in G
     g = Matrix.perm([(i+1)%n for i in range(n)])
     G = mulclose([g]+G)
-    print(len(G))
+    print("|G| =", len(G))
 
-    HL = H.concatenate(Lx)
+    HL = Hx.concatenate(Lx)
 
     count = 0
     logops = []
+    rows = []
     for l in find_lw(HL, 3):
-        if l[0,0]:
+        l = l[0]
+        if l[0]:
             print(l)
-        logops.append(l[0])
+            rows.append(l)
+            #print(Lz*l, Hz*l)
+        logops.append(l)
+        assert (Hz * l).sum() == 0
+        assert (Lz * l).sum() != 0
         count += 1
-    print(count)
     L = Matrix(logops)
     print(L.shape)
     #print(L.A.sum(0))
     #print(L.A.sum(1))
+
+    #for i in range(1, n):
+    #    for row in rows:
+    #        if row[i]:
+    #            print(row)
+    #return
+
     print(L.rank())
-    print((H.concatenate(L)).rank() - len(H))
-    assert H.rank() == len(H)
+    print((Hx.concatenate(L)).rank() - len(Hx))
+    assert Hx.rank() == len(Hx)
 
     remain = set(logops)
     orbits = []
@@ -466,14 +480,14 @@ def main_lw():
     for orbit in orbits:
         print("orbit:", len(orbit))
         L1 = Matrix(orbit)
-        print("rank:", (H.concatenate(L1)).rank() - len(H))
+        print("rank:", (Hx.concatenate(L1)).rank() - len(Hx))
 
     o = orbits[0] + orbits[1]
     L1 = Matrix(o)
-    print("rank 21+63:", (H.concatenate(L1)).rank() - len(H))
+    print("rank 21+63:", (Hx.concatenate(L1)).rank() - len(Hx))
     o = orbits[0] + orbits[1] + orbits[2]
     L1 = Matrix(o)
-    print("rank 21+63+189:", (H.concatenate(L1)).rank() - len(H))
+    print("rank 21+63+189:", (Hx.concatenate(L1)).rank() - len(Hx))
 
 
 def main_cnot():
