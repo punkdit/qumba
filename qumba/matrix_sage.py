@@ -239,9 +239,9 @@ def test():
     I = Matrix.identity(S, n)
     rows = list(cross([els]*n))
     shuffle(rows)
-    #for cols in cross( [rows]*n ):
-    while 1:
-        cols = [choice(rows) for i in range(n)]
+    for cols in cross( [rows]*n ):
+    #while 1:
+        #cols = [choice(rows) for i in range(n)]
         M = Matrix(S, cols)
         if M*M.t == I:
             found.append(M)
