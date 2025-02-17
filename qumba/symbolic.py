@@ -10,9 +10,10 @@ from scipy import optimize
 
 
 from bruhat.comonoid import dot, tensor, System
-from bruhat import comonoid 
+from bruhat.sympy import Const
 
 from qumba import construct
+from qumba.qcode import QCode
 from qumba.argv import argv
 from qumba.smap import SMap
 
@@ -62,7 +63,7 @@ def test_root():
     # find a fifth root of unity
 
     system = System(2)
-    z = system.unknown((2,))
+    z = system.get_unknown((2,))
     print(z)
 
     z2 = mul(z,z)
@@ -95,7 +96,7 @@ def snum(a):
     for v in [-1, 0, 1]:
         if abs(a-v) < EPSILON:
             return v
-    return a
+    return "%.6f"%a
 
 class Complex:
     def __init__(self, a, b=0):
@@ -194,37 +195,46 @@ class Matrix:
     
 
 
-class Solver(comonoid.System):
+class Solver(System):
     def __init__(self):
-        comonoid.System.__init__(self, 2)
+        System.__init__(self, 2)
 
-#    def unknown(self, shape, name='v'):
+#    def get_unknown(self, shape, name='v'):
 #        A = numpy.empty(shape, dtype=object)
 #        for idx in numpy.ndindex(shape):
 #            A[idx] = self.get_var(name)
 #        self.items.append(A)
 #        return A
 
-    def unknown(self, shape, name='v'):
+    def get_scalar(self, name="z"):
+        a = self.get_var(name+"a")
+        b = self.get_var(name+"b")
+        return Complex(a, b)
+
+    def get_unknown(self, shape, name='v'):
         A = numpy.empty(shape, dtype=object)
         for idx in numpy.ndindex(shape):
-            A[idx] = self.scalar(name)
+            A[idx] = self.get_scalar(name)
         A = Matrix(A)
         self.items.append(A)
         return A
 
-    def scalar(self, name="z"):
-        a = self.get_var(name+"a")
-        b = self.get_var(name+"b")
-        return Complex(a, b)
+    def get_phase(self, name='v'):
+        A = numpy.empty((2,2), dtype=object)
+        A[:] = Complex(Const(0), Const(0))
+        A[0,0] = Complex(Const(1), Const(0))
+        A[1,1] = self.get_scalar(name)
+        A = Matrix(A)
+        self.items.append(A)
+        return A
 
     def add_scalar(self, lhs, rhs=Complex(0)):
         eqs = self.eqs
         z = lhs-rhs
         assert isinstance(z, Complex)
-        if z.a != 0:
+        if not z.a.is_zero():
             eqs.append(z.a)
-        if z.b != 0:
+        if not z.b.is_zero():
             eqs.append(z.b)
 
     def add(self, lhs, rhs):
@@ -269,7 +279,7 @@ def test():
     one = Complex(1,0)
 
     solver = Solver()
-    z = solver.scalar()
+    z = solver.get_scalar()
     print(z)
 
     solver.add_scalar(z**5, one)
@@ -287,7 +297,7 @@ def test():
     solver = Solver()
 
     I = Matrix.identity(2)
-    U = solver.unknown((2,2))
+    U = solver.get_unknown((2,2))
     solver.add( U*U.d , I )
     solver.add( U*U*U , I )
 
@@ -304,20 +314,13 @@ def test():
     assert u*u.d == I
     
 
+def get_projector(code):
 
-
-def main_find():
-
-    code = construct.get_513() # doesn't find the SH ... hmm..
-    #code = construct.get_713() # too big
-    #code = construct.get_422() # finds the Hadamard
-    #code = construct.get_412()
-    print(code)
-    #print(code.longstr())
-
+    print("get_projector")
     N = 2**code.n
     M = 2**code.m
-    P = M*code.get_projector()
+    #P = M*code.get_projector()
+    P = code.get_average_operator()
 
     A = numpy.zeros((N,N), dtype=object)
     for idx in numpy.ndindex((N,N)):
@@ -334,30 +337,81 @@ def main_find():
     P = Matrix(A)
     assert P.shape == (N,N)
 
+    return P
+
+
+#def find_transversal(code):
+
+
+def main_find():
+
+    if argv.code==(5,1,3):
+        code = construct.get_513() # doesn't find the SH ... hmm..
+    elif argv.code==(4,2,2):
+        code = construct.get_422() # finds the Hadamard
+    elif argv.code==(4,1,2):
+        code = construct.get_412()
+    elif argv.code==(7,1,3):
+        code = construct.get_713() 
+    elif argv.code==(8,3,2):
+        code = construct.get_832()
+    elif argv.code==(10,1,4):
+        code = QCode.fromstr("""
+        YYZIZIIZIZ
+        ZYYZIZIIZI
+        IZYYZIZIIZ
+        ZIZYYZIZII
+        IZIZYYZIZI
+        IIZIZYYZIZ
+        ZIIZIZYYZI
+        IZIIZIZYYZ
+        ZIZIIZIZYY
+        """)
+    else:
+        return
+
+    print(code)
+    #print(code.longstr())
+    P = get_projector(code)
+
+    return
+
     found = set()
-    while 1:
-        solver = Solver()
-    
-        I = Matrix.identity(2)
-        U = solver.unknown((2,2))
+    solver = Solver()
+
+    I = Matrix.identity(2)
+
+    print("g")
+    if 0:
+        U = solver.get_phase()
+        g = reduce(matmul, [U]*code.n)
+    elif 0:
+        U = solver.get_unknown((2,2))
         solver.add( U*U.d , I )
         #solver.add(U*U*U, I)
-    
         g = reduce(matmul, [U]*code.n)
-        #print(g.shape)
-        assert g.shape == (N, N)
+    else:
+        ops = [solver.get_phase() for i in range(code.n)]
+        g = reduce(matmul, ops)
+
+    print("solver.add")
+    solver.add( P*g , g*P )
+
+    print("solve")
+    #for eq in solver.eqs:
+    #    print(eq)
+    ##f = solver.py_func(verbose=True)
+    #return
     
-        solver.add( P*g , g*P )
-    
+    while 1:
         items = solver.solve(trials=100, jac=False)
-        u = items[0]
+
+        s = str([u[1,1] for u in items])
     
-        s = str(u)
         if s in found:
             continue
         found.add(s)
         print(s)
-        print("identity:", u==I)
     
 
 

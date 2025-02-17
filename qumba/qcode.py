@@ -1037,12 +1037,26 @@ class QCode(object):
         c = Clifford(n)
         I = c.get_identity()
         P = I
-        gens = []
         for u in H:
             desc = strop(u)
             g = c.get_pauli(desc)
             P *= half * (I + g)
         return P
+
+    # much slower than get_projector
+#    def get_average_operator(self):
+#        "get Clifford projector onto codepsace"
+#        from qumba.clifford import Clifford, half
+#        H = self.H
+#        n = self.n
+#        assert n < 16, "wup.. too big ?"
+#        c = Clifford(n)
+#        P = None
+#        for u in H.rowspan():
+#            desc = strop(u)
+#            g = c.get_pauli(desc)
+#            P = g if P is None else P+g
+#        return P
 
 
 
