@@ -9,84 +9,12 @@ from numpy import array
 from scipy import optimize 
 
 
-from bruhat.comonoid import dot, tensor, System
-from bruhat.sympy import Const
-
 from qumba import construct
 from qumba.qcode import QCode
 from qumba.argv import argv
 from qumba.smap import SMap
 
 
-"""
-Here we are doing the complex algebra over the reals.
-
-(a + ib) * (c + id)
-= a*c - b*d + i(b*c + a*d)
-= [a*c-b*d  b*c+a*d]
-
-so the multiply matrix is:
-   ac ad bc bd
-  [1, 0, 0, -1], --> real
-  [0, 1, 1,  0]] --> imag
-
-"""
-
-
-
-
-def eq(a, b):
-    return numpy.allclose(a, b)
-
-def test_root():
-    
-    one = array([1, 0])
-    imag = array([0, 1])
-    
-    # complex multiply
-    M = array([
-        [1, 0, 0, -1],
-        [0, 1, 1,  0]])
-    
-    def mul(a, b):
-        return dot(M, tensor(a, b))
-    
-    def conj(a):
-        assert a.shape == (2,)
-        b = a.copy()
-        b[1] *= -1
-        return b
-    
-    
-    assert eq( dot(M, tensor(imag, imag) ), -one )
-
-    # find a fifth root of unity
-
-    system = System(2)
-    z = system.get_unknown((2,))
-    print(z)
-
-    z2 = mul(z,z)
-    z3 = mul(z2,z)
-    z4 = mul(z3,z)
-    z5 = mul(z4,z)
-
-    print(z5.shape)
-
-    system.add(z5, one)
-    system.add(mul(z, conj(z)), one)
-
-    #v = system.get_root(x0=[2,3])
-    items = system.root()
-    v = items[0]
-
-    print("solution:")
-    print(v, type(v))
-
-    theta = 2*pi / 5
-    for i in range(5):
-        print(sin(i*theta), cos(i*theta))
-    
 
 EPSILON = 1e-8
 
@@ -105,7 +33,12 @@ class Complex:
     def __str__(self):
         a = snum(self.a)
         b = snum(self.b)
-        return "(%s+i*%s)"%(a, b)
+        s = "<%s+i*%s>"%(a, b)
+        if s.endswith("+i*0>"):
+            s = s[:-len("+i*0>")] + ">"
+        elif s.startswith("<0+"):
+            s = "<" + s[len("<0+"):]
+        return s
     #def __repr__(self):
     #    return "Complex(%s,%s)"%(self.a, self.b)
     __repr__ = __str__
@@ -143,6 +76,165 @@ class Complex:
         a = self.a.subs(values)
         b = self.b.subs(values)
         return Complex(a, b)
+
+
+class Poly:
+    "multivariate polynomials over the integers"
+    def __init__(self, cs={}):
+        self.cs = dict(cs) # map tuple -> coeff
+        for k,v in cs.items():
+            assert v != 0, self # <----------- TODO: REMOVE ME FOR SPEED TODO 
+    @classmethod
+    def get_var(cls, rank, idx):
+        assert 0<=idx<rank
+        key = [0]*rank
+        key[idx] = 1
+        return cls({tuple(key):1})
+    @classmethod
+    def const(cls, rank, r):
+        if r == 0:
+            return cls({})
+        return cls({(0,)*rank:r})
+    #def __str__(self):
+    #    return str(self.cs)
+    def __str__(self):
+        cs = self.cs
+        items = []
+        for key,value in cs.items():
+            term = []
+            for (idx,i) in enumerate(key):
+                if i==0:
+                    continue
+                if i==1:
+                    term.append("v%d"%idx)
+                else:
+                    term.append("v%d**%d"%(idx,i))
+            assert value != 0
+            term = "*".join(term)
+            if not term:
+                items.append(str(value))
+            elif value==1:
+                items.append(term)
+            else:
+                items.append(str(value)+"*"+term)
+        s = "+".join(items) or "0"
+        if len(items)>1:
+            s = "("+s+")"
+        return s
+    __repr__ = __str__
+    def subs(self, ns):
+        #print("subs", ns)
+        vals = []
+        for k,v in ns.items():
+            assert k[0]=="v"
+            idx = int(k[1:])
+            if idx>=len(vals):
+                vals += [None]*(idx-len(vals)+1)
+            vals[idx] = v
+        #print(vals)
+        r = 0.
+        for (k,v) in self.cs.items():
+            s = 1.
+            for (idx,i) in enumerate(k):
+                if i==0:
+                    continue
+                s *= vals[idx]**i
+            r += v*s
+        return r
+    def __eq__(self, other):
+        #zero = Complex(0)
+        zero = 0
+        for k,v in self.cs.items():
+            if other.cs.get(k, zero) != v:
+                return False
+        for k,v in other.cs.items():
+            if self.cs.get(k, zero) != v:
+                return False
+        return True
+    def is_zero(self):
+        for k,v in self.cs.items():
+            assert v != 0, self
+            return False
+        return True
+    def __add__(lhs, rhs):
+        cs = dict(lhs.cs)
+        zero = 0
+        for k,v in rhs.cs.items():
+            v = cs.get(k, zero) + v
+            if v == 0 and cs.get(k) is not None:
+                del cs[k]
+            elif v != 0:
+                cs[k] = v
+        return Poly(cs)
+    def __sub__(lhs, rhs):
+        cs = dict(lhs.cs)
+        zero = 0
+        for k,v in rhs.cs.items():
+            v = cs.get(k, zero) - v
+            if v == 0 and cs.get(k) is not None:
+                del cs[k]
+            elif v != 0:
+                cs[k] = v
+        return Poly(cs)
+    def __mul__(lhs, rhs):
+        if type(rhs) == float:
+            #assert 0, "%s"%rhs
+            assert rhs==int(rhs)
+            rhs = int(rhs)
+        if type(rhs) == int:
+            return lhs.__rmul__(rhs)
+        cs = {}
+        for l,u in lhs.cs.items():
+          for r,v in rhs.cs.items():
+            k = tuple((a+b) for (a,b) in zip(l,r))
+            #cs[k] = u*v
+            v = cs.get(k, 0) + u*v
+            if v == 0 and cs.get(k) is not None:
+                del cs[k]
+            elif v != 0:
+                cs[k] = v
+        return Poly(cs)
+    def __rmul__(self, r):
+        #r = Complex.promote(r)
+        r = int(r)
+        if r==0:
+            return Poly({})
+        cs = {k:r*v for (k,v) in self.cs.items()}
+        return Poly(cs)
+
+
+def test():
+
+    #one = Complex(1)
+    #i = Complex(0,1)
+
+    one = Poly({(0,0,0):1})
+    zero = Poly({})
+
+    assert one == Poly.const(3,1)
+
+    a = Poly({(1,0,0):1})
+    b = Poly({(0,1,0):1})
+    c = Poly({(0,0,1):1})
+
+    assert str(a) == "v0", str(a)
+    assert str(a+b) == "(v0+v1)", str(a+b)
+
+    assert c == Poly.get_var(3, 2)
+
+    assert one*one == one
+    assert one*a == a
+    assert a+b == b+a
+    assert a+b != b
+    assert a+a == Poly({(1,0,0):2})
+    assert a*a == Poly({(2,0,0):1})
+    assert (a+b)*a == a*a + b*a
+    assert (a+b)*(b+c) == a*b + a*c + b*b + b*c
+
+    assert 3*a == a+a+a
+
+    assert (a+b) * (a-b) == a*a - b*b
+    assert (a+b)*(a+b) == a*a + 2*a*b + b*b
 
 
 class Matrix:
@@ -193,11 +285,33 @@ class Matrix:
         return A
         
     
+# modified from bruhat.comonoid
+class Solver:
+    def __init__(self, rank):
+        self.eqs = []
+        self.idx = 0
+        self.vs = [Poly.get_var(rank,i) for i in range(rank)]
+        self.items = [] # list of array's
+        self.rank = rank
+        self.zero = self.const(0)
+        self.one = self.const(1)
 
+    def check(self):
+        assert self.idx == self.rank, (self.idx, self.rank)
 
-class Solver(System):
-    def __init__(self):
-        System.__init__(self, 2)
+#    def get_var(self, stem='v'):
+#        ch = "%s_%d"%(stem, self.idx)
+#        self.idx += 1
+#        self.vs.append(ch)
+#        return Symbol(ch)
+
+    def get_var(self, stem='v'):
+        v = self.vs[self.idx]
+        self.idx += 1
+        return v
+
+    def const(self, r):
+        return Poly.const(self.rank, r)
 
 #    def get_unknown(self, shape, name='v'):
 #        A = numpy.empty(shape, dtype=object)
@@ -221,8 +335,9 @@ class Solver(System):
 
     def get_phase(self, name='v'):
         A = numpy.empty((2,2), dtype=object)
-        A[:] = Complex(Const(0), Const(0))
-        A[0,0] = Complex(Const(1), Const(0))
+        zero, one = self.zero, self.one
+        A[:] = Complex(zero, zero)
+        A[0,0] = Complex(one, zero)
         A[1,1] = self.get_scalar(name)
         A = Matrix(A)
         self.items.append(A)
@@ -246,16 +361,96 @@ class Solver(System):
             self.add_scalar(lhs[idx], rhs[idx])
         #print(len(eqs), "eqs")
 
-    def _solve(self):
-        n = len(self.vs)
-        x0 = list(numpy.random.normal(size=n))
-        v = self.get_root(x0=x0)
-        #items = solver.root()
-        #v = items[0]
-        return v
+    def py_func(self, verbose=False):
+        arg = "".join(str(v)+"," for v in self.vs)
+        #lines = ["def f(%s):"%arg]
+        lines = ["def f(x):"]
+        lines.append("  %s = x" % (arg,))
+        lines.append("  value = [")
+        for eq in self.eqs:
+            lines.append("    %s,"%(eq,))
+        lines.append("  ]")
+        lines.append("  return value")
+        code = '\n'.join(lines)
+        code = code.replace(" 1.0*", " ")
+        if verbose:
+            print(code)
+        ns = {}
+        exec(code, ns, ns)
+        return ns['f']
 
-    def subs(self, x):
-        return x
+    def root(self, trials=1, scale=1., method="lm",  # only lm works...
+            tol=1e-6, maxiter=1000, jac=True, debug=False, guess=1, verbose=0):
+        from scipy.optimize import root
+        n = len(self.vs)
+        f = self.py_func()
+        if jac:
+            jac = self.py_jac()
+        eol = ''
+        for trial in range(trials):
+            best = None
+            r = None
+            for _ in range(guess):
+                x0 = numpy.random.normal(size=n)*scale
+                fx0 = f(x0)
+                value = sum(abs(y) for y in fx0)
+                if best is None or value < r:
+                    best = x0
+                    r = value
+                    if guess>1:
+                        print("[%.3f]"%r, end="", flush=True)
+            if guess>1:
+                print()
+            x0 = best
+            #if verbose:
+            #    print("root: ", end="", flush=True); eol='\n'
+            solution = root(f, x0, method=method, jac=jac, tol=tol, options={"maxiter":maxiter})
+            if not solution.success and verbose:
+                print(".", end='', flush=True)
+                eol = '\n'
+
+            x = solution.x
+            fx = f(x)
+            for y in fx:
+                if abs(y) > 1e-4:
+                    break
+            else:
+                break
+            if verbose:
+                print("X", end='', flush=True)
+                eol = '\n'
+        else:
+            print()
+            return None
+        print(eol, end='')
+        self.solution = solution
+        x = solution.x
+        fx = f(x)
+        for y in fx:
+            if abs(y) > 1e-4:
+                print("System.root FAIL: %s != 0.0" % y)
+                return None
+        if debug:
+            print("x = ", x)
+            print("f(x) =", (' '.join("%.3f"%xi for xi in f(x))))
+            df = jac(x)
+            print("df(x) =", str(df)[:1000]+"...")
+            #sol = self.get_root(list(x))
+            #print("sol:", sol)
+            #x = sol
+        values = self.subs(x=x)
+        return values
+
+#    def _solve(self):
+#        n = len(self.vs)
+#        x0 = list(numpy.random.normal(size=n))
+#        v = self.get_root(x0=x0)
+#        #items = solver.root()
+#        #v = items[0]
+#        return v
+#
+#    def subs(self, x):
+#        return x
 
     def subs(self, values=None, x=None, dtype=float):
         if values is None:
@@ -273,7 +468,7 @@ class Solver(System):
 
 
 
-def test():
+def test_root():
     # find a fifth root of unity
 
     one = Complex(1,0)
@@ -319,8 +514,8 @@ def get_projector(code):
     print("get_projector")
     N = 2**code.n
     M = 2**code.m
-    #P = M*code.get_projector()
-    P = code.get_average_operator()
+    P = M*code.get_projector()
+    #P = code.get_average_operator()
 
     A = numpy.zeros((N,N), dtype=object)
     for idx in numpy.ndindex((N,N)):
@@ -344,6 +539,8 @@ def get_projector(code):
 
 
 def main_find():
+
+    test()
 
     if argv.code==(5,1,3):
         code = construct.get_513() # doesn't find the SH ... hmm..
@@ -374,28 +571,40 @@ def main_find():
     #print(code.longstr())
     P = get_projector(code)
 
-    return
-
-    found = set()
-    solver = Solver()
+    #return
 
     I = Matrix.identity(2)
 
+    found = set()
+
     print("g")
     if 0:
+        solver = Solver()
         U = solver.get_phase()
         g = reduce(matmul, [U]*code.n)
     elif 0:
+        solver = Solver()
         U = solver.get_unknown((2,2))
         solver.add( U*U.d , I )
         #solver.add(U*U*U, I)
         g = reduce(matmul, [U]*code.n)
     else:
+        solver = Solver(2*code.n)
         ops = [solver.get_phase() for i in range(code.n)]
         g = reduce(matmul, ops)
 
+    solver.check()
+
+    #print(g)
+    #return
+
+    print("lhs, rhs")
+    lhs = P*g
+    rhs = g*P
     print("solver.add")
-    solver.add( P*g , g*P )
+    solver.add( lhs, rhs )
+
+    #return
 
     print("solve")
     #for eq in solver.eqs:
@@ -411,7 +620,9 @@ def main_find():
         if s in found:
             continue
         found.add(s)
-        print(s)
+        print(s, len(found))
+
+        #break
     
 
 
