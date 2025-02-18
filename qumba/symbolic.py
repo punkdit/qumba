@@ -27,7 +27,9 @@ def snum(a):
     return "%.6f"%a
 
 class Complex:
-    def __init__(self, a, b=0):
+    def __init__(self, a, b):
+        assert isinstance(a, (Poly, int, float)), (type(a), a)
+        assert isinstance(b, (Poly, int, float)), (type(b), b)
         self.a = a
         self.b = b
     def __str__(self):
@@ -142,7 +144,6 @@ class Poly:
             r += v*s
         return r
     def __eq__(self, other):
-        #zero = Complex(0)
         zero = 0
         for k,v in self.cs.items():
             if other.cs.get(k, zero) != v:
@@ -176,11 +177,14 @@ class Poly:
             elif v != 0:
                 cs[k] = v
         return Poly(cs)
+    def __neg__(self):
+        cs = {k:-v for (k,v) in self.cs.items()}
+        return Poly(cs)
     def __mul__(lhs, rhs):
         if type(rhs) == float:
             #assert 0, "%s"%rhs
-            assert rhs==int(rhs)
-            rhs = int(rhs)
+            assert abs(rhs-int(round(rhs))) < EPSILON, str(rhs)
+            rhs = int(round(rhs))
         if type(rhs) == int:
             return lhs.__rmul__(rhs)
         cs = {}
@@ -195,7 +199,6 @@ class Poly:
                 cs[k] = v
         return Poly(cs)
     def __rmul__(self, r):
-        #r = Complex.promote(r)
         r = int(r)
         if r==0:
             return Poly({})
@@ -333,6 +336,13 @@ class Solver:
         self.items.append(A)
         return A
 
+    def get_identity(self):
+        zero = self.const(0)
+        one = self.const(1)
+        zero, one = Complex(zero,zero), Complex(one,zero)
+        I = Matrix([[one,zero],[zero,one]])
+        return I
+
     def get_phase(self, name='v'):
         A = numpy.empty((2,2), dtype=object)
         zero, one = self.zero, self.one
@@ -343,7 +353,7 @@ class Solver:
         self.items.append(A)
         return A
 
-    def add_scalar(self, lhs, rhs=Complex(0)):
+    def add_scalar(self, lhs, rhs):
         eqs = self.eqs
         z = lhs-rhs
         assert isinstance(z, Complex)
@@ -548,6 +558,22 @@ def main_find():
         code = construct.get_422() # finds the Hadamard
     elif argv.code==(4,1,2):
         code = construct.get_412()
+    elif argv.code==(6,1,2):
+        code = QCode.fromstr("""
+        XXXXII
+        IIXXXX
+        ZZZZII
+        IIZZZZ
+        IYIYIY
+        """)
+    elif argv.code==(6,2,2):
+        #code = construct.get_622()
+        code = QCode.fromstr("""
+        XXXXII
+        IIXXXX
+        ZZZZII
+        IIZZZZ
+        """)
     elif argv.code==(7,1,3):
         code = construct.get_713() 
     elif argv.code==(8,3,2):
@@ -568,30 +594,50 @@ def main_find():
         return
 
     print(code)
+
+    #dode = code.apply_S()
+    #print(dode.is_equiv(code))
+    #return
+
     #print(code.longstr())
     P = get_projector(code)
 
     #return
 
-    I = Matrix.identity(2)
+    #I = Matrix.identity(2)
 
     found = set()
 
     print("g")
-    if 0:
-        solver = Solver()
+    if argv.constphase:
+        solver = Solver(2)
         U = solver.get_phase()
         g = reduce(matmul, [U]*code.n)
-    elif 0:
-        solver = Solver()
+    elif argv.constdiag:
+        solver = Solver(8)
+        I = solver.get_identity()
         U = solver.get_unknown((2,2))
         solver.add( U*U.d , I )
-        #solver.add(U*U*U, I)
         g = reduce(matmul, [U]*code.n)
-    else:
+    elif argv.diag:
+        solver = Solver(8 * code.n)
+#        zero = solver.const(0)
+#        one = solver.const(1)
+#        zero,one = Complex(zero,zero), Complex(one,zero)
+#        I = Matrix([[one,zero],[zero,one]])
+        I = solver.get_identity()
+        ops = []
+        for i in range(code.n):
+            U = solver.get_unknown((2,2))
+            solver.add( U*U.d , I )
+            ops.append(U)
+        g = reduce(matmul, ops)
+    elif argv.phase:
         solver = Solver(2*code.n)
         ops = [solver.get_phase() for i in range(code.n)]
         g = reduce(matmul, ops)
+    else:
+        return
 
     solver.check()
 
@@ -604,7 +650,20 @@ def main_find():
     print("solver.add")
     solver.add( lhs, rhs )
 
-    #return
+    eqs = solver.eqs
+    print("eqs:", len(solver.eqs))
+    if 0:
+        n = len(eqs)
+        for i in range(n):
+          #print(eqs[i])
+          for j in range(i+1,n):
+            if eqs[i] == eqs[j]:
+                print("*", end="", flush=True)
+            else:
+                assert str(eqs[i]) != str(eqs[j])
+          #print("/", end="", flush=True)
+        #print()
+        #return
 
     print("solve")
     #for eq in solver.eqs:
@@ -615,7 +674,8 @@ def main_find():
     while 1:
         items = solver.solve(trials=100, jac=False)
 
-        s = str([u[1,1] for u in items])
+        #s = str([u[1,1] for u in items])
+        s = str([u for u in items])
     
         if s in found:
             continue
