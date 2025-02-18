@@ -232,16 +232,20 @@ def test():
     x = S.gens()[0]
     zero = x**2
     one = (x+1)**2
+    print("one:", one)
+    print("x:", x)
+    #return
 
-    els = [zero, one, one+x]
+    els = [zero, one, one+x, x]
     found = []
     n = argv.get("n", 2)
     I = Matrix.identity(S, n)
     rows = list(cross([els]*n))
     shuffle(rows)
-    for cols in cross( [rows]*n ):
-    #while 1:
-        #cols = [choice(rows) for i in range(n)]
+    #for cols in cross( [rows]*n ):
+    print("search:")
+    while 1:
+        cols = [choice(rows) for i in range(n)]
         M = Matrix(S, cols)
         if M*M.t == I:
             found.append(M)
@@ -249,9 +253,11 @@ def test():
             if len(found) > 1:
                 G = mulclose(found, verbose=True)
                 print("|G|=", len(G))
-                del G # free mem
+                #del G # free mem
                 #break
     print()
+    #for g in G:
+    #    print(g)
 
 
 if __name__ == "__main__":
