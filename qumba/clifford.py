@@ -1309,6 +1309,45 @@ def test_prep():
     print(r2*r_)
 
 
+def test_heirarchy():
+    K = CyclotomicField(8)
+    w = w8
+    one = K.one()
+    w2 = w*w
+    r2 = w+w.conjugate()
+    ir2 = r2 / 2
+    
+    I = Matrix(K, [[1, 0], [0, 1]])
+    w2I = Matrix(K, [[w2, 0], [0, w2]])
+    S = Matrix(K, [[1, 0], [0, w2]])
+    X = Matrix(K, [[0, 1], [1, 0]])
+    Z = Matrix(K, [[1, 0], [0, -1]])
+    H = Matrix(K, [[ir2, ir2], [ir2, -ir2]])
+    
+    Pauli1 = mulclose([w2I, X, Z])
+    Cliff1 = mulclose([w2I, S, H])
+    
+    assert len(Pauli1) == 16
+    assert len(Cliff1) == 192
+
+    nI = -I
+    assert nI in Cliff1
+
+    found = [g for g in Cliff1 if g*g==I]
+    count = 0
+    n = len(found)
+    for i in range(n):
+      g = found[i]
+      for j in range(i+1,n):
+        h = found[j]
+        if g*h == -h*g:
+            G = mulclose([g,h])
+            assert len(G) == 8
+            count += 1
+    print("found:", count)
+
+
+    
 def test():
     test_clifford()
     test_clifford3()
