@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+"""
+encoding equations as polynomials & rootfinding.
+
+"""
 
 from math import sin, cos, pi
 from functools import reduce
@@ -13,73 +17,11 @@ from qumba import construct
 from qumba.qcode import QCode
 from qumba.argv import argv
 from qumba.smap import SMap
+from qumba.action import mulclose
 
 
 
 EPSILON = 1e-8
-
-def snum(a):
-    if not isinstance(a, numpy.number):
-        return a
-    for v in [-1, 0, 1]:
-        if abs(a-v) < EPSILON:
-            return v
-    return "%.6f"%a
-
-class Complex:
-    def __init__(self, a, b):
-        assert isinstance(a, (Poly, int, float)), (type(a), a)
-        assert isinstance(b, (Poly, int, float)), (type(b), b)
-        self.a = a
-        self.b = b
-    def __str__(self):
-        a = snum(self.a)
-        b = snum(self.b)
-        s = "<%s+i*%s>"%(a, b)
-        if s.endswith("+i*0>"):
-            s = s[:-len("+i*0>")] + ">"
-        elif s.startswith("<0+"):
-            s = "<" + s[len("<0+"):]
-        return s
-    #def __repr__(self):
-    #    return "Complex(%s,%s)"%(self.a, self.b)
-    __repr__ = __str__
-    def __eq__(self, other):
-        #return self.a==other.a and self.b==other.b
-        err = (self.a-other.a)**2 + (self.b-other.b)**2
-        return err<EPSILON
-    def __add__(self, other):
-        return Complex(self.a+other.a, self.b+other.b)
-    def __sub__(self, other):
-        return Complex(self.a-other.a, self.b-other.b)
-    def __neg__(self):
-        return Complex(-self.a, -self.b)
-    def __mul__(self, other):
-        a = self.a*other.a - self.b*other.b
-        b = self.b*other.a + self.a*other.b
-        return Complex(a, b)
-    def __pow__(self, n):
-        if n==0:
-            return Complex(1,0)
-        a = self
-        while n>1:
-            a = a*self
-            n -= 1
-        return a
-    def conj(self):
-        return Complex(self.a, -self.b)
-    @classmethod
-    def promote(cls, item):
-        if isinstance(item, Complex):
-            return item
-        return Complex(item)
-    def subs(self, values):
-        #print("Complex", self, values)
-        a = self.a.subs(values)
-        b = self.b.subs(values)
-        return Complex(a, b)
-
-
 class Poly:
     "multivariate polynomials over the integers"
     def __init__(self, cs={}):
@@ -206,38 +148,70 @@ class Poly:
         return Poly(cs)
 
 
-def test():
+def snum(a):
+    if not isinstance(a, numpy.number):
+        return a
+    for v in [-1, 0, 1]:
+        if abs(a-v) < EPSILON:
+            return v
+    return "%.6f"%a
 
-    #one = Complex(1)
-    #i = Complex(0,1)
+class Complex:
+    def __init__(self, a, b):
+        assert isinstance(a, (Poly, int, float)), (type(a), a)
+        assert isinstance(b, (Poly, int, float)), (type(b), b)
+        assert type(a) is type(b)
+        self.a = a
+        self.b = b
+    def __str__(self):
+        a = snum(self.a)
+        b = snum(self.b)
+        s = "<%s+i*%s>"%(a, b)
+        if s.endswith("+i*0>"):
+            s = s[:-len("+i*0>")] + ">"
+        elif s.startswith("<0+"):
+            s = "<" + s[len("<0+"):]
+        return s
+    #def __repr__(self):
+    #    return "Complex(%s,%s)"%(self.a, self.b)
+    __repr__ = __str__
+    def __eq__(self, other):
+        assert type(self.a) == type(other.a)
+        if type(self.a) is Poly: # argh.. use inheritance ??
+            return self.a==other.a and self.b==other.b
+        err = (self.a-other.a)**2 + (self.b-other.b)**2
+        return err<EPSILON
+    def __add__(self, other):
+        return Complex(self.a+other.a, self.b+other.b)
+    def __sub__(self, other):
+        return Complex(self.a-other.a, self.b-other.b)
+    def __neg__(self):
+        return Complex(-self.a, -self.b)
+    def __mul__(self, other):
+        a = self.a*other.a - self.b*other.b
+        b = self.b*other.a + self.a*other.b
+        return Complex(a, b)
+    def __pow__(self, n):
+        if n==0:
+            return Complex(1,0)
+        a = self
+        while n>1:
+            a = a*self
+            n -= 1
+        return a
+    def conj(self):
+        return Complex(self.a, -self.b)
+    @classmethod
+    def promote(cls, item):
+        if isinstance(item, Complex):
+            return item
+        return Complex(item)
+    def subs(self, values):
+        #print("Complex", self, values)
+        a = self.a.subs(values)
+        b = self.b.subs(values)
+        return Complex(a, b)
 
-    one = Poly({(0,0,0):1})
-    zero = Poly({})
-
-    assert one == Poly.const(3,1)
-
-    a = Poly({(1,0,0):1})
-    b = Poly({(0,1,0):1})
-    c = Poly({(0,0,1):1})
-
-    assert str(a) == "v0", str(a)
-    assert str(a+b) == "(v0+v1)", str(a+b)
-
-    assert c == Poly.get_var(3, 2)
-
-    assert one*one == one
-    assert one*a == a
-    assert a+b == b+a
-    assert a+b != b
-    assert a+a == Poly({(1,0,0):2})
-    assert a*a == Poly({(2,0,0):1})
-    assert (a+b)*a == a*a + b*a
-    assert (a+b)*(b+c) == a*b + a*c + b*b + b*c
-
-    assert 3*a == a+a+a
-
-    assert (a+b) * (a-b) == a*a - b*b
-    assert (a+b)*(a+b) == a*a + 2*a*b + b*b
 
 
 class Matrix:
@@ -250,7 +224,9 @@ class Matrix:
 
     def __str__(self):
         #s = smap
-        return "Matrix(\n%s)"%str(self.A)
+        s = "Matrix(\n%s)"%str(self.A)
+        s = s.replace("\n", "")
+        return s
     __repr__ = __str__
 
     def copy(self):
@@ -258,6 +234,9 @@ class Matrix:
 
     def __eq__(self, other):
         return numpy.all(self.A == other.A)
+
+    def __hash__(self):
+        return hash(str(self))
 
     @classmethod
     def identity(self, n):
@@ -282,11 +261,19 @@ class Matrix:
     @property
     def d(self):
         A = self.A.transpose()
+        A = A.copy()
         for idx in numpy.ndindex(A.shape):
             A[idx] = A[idx].conj()
         A = Matrix(A)
         return A
         
+    def __pow__(self, n):
+        assert n>0
+        a = self
+        while n>1:
+            a = a*self
+            n -= 1
+        return a
     
 # modified from bruhat.comonoid
 class Solver:
@@ -336,11 +323,48 @@ class Solver:
         self.items.append(A)
         return A
 
-    def get_identity(self):
-        zero = self.const(0)
-        one = self.const(1)
-        zero, one = Complex(zero,zero), Complex(one,zero)
-        I = Matrix([[one,zero],[zero,one]])
+    def get_const(self, real, imag=0):
+        real = self.const(real)
+        imag = self.const(imag)
+        return Complex(real, imag)
+
+    def get_zero(self, d=2):
+        zero = self.get_const(0)
+        I = [[zero for i in range(d)] for i in range(d)]
+        I = Matrix(I)
+        return I
+
+    def promote(self, M):
+        M = numpy.array(M)
+        d = len(M)
+        A = self.get_zero(d)
+        for i in range(d):
+          for j in range(d):
+            u = M[i,j]
+            assert isinstance(u, (int, numpy.number)), repr(u)
+            A[i,j] = self.get_const(u)
+        return A
+
+    def X(self):
+        return self.promote([[0,1],[1,0]])
+
+    def Z(self):
+        return self.promote([[1,0],[0,-1]])
+
+#    def X(self):
+#        one = self.get_const(1)
+#        X = self.get_zero()
+#        X[1,0] = one
+#        X[0,1] = one
+#        return X
+
+    def get_identity(self, d=2):
+        zero = self.get_const(0)
+        one = self.get_const(1)
+        I = [[zero for i in range(d)] for i in range(d)]
+        for i in range(d):
+            I[i][i] = one
+        I = Matrix(I)
         return I
 
     def get_phase(self, name='v'):
@@ -478,30 +502,72 @@ class Solver:
 
 
 
+def test_poly():
+
+    #one = Complex(1)
+    #i = Complex(0,1)
+
+    one = Poly({(0,0,0):1})
+    zero = Poly({})
+
+    assert one == Poly.const(3,1)
+
+    a = Poly({(1,0,0):1})
+    b = Poly({(0,1,0):1})
+    c = Poly({(0,0,1):1})
+
+    assert str(a) == "v0", str(a)
+    assert str(a+b) == "(v0+v1)", str(a+b)
+
+    assert c == Poly.get_var(3, 2)
+
+    assert one*one == one
+    assert one*a == a
+    assert a+b == b+a
+    assert a+b != b
+    assert a+a == Poly({(1,0,0):2})
+    assert a*a == Poly({(2,0,0):1})
+    assert (a+b)*a == a*a + b*a
+    assert (a+b)*(b+c) == a*b + a*c + b*b + b*c
+
+    assert 3*a == a+a+a
+
+    assert (a+b) * (a-b) == a*a - b*b
+    assert (a+b)*(a+b) == a*a + 2*a*b + b*b
+
+
 def test_root():
     # find a fifth root of unity
 
-    one = Complex(1,0)
+    solver = Solver(2)
+    #z = solver.get_scalar()
+    #print(z)
+    #print(z**5)
+    z = solver.get_unknown((1,1))
 
-    solver = Solver()
-    z = solver.get_scalar()
-    print(z)
+    one = solver.get_const(1)
+    I = solver.get_identity(1)
 
-    solver.add_scalar(z**5, one)
-    solver.add_scalar(z*z.conj(), one) # _redundant
+    solver.add(z**5, I)
+    solver.add(z*z.d, I) # _redundant
+
+    for i in range(10):
+        items = solver.solve(trials=100, jac=False)
+        z = items[0]
+        u = z.d
+        #print(z)
+        #print(u)
+        #print(z*u, z**5)
 
     if 0:
-        print("solution:")
-        print(v, type(v))
-    
         theta = 2*pi / 5
         for i in range(5):
             print(sin(i*theta), cos(i*theta))
 
+    # ----------------------------------
 
-    solver = Solver()
-
-    I = Matrix.identity(2)
+    solver = Solver(8)
+    I = solver.get_identity(2)
     U = solver.get_unknown((2,2))
     solver.add( U*U.d , I )
     solver.add( U*U*U , I )
@@ -509,14 +575,34 @@ def test_root():
     UU = U@U
     assert UU.shape == (4,4)
 
-    items = solver.solve(trials=100)
+    items = solver.solve(trials=100, jac=False)
     u = items[0]
 
-    #print("identity:", u==I)
-    #print(u)
     uuu = u*u*u
-    assert (uuu==I)
-    assert u*u.d == I
+    assert str(uuu) == str(I)
+
+    # ----------------------------------
+
+    solver = Solver(8)
+    I = solver.get_identity(2)
+    U = solver.get_unknown((2,2))
+    solver.add( U*U.d , I )
+
+    X = solver.X()
+    Z = solver.Z()
+
+    Pauli = mulclose([X,Z])
+    print(len(Pauli))
+
+    print(X == X)
+    print(X)
+    print(U*X*U.d)
+
+    
+
+#    items = solver.solve(trials=100, jac=False)
+#    u = items[0]
+
     
 
 def get_projector(code):
@@ -549,8 +635,6 @@ def get_projector(code):
 
 
 def main_find():
-
-    test()
 
     if argv.code==(5,1,3):
         code = construct.get_513() # doesn't find the SH ... hmm..
@@ -647,6 +731,7 @@ def main_find():
     solver.add( lhs, rhs )
 
     eqs = solver.eqs
+    print("vs:", solver.rank)
     print("eqs:", len(solver.eqs))
     if 0:
         n = len(eqs)
@@ -678,7 +763,7 @@ def main_find():
         found.add(s)
         print(s, len(found))
 
-        #break
+        break
     
 
 

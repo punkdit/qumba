@@ -12,7 +12,7 @@ from qumba.lin import (parse, shortstr, linear_independent, eq2, dot2, identity2
     rank, rand2, pseudo_inverse, kernel, direct_sum)
 
 
-from qumba.qcode import QCode, SymplecticSpace
+from qumba.qcode import QCode, SymplecticSpace, strop
 from qumba.csscode import CSSCode
 from qumba import construct 
 from qumba.syntax import Syntax
@@ -443,13 +443,14 @@ def test_clifford_pairs():
                 
 
 def test_state_prep():
-    "fault tolerant state prep"
+    "fault tolerant state prep for CSS codes"
 
     from qumba.matrix import Matrix
     from qumba.umatrix import UMatrix, Solver, If, Not, And, Or, PbLe
 
     #code = construct.get_surface(3,3)
     code = construct.get_512() # sat
+    code = QCode.fromstr("XXXXII IIXXXX ZZZZII IIZZZZ") # sat
     #code = construct.get_713() # unsat
     #code = construct.get_toric(2,2) # [[8,2,2]] sat
     #code = construct.get_10_2_3() # unsat
@@ -464,11 +465,11 @@ def test_state_prep():
     print(code.longstr())
     print()
 
-    if 1:
-        E = code.get_encoder()
-        H = code.H
-        L = code.L
+    E = code.get_encoder()
+    H = code.H
+    L = code.L
 
+    if 0:
         print("E:")
         print(E, E.shape)
         print()
@@ -481,17 +482,17 @@ def test_state_prep():
         print(L, L.shape)
         print()
 
-        #return
-    
-        M = []
-        for i in range(code.m):
-            u = [0]*nn
-            u[2*i] = 1
-            M.append(u)
-        M = Matrix(M).t
-        EM = E*M
-        #print(EM, EM.shape)
-        assert EM == H.t
+    #return
+
+    M = []
+    for i in range(code.m):
+        u = [0]*nn
+        u[2*i] = 1
+        M.append(u)
+    M = Matrix(M).t
+    EM = E*M
+    #print(EM, EM.shape)
+    assert EM == H.t
 
     print("finding logops...")
     rows = []
@@ -509,7 +510,7 @@ def test_state_prep():
             assert d>=code.d
             if d==code.d:
                 logops.append(l)
-                print(l)
+                print(l, strop(l))
 
     print("logops:", len(logops))
     del L
@@ -791,28 +792,179 @@ def test_ancilla():
     #print(count)
 
 
-def test_css():
+def test_prep():
+    "fault tolerant state prep "
 
     from qumba.matrix import Matrix
     from qumba.umatrix import UMatrix, Solver, If, Not, And, Or, PbLe
 
     #code = construct.get_surface(3,3)
-    code = construct.get_512() # sat
-    #code = construct.get_713() # unsat
-    #code = construct.get_toric(2,2) # [[8,2,2]] sat
-    #code = construct.get_10_2_3() # ?
+    #code = construct.get_513() # unsat
+    #code = construct.get_512()
+    code = QCode.fromstr("XXXXII IIXXXX ZZZZII IIZZZZ IYIYIY ZIZIZI")
 
-    E = code.get_encoder()
-    print("E:")
-    print(E)
-    print(code.longstr())
-
-    code = code.to_css()
-    code.bz_distance()
+    space = code.space
+    n = code.n
+    nn = 2*n
 
     print(code)
-
     print(code.longstr())
+    print()
+
+    E = code.get_encoder()
+    H = code.H
+    L = code.L
+
+    if 0:
+        print("E:")
+        print(E, E.shape)
+        print()
+    
+        print("H:")
+        print(H, H.shape)
+        print()
+    
+        print("L:")
+        print(L, L.shape)
+        print()
+
+    #return
+
+    M = []
+    for i in range(code.m):
+        u = [0]*nn
+        u[2*i] = 1
+        M.append(u)
+    M = Matrix(M).t
+    EM = E*M
+    #print(EM, EM.shape)
+    assert EM == H.t
+
+    def weight(l):
+        s = strop(l)
+        return len(s) - s.count('.')
+    assert weight(numpy.array([1,0,0,0])) == 1
+    assert weight(numpy.array([1,1,0,0])) == 1
+    assert weight(numpy.array([1,1,0,1])) == 2
+
+    print("finding minimum weight logops...")
+    rows = []
+    kk = 2*code.k
+    H = code.H
+    L = code.L[:kk]
+    ldxs = list(Matrix(list(i)) for i in numpy.ndindex((2,)*kk) if sum(i))
+    assert len(ldxs) == 2**kk-1
+    logops = []
+    for idx in numpy.ndindex((2,)*code.m):
+        idx = Matrix(idx)
+        for ldx in ldxs:
+            l = idx*H + ldx*L
+            d = weight(l)
+            assert d>=code.d
+            if d==code.d:
+                logops.append(l)
+                print(strop(l))
+    print("logops:", len(logops))
+    del L
+
+    print("E =")
+    print(E)
+    def dump_ft(E):
+        print("dump_ft:")
+        #for i in range(2*code.n):
+        for i in range(1,2*code.n,2):
+            u = E[:,i]
+            print(u, end=" ")
+            for l in logops:
+                lu = Matrix(l.A * u.A)
+                c = lu.sum() or "." #if lu==u else "."
+                print(c, end="")
+            print(" i=%d"%i)
+
+    dump_ft(E)
+    #print(code.longstr())
+    print()
+
+    # find a fault tolerant unitary encoder U:
+
+    solver = Solver()
+    add = solver.add
+
+    m = code.m
+    U = UMatrix.unknown(*E.shape)
+    V = UMatrix.unknown(m,m)
+    W = UMatrix.unknown(m,m)
+    add(V*W==Matrix.identity(m))
+    add(U*M == H.t*V)
+    add(U.t*space.F*U == space.F)
+
+    #for i in range(1,2*code.m,2):
+    for i in range(1,2*code.n,2):
+        print(i, end=" ")
+        u = U[:,i]
+        #print(u, end=" ")
+        for l in logops:
+            lu = UMatrix(l.A * u.A)
+            items = list(lu)
+            items = [item.get() for item in items] # if str(item)!="0"]
+            #print(item, type(item))
+            #add(If(lu==u, Not(And(*[item for item in items])), True))
+            #add(Not(And(*[item for item in items])))
+            add(PbLe([(i,True) for i in items], 1))
+        #print(i)
+
+#    def x_type(i):
+#        for j in range(n):
+#            add(U[2*j+1, 2*i] == 0) # X type
+#            add(U[2*j, 2*i+1] == 0) # Z type
+#    def z_type(i):
+#        for j in range(n):
+#            add(U[2*j, 2*i] == 0) # Z type
+#            add(U[2*j+1, 2*i+1] == 0) # X type
+#
+#    css = code.to_css()
+#    mx, mz = css.mx, css.mz
+#    for i in range(n):
+#        if i < mx:
+#            x_type(i)
+#        elif i < mx+mz:
+#            z_type(i)
+#        else:
+#            x_type(i)
+
+
+    print()
+    print("solve:")
+    count = 0
+    while 1:
+        result = solver.check()
+        print(result)
+        if str(result) != "sat":
+            break
+        count += 1
+    
+        model = solver.model()
+        U1 = U.get_interp(model)
+        V1 = V.get_interp(model)
+        W1 = W.get_interp(model)
+        print()
+        print("U1:")
+        print(U1)
+        print()
+        assert (V1*W1) == Matrix.identity(m)
+        if code.k:
+            dump_ft(U1)
+
+        add(U != U1)
+    
+        dode = QCode.from_encoder(U1, k=code.k)
+        assert (dode.is_equiv(code))
+
+        print(dode.longstr())
+        #print(".", end='', flush=True)
+        #break
+
+    #print(count)
 
 
 if __name__ == "__main__":

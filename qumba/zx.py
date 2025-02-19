@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+"""
+scalable phase accurate Clifford group
+"""
+
 import pyzx as zx
 
 from qumba.argv import argv
