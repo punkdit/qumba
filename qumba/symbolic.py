@@ -621,10 +621,6 @@ def main_find():
         g = reduce(matmul, [U]*code.n)
     elif argv.diag:
         solver = Solver(8 * code.n)
-#        zero = solver.const(0)
-#        one = solver.const(1)
-#        zero,one = Complex(zero,zero), Complex(one,zero)
-#        I = Matrix([[one,zero],[zero,one]])
         I = solver.get_identity()
         ops = []
         for i in range(code.n):
