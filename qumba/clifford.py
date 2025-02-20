@@ -1309,7 +1309,7 @@ def test_prep():
     print(r2*r_)
 
 
-def test_heirarchy():
+def get_cliff1():
     K = CyclotomicField(8)
     w = w8
     one = K.one()
@@ -1318,11 +1318,12 @@ def test_heirarchy():
     ir2 = r2 / 2
     
     I = Matrix(K, [[1, 0], [0, 1]])
-    w2I = Matrix(K, [[w2, 0], [0, w2]])
-    S = Matrix(K, [[1, 0], [0, w2]])
+    w2I = Matrix(K, [[w2, 0], [0, w2]], ('w2I',))
+    assert w2I**2 == -I
+    S = Matrix(K, [[1, 0], [0, w2]], ('S',))
     X = Matrix(K, [[0, 1], [1, 0]])
     Z = Matrix(K, [[1, 0], [0, -1]])
-    H = Matrix(K, [[ir2, ir2], [ir2, -ir2]])
+    H = Matrix(K, [[ir2, ir2], [ir2, -ir2]], ('H',))
     
     Pauli1 = mulclose([w2I, X, Z])
     Cliff1 = mulclose([w2I, S, H])
@@ -1330,16 +1331,30 @@ def test_heirarchy():
     assert len(Pauli1) == 16
     assert len(Cliff1) == 192
 
+    return Cliff1
+
+
+def test_heirarchy():
+    Cliff1 = get_cliff1()
+
+    names = set()
+    for g in Cliff1:
+        name = g.name
+        print(name)
+        #name = tuple(n for n in name if n!='w2I')
+        #names.add(name)
+    #print("names:", len(names))
+
     nI = -I
     assert nI in Cliff1
 
-    found = [g for g in Cliff1 if g*g==I]
+    refls = [g for g in Cliff1 if g*g==I]
     count = 0
-    n = len(found)
+    n = len(refls)
     for i in range(n):
-      g = found[i]
+      g = refls[i]
       for j in range(i+1,n):
-        h = found[j]
+        h = refls[j]
         if g*h == -h*g:
             G = mulclose([g,h])
             assert len(G) == 8

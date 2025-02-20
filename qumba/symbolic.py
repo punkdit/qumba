@@ -24,21 +24,22 @@ from qumba.action import mulclose
 EPSILON = 1e-8
 class Poly:
     "multivariate polynomials over the integers"
-    def __init__(self, cs={}):
+    def __init__(self, rank, cs):
         self.cs = dict(cs) # map tuple -> coeff
         for k,v in cs.items():
             assert v != 0, self # <----------- TODO: REMOVE ME FOR SPEED TODO 
+        self.rank = rank
     @classmethod
     def get_var(cls, rank, idx):
         assert 0<=idx<rank
         key = [0]*rank
         key[idx] = 1
-        return cls({tuple(key):1})
+        return cls(rank, {tuple(key):1})
     @classmethod
     def const(cls, rank, r):
         if r == 0:
-            return cls({})
-        return cls({(0,)*rank:r})
+            return cls(rank, {})
+        return cls(rank, {(0,)*rank:r})
     #def __str__(self):
     #    return str(self.cs)
     def __str__(self):
@@ -86,6 +87,8 @@ class Poly:
             r += v*s
         return r
     def __eq__(self, other):
+        if not isinstance(other, Poly):
+            other = Poly.const(self.rank, rhs)
         zero = 0
         for k,v in self.cs.items():
             if other.cs.get(k, zero) != v:
@@ -100,6 +103,8 @@ class Poly:
             return False
         return True
     def __add__(lhs, rhs):
+        if not isinstance(rhs, Poly):
+            rhs = Poly.const(lhs.rank, rhs)
         cs = dict(lhs.cs)
         zero = 0
         for k,v in rhs.cs.items():
@@ -108,8 +113,10 @@ class Poly:
                 del cs[k]
             elif v != 0:
                 cs[k] = v
-        return Poly(cs)
+        return Poly(lhs.rank, cs)
     def __sub__(lhs, rhs):
+        if not isinstance(rhs, Poly):
+            rhs = Poly.const(lhs.rank, rhs)
         cs = dict(lhs.cs)
         zero = 0
         for k,v in rhs.cs.items():
@@ -118,10 +125,10 @@ class Poly:
                 del cs[k]
             elif v != 0:
                 cs[k] = v
-        return Poly(cs)
+        return Poly(lhs.rank, cs)
     def __neg__(self):
         cs = {k:-v for (k,v) in self.cs.items()}
-        return Poly(cs)
+        return Poly(self.rank, cs)
     def __mul__(lhs, rhs):
         if type(rhs) == float:
             #assert 0, "%s"%rhs
@@ -139,13 +146,21 @@ class Poly:
                 del cs[k]
             elif v != 0:
                 cs[k] = v
-        return Poly(cs)
+        return Poly(lhs.rank, cs)
     def __rmul__(self, r):
         r = int(r)
         if r==0:
-            return Poly({})
+            return Poly(self.rank, {})
         cs = {k:r*v for (k,v) in self.cs.items()}
-        return Poly(cs)
+        return Poly(self.rank, cs)
+    def __pow__(self, n):
+        assert n>0
+        a = self
+        while n>1:
+            a = a*self
+            n -= 1
+        return a
+    
 
 
 def snum(a):
@@ -176,20 +191,33 @@ class Complex:
     #    return "Complex(%s,%s)"%(self.a, self.b)
     __repr__ = __str__
     def __eq__(self, other):
-        assert type(self.a) == type(other.a)
+        #assert type(self.a) == type(other.a), (type(self.a), type(other.a))
+        assert isinstance(other, Complex)
+        if type(self.a) != type(other.a):
+            return str(self) == str(other) # hack this
         if type(self.a) is Poly: # argh.. use inheritance ??
             return self.a==other.a and self.b==other.b
         err = (self.a-other.a)**2 + (self.b-other.b)**2
         return err<EPSILON
     def __add__(self, other):
+        if not isinstance(other, Complex):
+            return NotImplemented
         return Complex(self.a+other.a, self.b+other.b)
     def __sub__(self, other):
+        if not isinstance(other, Complex):
+            return NotImplemented
         return Complex(self.a-other.a, self.b-other.b)
     def __neg__(self):
         return Complex(-self.a, -self.b)
     def __mul__(self, other):
+        if not isinstance(other, Complex):
+            return NotImplemented
         a = self.a*other.a - self.b*other.b
         b = self.b*other.a + self.a*other.b
+        return Complex(a, b)
+    def __rmul__(self, r):
+        a = r*self.a 
+        b = r*self.b
         return Complex(a, b)
     def __pow__(self, n):
         if n==0:
@@ -205,7 +233,7 @@ class Complex:
     def promote(cls, item):
         if isinstance(item, Complex):
             return item
-        return Complex(item)
+        return Complex(item, 0)
     def subs(self, values):
         #print("Complex", self, values)
         a = self.a.subs(values)
@@ -248,6 +276,10 @@ class Matrix:
         A = numpy.dot(self.A, other.A)
         return Matrix(A)
 
+    def __rmul__(self, r):
+        A = r*self.A
+        return Matrix(A)
+
     def __matmul__(self, other):
         A = numpy.kron(self.A, other.A)
         return Matrix(A)
@@ -274,6 +306,12 @@ class Matrix:
             a = a*self
             n -= 1
         return a
+
+    def det(self):
+        A = self.A
+        assert A.shape == (2,2)
+        return A[0,0]*A[1,1] - A[1,0]*A[0,1]
+
     
 # modified from bruhat.comonoid
 class Solver:
@@ -289,12 +327,6 @@ class Solver:
     def check(self):
         assert self.idx == self.rank, (self.idx, self.rank)
 
-#    def get_var(self, stem='v'):
-#        ch = "%s_%d"%(stem, self.idx)
-#        self.idx += 1
-#        self.vs.append(ch)
-#        return Symbol(ch)
-
     def get_var(self, stem='v'):
         v = self.vs[self.idx]
         self.idx += 1
@@ -302,13 +334,6 @@ class Solver:
 
     def const(self, r):
         return Poly.const(self.rank, r)
-
-#    def get_unknown(self, shape, name='v'):
-#        A = numpy.empty(shape, dtype=object)
-#        for idx in numpy.ndindex(shape):
-#            A[idx] = self.get_var(name)
-#        self.items.append(A)
-#        return A
 
     def get_scalar(self, name="z"):
         a = self.get_var(name+"a")
@@ -341,8 +366,12 @@ class Solver:
         for i in range(d):
           for j in range(d):
             u = M[i,j]
-            assert isinstance(u, (int, numpy.number)), repr(u)
-            A[i,j] = self.get_const(u)
+            if isinstance(u, (int, numpy.number)):
+                A[i,j] = self.get_const(u)
+            elif isinstance(u, Complex):
+                A[i,j] = u
+            else:
+                assert 0, (u, type(u))
         return A
 
     def X(self):
@@ -351,12 +380,8 @@ class Solver:
     def Z(self):
         return self.promote([[1,0],[0,-1]])
 
-#    def X(self):
-#        one = self.get_const(1)
-#        X = self.get_zero()
-#        X[1,0] = one
-#        X[0,1] = one
-#        return X
+    def S(self):
+        return self.promote([[1,0],[0,Complex(0,1)]])
 
     def get_identity(self, d=2):
         zero = self.get_const(0)
@@ -414,7 +439,7 @@ class Solver:
         return ns['f']
 
     def root(self, trials=1, scale=1., method="lm",  # only lm works...
-            tol=1e-6, maxiter=1000, jac=True, debug=False, guess=1, verbose=0):
+            tol=1e-6, maxiter=1000, jac=False, debug=False, guess=1, verbose=0):
         from scipy.optimize import root
         n = len(self.vs)
         f = self.py_func()
@@ -475,17 +500,6 @@ class Solver:
         values = self.subs(x=x)
         return values
 
-#    def _solve(self):
-#        n = len(self.vs)
-#        x0 = list(numpy.random.normal(size=n))
-#        v = self.get_root(x0=x0)
-#        #items = solver.root()
-#        #v = items[0]
-#        return v
-#
-#    def subs(self, x):
-#        return x
-
     def subs(self, values=None, x=None, dtype=float):
         if values is None:
             values = dict((str(v), xi) for (v, xi) in zip(self.vs, x))
@@ -507,14 +521,15 @@ def test_poly():
     #one = Complex(1)
     #i = Complex(0,1)
 
-    one = Poly({(0,0,0):1})
-    zero = Poly({})
+    rank = 3
+    one = Poly(rank, {(0,0,0):1})
+    zero = Poly(rank, {})
 
     assert one == Poly.const(3,1)
 
-    a = Poly({(1,0,0):1})
-    b = Poly({(0,1,0):1})
-    c = Poly({(0,0,1):1})
+    a = Poly(rank, {(1,0,0):1})
+    b = Poly(rank, {(0,1,0):1})
+    c = Poly(rank, {(0,0,1):1})
 
     assert str(a) == "v0", str(a)
     assert str(a+b) == "(v0+v1)", str(a+b)
@@ -525,8 +540,8 @@ def test_poly():
     assert one*a == a
     assert a+b == b+a
     assert a+b != b
-    assert a+a == Poly({(1,0,0):2})
-    assert a*a == Poly({(2,0,0):1})
+    assert a+a == Poly(rank, {(1,0,0):2})
+    assert a*a == Poly(rank, {(2,0,0):1})
     assert (a+b)*a == a*a + b*a
     assert (a+b)*(b+c) == a*b + a*c + b*b + b*c
 
@@ -552,7 +567,7 @@ def test_root():
     solver.add(z*z.d, I) # _redundant
 
     for i in range(10):
-        items = solver.solve(trials=100, jac=False)
+        items = solver.solve(trials=100)
         z = items[0]
         u = z.d
         #print(z)
@@ -575,7 +590,7 @@ def test_root():
     UU = U@U
     assert UU.shape == (4,4)
 
-    items = solver.solve(trials=100, jac=False)
+    items = solver.solve(trials=100)
     u = items[0]
 
     uuu = u*u*u
@@ -600,7 +615,7 @@ def test_root():
 
     
 
-#    items = solver.solve(trials=100, jac=False)
+#    items = solver.solve(trials=100)
 #    u = items[0]
 
     
@@ -753,7 +768,7 @@ def main_find():
     #return
     
     while 1:
-        items = solver.solve(trials=100, jac=False)
+        items = solver.solve(trials=100)
 
         #s = str([u[1,1] for u in items])
         s = str([u for u in items])
@@ -765,6 +780,122 @@ def main_find():
 
         break
     
+
+def test_clifford():
+    solver = Solver(2+8)
+
+    I = solver.get_identity()
+    X = solver.X()
+    Z = solver.Z()
+    S = solver.S()
+    #print(X)
+    #print(S)
+    assert S*S == Z
+
+    #ir2 = solver.get_var()
+    #one = solver.get_const(1)
+    #solver.add_scalar( 2*(ir2 ** 2), one )
+
+    ir2 = solver.get_unknown((1,1))
+    H = ir2[0,0] * Matrix([[1,1],[1,-1]])
+    #print(H*S*H)
+
+    T = solver.get_unknown((2,2))
+    solver.add(T*T, S)
+    solver.add(T*T.d, I)
+
+    one = solver.get_const(1)
+    I = solver.get_identity(1)
+
+    solver.add(2*(ir2**2), I)
+
+    #print(solver.eqs)
+
+    solver.check()
+    items = solver.solve(trials=10)
+    ir2, T = items
+    #print(T)
+    #print(T*T)
+
+    assert T*T == S
+
+
+def get_pairs():
+
+    from qumba.clifford import get_cliff1, I
+    Cliff1 = get_cliff1()
+
+    pairs = []
+    refls = [g for g in Cliff1 if g*g==I]
+    count = 0
+    n = len(refls)
+    for i in range(n):
+      g = refls[i]
+      for j in range(i+1,n):
+        h = refls[j]
+        if g*h == -h*g:
+            G = mulclose([g,h])
+            assert len(G) == 8
+            pairs.append((g.name,h.name))
+            count += 1
+    pairs.sort()
+    return pairs
+
+
+def main_clifford():
+
+    pairs = get_pairs()
+    print(len(pairs)) # 48
+
+    def get_op(name):
+        u = I
+        for n in name:
+            v = {"S":S, "H":H, "w2I":Complex(0,1)*I}[n]
+            u = v*u
+        return u
+
+    for (g,h) in pairs:
+        
+        solver = Solver(2+8)
+    
+        one = solver.get_identity(1)
+        I = solver.get_identity()
+        X = solver.X()
+        Z = solver.Z()
+        S = solver.S()
+        assert S*S == Z
+    
+        # Hadamard
+        ir2 = solver.get_unknown((1,1))
+        H = ir2[0,0] * Matrix([[1,1],[1,-1]])
+        solver.add(2*(ir2**2), one)
+    
+        print(g, h)
+        g = get_op(g)
+        h = get_op(h)
+    
+        # Cliff^3
+        U = solver.get_unknown((2,2))
+        solver.add(U*U.d, I) # unitary
+        solver.add(U*X*U.d, g)
+        solver.add(U*Z*U.d, h)
+        solver.add_scalar(U.det(), Complex(1,0)) # SU(2)
+    
+        solver.check()
+
+        for _ in range(1):
+            items = solver.solve(trials=10)
+            if items is None:
+                assert 0
+                continue
+            ir2, U = items
+            assert(U*U.d == I)
+            print(U)
+            print(U*U)
+            #print(U*U)
+        print()
+
+        #return
 
 
 if __name__ == "__main__":
