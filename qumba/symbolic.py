@@ -778,7 +778,7 @@ def main_find():
         found.add(s)
         print(s, len(found))
 
-        break
+        #break
     
 
 def test_clifford():
