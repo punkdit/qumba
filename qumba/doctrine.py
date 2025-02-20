@@ -504,6 +504,7 @@ def test_doctrine_sd_scss():
 
 
 def main_sd_scss():
+    I = Matrix([[1,0],[0,1]])
     A = Matrix([[0,1],[1,0]])
     B = Matrix([[1,0],[1,0]])
     n = argv.get("n", 5)
@@ -520,6 +521,12 @@ def main_sd_scss():
             continue
         J = H*bt
         if H.t.solve(J.t) is None:
+            continue
+
+        dode = code.apply_H()
+        assert dode.is_equiv(code)
+        L = dode.get_logical(code)
+        if L==I:
             continue
 
         print(code)
