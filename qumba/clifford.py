@@ -1334,14 +1334,12 @@ def get_cliff1():
     return Cliff1
 
 
-def test_heirarchy():
+def test_hierarchy():
     Cliff1 = get_cliff1()
 
     names = set()
     for g in Cliff1:
         name = g.name
-        print(name)
-        #name = tuple(n for n in name if n!='w2I')
         #names.add(name)
     #print("names:", len(names))
 

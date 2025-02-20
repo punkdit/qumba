@@ -4,7 +4,7 @@ encoding equations as polynomials & rootfinding.
 
 """
 
-from math import sin, cos, pi
+from math import sin, cos, pi, atan
 from functools import reduce
 from operator import matmul
 
@@ -192,6 +192,12 @@ class Complex:
     __repr__ = __str__
     def __eq__(self, other):
         #assert type(self.a) == type(other.a), (type(self.a), type(other.a))
+        #if isinstance(other, (int, Poly)):
+        #    return self.b==0 and self.a==other
+        if isinstance(other, (int,float)):
+            err = (self.a-other)**2 + self.b**2
+            #print("err:", err)
+            return err<EPSILON
         assert isinstance(other, Complex)
         if type(self.a) != type(other.a):
             return str(self) == str(other) # hack this
@@ -219,6 +225,12 @@ class Complex:
         a = r*self.a 
         b = r*self.b
         return Complex(a, b)
+    def __rtruediv__(self, r):
+        assert 0, "check this"
+        c = self.a
+        d = self.b
+        r = c**2 + d**2
+        return Complex((c+d)/r, (c-d)/r)
     def __pow__(self, n):
         if n==0:
             return Complex(1,0)
@@ -890,10 +902,18 @@ def main_clifford():
                 continue
             ir2, U = items
             assert(U*U.d == I)
+            z = U[0,1]
+            u = U[0,0]
+            if z!=0:
+                continue
+            theta = atan(u.b/u.a)
+            print(theta / (pi) )
+            r = Complex(cos(theta), sin(-theta))
+            print(U)
+            U = -r*U
             print(U)
             print(U*U)
-            #print(U*U)
-        print()
+            print()
 
         #return
 
