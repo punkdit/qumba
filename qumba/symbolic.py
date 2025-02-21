@@ -161,6 +161,25 @@ class Poly:
             a = a*self
             n -= 1
         return a
+    def diff(self, i):
+        cs = {}
+        for (k,v) in self.cs.items():
+            n = k[i]
+            if n==0:
+                continue
+            k = list(k)
+            k[i] = n-1
+            k = tuple(k)
+            v = n*v
+            if k in cs:
+                v = cs[k] + v
+                if v==0:
+                    del cs[k]
+                else:
+                    cs[k] = v
+            elif v != 0:
+                cs[k] = v
+        return Poly(self.rank, cs)
     
 
 
@@ -434,6 +453,7 @@ class Solver:
         #print(len(eqs), "eqs")
 
     def py_func(self, verbose=False):
+        print("py_func()")
         arg = "".join(str(v)+"," for v in self.vs)
         #lines = ["def f(%s):"%arg]
         lines = ["def f(x):"]
@@ -451,8 +471,32 @@ class Solver:
         exec(code, ns, ns)
         return ns['f']
 
+    def py_jac(self, verbose=False):
+        print("py_jac()")
+        arg = ",".join(str(v) for v in self.vs)
+        #lines = ["def f(%s):"%arg]
+        lines = ["def f(x):"]
+        #lines.append("  print('jac')")
+        lines.append("  %s = x" % (arg,))
+        lines.append("  value = [")
+        vs = self.vs
+        for eq in self.eqs:
+          row = []
+          for i,v in enumerate(vs):
+            d = eq.diff(i)
+            row.append(str(d))
+          lines.append("    [%s]," % (', '.join(row)))
+        lines.append("  ]")
+        lines.append("  return value")
+        code = '\n'.join(lines)
+        if verbose:
+            print(code)
+        ns = {}
+        exec(code, ns, ns)
+        return ns['f']
+
     def root(self, trials=1, scale=1., method="lm",  # only lm works...
-            tol=1e-6, maxiter=1000, jac=False, debug=False, guess=1, verbose=0):
+            tol=1e-6, maxiter=1000, jac=True, debug=False, guess=1, verbose=0):
         from scipy.optimize import root
         n = len(self.vs)
         f = self.py_func()
@@ -563,6 +607,10 @@ def test_poly():
     assert (a+b) * (a-b) == a*a - b*b
     assert (a+b)*(a+b) == a*a + 2*a*b + b*b
 
+    p = (a+b)**3
+    assert p == a**3 + 3*a**2*b + 3*a*b**2 + b**3
+    assert p.diff(0) == 3*a**2 + 6*a*b + 3*b**2
+
 
 def test_root():
     # find a fifth root of unity
@@ -604,10 +652,13 @@ def test_root():
     assert UU.shape == (4,4)
 
     items = solver.solve(trials=100)
+    assert items is not None
     u = items[0]
 
     uuu = u*u*u
     assert str(uuu) == str(I)
+    print(u)
+    print(uuu)
 
     # ----------------------------------
 
@@ -620,16 +671,6 @@ def test_root():
     Z = solver.Z()
 
     Pauli = mulclose([X,Z])
-    print(len(Pauli))
-
-    print(X == X)
-    print(X)
-    print(U*X*U.d)
-
-    
-
-#    items = solver.solve(trials=100)
-#    u = items[0]
 
     
 
@@ -737,14 +778,14 @@ def main():
         solver = Solver(2)
         U = solver.get_phase()
         g = reduce(matmul, [U]*code.n)
-    elif argv.constdiag:
+    elif argv.constlocal:
         solver = Solver(8)
         I = solver.get_identity()
         U = solver.get_unknown((2,2))
         solver.add( U*U.d , I )
         solver.add_scalar(U.det(), Complex(1,0)) # SU(2)
         g = reduce(matmul, [U]*code.n)
-    elif argv.diag:
+    elif argv.local:
         solver = Solver(8 * code.n)
         I = solver.get_identity()
         ops = []
@@ -794,8 +835,9 @@ def main():
     ##f = solver.py_func(verbose=True)
     #return
     
+    jac = argv.get("jac", False)
     while 1:
-        items = solver.solve(trials=100)
+        items = solver.solve(trials=100, jac=jac)
         if items is None:
             print("fail.")
             continue
@@ -808,7 +850,7 @@ def main():
         found.add(s)
         print(s, len(found))
 
-        #break
+        break
     
 
 def test_clifford():

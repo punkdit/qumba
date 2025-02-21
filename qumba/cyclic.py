@@ -728,10 +728,9 @@ def main():
         #if code.d <= 2:
         #    continue
         count += 1
-        if (code.n, code.k, code.d) == params:
+        if argv.show or (code.n, code.k, code.d) == params:
             print()
             print(code, 'gf4' if code.is_gf4() else "")
-            #print(code.longstr())
             print('"'+strop(code.H).replace("\n", " ")+'"')
 
         else:
