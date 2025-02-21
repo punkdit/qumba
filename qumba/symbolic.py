@@ -15,6 +15,7 @@ from scipy import optimize
 
 from qumba import construct
 from qumba.qcode import QCode
+from qumba.cyclic import get_cyclic_perms
 from qumba.argv import argv
 from qumba.smap import SMap
 from qumba.action import mulclose
@@ -671,12 +672,19 @@ def main():
         code = construct.get_412()
     elif argv.code==(6,1,2):
         code = QCode.fromstr("""
-        XXXXII
-        IIXXXX
-        ZZZZII
-        IIZZZZ
-        IYIYIY
-        """)
+        XX.ZZ.
+        .XX.ZZ
+        Z.XX.Z
+        ZZ.XX.
+        .ZZ.XX
+        """) # cyclic
+#        code = QCode.fromstr("""
+#        XXXXII
+#        IIXXXX
+#        ZZZZII
+#        IIZZZZ
+#        IYIYIY
+#        """)
     elif argv.code==(6,2,2):
         #code = construct.get_622()
         code = QCode.fromstr("""
@@ -701,21 +709,24 @@ def main():
         IZIIZIZYYZ
         ZIZIIZIZYY
         """)
+    elif argv.code:
+        code = QCode.fromstr(argv.code)
     else:
         return
 
     print(code)
 
-    #dode = code.apply_S()
-    #print(dode.is_equiv(code))
-    #return
+    Q = P = get_projector(code)
 
-    #print(code.longstr())
-    P = get_projector(code)
-
-    #return
-
-    #I = Matrix.identity(2)
+    if argv.cyclic:
+        assert code.is_cyclic()
+        perms = get_cyclic_perms(code.n)
+        for g in perms:
+            if g.is_identity():
+                continue
+            dode = g*code
+            print("is_equiv:", dode.is_equiv(code))
+        Q = get_projector(dode)
 
     found = set()
 
@@ -729,6 +740,7 @@ def main():
         I = solver.get_identity()
         U = solver.get_unknown((2,2))
         solver.add( U*U.d , I )
+        solver.add_scalar(U.det(), Complex(1,0)) # SU(2)
         g = reduce(matmul, [U]*code.n)
     elif argv.diag:
         solver = Solver(8 * code.n)
@@ -753,7 +765,7 @@ def main():
     #return
 
     print("lhs, rhs")
-    lhs = P*g
+    lhs = Q*g
     rhs = g*P
     print("solver.add")
     solver.add( lhs, rhs )

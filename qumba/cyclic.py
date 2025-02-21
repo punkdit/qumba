@@ -732,8 +732,7 @@ def main():
             print()
             print(code, 'gf4' if code.is_gf4() else "")
             #print(code.longstr())
-            print(strop(code.H))
-            print()
+            print(repr(strop(code.H).replace("\n", " ")))
 
         else:
             #print(code, "+" if sum(code.cyclic_gens[1])==0 else " ", end=" ", flush=True)
