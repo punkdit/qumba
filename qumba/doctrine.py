@@ -533,6 +533,74 @@ def main_sd_scss():
         print(code.longstr())
 
 
+def parse_sd_scss():
+    f = open("codes_612.out").readlines()
+    I = Matrix([[1,0],[0,1]])
+    
+    rows = None
+    for line in f:
+        line = line.strip()
+        if line.startswith("H ="):
+            assert rows is None
+            rows = []
+        elif "=" in line:
+            H = ' '.join(rows)
+            rows = None
+            code = QCode.fromstr(H)
+            dode = code.apply_H()
+            assert dode.is_equiv(code)
+            L = dode.get_logical(code)
+            if L==I:
+                continue
+            print(H)
+            #print()
+        elif rows is not None:
+            rows.append(line)
+
+def proc_612():
+    # these are all the [[6,1,2]]'s with non-trivial & transversal H
+    codes = """
+    Y.ZXZX ZXZXY. ..XXXX ZZ..ZZ ZZZZ..
+    XZZXY. .YZXZX ..XXXX ZZ..ZZ ZZZZ..
+    YZ.XZX .X.XXX ZZXXY. Z.Z.ZZ ZZZZ..
+    X..XXX ZY.XZX ZZXXY. .ZZ.ZZ ZZZZ..
+    X..XXX ZXZXY. Z.YXZX .ZZ.ZZ ZZZZ..
+    XZZXY. .X.XXX .ZYXZX Z.Z.ZZ ZZZZ..
+    Y.ZZXX ZXZY.X ..XXXX ZZZ..Z ZZ.ZZ.
+    XZZY.X .YZZXX ..XXXX ZZZ..Z ZZ.ZZ.
+    YZ.ZXX .X.XXX ZZXY.X ZZZ..Z Z.ZZZ.
+    X..XXX ZY.ZXX ZZXY.X ZZZ..Z .ZZZZ.
+    X..XXX ZXZY.X Z.YZXX ZZZ..Z .ZZZZ.
+    XZZY.X .X.XXX .ZYZXX ZZZ..Z Z.ZZZ.
+    Y.ZZXX ZXZYX. ..XXXX ZZ.Z.Z ZZZ.Z.
+    XZZYX. .YZZXX ..XXXX ZZ.Z.Z ZZZ.Z.
+    YZ.ZXX .X.XXX ZZXYX. Z.ZZ.Z ZZZ.Z.
+    X..XXX ZY.ZXX ZZXYX. .ZZZ.Z ZZZ.Z.
+    X..XXX ZXZYX. Z.YZXX .ZZZ.Z ZZZ.Z.
+    XZZYX. .X.XXX .ZYZXX Z.ZZ.Z ZZZ.Z.
+    YZZ.XX ZYZXX. ZZYX.X ZZ.Z.Z Z.ZZZ.
+    YZZXX. ZYZ.XX ZZYX.X ZZ.Z.Z .ZZZZ.
+    YZZ.XX ZYZX.X ZZYXX. Z.ZZ.Z ZZ.ZZ.
+    YZZX.X ZYZ.XX ZZYXX. .ZZZ.Z ZZ.ZZ.
+    YZZXX. ZYZX.X ZZY.XX Z.ZZ.Z .ZZZZ.
+    YZZX.X ZYZXX. ZZY.XX .ZZZ.Z Z.ZZZ.
+    YZXZX. ZYXZ.X ZZ.YXX Z.ZZ.Z .ZZZZ.
+    YZXZ.X ZYXZX. ZZ.YXX .ZZZ.Z Z.ZZZ.
+    X.X.XX ZXYZ.X Z.ZYXX ZZ.Z.Z .ZZZZ.
+    XZYZ.X .XX.XX .ZZYXX ZZ.Z.Z Z.ZZZ.
+    X.X.XX ZXYZX. Z.ZYXX .ZZZ.Z ZZ.ZZ.
+    XZYZX. .XX.XX .ZZYXX Z.ZZ.Z ZZ.ZZ.
+    """.strip().split("\n")
+    
+    for H in codes:
+        code = QCode.fromstr(H)
+        print(code)
+        dode = code.apply_H()
+        assert dode.is_equiv(code)
+        L = dode.get_logical(code)
+        print(L)
+
+
 
 def test_qchoose_2():
     from bruhat.algebraic import qchoose_2

@@ -661,7 +661,7 @@ def get_projector(code):
 #def find_transversal(code):
 
 
-def main_find():
+def main():
 
     if argv.code==(5,1,3):
         code = construct.get_513() # doesn't find the SH ... hmm..
@@ -737,6 +737,7 @@ def main_find():
         for i in range(code.n):
             U = solver.get_unknown((2,2))
             solver.add( U*U.d , I )
+            solver.add_scalar(U.det(), Complex(1,0)) # SU(2)
             ops.append(U)
         g = reduce(matmul, ops)
     elif argv.phase:
@@ -781,6 +782,9 @@ def main_find():
     
     while 1:
         items = solver.solve(trials=100)
+        if items is None:
+            print("fail.")
+            continue
 
         #s = str([u[1,1] for u in items])
         s = str([u for u in items])
