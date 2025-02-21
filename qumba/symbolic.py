@@ -730,6 +730,8 @@ def main():
 
     found = set()
 
+    print("P==Q", P==Q)
+
     print("g")
     if argv.constphase:
         solver = Solver(2)
