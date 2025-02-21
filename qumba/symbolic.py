@@ -518,8 +518,7 @@ class Solver:
             if guess>1:
                 print()
             x0 = best
-            #if verbose:
-            #    print("root: ", end="", flush=True); eol='\n'
+            print("root()")
             solution = root(f, x0, method=method, jac=jac, tol=tol, options={"maxiter":maxiter})
             if not solution.success and verbose:
                 print(".", end='', flush=True)
@@ -850,7 +849,7 @@ def main():
         found.add(s)
         print(s, len(found))
 
-        break
+        #break
     
 
 def test_clifford():
