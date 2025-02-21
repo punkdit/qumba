@@ -592,13 +592,19 @@ def proc_612():
     XZYZX. .XX.XX .ZZYXX Z.ZZ.Z ZZ.ZZ.
     """.strip().split("\n")
     
+    tgt = QCode.fromstr("XXXXII IIXXXX ZZZZII IIZZZZ IYIYIY")
+    N, perms = tgt.get_autos()
     for H in codes:
         code = QCode.fromstr(H)
-        print(code)
+        print(code, "*" if code.is_equiv(tgt) else "") # the second one
+        #print(strop(code.H))
         dode = code.apply_H()
         assert dode.is_equiv(code)
         L = dode.get_logical(code)
         print(L)
+    assert len(codes) == 30
+    assert N==24
+    # 30 == 720 / 24 so these are all the same code!
 
 
 

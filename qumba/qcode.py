@@ -1059,6 +1059,12 @@ class QCode(object):
 #        return P
 
 
+    def get_components(self):
+        print("get_components")
+        H = self.H
+        print(H.normal_form())
+        
+
 
 
 

@@ -395,7 +395,7 @@ class Matrix(object):
                 break
             link = idxs.pop()
             #print(size)
-            #print("contract at", link, size.get(link, 0))
+            #print("_contract at", link, size.get(link, 0))
             pair = []
             for (i, (A, links)) in enumerate(zip(net.As, net.linkss)):
                 if link in links:
@@ -406,7 +406,7 @@ class Matrix(object):
             #    print("no pair left")
                 break
             net.contract_pair(*pair)
-        #print("done contract")
+        #print("done _contract")
     
         assert len(net)
         A = reduce((lambda a,b:numpy.tensordot(a,b,axes=([],[]))), net.As)
@@ -438,6 +438,59 @@ class Matrix(object):
             v = numpy.dot(bits, A)%2
             wenum[v.sum()] += 1
         return tuple(wenum[i] for i in range(n+1))
+
+
+    def get_pivots(H):
+        "return pivots of a normal_form"
+        m, nn = H.shape
+        pivots = []
+        row = col = 0
+        while row < m:
+            while col < nn and H[row, col] == 0:
+                col += 1
+            if col < nn:
+                pivots.append((row,col))
+            row += 1
+            col += 1
+        return pivots
+
+    def get_components(H):
+        return get_components(H)
+
+
+def get_components(H): # dumb & slow XXX
+    #print("get_components")
+    H = H.normal_form()
+
+    found = set()
+    m, n = H.shape
+    for r0 in range(m):
+        h = H[r0]
+        cols = set(c for c in range(n) if H[r0,c])
+        done = False
+        while not done:
+            #print("cols", cols)
+            done = True
+            for col in list(cols):
+                for r1 in range(m):
+                    if H[r1,col] == 0:
+                        continue
+                    for c in range(n):
+                        if H[r1, c] and c not in cols:
+                            cols.add(c)
+                            done = False
+        #print("done")
+        cmp = list(cols)
+        cmp.sort()
+        cmp = tuple(cmp)
+        if cmp not in found:
+            H1 = H[:, list(cmp)]
+            H1 = H1.row_reduce()
+            yield H1
+            found.add(cmp)
+        
+    
+
 
 
 

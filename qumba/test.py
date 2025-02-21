@@ -2181,6 +2181,35 @@ def test_613():
     assert len(codes) == 2
 
 
+def test_components():
+    Ha = construct.get_422().H
+    Hb = construct.get_412().H
+
+    H = Ha.direct_sum(Hb)
+    m, nn = H.shape
+
+    while 1:
+        U = Matrix.rand(m,m)
+        H1 = U*H
+        if H1.rank() == len(H):
+            H = H1
+            break
+    n = nn//2
+    idxs = list(range(n))
+    shuffle(idxs)
+    P = SymplecticSpace(n).get_perm(idxs)
+    H = H*P
+
+    print(H)
+    print()
+    code = QCode(H)
+    print(code.longstr())
+
+    for H1 in H.get_components():
+        print("H1:")
+        print(H1)
+
+
 
 def test():
     print("\ntest()")
@@ -2197,6 +2226,7 @@ def test():
 
 if __name__ == "__main__":
 
+    from random import seed
     from time import time
     start_time = time()
 
