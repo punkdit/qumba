@@ -19,6 +19,7 @@ from qumba.cyclic import get_cyclic_perms
 from qumba.argv import argv
 from qumba.smap import SMap
 from qumba.action import mulclose
+from qumba.util import cache
 
 
 
@@ -452,8 +453,9 @@ class Solver:
             self.add_scalar(lhs[idx], rhs[idx])
         #print(len(eqs), "eqs")
 
+    @cache
     def py_func(self, verbose=False):
-        print("py_func()")
+        print("py_func()", flush=True)
         arg = "".join(str(v)+"," for v in self.vs)
         #lines = ["def f(%s):"%arg]
         lines = ["def f(x):"]
@@ -471,8 +473,9 @@ class Solver:
         exec(code, ns, ns)
         return ns['f']
 
+    @cache
     def py_jac(self, verbose=False):
-        print("py_jac()")
+        print("py_jac()", flush=True)
         arg = ",".join(str(v) for v in self.vs)
         #lines = ["def f(%s):"%arg]
         lines = ["def f(x):"]
@@ -754,7 +757,7 @@ def main():
     else:
         return
 
-    print(code)
+    print(code, flush=True)
 
     Q = P = get_projector(code)
 
@@ -765,14 +768,14 @@ def main():
             if g.is_identity():
                 continue
             dode = g*code
-            print("is_equiv:", dode.is_equiv(code))
+            print("is_equiv:", dode.is_equiv(code), flush=True)
         Q = get_projector(dode)
 
     found = set()
 
-    print("P==Q", P==Q)
+    print("P==Q", P==Q, flush=True)
 
-    print("g")
+    print("g", flush=True)
     if argv.constphase:
         solver = Solver(2)
         U = solver.get_phase()
@@ -806,15 +809,15 @@ def main():
     #print(g)
     #return
 
-    print("lhs, rhs")
+    print("lhs, rhs", flush=True)
     lhs = Q*g
     rhs = g*P
-    print("solver.add")
+    print("solver.add", flush=True)
     solver.add( lhs, rhs )
 
     eqs = solver.eqs
-    print("vs:", solver.rank)
-    print("eqs:", len(solver.eqs))
+    print("vs:", solver.rank, flush=True)
+    print("eqs:", len(solver.eqs), flush=True)
     if 0:
         n = len(eqs)
         for i in range(n):
@@ -828,17 +831,17 @@ def main():
         #print()
         #return
 
-    print("solve")
+    print("solve", flush=True)
     #for eq in solver.eqs:
     #    print(eq)
     ##f = solver.py_func(verbose=True)
     #return
     
-    jac = argv.get("jac", False)
+    jac = argv.get("jac", True)
     while 1:
         items = solver.solve(trials=100, jac=jac)
         if items is None:
-            print("fail.")
+            print("fail.", flush=True)
             continue
 
         #s = str([u[1,1] for u in items])
@@ -847,7 +850,7 @@ def main():
         if s in found:
             continue
         found.add(s)
-        print(s, len(found))
+        print(s, len(found), flush=True)
 
         #break
     
