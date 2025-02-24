@@ -790,13 +790,23 @@ def two_block(G, wa=2, wb=2, rand=True):
         if s in found:
             continue
         found.add(s)
-        if is_connected(Hx, Hz):
-
-            yield code
-
+        #if is_connected(Hx, Hz):
+        #    yield code
+        yield code
 
 
 def is_connected(Hx, Hz):
+    try:
+        try_is_connected(Hx, Hz)
+    except:
+        print("is_connected: fail")
+        print("Hx:")
+        print(Hx, Hx.shape)
+        print("Hz:")
+        print(Hz, Hz.shape)
+        raise
+
+def try_is_connected(Hx, Hz): # XXX Broken
     #print("is_connected")
     Hx = Hx.normal_form()
     Hz = Hz.normal_form()
