@@ -168,11 +168,12 @@ def check(code):
 
 
 def query():
+    count = 0
     for code in get_codes():
         #print(code, "_id=%s"%code._id)
         url = "https://qecdb.org/codes/%s"%code._id
-        print(code, url)
-
+        print(code, code.desc, url)
+        count += 1
 
         if argv.show:
             print(code.longstr())
@@ -191,6 +192,8 @@ def query():
 
         #if argv.update:
         #    update(code)
+    print("%d codes" % count)
+
 
 def update():
     print("update")
