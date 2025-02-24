@@ -521,7 +521,7 @@ class Solver:
             if guess>1:
                 print()
             x0 = best
-            print("root()")
+            print("root()", flush=True)
             solution = root(f, x0, method=method, jac=jac, tol=tol, options={"maxiter":maxiter})
             if not solution.success and verbose:
                 print(".", end='', flush=True)

@@ -837,6 +837,10 @@ def main_two_block():
     wa = argv.get("wa", w)
     wb = argv.get("wb", w)
 
+    start_idx = argv.get("start_idx", 0)
+    step_idx = argv.get("step_idx", 1)
+    mod_idx = argv.get("mod_idx", 0)
+
     if wa is None:
         ws = []
         for w in range(4, 9):
@@ -850,10 +854,16 @@ def main_two_block():
     def is_better(code, other):
         return code.d > other.d
     
-    for G in groups:
+    for idx,G in enumerate(groups):
         if len(G) < 9:
             continue
 
+        if idx < start_idx:
+            continue
+        if (idx%step_idx) != mod_idx:
+            continue
+        print("idx=%s G=%r" % (idx, G.desc))
+        #continue
         for (wa,wb) in ws:
             print(G.desc, wa, wb)
             best = {} 
