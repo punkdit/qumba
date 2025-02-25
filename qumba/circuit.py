@@ -27,9 +27,9 @@ from qumba.unwrap import unwrap, unwrap_encoder
 from qumba.smap import SMap
 from qumba.argv import argv
 from qumba.unwrap import Cover
-from qumba import clifford, matrix
-from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
-from qumba.syntax import Syntax
+#from qumba import clifford, matrix
+#from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
+#from qumba.syntax import Syntax
 
 
 def fix_qubit_order(job, samps):
@@ -66,6 +66,7 @@ def send(qasms=None, shots=1,
         memory_errors=True, # bool
         leak2depolar=False,
         reorder=False,
+        opts={},
         **kw): # kw goes into params
     from qjobs import QPU, Batch
     local = not argv.live
@@ -108,6 +109,7 @@ def send(qasms=None, shots=1,
             #'memory_errors': memory_errors, # bool
         }
     }
+    options.update(opts)
     print("options:", options)
     
     # We can append jobs to the Batch object to run
@@ -152,12 +154,15 @@ def load(flatten=True, reorder=False, match_jobs=False):
         f = open(name, "rb")
         batch = pickle.load(f)
         f.close()
+        print("batch.filename", batch.filename)
+        print("batch.save", batch.save)
         for job in batch.jobs:
             print("job:", job.id)
             results = job.retrieve()
             #results = job.results
             status = results["status"]
             print("\tstatus:", status)
+            #print(results)
             #print("params:", results["params"])
             #print(' '.join(results.keys()))
             print("job:", job.id)
@@ -194,6 +199,7 @@ def load(flatten=True, reorder=False, match_jobs=False):
             if reorder:
                 samps = fix_qubit_order(job, samps)
             sampss.append(samps)
+        batch.save()
     if flatten:
         return reduce(add, sampss, [])
     return sampss

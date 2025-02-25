@@ -24,9 +24,9 @@ from qumba.smap import SMap
 from qumba.argv import argv
 from qumba.unwrap import Cover
 from qumba import transversal 
-from qumba import clifford, matrix
-from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
-from qumba.syntax import Syntax
+#from qumba import clifford, matrix
+#from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
+#from qumba.syntax import Syntax
 from qumba.circuit import (Circuit, measure, barrier, send, vdump, variance,
     parsevec, strvec, find_state, get_inverse, load_batch, send_idxs)
 
