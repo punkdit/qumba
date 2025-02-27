@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from qumba.symplectic import SymplecticSpace
-from qumba.clifford import Clifford
 
 
 class Term(object):
@@ -54,6 +53,7 @@ class Syntax(object):
 
 
 def test():
+    from qumba.clifford import Clifford
     s = Syntax()
     X, Z, Y = s.X, s.Z, s.Y
     S, H, CX = s.S, s.H, s.CX
