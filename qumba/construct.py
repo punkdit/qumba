@@ -8,7 +8,8 @@ from operator import add
 import numpy
 
 from qumba.lin import (parse, shortstr, linear_independent, eq2, dot2, identity2,
-    zeros2, rank, rand2, pseudo_inverse, kernel, direct_sum, span)
+    array2, zeros2, rank, rand2, pseudo_inverse, kernel, direct_sum, span)
+from qumba.util import choose
 from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr
 from qumba.csscode import CSSCode, find_zx_duality
 from qumba.sp_pascal import i_grassmannian
@@ -183,11 +184,12 @@ def get_11_2_3():
 
 
 def get_622():
+    # https://errorcorrectionzoo.org/c/stab_6_2_2
     return QCode.fromstr("""
-    XXXIXI
-    ZZIZIZ
-    IYZXII
-    IIYYYY
+    XXXXII
+    XXIIXX
+    ZZZZII
+    ZZIIZZ
     """, d=2)
 
 
@@ -271,18 +273,43 @@ def get_bring():
     return CSSCode(Ax=Ax, Az=Az)
 
 
-def reed_muller():
-    # RM [[16,6,4]]
-    H = parse("""
-    11111111........
-    ....11111111....
-    ........11111111
-    11..11..11..11..
-    .11..11..11..11.
-    """)
+def reed_muller(r=1, m=4):
 
-    rm = QCode.build_css(H, H)
-    return rm
+    assert 0<=r<=m, "r=%s, m=%d"%(r, m)
+
+    n = 2**m # length
+
+    one = array2([1]*n)
+    basis = [one]
+
+    vs = [[] for i in range(m)]
+    for i in range(2**m):
+        for j in range(m):
+            vs[j].append(i%2)
+            i >>= 1
+        assert i==0
+
+    vs = [array2(v) for v in vs]
+
+    for k in range(r):
+        for items in choose(vs, k+1):
+            v = one
+            #print(items)
+            for u in items:
+                v = v*u
+            basis.append(v)
+
+    H = numpy.array(basis)
+    H = linear_independent(H)
+    A = dot2(H, H.transpose())
+    if A.max() == 0:
+        code = CSSCode(Hx=H, Hz=H)
+        if code.k:
+            code.bz_distance()
+        code = code.to_qcode(desc="reed_muller")
+        return code
+
+
 
 
 def biplanar(w=24, h=12):
@@ -322,6 +349,14 @@ def biplanar(w=24, h=12):
     if w==0:
         code = CSSCode(Ax=Ax, Az=Az)
         return code
+
+
+def slab(n):
+    "build the self-dual [[n,n-2,2]]"
+    assert n%2==0
+    H = array2([[1]*n])
+    code = QCode.build_css(H, H)
+    return code
 
 
 def classical_codes(n, m, distance=3):
@@ -992,6 +1027,12 @@ def test():
     code.d = d
     print(code)
     #print(code.longstr())
+
+
+    for m in range(4, 7):
+        C = reed_muller(1, m)
+        print(C, C.desc)
+    #print(C.longstr())
 
 
 

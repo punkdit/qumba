@@ -7,7 +7,7 @@ import string, os
 from random import randint, choice, random
 from time import sleep, time
 from functools import reduce
-from operator import add
+from operator import add, lshift
 import json
 
 import numpy, sys
@@ -930,6 +930,39 @@ class QCode(object):
         code = QCode.from_symplectic(E, k=right.k)
         return code
 
+    def concat(self, other):
+        #lhs = reduce(add, [self]*other.n)
+        #lhs = lhs.get_encoder()
+        E = self.get_encoder()
+        lhs = reduce(lshift, [E]*other.n)
+        I = SymplecticSpace(other.n).get_identity()
+        rhs = reduce(lshift, [I]*self.m + [other.get_encoder()]*self.k)
+        #idxs = [None]*(len(lhs)//2)
+        #count = 0
+        idxs = []
+        for i in range(self.m):
+          for j in range(other.n):
+            idxs.append( j*self.n + i )
+        for i in range(self.k):
+          for j in range(other.n):
+            idxs.append( j*self.n + (self.m + i) )
+        assert len(set(idxs)) == len(idxs)
+        P = SymplecticSpace(len(idxs)).get_perm(idxs).t
+        E = lhs * P * rhs
+        idxs = list(range(other.n*self.m))
+        k = len(idxs)
+        for i in range(self.k):
+          for j in range(other.m):
+            idxs.append( k + i*other.n + j )
+        for i in range(self.k):
+          for j in range(other.k):
+            idxs.append( k + i*other.n + other.m + j )
+        assert len(set(idxs)) == len(idxs)
+        P = SymplecticSpace(len(idxs)).get_perm(idxs).t
+        E = E * P
+        code = QCode.from_encoder(E, k=self.k*other.k)
+        return code
+
     @classmethod
     def load_codetables(cls):
         f = open("codetables.txt")
@@ -991,15 +1024,19 @@ class QCode(object):
         return sd
 
     def get_tp(self):
-        tp = "none"
-        if self.is_gf4():
-            tp = "gf4"
-        if self.is_css():
-            tp = "css"
-        if self.is_selfdual():
-            tp = "selfdual"
-        if self.is_selfdual() and self.is_css():
+        gf4 = self.is_gf4()
+        css = self.is_css()
+        sd = self.is_selfdual()
+        if css and sd:
             tp = "selfdualcss"
+        elif css:
+            tp = "css"
+        elif gf4:
+            tp = "gf4"
+        elif sd:
+            tp = "selfdual"
+        else:
+            tp = "none"
         self.attrs["tp"] = tp
         return tp
 

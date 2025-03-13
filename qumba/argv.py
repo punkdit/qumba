@@ -26,6 +26,9 @@ class Argv(object):
     def get(self, name, default=None):
         return self.argmap.get(name, default)
 
+    def set(self, name, value):
+        self.argmap[name] = value
+
     def __str__(self):
         return ' '.join(sys.argv)
 

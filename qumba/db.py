@@ -19,6 +19,8 @@ else:
 db = client["qumba"]
 codes = db["codes"]
 
+print("qumba.db: user=%r, passwd=%r"%(user, passwd))
+
 def add(code, force=False, dummy=False):
     from qumba.qcode import strop
     code = code.to_qcode()
@@ -294,7 +296,7 @@ def normalize():
         n += 1
 
 
-def prune_slow():
+def prune_slow_z3():
     n = argv.get("n", 15)
     k = argv.get("k")
     d = argv.get("d")

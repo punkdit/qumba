@@ -12,7 +12,8 @@ from qumba.qcode import QCode, SymplecticSpace, strop, Matrix, fromstr
 from qumba.csscode import CSSCode, find_logicals
 from qumba.autos import get_autos, get_autos_css
 from qumba import csscode, construct
-from qumba.construct import get_422, get_513, get_golay, get_10_2_3, reed_muller
+from qumba.construct import (get_422, get_513, get_golay, get_10_2_3, reed_muller,
+    slab)
 from qumba.action import mulclose, mulclose_hom, mulclose_find
 from qumba.util import cross, allperms
 from qumba.symplectic import Building
@@ -2208,6 +2209,118 @@ def test_components():
     for H1 in H.get_components():
         print("H1:")
         print(H1)
+
+def get_wenum(code):
+    css = code.to_css()
+    Hx = Matrix(css.Hx)
+    Hz = Matrix(css.Hz)
+    wx = Hx.get_wenum()
+    if Hx==Hz:
+        wz = wx
+    else:
+        wz = Hz.get_wenum()
+    return wx, wz
+
+
+def test_concat():
+    codes = [
+        slab(4),
+        slab(6),
+        slab(8),
+        slab(10),
+        construct.get_412(), # non-css
+        construct.get_513(), # gf4
+        construct.get_622(), # smaller stabs than 642
+        construct.get_832(), 
+        construct.get_713(),
+        construct.get_913(),
+    ]
+    for (a,b) in [(2,2), (3,1), (3,3), (4,2), (4,4)]:
+        codes.append( construct.get_toric(a,b) )
+
+    for c in QCode.load_codetables():
+        if c.n<8 or c.k==0:
+            continue
+        if c.n>16:
+            break
+        #print(c, c.get_tp())
+        codes.append(c)
+    #return
+
+    codes.sort(key = lambda code:(code.n,code.k,code.d))
+    for c in codes:
+        print(c, c.get_tp())
+    #return
+
+    N = len(codes)
+
+    if 0:
+        # concat is associative
+        for c in codes:
+          for d in codes:
+            if c.n*d.n > 40:
+                continue
+            cd = c.concat(d)
+            for e in codes:
+                if cd.n*e.n > 120:
+                    continue
+                cd_e = cd.concat(e)
+                c_de = c.concat(d.concat(e))
+                H, J = cd_e.H , c_de.H
+                assert H.shape == J.shape
+                assert cd_e.is_equiv(c_de)
+                print(cd_e)
+
+
+    for li in range(N):
+      for ri in range(N):
+        l = codes[li]
+        r = codes[ri]
+        if l.n*r.n > 92:
+            continue
+
+        print(l, ".", r, "=", end=" ", flush=True)
+        lr = l.concat(r)
+ 
+        assert l.n*r.n == lr.n
+        assert l.k*r.k == lr.k
+
+        if not lr.is_css():
+            if lr.n < 42:
+                lr.distance("z3")
+            print(lr, lr.get_tp())
+            if lr.get_tp() == "selfdual":
+                #print(strop(lr.H))
+                eode = lr.apply_H()
+                assert eode.is_equiv(lr)
+                L = eode.get_logical(lr)
+                #print(L)
+            if lr.d is not None:
+                assert l.d*r.d <= lr.d
+            continue
+
+        css = lr.to_css()
+        css.bz_distance()
+        lr = css.to_qcode()
+
+        print(css, lr.get_tp(), "!!" if l.d*r.d<lr.d else "")
+        assert l.d*r.d <= lr.d
+
+        continue
+
+        other = r.concat(l)
+        other = other.to_css()
+        other.bz_distance()
+
+        #print(get_wenum(css) == get_wenum(other))
+        w = get_wenum(css)
+        print(w[0])
+        print(w[1])
+        print(other)
+        w = get_wenum(other)
+        print(w[0])
+        print(w[1])
+        print()
 
 
 
