@@ -2234,6 +2234,20 @@ def test_concat():
         construct.get_832(), 
         construct.get_713(),
         construct.get_913(),
+        QCode.fromstr("""
+        XXXX............
+        ....XXXX........
+        ........XXXX....
+        ............XXXX
+        XX..XX..XX..XX..
+        X.X.X.X.X.X.X.X.
+        ZZZZ............
+        ....ZZZZ........
+        ........ZZZZ....
+        ............ZZZZ
+        Z.Z.Z.Z.Z.Z.Z.Z.
+        ZZ..ZZ..ZZ..ZZ..
+        """) # [[16,4,4]]
     ]
     for (a,b) in [(2,2), (3,1), (3,3), (4,2), (4,4)]:
         codes.append( construct.get_toric(a,b) )
@@ -2251,6 +2265,9 @@ def test_concat():
     for c in codes:
         print(c, c.get_tp())
     #return
+
+    pairs = [(c,d) for c in codes for d in codes]
+    pairs.sort(key = lambda pair:pair[0].n*pair[1].n)
 
     N = len(codes)
 
@@ -2272,10 +2289,11 @@ def test_concat():
                 print(cd_e)
 
 
-    for li in range(N):
-      for ri in range(N):
-        l = codes[li]
-        r = codes[ri]
+#    for li in range(N):
+#      for ri in range(N):
+#        l = codes[li]
+#        r = codes[ri]
+    for (l,r) in pairs:
         if l.n*r.n > 92:
             continue
 
@@ -2305,6 +2323,9 @@ def test_concat():
 
         print(css, lr.get_tp(), "!!" if l.d*r.d<lr.d else "")
         assert l.d*r.d <= lr.d
+
+        if (lr.n,lr.k,lr.d)==(16,4,4):
+            print(strop(lr.H))
 
         continue
 

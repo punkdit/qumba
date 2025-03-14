@@ -154,7 +154,7 @@ def slow_get_autos(code):
     return list(get_isos(code, code))
 
 
-def get_autos_selfdualcss(code):
+def get_autos_selfdualcss(code, maxw=None):
 
     #assert code.tp == "selfdualcss"
     css = code.to_css()
@@ -162,11 +162,16 @@ def get_autos_selfdualcss(code):
     H = css.Hx
 
     m, n = H.shape
+    if maxw is None:
+        maxw = n+1
+
     wenum = {i:[] for i in range(n+1)}
     span = []
     for u in enum2(m):
         v = dot2(u, H)
         d = v.sum()
+        if d>maxw:
+            continue
         wenum[d].append(v)
         if d:
             span.append(v)
