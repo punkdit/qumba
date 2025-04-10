@@ -1020,6 +1020,148 @@ def test_bimodule():
         assert L*R == R*L
 
 
+def get_gen(G, n):
+    for trial in range(1000):
+        gen = [choice(G) for i in range(n)]
+        if len(gen)!=len(set(gen)):
+            continue
+        G1 = mulclose(gen)
+        if len(G1) != len(G):
+            continue
+        return gen
+
+    
+
+def make_bicayley(G):
+    # quantum tanner codes
+    # https://arxiv.org/abs/2202.13641
+    na = argv.get("a", 3)
+    nb = argv.get("b", 3)
+
+    A = get_gen(G, na)
+    B = get_gen(G, nb)
+    if A is None or B is None:
+        return
+
+    print(A)
+    print(B)
+    CA = Matrix([[1]*na])
+    CBT = Matrix([[1]*nb])
+    CAT = CA.kernel()
+    CB = CBT.kernel()
+    #print(CA, CA.shape)
+    #print(CB, CB.shape)
+
+    squares = {}
+    lookup = {}
+    for g in G:
+      for a in A:
+        for b in B:
+            s = (g, g*b, a*g, a*g*b)
+            assert (g,a,b) not in squares
+            squares[g,a,b] = s
+            assert s not in lookup
+            lookup[s] = len(lookup)
+    n = len(squares)
+    print("squares:", n)
+
+    Vs = [set() for i in range(4)]
+    for s in squares.values():
+        for i in range(4):
+            Vs[i].add(s[i])
+    items = set(G)
+    for V in Vs:
+        assert V == items
+
+    CACB = CA@CB
+    CATCBT = CAT@CBT
+    print(CACB, CACB.shape)
+    print(CATCBT, CATCBT.shape)
+
+    Hx = []
+    Hz = []
+    for g in G:
+        nbd = [s for s in squares.values() if s[0] == g] # V_00
+        assert len(nbd) == na*nb
+        row = zeros2(len(CACB), n)
+        for i,a in enumerate(A):
+          for j,b in enumerate(B):
+            s = squares[g, a, b]
+            assert s in nbd
+            idx = lookup[s]
+            row[:, idx] = CACB[:, i+na*j]
+        Hx.append(row)
+
+        nbd = [s for s in squares.values() if s[1] == g] # V_01
+        assert len(nbd) == na*nb
+        row = zeros2(len(CATCBT), n)
+        for i,a in enumerate(A):
+          for j,b in enumerate(B):
+            s = squares[g*(~b), a, b]
+            assert s in nbd
+            idx = lookup[s]
+            row[:, idx] = CATCBT[:, i+na*j]
+        Hz.append(row)
+
+        nbd = [s for s in squares.values() if s[2] == g] # V_10
+        assert len(nbd) == na*nb
+        row = zeros2(len(CATCBT), n)
+        for i,a in enumerate(A):
+          for j,b in enumerate(B):
+            s = squares[(~a)*g, a, b]
+            assert s in nbd
+            idx = lookup[s]
+            row[:, idx] = CATCBT[:, i+na*j]
+        Hz.append(row)
+
+        nbd = [s for s in squares.values() if s[3] == g] # V_11
+        assert len(nbd) == na*nb
+        row = zeros2(len(CACB), n)
+        for i,a in enumerate(A):
+          for j,b in enumerate(B):
+            s = squares[(~a)*g*(~b), a, b]
+            assert s in nbd
+            idx = lookup[s]
+            row[:, idx] = CACB[:, i+na*j]
+        Hx.append(row)
+
+    Hx = numpy.concatenate(tuple(Hx))
+    Hx = Matrix(Hx)
+    Hz = numpy.concatenate(tuple(Hz))
+    Hz = Matrix(Hz)
+    #print(Hx, Hx.shape)
+    #print(Hz, Hz.shape)
+
+    U = Hx*Hz.t
+    assert U.max() == 0
+
+    code = CSSCode(Hx=Hx.A, Hz=Hz.A, check=True, build=True)
+    code.bz_distance()
+    print(code)
+        
+
+
+
+def test_bicayley():
+    print("test_bicayley")
+    G = get_group()
+
+    if G is None:
+        from bruhat.small_groups import groups
+    else:
+        groups = [G]
+
+    for G in groups:
+        if len(G) < 5:
+            continue
+        if len(G) >= 14:
+            break
+        print()
+        print(G)
+        make_bicayley(G)
+            
+
+
 
 if __name__ == "__main__":
     from time import time
