@@ -1032,19 +1032,12 @@ def get_gen(G, n):
 
     
 
-def make_bicayley(G):
+def make_bicayley(G, A, B):
     # quantum tanner codes
     # https://arxiv.org/abs/2202.13641
-    na = argv.get("a", 3)
-    nb = argv.get("b", 3)
 
-    A = get_gen(G, na)
-    B = get_gen(G, nb)
-    if A is None or B is None:
-        return
-
-    print(A)
-    print(B)
+    na = len(A)
+    nb = len(B)
     CA = Matrix([[1]*na])
     CBT = Matrix([[1]*nb])
     CAT = CA.kernel()
@@ -1063,7 +1056,7 @@ def make_bicayley(G):
             assert s not in lookup
             lookup[s] = len(lookup)
     n = len(squares)
-    print("squares:", n)
+    #print("squares:", n)
 
     Vs = [set() for i in range(4)]
     for s in squares.values():
@@ -1075,8 +1068,10 @@ def make_bicayley(G):
 
     CACB = CA@CB
     CATCBT = CAT@CBT
-    print(CACB, CACB.shape)
-    print(CATCBT, CATCBT.shape)
+    #print(CA, CA.shape)
+    #print(CB, CB.shape)
+    #print(CACB, CACB.shape)
+    #print(CATCBT, CATCBT.shape)
 
     Hx = []
     Hz = []
@@ -1089,7 +1084,7 @@ def make_bicayley(G):
             s = squares[g, a, b]
             assert s in nbd
             idx = lookup[s]
-            row[:, idx] = CACB[:, i+na*j]
+            row[:, idx] = CACB[:, i*nb+j]
         Hx.append(row)
 
         nbd = [s for s in squares.values() if s[1] == g] # V_01
@@ -1100,7 +1095,7 @@ def make_bicayley(G):
             s = squares[g*(~b), a, b]
             assert s in nbd
             idx = lookup[s]
-            row[:, idx] = CATCBT[:, i+na*j]
+            row[:, idx] = CATCBT[:, i*nb+j]
         Hz.append(row)
 
         nbd = [s for s in squares.values() if s[2] == g] # V_10
@@ -1111,7 +1106,7 @@ def make_bicayley(G):
             s = squares[(~a)*g, a, b]
             assert s in nbd
             idx = lookup[s]
-            row[:, idx] = CATCBT[:, i+na*j]
+            row[:, idx] = CATCBT[:, i*nb+j]
         Hz.append(row)
 
         nbd = [s for s in squares.values() if s[3] == g] # V_11
@@ -1122,7 +1117,7 @@ def make_bicayley(G):
             s = squares[(~a)*g*(~b), a, b]
             assert s in nbd
             idx = lookup[s]
-            row[:, idx] = CACB[:, i+na*j]
+            row[:, idx] = CACB[:, i*nb+j]
         Hx.append(row)
 
     Hx = numpy.concatenate(tuple(Hx))
@@ -1136,9 +1131,8 @@ def make_bicayley(G):
     assert U.max() == 0
 
     code = CSSCode(Hx=Hx.A, Hz=Hz.A, check=True, build=True)
-    code.bz_distance()
-    print(code)
-        
+    return code
+
 
 
 
@@ -1151,15 +1145,38 @@ def test_bicayley():
     else:
         groups = [G]
 
+    na = argv.get("na", 3)
+    nb = argv.get("nb", 3)
     for G in groups:
-        if len(G) < 5:
+        if len(G) <= 9:
             continue
-        if len(G) >= 14:
+        if len(G) >= 12:
             break
         print()
         print(G)
-        make_bicayley(G)
-            
+
+        if argv.exhaustive:
+            print("exhaustive enumerate")
+            As = [A for A in choose(G,na) if len(mulclose(A))==len(G)]
+            if nb != na:
+                Bs = [B for B in choose(G,nb) if len(mulclose(B))==len(G)]
+            else:
+                Bs = As
+        else:
+            As = [get_gen(G,na) for trial in range(10)]
+            Bs = [get_gen(G,nb) for trial in range(10)]
+
+        best = {}
+        for A in As:
+          for B in Bs:
+            code = make_bicayley(G, A, B)
+            #print(code)
+            code.bz_distance()
+            d = best.get(code.k, 0)
+            if code.d > d:
+                print(code, code.d)
+                best[code.k] = code.d
+    
 
 
 
