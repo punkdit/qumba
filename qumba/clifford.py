@@ -23,6 +23,7 @@ from sage import all_cmdline
 
 from qumba.lin import zeros2, identity2
 from qumba.action import mulclose, mulclose_names, mulclose_find
+from qumba.util import cross
 from qumba.argv import argv
 
 if argv.sage or 1:
@@ -609,7 +610,12 @@ def test_quaternion():
     CX = c2.CX(0, 1)
 
     gen = [SI, IS, HI, IH] #, CZ, CX]
-    LCliff2 = mulclose(gen)
+    LCliff2 = mulclose(gen, verbose=True)
+    print(len(LCliff2))
+    for g in LCliff2:
+        for h in Q2:
+            assert (~g)*h*g in Q2
+
     items = mulclose(gen+[CX,CZ], maxsize=5000)
     found = []
     for g in items:
@@ -668,6 +674,7 @@ def test_quaternion3():
 
     Q3 = [g@I@I for g in Q1] + [I@g@I for g in Q1] + [I@I@g for g in Q1]
     Q3 = mulclose(Q3)
+    assert type(Q3) is set
     print(len(Q3))
 
     c = Clifford(3)
@@ -676,16 +683,41 @@ def test_quaternion3():
 
     gen = [S(0), S(1), S(2), H(0), H(1), H(2)]
     LCliff = mulclose(gen, verbose=True)
+
+    #LCliff = set(reduce(matmul, items) for items in cross([tuple(Cliff1)]*3))
+    #print(len(LCliff))
+
+    if 0:
+        LCliff = set()
+        for a in Cliff1:
+          for b in Cliff1:
+            ab = a@b
+            for c in Cliff1:
+                abc = ab@c
+                LCliff.add(abc)
+          print(len(LCliff), end=" ", flush=True)
+          #break
+          if len(LCliff) == 110592:
+            break
+
+    print()
+    print(len(LCliff))
+    assert len(LCliff) == 110592
+
     cgen = [CZ(0,1), CZ(0,2), CZ(1,2)]
     cgen += [CX(0,1), CX(0,2), CX(1,2), CX(1,0), CX(2,0), CX(2,1)]
 
-    Q3 = set(Q3)
-    LCliff = set(LCliff)
+    #biggen = list(LCliff) + cgen
+    #Q3 = set(Q3)
+    #LCliff = set(LCliff)
+    items = list(LCliff)
 
     found = []
     g = I
     while len(found)<5:
-        g = g * choice(LCliff+cgen)
+        g1 = g*choice(items)
+        g2 = g*choice(cgen)
+        g = choice([g1,g2])
         if g in LCliff:
             continue
         #print(g.name, end="  ")
@@ -697,6 +729,7 @@ def test_quaternion3():
             #print("yes")
             print(g.name)
             found.append(g)
+            g = I
 
     gen = gen + found
     QCliff = mulclose(gen, verbose=True)
