@@ -78,7 +78,7 @@ H = (r2/2) * matrix([[1, 1], [1, -1]])
 X = matrix([[0, 1], [1, 0]])
 Z = matrix([[1, 0], [0, -1]])
 Y = matrix([[0, -w4], [w4, 0]])
-
+S = matrix([[1,0],[0,w4]])
 
 class Coset(object):
     def __init__(self, group, items):
@@ -556,6 +556,151 @@ def test_clifford():
     c = Clifford(2)
     M = c.CY()
     assert M[2:, 2:] == Y
+
+
+def test_quaternion():
+
+    Pauli1 = mulclose([X,Z,Y])
+    assert len(Pauli1) == 16
+
+    iX = w4*X
+    iY = w4*Y
+    iZ = w4*Z
+
+    Q1 = mulclose([iX,iY,iZ]) # quaternion group
+    assert len(Q1) == 8
+
+    Cliff1 = mulclose([S, H])
+    assert len(Cliff1) == 192
+
+    N = []
+    for g in Cliff1:
+        for h in Pauli1:
+            assert (~g)*h*g in Pauli1
+        for h in Q1:
+            if (~g)*h*g not in Q1:
+                break
+        else:
+            N.append(g)
+    assert len(N) == len(Cliff1)
+
+    Q2 = [g@I for g in Q1] + [I@g for g in Q1]
+    Q2 = mulclose(Q2)
+    print(len(Q2))
+
+    c2 = Clifford(2)
+    II = c2.I
+    XI = c2.X(0)
+    IX = c2.X(1)
+    ZI = c2.Z(0)
+    IZ = c2.Z(1)
+    wI = c2.wI()
+
+    Pauli = mulclose([wI*wI, XI, IX, ZI, IZ])
+    assert len(Pauli) == 64, len(Pauli)
+
+    assert c2 is Clifford(2)
+
+    SI = c2.S(0)
+    IS = c2.S(1)
+    HI = c2.H(0)
+    IH = c2.H(1)
+    CZ = c2.CZ(0, 1)
+    CX = c2.CX(0, 1)
+
+    gen = [SI, IS, HI, IH] #, CZ, CX]
+    LCliff2 = mulclose(gen)
+    items = mulclose(gen+[CX,CZ], maxsize=5000)
+    found = []
+    for g in items:
+        if g in LCliff2:
+            continue
+        #print(g.name, end="  ")
+        for h in Q2:
+            if (~g)*h*g not in Q2:
+                #print("no")
+                break
+        else:
+            #print("yes")
+            print(g.name)
+            found.append(g)
+
+    gen = gen + found
+    QCliff = mulclose(gen, verbose=True)
+    print(len(QCliff))
+
+    return
+
+    Cliff2 = mulclose([SI, IS, HI, IH, CZ], maxsize=None, verbose=True) # slow!
+    assert len(Cliff2) == 92160
+
+    N = []
+    for g in Cliff2:
+        for h in Q2:
+            if (~g)*h*g not in Q2:
+                break
+        else:
+            N.append(g)
+    assert len(N) == 9216
+
+
+def test_quaternion3():
+
+    c = Clifford(1)
+    I, X, Z, Y = c.I, c.X(0), c.Z(0), c.Y(0)
+    S, H = c.S(0), c.H(0)
+    Pauli1 = mulclose([X,Z,Y])
+    assert len(Pauli1) == 16
+
+    iX = w4*X
+    iY = w4*Y
+    iZ = w4*Z
+
+    Q1 = mulclose([iX,iY,iZ]) # quaternion group
+    assert len(Q1) == 8
+
+    Cliff1 = mulclose([S, H])
+    assert len(Cliff1) == 192
+
+    Q2 = [g@I for g in Q1] + [I@g for g in Q1]
+    Q2 = mulclose(Q2)
+    print(len(Q2))
+
+    Q3 = [g@I@I for g in Q1] + [I@g@I for g in Q1] + [I@I@g for g in Q1]
+    Q3 = mulclose(Q3)
+    print(len(Q3))
+
+    c = Clifford(3)
+    I, X, Z = c.I, c.X, c.Z
+    S, H, CZ, CX = c.S, c.H, c.CZ, c.CX
+
+    gen = [S(0), S(1), S(2), H(0), H(1), H(2)]
+    LCliff = mulclose(gen, verbose=True)
+    cgen = [CZ(0,1), CZ(0,2), CZ(1,2)]
+    cgen += [CX(0,1), CX(0,2), CX(1,2), CX(1,0), CX(2,0), CX(2,1)]
+
+    Q3 = set(Q3)
+    LCliff = set(LCliff)
+
+    found = []
+    g = I
+    while len(found)<5:
+        g = g * choice(LCliff+cgen)
+        if g in LCliff:
+            continue
+        #print(g.name, end="  ")
+        for h in Q3:
+            if (~g)*h*g not in Q3:
+                #print("no")
+                break
+        else:
+            #print("yes")
+            print(g.name)
+            found.append(g)
+
+    gen = gen + found
+    QCliff = mulclose(gen, verbose=True)
+    print(len(QCliff))
 
 
 def test_CY():

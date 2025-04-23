@@ -173,6 +173,7 @@ class Matrix(object):
     def inverse(self):
         M = self.M.inverse()
         return Matrix(self.ring, M)
+    __invert__ = inverse
 
     def transpose(self):
         M = self.M.transpose()
