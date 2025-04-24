@@ -87,6 +87,24 @@ class Matrix(object):
         return '\n'.join(lines)
     __repr__ = __str__
 
+    def gapstr(self):
+        rows = []
+        #for idx in numpy.ndindex(self.shape):
+        m, n = self.shape
+        for i in range(m):
+          row = []
+          for j in range(n):
+            r = self.M[i,j] 
+            r = str(r)
+            r = r.replace(" ", "")
+            r = r.replace("zeta4", "E(4)")
+            r = r.replace("zeta8", "E(8)")
+            assert "zeta" not in r, r
+            row.append(r)
+          row = "[" + ', '.join(row) + "]"
+          rows.append(row)
+        return "[" + ", ".join(rows) + "]"
+
     def __len__(self):
         return self.shape[0]
 

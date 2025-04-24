@@ -589,6 +589,9 @@ def test_quaternion():
     Q2 = mulclose(Q2)
     print(len(Q2))
 
+    for g in Q2:
+        print(g)
+
     c2 = Clifford(2)
     II = c2.I
     XI = c2.X(0)
@@ -608,15 +611,30 @@ def test_quaternion():
     IH = c2.H(1)
     CZ = c2.CZ(0, 1)
     CX = c2.CX(0, 1)
+    SWAP = c2.SWAP(0, 1)
 
     gen = [SI, IS, HI, IH] #, CZ, CX]
     LCliff2 = mulclose(gen, verbose=True)
-    print(len(LCliff2))
-    for g in LCliff2:
-        for h in Q2:
-            assert (~g)*h*g in Q2
+    print("LCliff2:", len(LCliff2))
+    #for g in LCliff2:
+    #    ig = ~g
+    #    for h in Q2:
+    #        assert (ig)*h*g in Q2
 
-    items = mulclose(gen+[CX,CZ], maxsize=5000)
+    g = SWAP
+    assert g not in LCliff2
+    for h in Q2:
+        ig = ~g
+        assert (ig)*h*g in Q2
+
+    #G = mulclose([SWAP] + gen, verbose=True)
+    #print("G:", len(G))
+    #return
+
+    #return
+
+    items = mulclose(gen+[CX,CZ], maxsize=5000, verbose=True)
+    print("items:", len(items))
     found = []
     for g in items:
         if g in LCliff2:
@@ -629,6 +647,7 @@ def test_quaternion():
         else:
             #print("yes")
             print(g.name)
+            print(g)
             found.append(g)
 
     gen = gen + found
@@ -677,16 +696,19 @@ def test_quaternion3():
     assert type(Q3) is set
     print(len(Q3))
 
+    #return
+
     c = Clifford(3)
     I, X, Z = c.I, c.X, c.Z
     S, H, CZ, CX = c.S, c.H, c.CZ, c.CX
 
     gen = [S(0), S(1), S(2), H(0), H(1), H(2)]
-    LCliff = mulclose(gen, verbose=True)
-
+    print("gen:")
+    for g in gen:
+        print(g.gapstr())
+    print()
+    LCliff = mulclose(gen, verbose=True, maxsize=110592)
     #LCliff = set(reduce(matmul, items) for items in cross([tuple(Cliff1)]*3))
-    #print(len(LCliff))
-
     if 0:
         LCliff = set()
         for a in Cliff1:
@@ -712,25 +734,30 @@ def test_quaternion3():
     #LCliff = set(LCliff)
     items = list(LCliff)
 
+    print("\n"*2)
+
     found = []
     g = I
-    while len(found)<5:
+    while len(found)<10:
         g1 = g*choice(items)
         g2 = g*choice(cgen)
         g = choice([g1,g2])
         if g in LCliff:
             continue
         #print(g.name, end="  ")
+        ig = ~g
         for h in Q3:
-            if (~g)*h*g not in Q3:
+            if (ig)*h*g not in Q3:
                 #print("no")
                 break
         else:
             #print("yes")
-            print(g.name)
+            #print(g.name)
+            print(g.gapstr() + ",")
             found.append(g)
-            g = I
+            #g = I
 
+    return
     gen = gen + found
     QCliff = mulclose(gen, verbose=True)
     print(len(QCliff))
