@@ -4,7 +4,8 @@
 brute-force some 2-cocycle's
 
 see:
-https://math.stanford.edu/~conrad/210BPage/handouts/gpext.pdf
+    https://math.stanford.edu/~conrad/210BPage/handouts/gpext.pdf
+    
 
 """
 
@@ -12,52 +13,12 @@ import numpy
 
 from bruhat.gset import Perm, Group
 from bruhat.repr_sage import dixon_irr
+
 from qumba.argv import argv
 from qumba.umatrix import Not, And, Var, UMatrix, Solver
+from qumba.lin import zeros2
 
 
-#class Cocycle2(
-
-
-def test():
-
-    Z2 = Group.cyclic(2)
-    G = Z2*Z2
-
-    G = Group.alternating(4)
-
-    M = [0,1] # the module
-
-    MG = [(m,g) for m in M for g in G]
-    n = len(MG)
-    lookup = {(m,g):i for (i,(m,g)) in enumerate(MG)}
-    found = {}
-    for cocycle in find_cocycles(G):
-        #mul = {}
-        mul = numpy.zeros((n, n), dtype=int)
-        for (m,g) in MG:
-          for (m1,g1) in MG:
-            m2 = (m + m1 + cocycle[g,g1]) % 2
-            g2 = g*g1
-            #mul[(m,g),(m1,g1)] = (m2,g2)
-            mul[lookup[m,g],lookup[m1,g1]] = lookup[m2,g2]
-        #print(mul)
-        G = Group.from_table(mul)
-        G.do_check()
-
-        item = [g.order() for g in G]
-        item.sort()
-        item = tuple(item)
-        found[item] = G
-    #print(len(found))
-    for item in found:
-        print(item)
-        G = found[item]
-        table = dixon_irr(G)
-        print(table)
-        print()
-        
-        
 
 
 def find_cocycles(G):
@@ -103,6 +64,72 @@ def find_cocycles(G):
 
         
     
+def test_extend():
+
+    Z2 = Group.cyclic(2)
+    G = Z2*Z2
+
+    G = Group.alternating(4)
+
+    M = [0,1] # the module
+
+    MG = [(m,g) for m in M for g in G]
+    n = len(MG)
+    lookup = {(m,g):i for (i,(m,g)) in enumerate(MG)}
+    found = {}
+    for cocycle in find_cocycles(G):
+        #mul = {}
+        mul = numpy.zeros((n, n), dtype=int)
+        for (m,g) in MG:
+          for (m1,g1) in MG:
+            m2 = (m + m1 + cocycle[g,g1]) % 2
+            g2 = g*g1
+            #mul[(m,g),(m1,g1)] = (m2,g2)
+            mul[lookup[m,g],lookup[m1,g1]] = lookup[m2,g2]
+        #print(mul)
+        G = Group.from_table(mul)
+        G.do_check()
+
+        item = [g.order() for g in G]
+        item.sort()
+        item = tuple(item)
+        found[item] = G
+    #print(len(found))
+    for item in found:
+        print(item)
+        G = found[item]
+        table = dixon_irr(G)
+        print(table)
+        print()
+        
+        
+
+def symplectic_form(n):
+    F = zeros2(2*n, 2*n)
+    for i in range(n):
+        F[2*i:2*i+2, 2*i:2*i+2] = [[0,1],[1,0]]
+    return F
+
+
+def test_weil():
+    """
+    The Weil representation in characteristic two
+    Shamgar Gurevicha,∗, Ronny Hadani
+    2012
+    section 0.2
+
+    see also: bruhat/heisenberg.py
+
+    """
+
+    n = 1
+    nn = 2*n
+
+    omega = symplectic_form(n)
+    print(omega)
+
+    # beta(u,v) - beta(v,u) = 2*omega(u,v) in 2Z/4Z
+
 
 
 

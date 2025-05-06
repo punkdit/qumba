@@ -369,6 +369,9 @@ def test():
         .ZZZ...Z..ZZ
         ..Z.ZZZ...ZZ
         """) # [[12, 2, 4]] # fail
+    elif argv.code == (18, 2, 3):
+        css = construct.toric(3, 3)
+        code = css.to_qcode()
     elif argv.code == (23, 1, 7):
         code = construct.get_golay(23)
     elif argv.code == (63, 51, 3):
