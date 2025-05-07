@@ -189,6 +189,15 @@ class Matrix(object):
     def is_identity(self):
         return self == Matrix.identity(len(self))
 
+    def order(self):
+        n = 1
+        A = self
+        I = Matrix.identity(len(self))
+        while A != I:
+            n += 1
+            A *= self
+        return n
+
     def __len__(self):
         return len(self.A)
 

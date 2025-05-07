@@ -1401,6 +1401,77 @@ def main_galois():
         print(dode.is_equiv(code), dode.is_cyclic())
 
 
+def main_toric():
+    #code = construct.get_toric(1, 3)
+    code = construct.get_513()
+    n = code.n
+    N, gens = code.get_autos()
+
+    #G = mulclose([Matrix.get_perm(g) for g in gens])
+    #assert len(G) == N
+    print("code auts:", N)
+
+    from bruhat.gset import Perm, Group
+    gens = [Perm(g) for g in gens]
+    G = Group.generate(gens)
+    print(G)
+
+    mul = zeros2(N, N*N)
+    for i,g in enumerate(G):
+      for j,h in enumerate(G):
+        k = G.lookup[g*h]
+        mul[k, i + N*j] = 1
+    #print(shortstr(mul), mul.shape)
+    mul = Matrix(mul)
+
+    from qumba.umatrix import UMatrix, Solver, Not, Or, And
+    solver = Solver()
+    add = solver.add
+
+    U = UMatrix.get_perm(solver, N)
+
+    #for g in G:
+    #    add( U*g == g*U )
+    add( U*mul == mul*(U@U) )
+
+    found = []
+    while 1:
+
+        result = solver.check()
+        if str(result) != "sat":
+            break
+        
+        model = solver.model()
+        u = U.get_interp(model)
+    
+        #print(u)
+
+        found.append(u)
+        add(U != u)
+
+    print(len(found))
+
+    for g in found:
+        print(g.order(), end=" ")
+    print()
+
+    #A = mulclose(found)
+    #print(len(A))
+
+    space = code.space
+    for g in found:
+        perm = g.to_perm()
+        print(perm)
+        u = space.get_perm(perm)
+        dode = u*code
+        print(dode, dode.is_equiv(code))
+
+
+
+
+            
+
+
 def main_galois_15():
     code = QCode.fromstr("""
     XIXIIXXIXXXIIII

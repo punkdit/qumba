@@ -237,6 +237,22 @@ class UMatrix(object):
         return UMatrix(A)
 
     @classmethod
+    def get_perm(cls, solver, n):
+        add = solver.add
+        I = Matrix.identity(n)
+        U = UMatrix.unknown(n, n)
+        for i in range(n):
+            for j in range(n):
+                term = And(*[Not(U[i,k].get()) for k in range(n) if k!=j])
+                term = Or(Not(U[i,j].get()), term)
+                #print(term)
+                add(term)
+            term = Or(*[U[i,k].get() for k in range(n)])
+            add(term)
+        add( U*U.t == I )
+        return U
+
+    @classmethod
     def identity(cls, n):
         A = numpy.identity(n, dtype=int)
         return UMatrix(A)
