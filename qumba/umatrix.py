@@ -191,6 +191,13 @@ class UMatrix(object):
             assert 0, other
         return UMatrix(A)
 
+    def __rmatmul__(self, other):
+        if isinstance(other, Matrix):
+            A = numpy.kron(other.A, self.A)
+        else:
+            assert 0, other
+        return UMatrix(A)
+
     def prod(self, other):
         A = self.A * other.A
         return UMatrix(A)

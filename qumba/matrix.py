@@ -246,8 +246,11 @@ class Matrix(object):
         return Matrix(A, self.p)
 
     def __matmul__(self, other):
-        A = numpy.kron(self.A, other.A)
-        return Matrix(A, self.p)
+        if isinstance(other, Matrix):
+            A = numpy.kron(self.A, other.A)
+            return Matrix(A, self.p)
+        else:
+            return NotImplemented
 
     def __pow__(self, n):
         assert n>=0
