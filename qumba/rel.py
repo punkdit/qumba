@@ -65,7 +65,7 @@ class Relation(object):
     def nf(self): # normal form
         return self.__class__(self.left, self.right)
 
-    def get_left(self, r):
+    def get_left(self, r): # __mul__ ?
         r = Matrix.promote(r)
         if len(r.shape)==1:
             n = len(r)
@@ -78,7 +78,7 @@ class Relation(object):
         return l
     __call__ = get_left
 
-    def get_right(self, l):
+    def get_right(self, l): # __rmul__ ?
         if len(l.shape)==1:
             n = len(l)
             l = l.reshape(1, n)
@@ -952,6 +952,11 @@ def css_prep(code):
     return prep
 
 
+def test_transcode():
+    code = QCode.fromstr("XXXXII IIXXXX ZZZZII IIZZZZ")
+    E = code.get_encoder()
+    print(E)
+
 def test_prep():
 
     module = Module(2)
@@ -994,6 +999,7 @@ def test_prep():
     code = construct.get_713()
     prep = css_prep(code)
 
+    print("prep:")
     print(prep)
 
     n = code.n
