@@ -952,11 +952,6 @@ def css_prep(code):
     return prep
 
 
-def test_transcode():
-    code = QCode.fromstr("XXXXII IIXXXX ZZZZII IIZZZZ")
-    E = code.get_encoder()
-    print(E)
-
 def test_prep():
 
     module = Module(2)
