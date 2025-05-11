@@ -69,7 +69,8 @@ def test_extend():
     Z2 = Group.cyclic(2)
     G = Z2*Z2
 
-    G = Group.alternating(4)
+    #G = Group.alternating(4)
+    G = Group.symmetric(4)
 
     M = [0,1] # the module
 
@@ -93,11 +94,10 @@ def test_extend():
         item = [g.order() for g in G]
         item.sort()
         item = tuple(item)
+        if item in found:
+            continue
         found[item] = G
-    #print(len(found))
-    for item in found:
         print(item)
-        G = found[item]
         table = dixon_irr(G)
         print(table)
         print()

@@ -33,6 +33,52 @@ from qumba.syntax import Syntax
 #from qumba.circuit import parsevec, Circuit, send, get_inverse, measure, barrier, variance, vdump, load
 
 
+def test_ec():
+    code = QCode.fromstr("XXI IXX ZZZ")
+    #code = QCode.fromstr("XXXX ZZZZ")
+    #code = construct.get_513()
+
+    n = code.n
+    P = code.get_projector()
+    assert P*P == P
+    assert P.rank() == 2**code.k
+
+    c = Clifford(n)
+    N = 2**n
+
+    for k in range(N):
+        if P[0,k] != 0:
+            break
+    else:
+        assert 0
+
+    u = P[0,k]
+
+    errors = [c.X(i) for i in range(n)]
+    errors += [c.Z(i) for i in range(n)]
+    errors += [c.S(i) for i in range(n)]
+    errors += [c.S(i)*c.H(i) for i in range(n)]
+
+    for E in errors:
+        lhs = P*E*P
+        v = (lhs[0,k]/u) 
+        rhs = v * P
+        assert lhs==rhs
+        print(v, end=" ", flush=True)
+
+    return
+
+    for Ei in errors:
+      for Ej in errors:
+        if Ei==Ej:
+            continue
+        lhs = P*Ei.d * Ej *P
+        v = (lhs[0,k]/u) 
+        rhs = v * P
+        assert lhs==rhs
+        print(v, end=" ", flush=True)
+
+
 
 def test():
 

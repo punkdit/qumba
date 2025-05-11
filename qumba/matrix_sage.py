@@ -160,6 +160,8 @@ class Matrix(object):
     def __getitem__(self, idx):
         if type(idx) is int:
             return self.M[idx]
+        elif type(idx) is tuple and len(idx)==2 and type(idx[0])==type(idx[1])==int:
+            return self.M[idx]
         M = self.M[idx]
         return Matrix(self.ring, M)
 
