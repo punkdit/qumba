@@ -110,7 +110,7 @@ def test():
         assert op*P == P*op
 
     I = red(1,1)
-    _r = red(0,1) # TODO: add phase here & Pauli correction below
+    _r = red(0,1,2) # TODO: add phase here & Pauli correction below
     _g = green(0,1) # TODO: add phase here & Pauli correction below
 
     op = reduce(matmul, [_r,_g,I,I,I,I])
@@ -137,7 +137,21 @@ def test():
 
     lop = c4.get_pauli("ZIZI")
     rop = c6.get_pauli("ZIZIZI")
-    print(lop*Q == Q*rop)
+    print(lop*Q == Q*rop, lop*Q == -Q*rop)
+
+    Q = Q*Q.d
+    assert Q*Q == Q
+    stab = c4.get_pauli("XXXX")
+    print(stab*Q == Q)
+    stab = c4.get_pauli("ZZZZ")
+    print(stab*Q == Q)
+
+    return
+
+    for s in cross(["IZX"]*4):
+        lop = c4.get_pauli(s)
+        if(-lop*Q == Q*rop):
+            print("\t", s)
 
     return
 
@@ -145,7 +159,7 @@ def test():
         s = ''.join(s)
         rop = c6.get_pauli(s)
         if(lop*Q == Q*rop):
-            print(s)
+            print("\t", s)
 
     #print(QCode.fromstr("XXXX ZZZZ").longstr())
 
