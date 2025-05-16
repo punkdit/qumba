@@ -36,7 +36,12 @@ def find_cocycles(G):
         u = Cocycle[g1,g2] + Cocycle[g*g1, g2] + Cocycle[g,g1*g2] + Cocycle[g,g1]
         add(u==0)
 
-    print("\tsolver.check:")
+    # redundant but helps..
+    e = G.identity
+    for g in G:
+        add(Cocycle[e,g] == Cocycle[e,e])
+
+    print("solver.check()")
     count = 0
     while 1:
         if str(solver.check()) != "sat":
@@ -67,10 +72,10 @@ def find_cocycles(G):
 def test_extend():
 
     Z2 = Group.cyclic(2)
-    G = Z2*Z2
-
+    G = Z2*Z2*Z2
+    #G = Group.symmetric(4)
     #G = Group.alternating(4)
-    G = Group.symmetric(4)
+    #G = Group.dihedral(8)
 
     M = [0,1] # the module
 
@@ -100,6 +105,7 @@ def test_extend():
         print(item)
         table = dixon_irr(G)
         print(table)
+        table.check_complete()
         print()
         
         
