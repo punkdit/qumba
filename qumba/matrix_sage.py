@@ -21,44 +21,6 @@ from qumba.lin import zeros2, identity2
 from qumba.action import mulclose, mulclose_names, mulclose_find
 from qumba.argv import argv
 
-#from qumba.clifford_ring import degree
-#K = CyclotomicField(degree)
-#root = K.gen() # primitive eighth root of unity
-#w8 = root ** (degree // 8)
-#half = K.one()/2
-#w4 = w8**2
-#r2 = w8 + w8**7
-#ir2 = r2 / 2
-#assert r2**2 == 2
-#
-#def simplify_latex(self):
-#    M = self.M
-#    m, n = self.shape
-#    idxs = [(i,j) for i in range(m) for j in range(n)]
-#    for idx in idxs:
-#        if M[idx] != 0:
-#            break
-#    else:
-#        assert 0
-#    scale = M[idx]
-#    if scale != 1 and scale != -1:
-#        M = (1/scale) * M
-#        s = {
-#            r2 : r"\sqrt{2}",
-#            1/r2 : r"\frac{1}{\sqrt{2}}",
-#            #2/r2 : r"\frac{2}{\sqrt{2}}",
-#            2/r2 : r"\sqrt{2}",
-#            #r2/2 : r"\sqrt{2}/2",
-#        }.get(scale, latex(scale))
-#        if "+" in s:
-#            s = "("+s+")"
-#        s = "%s %s"%(s, latex(M))
-#    else:
-#        s = latex(M)
-#    s = s.replace(r"\zeta_{8}^{2}", "i")
-#    return s
-
-
 class Matrix(object):
     def __init__(self, ring, rows, name=()):
         M = all_cmdline.Matrix(ring, rows)
@@ -224,6 +186,9 @@ class Matrix(object):
 
     def rank(self):
         return self.M.rank()
+
+    def determinant(self):
+        return self.M.determinant()
 
     def eigenvectors(self):
         evs = self.M.eigenvectors_right()

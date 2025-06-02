@@ -15,6 +15,7 @@ from bruhat.gset import Perm, Group
 from bruhat.repr_sage import dixon_irr
 
 from qumba.argv import argv
+from qumba.smap import SMap
 from qumba.umatrix import Not, And, Var, UMatrix, Solver
 from qumba.lin import zeros2
 
@@ -67,15 +68,37 @@ def find_cocycles(G):
         count += 1
     print("distinct cocycles:", count)
 
-        
+
+def find_gens(G):
+    gens = []
+    for a in G:
+      for b in G:
+        if a.order()==2 and b.order()==2 and len(Group.generate([a,b]))==len(G):
+            return [a,b]
+    assert 0
+
     
 def test_extend():
 
+    name = argv.next()
+
+    gens = []
     Z2 = Group.cyclic(2)
-    G = Z2*Z2*Z2
-    #G = Group.symmetric(4)
-    #G = Group.alternating(4)
-    #G = Group.dihedral(8)
+    if name == "Z2Z2Z2":
+        G = Z2*Z2*Z2
+    elif name == "Z2Z2":
+        G = Z2*Z2
+        #gens = find_gens(G)
+        gens = [a for a in G if a.order() == 2]
+    elif name == "S4":
+        G = Group.symmetric(4)
+    elif name == "A4":
+        G = Group.alternating(4)
+    elif name == "D8":
+        G = Group.dihedral(8)
+    else:
+        print("name=?")
+        return
 
     M = [0,1] # the module
 
@@ -83,7 +106,14 @@ def test_extend():
     n = len(MG)
     lookup = {(m,g):i for (i,(m,g)) in enumerate(MG)}
     found = {}
-    for cocycle in find_cocycles(G):
+    src = G
+    pairs = [(g,h) for g in G for h in G]
+    uniq = set()
+    for i, cocycle in enumerate(find_cocycles(src)):
+        item = tuple(cocycle[pair] for pair in pairs)
+        #print(i, item)
+        assert item not in uniq
+        uniq.add(item)
         #mul = {}
         mul = numpy.zeros((n, n), dtype=int)
         for (m,g) in MG:
@@ -95,18 +125,43 @@ def test_extend():
         #print(mul)
         G = Group.from_table(mul)
         G.do_check()
-
-        item = [g.order() for g in G]
-        item.sort()
-        item = tuple(item)
-        if item in found:
+        G.cocycle = dict(cocycle)
+        key = [g.order() for g in G]
+        key.sort()
+        key = tuple(key)
+        #found.setdefault(key, []).append(G)
+        if key in found:
+            found[key].append(G)
             continue
-        found[item] = G
-        print(item)
+        found[key] = [G]
+        #found[key] = G
+        print(key)
         table = dixon_irr(G)
         print(table)
         table.check_complete()
         print()
+
+    if len(src) > 4:
+        return
+
+    for key,items in found.items():
+        print(key, len(items))
+        #for G in items:
+        #    table = dixon_irr(G)
+        #    print(table)
+        #print()
+        smap = SMap()
+        col = 0
+        for G in items:
+            cocycle = G.cocycle
+            for i,a in enumerate(src):
+              for j,b in enumerate(src):
+                s = ".1"[cocycle[a,b]]
+                smap[i,j+col] = s
+            col += len(gens)+2
+
+        print(smap)
+
         
         
 

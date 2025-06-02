@@ -1565,6 +1565,55 @@ def test_hierarchy():
     print("found:", count)
 
 
+def test_su2():
+    K = CyclotomicField(8)
+    w = K.gen()
+    one = K.one()
+    w2 = w*w
+    assert w2*w2 == -1
+    r2 = w+w.conjugate()
+    ir2 = r2 / 2
+
+    I = Matrix(K, [[1, 0], [0, 1]], name=("I",))
+    nI = Matrix(K, [[-1, 0], [0, -1]], name=("(-I)",))
+    w2I = Matrix(K, [[w2, 0], [0, w2]], name=("w2",))
+    S = Matrix(K, [[1, 0], [0, w2]], name=("S",))
+    X = Matrix(K, [[0, 1], [1, 0]], name=("X",))
+    Y = Matrix(K, [[0, w2], [-w2, 0]], name=("Y",))
+    Z = Matrix(K, [[1, 0], [0, -1]], name=("Z",))
+    H = Matrix(K, [[ir2, ir2], [ir2, -ir2]], name=("H",))
+
+    Pauli1 = mulclose([w2I, X, Z])
+    Cliff1 = mulclose([I, w2I, nI, S, Z, X, H])
+
+    assert len(Pauli1) == 16
+    assert len(Cliff1) == 192
+
+    name = lambda g: "*".join(g.name)
+
+    # binary octahedral group
+    BO = [g for g in Cliff1 if g.determinant() == 1]
+    for g in BO:
+        print(name(g), end=" ")
+    print()
+    assert len(BO) == 48
+
+    assert w2I*H in BO
+
+    # quaternion group
+    Q = mulclose([w2I*X, w2I*Z])
+    assert len(Q) == 8
+    #for g in Q:
+    #    print(name(g))
+    assert X*Z in Q
+    assert w2I*Y in Q
+
+    # Q is the ``pauli rotation group''
+    G = mulclose( [X*Z, X*Y, Z*Y] )
+    assert set(G) == set(Q)
+
+
+
     
 def test():
     test_clifford()
