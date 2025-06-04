@@ -21,6 +21,16 @@ from qumba.lin import zeros2, identity2
 from qumba.action import mulclose, mulclose_names, mulclose_find
 from qumba.argv import argv
 
+
+def unify(R, S):
+    if R.coerce_map_from(S) is not None:
+        return R
+    if S.coerce_map_from(R) is not None:
+        return S
+    assert 0
+
+
+
 class Matrix(object):
     def __init__(self, ring, rows, name=()):
         M = all_cmdline.Matrix(ring, rows)
@@ -119,6 +129,18 @@ class Matrix(object):
         M = block_diagonal_matrix(self.M, other.M)
         return Matrix(self.ring, M)
 
+    def stack(self, other):
+        "concatenate rows of self & other"
+        #assert self.ring == other.ring
+        ring = unify(self.ring, other.ring)
+        return Matrix(ring, self.M.stack(other.M))
+
+    def augment(self, other):
+        "concatenate cols of self & other"
+        #assert self.ring == other.ring
+        ring = unify(self.ring, other.ring)
+        return Matrix(ring, self.M.augment(other.M))
+
     def __getitem__(self, idx):
         if type(idx) is int:
             return self.M[idx]
@@ -190,18 +212,40 @@ class Matrix(object):
     def determinant(self):
         return self.M.determinant()
 
-    def eigenvectors(self):
+    def eigenvectors(self, ring=None):
+        if ring is None:
+            ring = self.ring
         evs = self.M.eigenvectors_right()
         vecs = []
         for val,vec,dim in evs:
             #print(val, dim)
+            #print(vec[0])
             #print(type(vec[0]))
-            vec = all_cmdline.Matrix(self.ring, vec[0])
+            vec = all_cmdline.Matrix(ring, vec[0])
             vec = vec.transpose() 
-            vec = Matrix(self.ring, vec)
+            vec = Matrix(ring, vec)
             vecs.append((val, vec, dim))
         #print(type(self.M))
         return vecs
+
+
+    def cokernel(self):
+        K = all_cmdline.kernel(self.M)
+        B = K.basis()
+        #print(K, type(K))
+        M = Matrix(self.ring, B)
+        # XXX fix empty M shape
+        return M
+
+    def kernel(self):
+        K = self.t.cokernel().t
+        return K
+
+    def charpoly(self):
+        return self.M.characteristic_polynomial()
+
+
+
 
 
 def test():

@@ -1248,6 +1248,68 @@ def test_platonic():
             print(g, ''.join(name), "in Semi-Clifford")
 
 
+def test_face_gate():
+
+    c = Clifford(1)
+    I = c.I
+    wI = c.wI()
+    S = c.get_S()
+    H = c.get_H()
+    J = w8*H
+
+
+    F = S*J
+    assert F.order() == 6
+
+    #print(2*F)
+
+    print()
+
+    M = F.M
+    #print(dir(M))
+    p = M.characteristic_polynomial()
+    #print(p, type(p))
+    #print(dir(p))
+    #print(p.roots())
+
+    #vecs = F.eigenvectors()
+    #for v in vecs:
+    #    print(v)
+
+    E = all_cmdline.E
+    ring = all_cmdline.UniversalCyclotomicField()
+
+    I = Matrix.identity(ring, 2)
+
+    #ring = CyclotomicField(12)
+    F = Matrix(ring, F.M)
+    print(F)
+
+    r = E(3)*I
+    F1 = F+r
+    v0 = (F1.kernel())
+
+    F1 = F+r*r
+    v1 = (F1.kernel())
+
+    print(v0)
+    print( F * v0 )
+    print( F * v0 == -E(3)*v0 )
+
+    print(v1)
+    print( F * v1 )
+    print( F * v1 == -E(3)*E(3)*v1 )
+
+    U = v0.augment(v1)
+    print(U)
+    print(U*U.d)
+
+    #print(v)
+    #print(F*v)
+
+    #v = Matrix(
+
+
 def test_higher():
     "higher Clifford group elements"
     c1 = Clifford(1)
