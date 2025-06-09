@@ -127,7 +127,7 @@ class Matrix(object):
         for row in A:
             idx = numpy.where(row)[0]
             assert len(idx) == 1, "not a perm"
-            perm.append(idx[0])
+            perm.append(int(idx[0]))
         return perm
 
     @classmethod

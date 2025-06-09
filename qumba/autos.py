@@ -7,6 +7,8 @@ find automorphisms of QCode's that permute the qubits.
 from time import time
 start_time = time()
 from random import shuffle, choice
+from functools import reduce
+from operator import lshift
 
 import numpy
 
@@ -592,6 +594,110 @@ def test_bring():
         for g in find_isomorphisms_css(code, dode, ffinv=True):
             break
         print(g)
+
+
+def test_bring_zx():
+    from qumba.transversal import find_isomorphisms_css
+    css = construct.get_bring()
+    code = css.to_qcode()
+    n = css.n
+    assert n%2 == 0
+
+    css.bz_distance()
+    print(css)
+    #return
+
+    inner = construct.get_422()
+    print(inner)
+    #print(inner.longstr())
+    #return
+
+    E = inner.get_encoder()
+
+    E1 = reduce(lshift, [E]*(n//2))
+
+    dode = css.get_dual()
+    for f in find_isomorphisms_css(css, dode, ffinv=True):
+        #break
+
+        succ = True
+        for i in range(n):
+            if f[i,i]:
+                succ = False
+        if not succ:
+            break
+    
+        perm = f.to_perm()
+        print(perm)
+        pairs = []
+        for i in range(n):
+            j = perm[i]
+            if j < i:
+                continue
+            assert j!=i
+            pairs.append((i,j))
+
+        print(pairs)
+
+        #pairs = [(0, 8), (1, 23), (2, 15), (3, 22), (4, 25),
+        #(5, 21), (6, 16), (7, 24), (9, 28), (10, 29), (11, 27),
+        #(12, 26), (13, 18), (14, 20), (17, 19)]
+    
+        #pairs = [(2*i,2*i+1) for i in range(n)]
+    
+    
+        space = SymplecticSpace(2*n)
+        idxs = list(range(2*n))
+    
+        idxs = []
+        for i in range(n//2):
+            idxs.append( 4*i + 0 )
+            idxs.append( 4*i + 1 )
+        for i in range(n//2):
+            idxs.append( 4*i + 2 )
+            idxs.append( 4*i + 3 )
+    
+        assert len(idxs) == 2*n, len(idxs)
+        assert len(set(idxs)) == len(idxs)
+    
+        P = space.get_perm( idxs )
+    
+        E0 = code.get_encoder()
+        E0 = code.space.get_identity() << E0
+    
+        EE = E1 * P.t * E0
+        tgt = QCode.from_encoder(EE, k=code.k)
+        #print(tgt)
+        #print(tgt.longstr())
+    
+        assert tgt.is_css()
+        css = tgt.to_css()
+        css.bz_distance()
+        print(css)
+
+    from csscode import distance_z3_css, logop_meetup
+    #dx, dz = distance_z3_css(css)
+    #print(dx, dz)
+
+    #l = logop_meetup(css.Hx, css.Lz)
+    #s = ''.join([".Z"[li] for li in l])
+    #print(s)
+
+    #return
+
+#    code.bz_distance()
+#    print(code)
+#
+#    return
+#
+#    result = get_autos_css(code)
+#    assert result is not None
+#    gen, order, ops = result
+#    assert order == 120
+#    #return
+#
+#    L = mulclose(ops, verbose=True)
+#    print("|G| =", order, "logicals:", len(L))
 
 
 def test_logicals():

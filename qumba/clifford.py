@@ -1283,7 +1283,10 @@ def test_face_gate():
 
     #ring = CyclotomicField(12)
     F = Matrix(ring, F.M)
-    print(F)
+    for i in range(1,6):
+        print(F**i)
+
+    return
 
     r = E(3)*I
     F1 = F+r

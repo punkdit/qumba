@@ -458,16 +458,16 @@ def test_fold():
     from qumba.transversal import find_isomorphisms_css, find_lw_css
     from qumba.action import Perm
     from qumba.unwrap import wrap
-    #code = construct.biplanar(6, 12) # [[36, 8, 4]] --> [[18, 4, 3]]
+    code = construct.biplanar(6, 12) # [[36, 8, 4]] --> [[18, 4, 3]]
     #code = construct.biplanar(12, 12) # [[72, 12, 6]] --> [[36, 6, 6]]
-    code = construct.biplanar(18, 12) # [[108, 8, 10]] --> [[54, 4, 7<=d<=10]]
+    #code = construct.biplanar(18, 12) # [[108, 8, 10]] --> [[54, 4, 7<=d<=10]]
     if code.n < 70:
         code.bz_distance()
     print(code)
 
     hx, hz = find_lw_css(code)
     print(len(hx), len(hz))
-    return
+    #return
 
     dode = code.get_dual()
 
