@@ -15,11 +15,12 @@ from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, ForAll, PbEq
 from qumba.qcode import QCode, SymplecticSpace, fromstr, shortstr, strop
 from qumba.matrix import Matrix, scalar
 from qumba import csscode
-from qumba.action import mulclose, Group, Perm, mulclose_find
-from qumba.util import allperms
+from qumba.action import mulclose, Group, Perm, mulclose_find, mulclose_hom
+from qumba.util import allperms, cross
 from qumba import equ
 from qumba import construct 
 from qumba import autos
+from qumba import lin
 from qumba.unwrap import unwrap, Cover
 from qumba.argv import argv
 from qumba.umatrix import UMatrix
@@ -1920,6 +1921,252 @@ def test_braid():
         print(g.name)
 
     
+def find_qcode():
+    # generalize find_css to non-css codes
+
+    params = argv.code
+    if params is not None:
+        n, k, d = params
+        m = n-k
+    else:
+        n = argv.get("n", 5)
+        k = argv.get("k", 2)
+        d = argv.get("d", 2) 
+        m = n-k
+
+    print("code: [[%d, %d, %d]]"%(n, k, d))
+
+    space = SymplecticSpace(n)
+    F = space.F
+
+    solver = Solver()
+    Add = solver.add
+
+    nn = 2*n
+
+    # symplectic/unitary encoder map
+    E = UMatrix.unknown(nn, nn) 
+
+    H = E[:2*m:2, :]
+    L = E[2*m:, :]
+
+    # just check single qubit errors
+    for i in range(n):
+        for e in [(1,0), (0,1), (1,1)]:
+            err = lin.zeros2(nn,1)
+            err[2*i:2*i+2, 0] = e
+            check = H*Matrix(err)
+            Add(Or(*[check[j,0].get() for j in range(m)]))
+
+    assert d==2, "not implemented" # XX TODO
+
+    Add( E.t * F * E == F )
+
+    count = 0
+    while 1:
+        result = solver.check()
+        if str(result) != "sat":
+            #print(result)
+            break
+    
+        model = solver.model()
+        _E = E.get_interp(model)
+        _H = H.get_interp(model)
+    
+        code = QCode.from_encoder(_E.t, k=k)
+        print(code)
+        print(code.longstr())
+        assert code.get_encoder() == _E.t
+
+        Add( H != _H )
+
+        # this needs to be ForAll U: U*H != _H
+        #U = UMatrix.unknown(m, m)
+        #Add( U*H != _H )
+
+        count += 1
+        #break # <-----------
+
+        #print(".", end="", flush=True)
+    #print()
+
+    print("found:", count)
+
+
+
+
+def find_code():
+    # modify find_qcode above to allow for certain automorphisms...
+
+    params = argv.code
+    if params is not None:
+        n, k, d = params
+        m = n-k
+    else:
+        n = argv.get("n", 5)
+        k = argv.get("k", 2)
+        d = argv.get("d", 2) 
+        m = n-k
+
+    l = argv.get("l", 1)
+    assert n%l == 0, "blocks must divide n"
+
+    print("code: [[%d, %d, %d]]"%(n, k, d))
+
+    space = SymplecticSpace(n)
+    F = space.F
+
+    solver = Solver()
+    Add = solver.add
+
+    nn = 2*n
+
+    #H = UMatrix.unknown(m, nn)
+    #T = UMatrix.unknown(m, nn)
+    #Lx = UMatrix.unknown(k, nn)
+    #Lz = UMatrix.unknown(k, nn)
+
+    # symplectic/unitary encoder map
+    E = UMatrix.unknown(nn, nn) 
+
+    H = E[:2*m:2, :]
+    L = E[2*m:, :]
+
+    assert d==2, "not implemented"
+
+    # just check single qubit errors
+    for i in range(n):
+        for e in [(1,0), (0,1), (1,1)]:
+            err = lin.zeros2(nn,1)
+            err[2*i:2*i+2, 0] = e
+            check = H*Matrix(err)
+            Add(Or(*[check[j,0].get() for j in range(m)]))
+
+    perms = []
+    idxs = list(range(n//l))
+    idxs[:2] = [1,0] # swap
+    perms.append(idxs)
+    perms.append([(i+1)%(n//l) for i in range(n//l)])
+
+    #perm = space.SWAP(0,1)
+    #perms.append(perm)
+    #perm = space.P(*[(i+1)%n for i in range(n)])
+    #perms.append(perm)
+
+    ops = []
+
+    for perm in perms:
+        perm = reduce(add,
+            [[i + block*(n//l) for i in perm] for block in range(l)])
+        print("perm:", perm)
+        assert len(perm)==n
+        assert len(perm)==len(set(perm))
+        op = space.P(*perm).t
+        ops.append(op)
+        H1 = H * op
+        if 1:
+            U = UMatrix.unknown(m, m)
+            Add( U*H1 == H )
+        else:
+            # on small codes (n=4,5) this is much slower, 
+            # haven't tried larger codes:
+            Add( H*F*H1.t == 0 )
+            Add( L*F*H1.t == 0 )
+
+    Add( E.t * F * E == F )
+
+    count = 0
+    while 1:
+        result = solver.check()
+        if str(result) != "sat":
+            #print(result)
+            break
+    
+        model = solver.model()
+        _E = E.get_interp(model)
+        #print("E:")
+        #print(_E)
+    
+        _H = H.get_interp(model)
+        #print("H:")
+        #print(_H)
+    
+        code = QCode.from_encoder(_E.t, k=k)
+        print(code)
+        print(code.longstr())
+        assert code.get_encoder() == _E.t
+
+        gen = set()
+        for op in ops:
+            dode = op*code
+            assert dode.is_equiv(code)
+            logop = dode.get_logical(code)
+            gen.add(logop)
+        gen = list(gen)
+        G = mulclose(gen, verbose=True)
+        print("logical action:", len(G))
+
+        #Add( E != _E )
+        Add( H != _H )
+
+        # this needs to be ForAll U: U*H != _H
+        #U = UMatrix.unknown(m, m)
+        #Add( U*H != _H )
+
+        count += 1
+        #break # <-----------
+
+        #print(".", end="", flush=True)
+    #print()
+
+    print("found:", count)
+
+
+def find_Sp2():
+
+    # construct an explicit isomorphism: Sp(4,2) = S_6
+    # (not shown: gap torture session)
+
+    from qumba.symplectic import uturn_to_zip
+    U = uturn_to_zip(2)
+
+    space = SymplecticSpace(2)
+    a = Matrix.parse("""
+    1 . 1 1
+    1 . . 1
+    . 1 . 1
+    1 1 1 1
+    """)
+    b = Matrix.parse("""
+    . . 1 .
+    1 . . .
+    . . . 1
+    . 1 . .
+    """)
+
+    a = U.t*a*U
+    b = U.t*b*U
+    assert space.is_symplectic(a)
+    assert space.is_symplectic(b)
+
+    # a -> (1,2,6,3)
+    s = Perm.fromcycles([(0,1,5,2)], list(range(6)))
+    # b -> (1,5)(2,4,3,6)
+    t = Perm.fromcycles([(0,4), (1,3,2,5)], list(range(6)))
+    hom = mulclose_hom([a,b], [s,t])
+
+    assert len(hom) == 720
+
+    hom = {v:k for (k,v) in hom.items()}
+    S6 = mulclose([s,t])
+    S6 = list(S6)
+    for g in S6:
+        print(g)
+        print(hom[g])
+    
+    
+    
+
 
 def find_css():
     # see also previous version: csscode.find_z3
