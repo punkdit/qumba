@@ -1047,12 +1047,23 @@ class QCode(object):
         code = self.space.get_perm(perm)*self
         return code.is_equiv(self)
 
-    def get_logical(self, other, check=False):
+    def old_get_logical(self, other, check=False):
         if check:
             assert self.is_equiv(other)
         L = self.get_decoder() * other.get_encoder()
         L = L[-self.kk:, -self.kk:]
         return L
+
+    def get_logical(self, other, check=False):
+        if check:
+            assert self.is_equiv(other)
+        Fn = self.space.F
+        Fk = SymplecticSpace(self.k).F
+        U = Fk*self.L * Fn * other.L.t
+        if check:
+            L = self.old_get_logical(other)
+            assert U == L
+        return U
 
     def get_overlap(self, other):
         assert 0, "fix me"

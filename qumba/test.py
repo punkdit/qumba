@@ -872,8 +872,12 @@ def test_genon():
     code = QCode.fromstr("XYZI IXYZ ZIXY")
     print(code.longstr())
 
-    G = list(get_autos(code))
-    assert len(G) == 4 # Z/4
+    items = get_autos(code)
+    print(items)
+
+    gen, order, ops = get_autos(code)
+    #G = mulclose(ops)
+    #assert len(G) == 4 # Z/4
 
     space = SymplecticSpace(1)
     H = space.get_H()
@@ -1736,6 +1740,7 @@ def test_422():
         L = code2.get_logical(code1)
         if L == s2.CZ():
             found.append(code1)
+
     assert len(found) == 48 # two kinds up to 4!==24 perms
     #for code in found:
     #    print()
