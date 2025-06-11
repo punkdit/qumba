@@ -1993,9 +1993,7 @@ def find_qcode():
     print("found:", count)
 
 
-
-
-def find_code():
+def find_code_autos():
     # modify find_qcode above to allow for certain automorphisms...
 
     params = argv.code
@@ -2122,7 +2120,7 @@ def find_code():
     print("found:", count)
 
 
-def find_Sp2():
+def gethom_Sp2(idx=0):
 
     # construct an explicit isomorphism: Sp(4,2) = S_6
     # (not shown: gap torture session)
@@ -2149,10 +2147,12 @@ def find_Sp2():
     assert space.is_symplectic(a)
     assert space.is_symplectic(b)
 
+    items = list(range(6))
+
     # a -> (1,2,6,3)
-    s = Perm.fromcycles([(0,1,5,2)], list(range(6)))
+    s = Perm.fromcycles([(0,1,5,2)], items)
     # b -> (1,5)(2,4,3,6)
-    t = Perm.fromcycles([(0,4), (1,3,2,5)], list(range(6)))
+    t = Perm.fromcycles([(0,4), (1,3,2,5)], items)
     hom = mulclose_hom([a,b], [s,t])
 
     assert len(hom) == 720
@@ -2160,11 +2160,153 @@ def find_Sp2():
     hom = {v:k for (k,v) in hom.items()}
     S6 = mulclose([s,t])
     S6 = list(S6)
-    for g in S6:
-        print(g)
-        print(hom[g])
+    #for g in S6:
+    #    print(g)
+    #    print(hom[g])
+
+    #gap> aut := AutomorphismGroup(H);
+    #gap> GeneratorsOfGroup(aut);
+    #[ ^(1,2,3,4,5,6), ^(1,2), 
+    #    [ (5,6), (1,2,3,4,5) ]
+    #    -> [(1,2)(3,5)(4,6), (1,2,3,4,5) ] ]
+    # gap> Order(aut);
+    # 1440
+
+    lgen = [
+        Perm.fromcycles([(4,5)], items),
+        Perm.fromcycles([(0,1,2,3,4)], items)]
+    rgen = [
+        Perm.fromcycles([(0,1),(2,4),(3,5)], items),
+        Perm.fromcycles([(0,1,2,3,4)], items)]
+
+    outer = mulclose_hom(lgen, rgen)
+    assert len(outer) == 720
+
+    if idx == 0:
+        return [s,t], hom
+    elif idx == 1:
+        s = outer[s]
+        t = outer[t]
+        return [s,t], hom
+    assert 0
+
     
+def find_code_Sp2():
+    # modify find_code_autos above ...
+
+    l = argv.get("l", 1)
+    k = 2
+    n = 6*l
+    m = n-k
+    d = 2
+
+    idx = argv.get("idx", 0)
+
+    print("code: [[%d, %d, %d]]"%(n, k, d))
+
+    space = SymplecticSpace(n)
+    Fn = space.F
+    Fk = SymplecticSpace(k).F
+
+    solver = Solver()
+    Add = solver.add
+
+    nn = 2*n
+
+    # symplectic/unitary encoder map
+    E = UMatrix.unknown(nn, nn) 
+
+    H = E[:2*m:2, :]
+    L = E[2*m:, :]
+
+    assert d==2, "not implemented"
+
+    # just check single qubit errors
+    for i in range(n):
+        for e in [(1,0), (0,1), (1,1)]:
+            err = lin.zeros2(nn,1)
+            err[2*i:2*i+2, 0] = e
+            check = H*Matrix(err)
+            Add(Or(*[check[j,0].get() for j in range(m)]))
+
+    gen, hom = gethom_Sp2(idx)
+    #G = mulclose(gen)
+    #for a in G:
+    #  for b in G:
+    #    assert hom[a]*hom[b] == hom[a*b]
+    #print("is hom: yes")
+
+    ops = []
+    for g in gen:
+        tgt = hom[g] # target Sp_2
+        perm = [g[i] for i in range(6)]
+        print(perm)
+        perm = reduce(add,
+            [[i + block*(n//l) for i in perm] for block in range(l)])
+        print(perm)
+        assert len(perm)==n
+        assert len(perm)==len(set(perm))
+        op = space.P(*perm).t
+        ops.append(op)
+        H1 = H * op
+        U = UMatrix.unknown(m, m)
+        Add( U*H1 == H ) # preserve the stabilizer space
+
+        L1 = L * op
+        Add( Fk * L * Fn * L1.t == tgt )
+        print(tgt)
+
+    Add( E.t * Fn * E == Fn )
+
+    #return
+
+    count = 0
+    while 1:
+        result = solver.check()
+        if str(result) != "sat":
+            #print(result)
+            break
     
+        model = solver.model()
+        _E = E.get_interp(model)
+        #print("E:")
+        #print(_E)
+    
+        _H = H.get_interp(model)
+        #print("H:")
+        #print(_H)
+    
+        code = QCode.from_encoder(_E.t, k=k)
+        print(code)
+        print(code.longstr())
+        assert code.get_encoder() == _E.t
+
+        gen = set()
+        for op in ops:
+            dode = op*code
+            assert dode.is_equiv(code)
+            logop = dode.get_logical(code)
+            gen.add(logop)
+        gen = list(gen)
+        G = mulclose(gen, verbose=True)
+        print("logical action:", len(G))
+
+        #Add( E != _E )
+        Add( H != _H )
+
+        # this needs to be ForAll U: U*H != _H
+        #U = UMatrix.unknown(m, m)
+        #Add( U*H != _H )
+
+        count += 1
+        #break # <-----------
+
+        #print(".", end="", flush=True)
+    #print()
+
+    print("found:", count)
+
+
     
 
 
