@@ -44,7 +44,7 @@ class Matrix(object):
 
     def __eq__(self, other):
         assert isinstance(other, Matrix)
-        assert self.ring == other.ring
+        #assert self.ring == other.ring
         assert self.shape == other.shape
         return self.M == other.M
 
@@ -82,24 +82,24 @@ class Matrix(object):
 
     def __mul__(self, other):
         assert isinstance(other, Matrix), type(other)
-        assert self.ring == other.ring
         assert self.shape[1] == other.shape[0], (
             "cant multiply %sx%s by %sx%s"%(self.shape + other.shape))
+        ring = unify(self.ring, other.ring)
         M = self.M * other.M
         name = self.name + other.name
-        return Matrix(self.ring, M, name)
+        return Matrix(ring, M, name)
 
     def __add__(self, other):
         assert isinstance(other, Matrix)
-        assert self.ring == other.ring
+        ring = unify(self.ring, other.ring)
         M = self.M + other.M
-        return Matrix(self.ring, M)
+        return Matrix(ring, M)
 
     def __sub__(self, other):
         assert isinstance(other, Matrix)
-        assert self.ring == other.ring
+        ring = unify(self.ring, other.ring)
         M = self.M - other.M
-        return Matrix(self.ring, M)
+        return Matrix(ring, M)
 
     def __neg__(self):
         M = -self.M
@@ -112,8 +112,9 @@ class Matrix(object):
        return reduce(mul, [self]*n)
 
     def __rmul__(self, r):
+        ring = unify(r.parent(), self.ring)
         M = r*self.M
-        return Matrix(self.ring, M)
+        return Matrix(ring, M)
 
     def __matmul__(self, other):
         assert isinstance(other, Matrix)
@@ -147,6 +148,10 @@ class Matrix(object):
         elif type(idx) is tuple and len(idx)==2 and type(idx[0])==type(idx[1])==int:
             return self.M[idx]
         M = self.M[idx]
+        return Matrix(self.ring, M)
+
+    def __call__(self, val):
+        M = self.M(val)
         return Matrix(self.ring, M)
 
     def _latex_(self):
