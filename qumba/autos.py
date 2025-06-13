@@ -620,11 +620,12 @@ def test_bring_zx():
     for f in find_isomorphisms_css(css, dode, ffinv=True):
         #break
 
-        succ = True
+        fixed = []
         for i in range(n):
             if f[i,i]:
-                succ = False
-        if not succ:
+                fixed.append(i)
+        print("fixed:", fixed)
+        if fixed:
             break
     
         perm = f.to_perm()
@@ -674,6 +675,9 @@ def test_bring_zx():
         css = tgt.to_css()
         css.bz_distance()
         print(css)
+
+        print()
+
 
     from csscode import distance_z3_css, logop_meetup
     #dx, dz = distance_z3_css(css)

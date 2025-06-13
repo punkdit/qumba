@@ -1807,6 +1807,68 @@ def test_dehn():
         print(M)
         print(code.space.get_name(M))
         #break
+
+
+def test_16_4_4():
+    l = 4
+    n = l**2
+
+    lookup = {}
+    for row in range(l):
+      for col in range(l):
+        lookup[row, col] = len(lookup)
+    #print(lookup)
+
+    stabs = []
+    for row in range(l):
+      for col in range(l):
+        bit = "X" if (row+col)%2==0 else "Z"
+        stab = ["I"]*n
+        #print(row, col, bit)
+        stab[lookup[row,col]] = bit
+        stab[lookup[row,(col+1)%l]] = bit
+        stab[lookup[(row+1)%l,(col+1)%l]] = bit
+        stab[lookup[(row+1)%l,col]] = bit
+        stab = "".join(stab)
+        stabs.append(stab)
+    stabs = stabs[:-2]
+    H = '\n'.join(stabs)
+    print(H.replace("I","."))
+    print()
+    space = SymplecticSpace(n)
+    H = space.fromstr(H)
+    print(H, H.shape, H.rank())
+    print( space.is_isotropic(H) )
+
+    code = QCode(H)
+    print(code)
+
+    G = space.get_identity()
+    for row in range(l):
+      for col in range(l):
+        if (row+col)%2==0:
+            i = lookup[row, col]
+            j = lookup[(row+1)%l, col]
+            op = space.CX(j,i)
+            #print(i,j)
+            assert op*G == G*op
+            G = op*G
+    
+    dode = G*code
+    print(dode.is_equiv(code))
+
+    perm = {}
+    for row in range(l):
+      for col in range(l):
+        src = lookup[row, col]
+        tgt = lookup[(row + col)%l, col]
+        perm[src] = tgt
+    perm = [perm[i] for i in range(n)]
+    G = space.get_perm(perm)
+    dode = G*dode
+    print(dode.is_equiv(code))
+
+
     
 
 def test_all_412():
@@ -2444,8 +2506,6 @@ if __name__ == "__main__":
         fn()
 
     print("finished in %.3f seconds.\n"%(time() - start_time))
-
-
 
 
 
