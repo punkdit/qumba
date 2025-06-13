@@ -1809,7 +1809,8 @@ def test_dehn():
         #break
 
 
-def test_16_4_4():
+def test_16_2_4():
+    "dehn twists on [[16,2,4]]"
     l = 4
     n = l**2
 
@@ -1833,29 +1834,27 @@ def test_16_4_4():
         stabs.append(stab)
     stabs = stabs[:-2]
     H = '\n'.join(stabs)
-    print(H.replace("I","."))
-    print()
     space = SymplecticSpace(n)
     H = space.fromstr(H)
-    print(H, H.shape, H.rank())
-    print( space.is_isotropic(H) )
+    assert space.is_isotropic(H)
 
     code = QCode(H)
     print(code)
 
-    G = space.get_identity()
-    for row in range(l):
-      for col in range(l):
-        if (row+col)%2==0:
-            i = lookup[row, col]
-            j = lookup[(row+1)%l, col]
-            op = space.CX(j,i)
-            #print(i,j)
-            assert op*G == G*op
-            G = op*G
-    
-    dode = G*code
-    print(dode.is_equiv(code))
+    if 0:
+        G = space.get_identity()
+        for row in range(l):
+          for col in range(l):
+            if (row+col)%2==0:
+                i = lookup[row, col]
+                j = lookup[(row+1)%l, col]
+                op = space.CX(j,i)
+                #print(i,j)
+                assert op*G == G*op
+                G = op*G
+        
+        dode = G*code
+        print(dode.is_equiv(code))
 
     perm = {}
     for row in range(l):
@@ -1865,14 +1864,119 @@ def test_16_4_4():
         perm[src] = tgt
     perm = [perm[i] for i in range(n)]
     G = space.get_perm(perm)
-    dode = G*dode
+    dode = G*code
     print(dode.is_equiv(code))
 
+    print(code.H.shape)
 
+    H0 = code.H.intersect(dode.H)
+    print(H0, H0.shape)
+
+    #eode = QCode(H0)
+    #print(eode)
+    #print(eode.longstr())
+
+    from qumba.css import CSS
+
+    src = dode.to_css()
+    tgt = code.to_css()
+
+    src = CSS(src.Hx, src.Hz)
+    tgt = CSS(tgt.Hx, tgt.Hz)
+    print(src)
+    print(tgt)
+
+    mx = src.mx
+    mz = src.mz
+
+    solver = Solver()
+    Add = solver.add
+
+    U = UMatrix.unknown(n, n)
+    V = UMatrix.unknown(n, n)
+    I = Matrix.identity(n)
+
+    Add( U*V == I )
+
+    Mx = UMatrix.unknown(mx, mx)
+    Mz = UMatrix.unknown(mz, mz)
+
+    Add( src.Hx * U.t == Mx * tgt.Hx )
+    Add( src.Hz * V == Mz * tgt.Hz )
+
+    if argv.diagonal:
+        for i in range(n):
+            Add( U[i,i] == 1 )
+
+    # locality ?
+    coords = [(row,col) for row in range(l) for col in range(l)]
+#    for u in coords:
+#      for v in coords:
+#        nbd = [((u[0]+i)%l, (u[1]+j)%l) for i in [-1,0,1] for j in [-1,0,1]]
+#        i = lookup[u]
+
+    def get_shift(dx, dy):
+        perm = []
+        for u in coords:
+            v = (u[0]+dx)%l, (u[1]+dy)%l
+            perm.append(lookup[v])
+        P = Matrix.get_perm(perm)
+        return P
+
+    P = get_shift(2,0)
+    Add( P * U * P.t == U )
+    P = get_shift(0,2)
+    Add( P * U * P.t == U )
+
+    row_weight = argv.get("row_weight")
+    if row_weight is not None:
+        for i in range(n):
+            Add(Sum([If(U[i,j].get(),1,0) for j in range(n)])<=row_weight)
+
+    count = 0
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("result:", result)
+            print(result)
+            return
     
+        model = solver.model()
+        U0 = U.get_interp(model)
+        V0 = V.get_interp(model)
+        Add(U != U0)
+    
+        weight = U0.sum()
+        if weight-n > 8:
+            continue
+
+        print()
+        print(U0, U0.shape, U0.sum()-n)
+
+        count += 1
+        #break
+        assert U0*V0 == I
+    
+        E = U0 << V0.t
+        # block order --> ziporder
+        perm = []
+        for i in range(n):
+            perm.append(i)
+            perm.append(i+n)
+        E = E[perm, :]
+        E = E[:, perm]
+    
+        space = SymplecticSpace(n)
+        assert space.is_symplectic(E)
+    
+        #assert (E*code).is_equiv(dode)
+        assert (E*dode).is_equiv(code)
+    
+    print("found:", count)
+
 
 def test_all_412():
-    "generate all 412 codes & look for local clifford & perm gates"
+    "generate all 412 codes & _look for local clifford & perm gates"
     n, k, d = 4, 1, 2
     G = Group.symmetric(n)
     perms = [[g[i] for i in range(n)] for g in G]
