@@ -1697,7 +1697,7 @@ def search_gate(code, dode, *perms, row_weight=None, diagonal=False):
         Add(U != M)
 
 
-def test_dehn():
+def old_test_dehn():
     lookup = {}
     rows, cols = 4, 4
     for i in range(rows):
@@ -1973,6 +1973,119 @@ def test_16_2_4():
         assert (E*dode).is_equiv(code)
     
     print("found:", count)
+
+
+def test_dehn():
+    "dehn twists on toric codes"
+    l = 4
+
+    css = construct.toric(l, l)
+    css.bz_distance()
+    print(css)
+
+    n = css.n
+    lookup = css.lookup
+
+    code = css.to_qcode()
+
+    space = code.space
+    G = space.get_identity()
+    for r in range(l):
+      for c in range(l):
+        idx = lookup[r,c,0]
+        jdx = lookup[r,c,1]
+        op = space.CX(idx, jdx)
+        print((idx,jdx), end=" ")
+        assert op*G == G*op
+        G = op*G
+    print()
+
+    dode = G*code
+    #dode = code
+    print(dode.is_equiv(code))
+
+    other = dode.to_css()
+    other.bz_distance()
+    print(other)
+
+    #return
+
+    from qumba.css import CSS
+
+    src = dode.to_css()
+    tgt = code.to_css()
+
+    src = CSS(src.Hx, src.Hz)
+    tgt = CSS(tgt.Hx, tgt.Hz)
+    print(src)
+    print(tgt)
+
+    mx = src.mx
+    mz = src.mz
+
+    solver = Solver()
+    Add = solver.add
+
+    U = UMatrix.unknown(n, n)
+    #V = UMatrix.unknown(n, n)
+    V = U.t
+    I = Matrix.identity(n)
+
+    Add( U*V == I )
+
+    Mx = UMatrix.unknown(mx, mx)
+    Mz = UMatrix.unknown(mz, mz)
+
+    Add( src.Hx * U.t == Mx * tgt.Hx )
+    Add( src.Hz * V == Mz * tgt.Hz )
+
+    row_weight = argv.get("row_weight", 1)
+    if row_weight is not None:
+        print("row_weight:", row_weight)
+        for i in range(n):
+            Add(Sum([If(U[i,j].get(),1,0) for j in range(n)])<=row_weight)
+
+    gen = set()
+
+    count = 0
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("result:", result)
+            print(result)
+            break
+    
+        model = solver.model()
+        U0 = U.get_interp(model)
+        V0 = V.get_interp(model)
+        Add(U != U0)
+    
+        count += 1
+        assert U0*V0 == I
+    
+        E = U0 << V0.t
+        # block order --> ziporder
+        perm = []
+        for i in range(n):
+            perm.append(i)
+            perm.append(i+n)
+        E = E[perm, :]
+        E = E[:, perm]
+    
+        space = SymplecticSpace(n)
+        assert space.is_symplectic(E)
+    
+        eode = E*dode
+        assert eode.is_equiv(code)
+        l = eode.get_logical(code)
+        if l not in gen:
+            gen.add(l)
+            print(l)
+    
+    print("found:", count)
+    print("gen:", len(gen))
+    G = mulclose(gen)
+    print("logicals:", len(G))
 
 
 def test_all_412():

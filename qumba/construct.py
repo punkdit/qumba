@@ -237,6 +237,10 @@ def toric(rows, cols, delta_row=0, delta_col=0):
     Hz = numpy.array(Hz)
 
     code = CSSCode(Hx=Hx, Hz=Hz)
+    code.lookup = {(r,c,k):getidx(r,c,k)
+        for r in range(rows) 
+        for c in range(cols)
+        for k in [0,1]}
     return code
 
 
