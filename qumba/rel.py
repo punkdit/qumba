@@ -21,6 +21,7 @@ from qumba.symplectic import symplectic_form
 from qumba.qcode import strop, QCode, SymplecticSpace
 from qumba.smap import SMap
 from qumba.action import mulclose, mulclose_names
+from qumba.syntax import Syntax
 from qumba.argv import argv
 from qumba import construct
 
@@ -880,7 +881,7 @@ class Module:
         I = self.space.get_identity()
         return Lagrangian(I)
 
-    # Argggh, why is this transposed : XXX
+    # Argggh, why is this transposed
     def CX(self, i, j):
         CX = self.space.CX(i, j)
         CX = Lagrangian(CX.t)
@@ -1012,6 +1013,31 @@ def test_prep():
             x = module.X(i) + module.X(j)
             l = prep(x)
             assert len(l) == 0
+
+
+def test_goto():
+    # See: https://www.nature.com/articles/srep19578
+
+    n = 8
+    syntax = Syntax()
+    CX, H = syntax.CX, syntax.H
+
+    prog = (CX(6,7)*CX(5,7)*CX(0,7)
+        *CX(6,4)*CX(1,5)*CX(3,6)*CX(2,0)
+        *CX(1,4)*CX(2,6)*CX(3,5)*CX(1,0)
+        *H(1)*H(2)*H(3))
+
+    print(prog)
+
+    space = SymplecticSpace(n)
+    mod = Module(n)
+    rel = prog*mod
+
+    print(rel)
+
+    "IIIZZZZ ZIIIIZZ IZIIZIZ IIZIZZI"
+
+
 
 
 

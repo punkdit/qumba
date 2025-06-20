@@ -11,6 +11,7 @@ class Term(object):
         atoms = self.atoms
         s = "*".join("%s%s"%((name,)+(arg,)) for (name,arg) in atoms)
         s = s.replace(',)', ')')
+        s = s.replace(' ', '')
         return s
 
     @property
