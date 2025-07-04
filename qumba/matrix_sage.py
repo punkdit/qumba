@@ -112,7 +112,10 @@ class Matrix(object):
        return reduce(mul, [self]*n)
 
     def __rmul__(self, r):
-        ring = unify(r.parent(), self.ring)
+        if isinstance(r, int):
+            ring = self.ring
+        else:
+            ring = unify(r.parent(), self.ring)
         M = r*self.M
         return Matrix(ring, M)
 

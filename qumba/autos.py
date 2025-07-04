@@ -724,20 +724,37 @@ def test_css_db():
     from qumba import db
     n = argv.get("n")
     d = argv.get("d")
-    ns = range(17, 28) if n is None else [n]
+    n0 = argv.get("n0", 20)
+    n1 = argv.get("n1", 28)
+    #ns = range(17, 28) if n is None else [n]
+    ns = range(20, 28) if n is None else [n]
     for n in ns:
         kw = {"n":n, "css":True}
         if d is not None:
             kw["d"] = d
         for code in db.get(**kw):
             result = get_autos_css(code)
-            if result is not None:
-                gen, order, ops = result
-                L = mulclose(ops, verbose=True)
-                print("|G| =", order, "logicals:", len(L))
+            if result is None and n < 15:
+                print("result is None")
+                print("get_autos():")
+                order, perms = code.get_autos()
+            elif result is None:
+                print("result is None")
+                print("fail!!\n\n")
+                continue
             else:
-                print("fail")
+                gen, order, ops = result
+            #L = mulclose(ops, verbose=True)
+            #print("automorphisms =", order, "logicals:", len(L))
+            print("automorphisms =", order)
+            if argv.update_db:
+                key = {"_id":code._id}
+                print("updating https://qecdb.org/codes/%s"%(code._id))
+                res = db.codes.update_one(key, {"$set":{"automorphisms":order}})
+                print(res)
             print()
+                
+
 
 def get_codes():
     from qumba import db
