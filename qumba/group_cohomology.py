@@ -9,6 +9,8 @@ see:
 
 """
 
+from random import choice
+
 import numpy
 
 from bruhat.gset import Perm, Group, mulclose, mulclose_hom
@@ -17,7 +19,7 @@ from bruhat.repr_sage import dixon_irr
 from qumba.argv import argv
 from qumba.smap import SMap
 from qumba.umatrix import Not, And, Var, UMatrix, Solver
-from qumba.lin import zeros2
+from qumba.lin import zeros2, array2
 from qumba.matrix import Matrix
 
 
@@ -283,13 +285,6 @@ def test_clifford():
         
         
 
-def symplectic_form(n):
-    F = zeros2(2*n, 2*n)
-    for i in range(n):
-        F[2*i:2*i+2, 2*i:2*i+2] = [[0,1],[1,0]]
-    return F
-
-
 def test_weil():
     """
     The Weil representation in characteristic two
@@ -301,17 +296,125 @@ def test_weil():
 
     """
 
-    n = 1
+    n = argv.get("n", 1)
     nn = 2*n
 
-    omega = symplectic_form(n)
-    print(omega)
+    from qumba.symplectic import SymplecticSpace
+    space = SymplecticSpace(n)
+    F = space.F # omega
 
+    V = []
+    basis = []
+    for idxs in numpy.ndindex((2,)*nn):
+        v = Matrix(array2(idxs)).reshape(nn, 1)
+        V.append(v)
+        if v.sum() == 1:
+            basis.append(v)
+        elif v.sum() == 0:
+            zero = v
+    assert len(basis) == nn
+
+    omega = {}
+    for u in V:
+      for v in V:
+        w = (u.t * F * v)
+        assert w.shape == (1,1)
+        w = int(w[0,0])
+        omega[u,v] = w
+
+    # beta is a 2-cocycle for constructing the Heisenberg group
+    # as a central extension:
+    # Z_4 >---> H(V) -->> V
+
+    beta = {}
+    for u in V:
+      u0 = u[::2, :]
+      #print(u.t, u.shape, u0.t, u0.shape)
+      for v in V:
+        v0 = v[1::2, :]
+        uv = u0.t*v0
+        beta[u,v] = 2*int(uv[0,0])
+        #print("\t", v.t, v.shape, v0.t, v0.shape, "=", uv, uv.shape)
+
+    # check that
     # beta(u,v) - beta(v,u) = 2*omega(u,v) in 2Z/4Z
+    for u in V:
+      for v in V:
+        lhs = (beta[u,v] - beta[v,u]) % 4
+        rhs = 2*omega[u,v]
+        #print("%s:%s"%(lhs, rhs), end=" ")
+        assert lhs==rhs
 
+    # todo: construct H(V) using beta & check it..
 
+    S, H, CX = space.S, space.H, space.CX
+    gen = []
+    for i in range(n):
+        gen.append(S(i))
+        gen.append(H(i))
+        for j in range(n):
+            if i!=j:
+                gen.append(CX(i,j))
 
+    G = mulclose(gen)
+    print(len(G))
+    
+    ASp = [] # here goes..
+    for g in G:
+        # alpha : V --> Z/4Z
+        for bits in numpy.ndindex((4,)*nn):
+            alpha = {zero:0}
+            for i,bit in enumerate(bits):
+                alpha[basis[i]] = bit
+            succ = True
+            gen = set(alpha.keys())
+            while succ and len(gen) < 2**nn:
+                for u in list(gen):
+                  for v in basis:
+                    uv = u+v
+                    value = (beta[g*u,g*v] - beta[u,v] + alpha[u] + alpha[v])%4
+                    if uv in alpha and alpha[uv] != value:
+                        succ = False
+                        break
+                    elif uv in alpha:
+                        continue
+                    assert u in alpha
+                    assert v in alpha
+                    alpha[uv] = value
+                    gen.add(uv)
+                  if not succ:
+                    break
+            if succ:
+                ASp.append((g, alpha))
+                #print([alpha[basis[i]] for i in range(nn)])
+        print(".", end="", flush=True)
+    print()
 
+    print(len(ASp))
+    #for (g,alpha) in ASp:
+    for trial in range(100):
+        (g, alpha) = choice(ASp)
+        for u in V:
+          for v in V:
+            lhs = (alpha[u+v] - alpha[u] - alpha[v]) % 4
+            rhs = (beta[g*u,g*v] - beta[u,v])%4
+            assert lhs==rhs
+
+    for trial in range(100):
+        (g, a) = choice(ASp)
+        (h, b) = choice(ASp)
+
+        gh = g*h
+        ab = {v:(a[h*v]+b[v])%4 for v in V}
+
+        for u in V:
+          for v in V:
+            lhs = (ab[u+v] - ab[u] - ab[v]) % 4
+            rhs = (beta[gh*u,gh*v] - beta[u,v])%4
+            assert lhs==rhs
+
+        assert (gh,ab) in ASp
+        
 
 
 if __name__ == "__main__":
