@@ -792,6 +792,8 @@ def two_block(G, wa=2, wb=2, rand=True):
         found.add(s)
         #if is_connected(Hx, Hz):
         #    yield code
+
+        code.LR = (L,R)
         yield code
 
 
@@ -851,6 +853,8 @@ def main_two_block():
     step_idx = argv.get("step_idx", 1)
     mod_idx = argv.get("mod_idx", 0)
 
+    desc = argv.get("desc")
+
     if wa is None:
         ws = []
         for w in range(4, 9):
@@ -872,6 +876,11 @@ def main_two_block():
             continue
         if (idx%step_idx) != mod_idx:
             continue
+
+        if desc is not None and G.desc != desc:
+            #print(G.desc)
+            continue
+
         print("idx=%s G=%r" % (idx, G.desc))
         #continue
         for (wa,wb) in ws:
@@ -879,6 +888,9 @@ def main_two_block():
             best = {} 
             for code in two_block(G, wa, wb):
                 print("\t", code)
+                L,R = code.LR
+                #print(L)
+                #print(R)
                 #print(strop(code.to_qcode().H))
                 key = (code.n, code.k)
                 other = best.get(key)
