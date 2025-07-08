@@ -48,6 +48,62 @@ class AffineSpace:
         self.basis = basis
         self.V = V
 
+    def find_all(self, g):
+        # alpha : V --> Z/4Z
+        nn = 2*self.n
+        zero = self.zero
+        basis = self.basis
+        for bits in numpy.ndindex((4,)*nn):
+            alpha = {zero:0}
+            for i,bit in enumerate(bits):
+                alpha[basis[i]] = bit
+            element = Element.build(self, g, alpha)
+            if element is not None:
+                yield element
+
+    def S(self, i=0):
+        assert i is not None
+        g = self.space.S(i)
+        alpha = {v:0 for v in self.basis}
+        alpha[self.basis[2*i]] = 1 # or 3 ?
+        e = Element.build(self, g, alpha)
+        assert e is not None
+        e.check()
+        return e
+
+    def H(self, i=None):
+        g = self.space.H(i)
+        alpha = {v:0 for v in self.basis}
+        e = Element.build(self, g, alpha)
+        assert e is not None
+        e.check()
+        return e
+
+    def CX(self, i=0, j=1):
+        g = self.space.CX(i, j)
+        alpha = {v:0 for v in self.basis}
+        e = Element.build(self, g, alpha)
+        assert e is not None
+        e.check()
+        return e
+
+    def CZ(self, i=0, j=1):
+        g = self.space.CZ(i, j)
+        alpha = {v:0 for v in self.basis}
+        e = Element.build(self, g, alpha)
+        assert e is not None
+        e.check()
+        return e
+
+    def CY(self, i=0, j=1):
+        g = self.space.CY(i, j)
+        alpha = {v:0 for v in self.basis}
+        e = Element.build(self, g, alpha)
+        assert e is not None
+        e.check()
+        return e
+
+
 
 
 class Element:
@@ -55,6 +111,26 @@ class Element:
         self.affine = affine
         self.g = g
         self.alpha = alpha
+
+    @classmethod
+    def build(self, affine, g, alpha):
+        "build from values on basis"
+        basis = affine.basis
+        alpha = dict(alpha) # paranoid
+        nn = 2*affine.n
+        while len(alpha) < 2**nn:
+            for u in list(alpha.keys()):
+              for v in basis:
+                uv = u+v
+                value = (beta(g*u,g*v) - beta(u,v) + alpha[u] + alpha[v])%4
+                if uv in alpha and alpha[uv] != value:
+                    return
+                elif uv in alpha:
+                    continue
+                assert u in alpha
+                assert v in alpha
+                alpha[uv] = value
+        return Element(affine, g, alpha)
 
     def check(self):
         affine, g, alpha = self.affine, self.g, self.alpha
@@ -95,6 +171,9 @@ class Element:
         return self.g*v, (phase + self.alpha[v])%4
 
 
+def vec(bits):
+    nn = len(bits)
+    return Matrix(array2(bits)).reshape(nn,1)
 
 def get(n):
 
@@ -104,15 +183,16 @@ def get(n):
     F = space.F # omega
 
     V = []
-    basis = []
     for idxs in numpy.ndindex((2,)*nn):
-        v = Matrix(array2(idxs)).reshape(nn, 1)
+        v = vec(idxs)
         V.append(v)
-        if v.sum() == 1:
-            basis.append(v)
-        elif v.sum() == 0:
-            zero = v
+    basis = []
+    for i in range(nn):
+        bits = [0]*nn
+        bits[i] = 1
+        basis.append(vec(bits))
     assert len(basis) == nn
+    zero = vec((0,)*nn)
 
     omega = {}
     for u in V:
@@ -121,20 +201,6 @@ def get(n):
         assert w.shape == (1,1)
         w = int(w[0,0])
         omega[u,v] = w
-
-    # beta is a 2-cocycle for constructing the Heisenberg group
-    # as a central extension:
-    # Z_4 >---> H(V) -->> V
-
-#    beta = {}
-#    for u in V:
-#      u0 = u[::2, :]
-#      #print(u.t, u.shape, u0.t, u0.shape)
-#      for v in V:
-#        v0 = v[1::2, :]
-#        uv = u0.t*v0
-#        beta[u,v] = 2*int(uv[0,0])
-#        #print("\t", v.t, v.shape, v0.t, v0.shape, "=", uv, uv.shape)
 
     # check that
     # beta(u,v) - beta(v,u) = 2*omega(u,v) in 2Z/4Z
@@ -151,7 +217,7 @@ def get(n):
 
 
 
-def build(n):
+def test_ASp(n):
 
     nn = 2*n
     affine = get(n)
@@ -170,37 +236,10 @@ def build(n):
     G = mulclose(gen)
     print("|Sp| =", len(G))
 
-    zero, basis = affine.zero, affine.basis
-    
     ASp = [] # here goes..
     for g in G:
-        # alpha : V --> Z/4Z
-        for bits in numpy.ndindex((4,)*nn):
-            alpha = {zero:0}
-            for i,bit in enumerate(bits):
-                alpha[basis[i]] = bit
-            succ = True
-            gen = set(alpha.keys())
-            while succ and len(gen) < 2**nn:
-                for u in list(gen):
-                  for v in basis:
-                    uv = u+v
-                    value = (beta(g*u,g*v) - beta(u,v) + alpha[u] + alpha[v])%4
-                    if uv in alpha and alpha[uv] != value:
-                        succ = False
-                        break
-                    elif uv in alpha:
-                        continue
-                    assert u in alpha
-                    assert v in alpha
-                    alpha[uv] = value
-                    gen.add(uv)
-                  if not succ:
-                    break
-            if succ:
-                element = Element(affine, g, alpha)
-                ASp.append(element)
-                #print([alpha[basis[i]] for i in range(nn)])
+        for e in affine.find_all(g):
+            ASp.append(e)
         print(".", end="", flush=True)
     print()
 
@@ -263,17 +302,40 @@ def build(n):
         #print(".", end="", flush=True)
     #print()
     G = Group(perms)
-    print(G)
+    #print(G)
     #G.do_check()
 
+    print()
+
 
     
+
+def build(n):
+    nn = 2*n
+    affine = get(n)
+
+    S, H, CX, CZ = affine.S, affine.H, affine.CX, affine.CZ
+    gen = []
+    for i in range(n):
+        gen.append(S(i))
+        gen.append(H(i))
+        for j in range(n):
+            if i!=j:
+                gen.append(CX(i,j))
+            if i<j:
+                gen.append(CZ(i,j))
+
+    G = mulclose(gen, verbose=True)
+    print(len(G))
+
+
+
 def test():
-    build(1)
-    build(2)
+    test_ASp(1)
+    #test_ASp(2)
+
+    build(3)
     
-
-
 
 
 if __name__ == "__main__":
