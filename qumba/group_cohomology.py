@@ -288,11 +288,11 @@ def test_clifford():
 def test_weil():
     """
     The Weil representation in characteristic two
-    Shamgar Gurevicha,∗, Ronny Hadani
+    Shamgar Gurevich,∗, Ronny Hadani
     2012
     section 0.2
 
-    see also: bruhat/heisenberg.py
+    see qumba/weil_repr.py for newer version of this
 
     """
 
