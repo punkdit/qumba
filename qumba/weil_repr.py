@@ -377,10 +377,10 @@ def test_hom(n):
 
 def test():
     test_ASp(1)
-    #test_ASp(2)
+    #test_ASp(2) # sloow
 
     test_hom(1)
-    test_hom(2)
+    test_hom(2) # sloow
     
 
 
