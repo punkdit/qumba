@@ -14,6 +14,9 @@ qumba/group_cohomology.py
 
 from random import choice
 
+from functools import lru_cache
+cache = lru_cache(maxsize=None)
+
 import numpy
 
 from bruhat.gset import Perm, Group, mulclose, mulclose_hom
@@ -60,6 +63,15 @@ class AffineSpace:
             element = Element.build(self, g, alpha)
             if element is not None:
                 yield element
+
+    @cache
+    def get_identity(self):
+        g = self.space.get_identity()
+        alpha = {v:0 for v in self.basis}
+        e = Element.build(self, g, alpha)
+        assert e is not None
+        e.check()
+        return e
 
     def S(self, i=0):
         assert i is not None
@@ -310,23 +322,56 @@ def test_ASp(n):
 
     
 
-def build(n):
+def test_hom(n):
     nn = 2*n
     affine = get(n)
-
     S, H, CX, CZ = affine.S, affine.H, affine.CX, affine.CZ
-    gen = []
+    agen = []
     for i in range(n):
-        gen.append(S(i))
-        gen.append(H(i))
+        agen.append(S(i))
+        agen.append(H(i))
         for j in range(n):
             if i!=j:
-                gen.append(CX(i,j))
+                agen.append(CX(i,j))
             if i<j:
-                gen.append(CZ(i,j))
+                agen.append(CZ(i,j))
 
-    G = mulclose(gen, verbose=True)
-    print(len(G))
+    from qumba.clifford import Clifford
+    c = Clifford(n)
+    S, H, CX, CZ = c.S, c.H, c.CX, c.CZ
+    bgen = []
+    for i in range(n):
+        bgen.append(S(i))
+        bgen.append(H(i))
+        for j in range(n):
+            if i!=j:
+                bgen.append(CX(i,j))
+            if i<j:
+                bgen.append(CZ(i,j))
+
+    #G = mulclose(gen, verbose=True)
+    #print(len(G))
+
+    hom = mulclose_hom(bgen, agen, verbose=True)
+
+    def getrand(gen, N=10):
+        g = gen[0]
+        for trial in range(N):
+            g = g*choice(gen)
+        return g
+
+    I = c.I
+    for trial in range(100):
+        g = getrand(bgen)
+        h = getrand(bgen)
+        assert hom[g]*hom[h] == hom[g*h]
+
+    # kernel
+    w = c.wI()
+    for n in range(8):
+        assert hom[w**n] == affine.get_identity()
+
+
 
 
 
@@ -334,7 +379,8 @@ def test():
     test_ASp(1)
     #test_ASp(2)
 
-    build(3)
+    test_hom(1)
+    test_hom(2)
     
 
 
