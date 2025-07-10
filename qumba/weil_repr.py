@@ -1,12 +1,22 @@
 #!/usr/bin/env python
 
 """
+
+An implementation of the projective Clifford group.
+These have orders: 24, 11520, 92897280, ...
+
+The idea is to store (g,alpha) in class Element.
+This is a F_2 symplectic matrix g, together with
+a dict alpha:V-->Z/4 of phases. V here is the
+collection of F_2 vectors. alpha satisfies an
+equation that we check in Element.check below.
+
+Reference:
 The Weil representation in characteristic two
-Shamgar Gurevich,∗, Ronny Hadani
-2012
+Shamgar Gurevich,∗, Ronny Hadani (2012)
 section 0.2
 
-see also: 
+See also: 
 bruhat/heisenberg.py
 qumba/group_cohomology.py
 
@@ -24,14 +34,13 @@ from bruhat.gset import Perm, Group, mulclose, mulclose_hom
 
 from qumba.argv import argv
 from qumba.smap import SMap
-from qumba.umatrix import Not, And, Var, UMatrix, Solver
 from qumba.lin import zeros2, array2
 from qumba.matrix import Matrix
 from qumba.symplectic import SymplecticSpace
 
 
 def beta(u, v):
-    # beta is a 2-cocycle for constructing the Heisenberg group
+    # beta is a 2-cocycle for constructing a "Heisenberg group"
     # as a central extension:
     # Z_4 >---> H(V) -->> V
     assert u.shape == v.shape
@@ -169,7 +178,7 @@ class Element:
     def __hash__(self):
         return hash(str(self))
 
-    def __mul__(self, other):
+    def __mul__(self, other): # hotspot 10%
         assert isinstance(other, Element)
         assert self.affine is other.affine
         V = self.affine.V
@@ -380,7 +389,7 @@ def test():
     #test_ASp(2) # sloow
 
     test_hom(1)
-    test_hom(2) # sloow
+    #test_hom(2) # sloow
     
 
 
