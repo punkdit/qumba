@@ -18,6 +18,9 @@ from qumba import construct
 from qumba.syntax import Syntax
 from qumba.argv import argv
 
+from qumba.matrix import Matrix
+from qumba.umatrix import UMatrix, Solver, If, Not, And, Or, PbLe
+
 
 
 
@@ -445,9 +448,6 @@ def test_clifford_pairs():
 def test_state_prep():
     "fault tolerant state prep for CSS codes"
 
-    from qumba.matrix import Matrix
-    from qumba.umatrix import UMatrix, Solver, If, Not, And, Or, PbLe
-
     #code = construct.get_surface(3,3)
     code = construct.get_512() # sat
     code = QCode.fromstr("XXXXII IIXXXX ZZZZII IIZZZZ") # sat
@@ -615,9 +615,6 @@ def test_state_prep():
 
 def test_ancilla():
     "fault tolerant state prep with ancilla"
-
-    from qumba.matrix import Matrix
-    from qumba.umatrix import UMatrix, Solver, If, Not, And, Or, PbLe
 
     #code = construct.get_surface(3,3)
     code = construct.get_512() # sat
@@ -794,9 +791,6 @@ def test_ancilla():
 
 def test_prep():
     "fault tolerant state prep "
-
-    from qumba.matrix import Matrix
-    from qumba.umatrix import UMatrix, Solver, If, Not, And, Or, PbLe
 
     #code = construct.get_surface(3,3)
     #code = construct.get_513() # unsat
@@ -989,6 +983,140 @@ def test_goto():
 
     "IIIZZZZ ZIIIIZZ IZIIZIZ IIZIZZI"
     
+
+def find_chaimap(src, tgt, injective=False):
+    
+    # mx ---Hx.t--> n --Hz--> mz : 0
+    # |             |         |
+    # |fx           |fn       |fz
+    # |             |         |
+    # v             v         v
+    # mx ---Hx.t--> n --Hz--> mz : 1
+
+    src = src.to_css()
+    tgt = tgt.to_css()
+
+    Hz0, Hxt0 = Matrix(src.Hz), Matrix(src.Hx).t
+    Hz1, Hxt1 = Matrix(tgt.Hz), Matrix(tgt.Hx).t
+    assert ( Hz0 * Hxt0 ).is_zero()
+    assert ( Hz1 * Hxt1 ).is_zero()
+
+    mx0, mx1 = Hxt0.shape[1], Hxt1.shape[1]
+    n0, n1 = Hz0.shape[1], Hz1.shape[1]
+    assert (n0, n1) == (Hxt0.shape[0], Hxt1.shape[0])
+    mz0, mz1 = Hz0.shape[0], Hz1.shape[0]
+
+    solver = Solver()
+    add = solver.add
+
+    fx = UMatrix.unknown(mx1, mx0) # mx1<--mx0
+    fn = UMatrix.unknown(n1, n0) # n1<--n0
+    fz = UMatrix.unknown(mz1, mz0) # mx1<--mx0
+
+    if injective:
+        for i in range(n1):
+            add(PbLe([(fn[i,j].get(),True) for j in range(n0)], 1))
+        for j in range(n0):
+            add(PbLe([(fn[i,j].get(),True) for i in range(n1)], 1))
+
+    add(Hxt1*fx == fn*Hxt0)
+    add(Hz1*fn == fz*Hz0)
+
+    print()
+    print("solve:")
+    count = 0
+    prev = None
+    while 1:
+        result = solver.check()
+        if str(result) != "sat":
+            break
+        count += 1
+    
+        model = solver.model()
+        _fx = fx.get_interp(model)
+        _fn = fn.get_interp(model)
+        _fz = fz.get_interp(model)
+
+        assert (Hxt1*_fx == _fn*Hxt0)
+        assert (Hz1*_fn == _fz*Hz0)
+
+        result = (_fx, _fn, _fz)
+        assert result != prev
+        yield result
+        prev = (_fx, _fn, _fz)
+
+        add(Not(And(fx==_fx, fn==_fn, fz==_fz)))
+        add(fn != _fn)
+
+        #break
+        #if count>10:
+        #    break
+
+    print("count =", count)
+
+
+
+
+
+def test_transversal():
+
+    #code = construct.get_surface(3,3)
+    #code = construct.get_512()
+    #code = construct.get_713()
+    #code = construct.get_toric(2,2)
+    #code = construct.get_10_2_3()
+    #code = construct.get_913()
+    #code = construct.get_toric(3,3)
+
+    #src = tgt = code
+    #src = construct.get_surface(3,3)
+    #tgt = construct.get_surface(4,4)
+
+    tgt = construct.get_toric(2,2)
+    src = construct.get_toric(4,4)
+
+    #tgt = construct.get_512()
+    #tgt = construct.get_713()
+    #tgt = construct.get_10_2_3()
+
+    #print(src.longstr())
+
+    code = src + tgt
+    print(src, tgt)
+    #print(code.longstr())
+    space = code.space
+
+    found = set()
+    logical = set()
+    for (fx, fn, fz) in find_chaimap(src, tgt, True):
+        #print(".", end="", flush=True)
+        #print(fn)
+        #print("-"*20)
+        assert fn not in found
+        found.add(fn)
+
+        m,n = fn.shape
+        assert fn.shape == (tgt.n, src.n)
+        op = space.get_identity()
+        for i in range(m): # tgt index
+          for j in range(n): # src index
+            if fn[i,j]:
+                op = op * space.CX(j,i+n) # src is ctrl, tgt is tgt
+                #op = op * space.CX(i+n,j) # nope
+        #print(op)
+
+        dode = op*code
+        succ = dode.is_equiv(code)
+        assert succ
+
+        L = dode.get_logical(code)
+        if L not in logical:
+            logical.add(L)
+            print("logical:")
+            print(L)
+            print("fn:")
+            print(fn)
+
 
 
 if __name__ == "__main__":
