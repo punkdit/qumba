@@ -3,6 +3,7 @@
 
 from random import shuffle, randint
 from operator import add, matmul, mul
+import operator 
 from functools import reduce
 
 import numpy
@@ -16,6 +17,7 @@ from qumba.qcode import QCode, SymplecticSpace, strop
 from qumba.csscode import CSSCode
 from qumba import construct 
 from qumba.syntax import Syntax
+from qumba.util import choose
 from qumba.argv import argv
 
 from qumba.matrix import Matrix
@@ -982,9 +984,36 @@ def test_goto():
     print(strop(E.t))
 
     "IIIZZZZ ZIIIIZZ IZIIZIZ IIZIZZI"
+
+
+def get_logops(css):
+    Hz = Matrix(css.Hz)
+    Lz = Matrix(css.Lz)
+    css.bz_distance()
+    d = css.dz
+    assert d is not None
+
+    k = len(Lz)
+    mz = len(Hz)
+    ops = []
+    for idx in numpy.ndindex((2,)*k):
+        if sum(idx)==0:
+            continue
+        lop = Matrix(idx) * Lz
+        #print(lop)
+        for jdx in numpy.ndindex((2,)*mz):
+            op = Matrix(jdx) * Hz
+            op = lop + op
+            w = op.sum()
+            assert w>=d
+            if w==d:
+                ops.append(op)
+                #print("\t", op)
+    return ops
+            
     
 
-def find_chaimap(src, tgt, injective=False):
+def find_chainmap(src, tgt, injective=False):
     
     # mx ---Hx.t--> n --Hz--> mz : 0
     # |             |         |
@@ -1001,10 +1030,15 @@ def find_chaimap(src, tgt, injective=False):
     assert ( Hz0 * Hxt0 ).is_zero()
     assert ( Hz1 * Hxt1 ).is_zero()
 
+    Lz0, Lx0 = Matrix(src.Lz), Matrix(src.Lx)
+    Lz1, Lx1 = Matrix(tgt.Lz), Matrix(tgt.Lx)
+
     mx0, mx1 = Hxt0.shape[1], Hxt1.shape[1]
     n0, n1 = Hz0.shape[1], Hz1.shape[1]
     assert (n0, n1) == (Hxt0.shape[0], Hxt1.shape[0])
     mz0, mz1 = Hz0.shape[0], Hz1.shape[0]
+
+    # solver -------------------------------
 
     solver = Solver()
     add = solver.add
@@ -1015,12 +1049,27 @@ def find_chaimap(src, tgt, injective=False):
 
     if injective:
         for i in range(n1):
-            add(PbLe([(fn[i,j].get(),True) for j in range(n0)], 1))
+            add(PbLe([(fn[i,j].get(),True) for j in range(n0)], 2))
         for j in range(n0):
-            add(PbLe([(fn[i,j].get(),True) for i in range(n1)], 1))
+            add(PbLe([(fn[i,j].get(),True) for i in range(n1)], 2))
 
     add(Hxt1*fx == fn*Hxt0)
     add(Hz1*fn == fz*Hz0)
+
+    for zop in get_logops(src):
+        idxs = zop.where()
+        print("\t", zop, idxs)
+
+        for bits in choose(idxs, 2):
+            bits = reduce(operator.add, bits)
+            #print("\t", bits)
+            #for i in range(n1):
+            #    add( Not(And( *[fn[i,bit].get() for bit in bits] )) )
+
+    #return
+
+
+    # ---------------------------------------
 
     print()
     print("solve:")
@@ -1072,12 +1121,17 @@ def test_transversal():
     #src = construct.get_surface(3,3)
     #tgt = construct.get_surface(4,4)
 
-    tgt = construct.get_toric(2,2)
-    src = construct.get_toric(4,4)
+    #src = construct.get_toric(2,2) # [[8,2,2]]
+    #tgt = construct.get_toric(4,4) # [[32,2,4]]
 
-    #tgt = construct.get_512()
+    #src = construct.get_512()
     #tgt = construct.get_713()
-    #tgt = construct.get_10_2_3()
+
+    src = construct.get_toric(1,3) # [[10, 2, 3]]
+    tgt = construct.get_toric(1,5) # [[26, 2, 5]]
+
+    #src = construct.get_surface(3,3)
+    #print(src)
 
     #print(src.longstr())
 
@@ -1088,7 +1142,7 @@ def test_transversal():
 
     found = set()
     logical = set()
-    for (fx, fn, fz) in find_chaimap(src, tgt, True):
+    for (fx, fn, fz) in find_chainmap(src, tgt, True):
         #print(".", end="", flush=True)
         #print(fn)
         #print("-"*20)
@@ -1102,7 +1156,6 @@ def test_transversal():
           for j in range(n): # src index
             if fn[i,j]:
                 op = op * space.CX(j,i+n) # src is ctrl, tgt is tgt
-                #op = op * space.CX(i+n,j) # nope
         #print(op)
 
         dode = op*code
@@ -1112,11 +1165,12 @@ def test_transversal():
         L = dode.get_logical(code)
         if L not in logical:
             logical.add(L)
-            print("logical:")
-            print(L)
+            #print("logical:")
+            #print(L)
             print("fn:")
-            print(fn)
+            print(fn, SymplecticSpace(code.k).get_name(L))
 
+    print("logicals:", len(logical))
 
 
 if __name__ == "__main__":
