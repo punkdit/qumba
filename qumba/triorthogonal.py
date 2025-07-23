@@ -154,38 +154,94 @@ def search():
             print(".", end="", flush=True)
 
 
-def make_double(S, T=None):
+def matrix_double(S, T=None):
     ms, ns = S.shape
     if T is None:
-        T = zeros2(0, ns)
+        T = zeros2(1, 1)
+        T[:] = 1
     mt, nt = T.shape
-    D = zeros2(ms+mt+1, 2*ns+nt)
+    D = zeros2(ms+mt, 2*ns+nt)
     D[:ms, :ns] = S
     D[:ms, ns:2*ns] = S
+    D[ms+mt-1, ns:2*ns] = 1
     D[ms:ms+mt, 2*ns:] = T
-    D[ms+mt, ns:] = 1
     return D
     
 
 
 def te_codes():
     # see: 
+    # https://arxiv.org/abs/1509.03239 section 10 & 11
     # https://arxiv.org/abs/2408.12752
     # https://www.youtube.com/watch?v=F266RMc0yEI
 
     # step 1: classical self-dual code of type-II
     # ...
 
-    de = construct.get_713()
+    S0 = construct.get_713()
+    print(S0)
 
-    print(de)
+    T1 = get_double(S0)
+    T1.bz_distance()
+    print(T1)
 
-    de = de.to_css()
+    S1 = QCode.fromstr("""
+    XIIIIIIIIXIIXIIXI
+    IXIIIIIIIXIIXIIIX
+    IIXIIIIIIIIXIXXII
+    IIIXIIIIXXIIXIIII
+    IIIIXIIIXIXIXXXXX
+    IIIIIXIIIIXXIXIII
+    IIIIIIXIXXXIIXXXX
+    IIIIIIIXIIXXIIXII
+    ZIIIIIIIIZIIZIIZI
+    IZIIIIIIIZIIZIIIZ
+    IIZIIIIIIIIZIZZII
+    IIIZIIIIZZIIZIIII
+    IIIIZIIIZIZIZZZZZ
+    IIIIIZIIIIZZIZIII
+    IIIIIIZIZZZIIZZZZ
+    IIIIIIIZIIZZIIZII
+    """)
+
+    T2 = get_double(S1, T1)
+    T2.bz_distance()
+    print(T2)
+
+
+
+def get_double(bi_code, tri_code=None):
+
+    de = bi_code.to_css()
     S = de.Hx
-    print(S)
+    assert is_morthogonal(S, 2)
 
-    D = make_double(S)
-    print(D)
+    T = None
+    if tri_code is not None:
+        tri_code = tri_code.to_css()
+        T = tri_code.Hx
+        assert is_morthogonal(T, 3)
+
+    Hx = matrix_double(S, T)
+    #print(Hx, Hx.shape)
+
+    r = is_morthogonal(Hx, 3)
+    #print("is triorthogonal:", r)
+    assert r
+
+    mx, n = Hx.shape
+    Lx = zeros2(1, n)
+    Lz = zeros2(1, n)
+    Lx[:] = 1
+    Lz[:] = 1
+
+    HxLz = numpy.concatenate((Hx, Lz))
+    Hz = kernel(HxLz)
+    #print(Hz, Hz.shape)
+
+    css = CSSCode(Hx=Hx, Hz=Hz, Lx=Lx, Lz=Lz)
+    return css
+
 
 
 def bravyi49():
