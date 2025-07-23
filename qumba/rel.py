@@ -80,7 +80,6 @@ class Relation(object):
 #        f = right.t.solve(A.t).t
 #        l = f*left
 #        return l
-#    __call__ = get_left
 #
 #    def get_right(self, l): # __rmul__ ?
 #        if len(l.shape)==1:
@@ -95,9 +94,30 @@ class Relation(object):
 #        l = f*right
 #        return l
 
-    # XXX XXX BROKEN
 
     def find_left(self, r): # __mul__ ?
+        if len(r.shape)==1:
+            n = len(r)
+            r = r.reshape(1, n)
+        null = Matrix.zeros(0,0).reshape(r.shape[0],0)
+        r = Relation(r, null)
+        self = Relation(self.left, self.right)
+        op = self*r
+        return op.left
+    __call__ = find_left
+
+    def find_right(self, l): # __mul__ ?
+        if len(l.shape)==1:
+            n = len(l)
+            l = l.reshape(1, n)
+        null = Matrix.zeros(0,0).reshape(l.shape[0],0)
+        l = Relation(null, l)
+        self = Relation(self.left, self.right)
+        op = l*self
+        return op.right
+
+    # XXX XXX BROKEN
+    def XXX_find_left(self, r): # __mul__ ?
         if len(r.shape)==1:
             n = len(r)
             r = r.reshape(1, n)
@@ -120,9 +140,9 @@ class Relation(object):
         l = A[:, :left.shape[1]]
         #print(l)
         return l
-    __call__ = find_left
+    #__call__ = find_left
 
-    def find_right(self, l): # __rmul__ ?
+    def XXX_find_right(self, l): # __rmul__ ?
         if len(l.shape)==1:
             n = len(l)
             l = l.reshape(1, n)
@@ -993,18 +1013,20 @@ class Module:
             op = pauli + op
         return op
 
-    def MX(self, i):
+    def MX(self, *idxs):
         n = self.n
         ops = [I]*n
-        ops[i] = _b
+        for i in idxs:
+            ops[i] = _b
         #print(ops)
         op = reduce(matmul, ops)
         return op
 
-    def MZ(self, i):
+    def MZ(self, *idxs):
         n = self.n
         ops = [I]*n
-        ops[i] = _w
+        for i in idxs:
+            ops[i] = _w
         #print(ops)
         op = reduce(matmul, ops)
         return op
@@ -1062,14 +1084,14 @@ def test_prep():
     for i in range(n):
         x = module.X(i)
         l = prep(x)
-        assert len(l) == 0
+        assert len(l) == 1, len(l)
 
         x = Lagrangian(x, zeros(1,0))
         px = prep*x # ??
 
         z = module.Z(i)
         l = prep(z)
-        assert len(l) == 1
+        assert len(l) == 2, len(l)
 
         z = Lagrangian(z, zeros(1,0))
         pz = prep*z # ??
@@ -1126,23 +1148,23 @@ def test_goto():
 
 
 def get_code(U, k=0):
-    print("get_code")
+    #print("get_code")
     assert isinstance(U, Lagrangian)
     rank, tgt, src = U.shape
-    print(rank, tgt, src)
+    #print(rank, tgt, src)
     module = Module(src//2)
     H = Matrix([]).reshape(0, tgt)
     for i in range(src//2-k):
         r = module.X(i)
-        print("find_left:")
-        print(strop(r))
+        #print("find_left:")
+        #print(strop(r))
         op = U.find_left(r)
-        print(op, op.shape)
+        #print(op, op.shape)
         if len(op):
-            print(op.shape)
-            print(strop(op))
+            #print(op.shape)
+            #print(strop(op))
             H = H.concatenate(op)
-    print(H)
+    #print(H)
     #H = Matrix(rows)
     return QCode(H)
 
@@ -1150,7 +1172,8 @@ def get_code(U, k=0):
 def test_double():
     from qumba.triorthogonal import get_double
 
-    code = construct.get_422()
+#    code = construct.get_422()
+    code = construct.get_713()
     print(code.longstr())
 
     #dode = get_double([code])
@@ -1200,21 +1223,20 @@ def test_double():
         #rop = rev.find_left(op)
         #print(strop(rop), rop.shape)
 
-    return
-
     print(encode)
     print()
 
-    m = module.MX(0)
+    m = module.MX(0, 1)
     print(m, m.shape)
 
     e = m*encode
     print()
     print(e)
 
-    dode = get_code(encode)
+    dode = get_code(e)
     print()
     print(dode)
+    print(dode.longstr())
 
     #dode = dode.to_qcode()
     #print(dode)
