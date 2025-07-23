@@ -59,6 +59,9 @@ class Relation(object):
         self.src = right.shape[1]
         self.rank = rank
         self.A = left.concatenate(right, axis=1)
+        #B = self._left.concatenate(self._right, axis=1)
+        #AB = self.A.intersect(B)
+        #assert len(AB) == rank
         self.shape = (rank, self.tgt, self.src)
         self.p = p
 
@@ -66,29 +69,79 @@ class Relation(object):
     def nf(self): # normal form
         return self.__class__(self.left, self.right)
 
-    def get_left(self, r): # __mul__ ?
-        r = Matrix.promote(r)
+#    def get_left(self, r): # __mul__ ?
+#        r = Matrix.promote(r)
+#        if len(r.shape)==1:
+#            n = len(r)
+#            r = r.reshape(1, n)
+#        left, right = self.left, self.right
+#        assert r.shape[1] == right.shape[1]
+#        A = right.intersect(r)
+#        f = right.t.solve(A.t).t
+#        l = f*left
+#        return l
+#    __call__ = get_left
+#
+#    def get_right(self, l): # __rmul__ ?
+#        if len(l.shape)==1:
+#            n = len(l)
+#            l = l.reshape(1, n)
+#        left, right = self.left, self.right
+#        assert l.shape[1] == left.shape[1]
+#        #print("get_right", self.shape, l.shape)
+#        A = left.intersect(l)
+#        #print("\t", A.shape)
+#        f = left.t.solve(A.t).t
+#        l = f*right
+#        return l
+
+    # XXX XXX BROKEN
+
+    def find_left(self, r): # __mul__ ?
         if len(r.shape)==1:
             n = len(r)
             r = r.reshape(1, n)
         left, right = self.left, self.right
-        assert r.shape[1] == right.shape[1]
-        A = right.intersect(r)
-        f = right.t.solve(A.t).t
-        l = f*left
+        assert r.shape[1] == right.shape[1], ( r.shape[1] , right.shape[1] )
+        I = Matrix.identity(left.shape[1])
+        rows = []
+        for row0 in r:
+            for row1 in I: # XXX could vectorize this
+                row = row1.concatenate(row0)
+                rows.append(row)
+        rows = Matrix(rows)
+        print("find_left")
+        print(strop(rows))
+        print("intersect")
+        print(strop(self.A))
+        A = self.A.intersect(rows)
+        #print("intersect:")
+        #print(A)
+        l = A[:, :left.shape[1]]
+        #print(l)
         return l
-    __call__ = get_left
+    __call__ = find_left
 
-    def get_right(self, l): # __rmul__ ?
+    def find_right(self, l): # __rmul__ ?
         if len(l.shape)==1:
             n = len(l)
             l = l.reshape(1, n)
         left, right = self.left, self.right
         assert l.shape[1] == left.shape[1]
-        A = left.intersect(l)
-        f = left.t.solve(A.t).t
-        l = f*right
-        return l
+        I = Matrix.identity(right.shape[1])
+        rows = []
+        for row0 in l:
+            for row1 in I: # XXX could vectorize this
+                row = row0.concatenate(row1)
+                rows.append(row)
+        rows = Matrix(rows)
+        #print(rows)
+        A = self.A.intersect(rows)
+        #print("intersect:")
+        #print(A)
+        r = A[:, left.shape[1]:]
+        #print(r)
+        return r
 
     @classmethod
     def identity(cls, n, p=2):
@@ -902,6 +955,10 @@ class Module:
         H = Lagrangian(H.t)
         return H
 
+    # -----------------------------------------
+    # note: Lagrangian relations act on Pauli's
+    # via get_left, get_right
+
     def X(self, i):
         nn = 2*self.n
         x = [0]*nn
@@ -922,6 +979,36 @@ class Module:
         y[2*i+1] = 1
         y = Matrix(y).reshape(1, nn)
         return y
+
+    def get_pauli(self, desc):
+        assert len(desc) == self.n
+        nn = 2*self.n
+        op = Matrix([0]*nn).reshape(1, nn)
+        for i,c in enumerate(desc):
+            if c in ".I":
+                continue
+            method = getattr(self, c)
+            pauli = method(i)
+            #print(pauli)
+            op = pauli + op
+        return op
+
+    def MX(self, i):
+        n = self.n
+        ops = [I]*n
+        ops[i] = _b
+        #print(ops)
+        op = reduce(matmul, ops)
+        return op
+
+    def MZ(self, i):
+        n = self.n
+        ops = [I]*n
+        ops[i] = _w
+        #print(ops)
+        op = reduce(matmul, ops)
+        return op
+
 
             
 def css_prep(code):
@@ -1003,16 +1090,16 @@ def test_prep():
     for i in range(n):
         x = module.X(i)
         l = prep(x)
-        assert len(l) == 0
+        assert len(l) == 6, len(l)
 
         z = module.Z(i)
         l = prep(z)
-        assert len(l) == 0
+        assert len(l) == 6
 
         for j in range(i+1, n):
             x = module.X(i) + module.X(j)
             l = prep(x)
-            assert len(l) == 0
+            assert len(l) == 6
 
 
 def test_goto():
@@ -1036,6 +1123,102 @@ def test_goto():
     print(rel)
 
     "IIIZZZZ ZIIIIZZ IZIIZIZ IIZIZZI"
+
+
+def get_code(U, k=0):
+    print("get_code")
+    assert isinstance(U, Lagrangian)
+    rank, tgt, src = U.shape
+    print(rank, tgt, src)
+    module = Module(src//2)
+    H = Matrix([]).reshape(0, tgt)
+    for i in range(src//2-k):
+        r = module.X(i)
+        print("find_left:")
+        print(strop(r))
+        op = U.find_left(r)
+        print(op, op.shape)
+        if len(op):
+            print(op.shape)
+            print(strop(op))
+            H = H.concatenate(op)
+    print(H)
+    #H = Matrix(rows)
+    return QCode(H)
+
+
+def test_double():
+    from qumba.triorthogonal import get_double
+
+    code = construct.get_422()
+    print(code.longstr())
+
+    #dode = get_double([code])
+    #print(dode)
+
+    E = code.get_encoder()
+    
+    encode = Lagrangian(E.t)
+
+    print("encode:")
+    print(encode)
+    print()
+    
+#    #print(code.H)
+#    prep = css_prep(code) # what is this ??? XXX
+#
+#    print("prep:")
+#    print(prep)
+#    print()
+#
+#    print(prep == prep.op)
+#
+#    return
+
+
+    n = code.n
+    module = Module(n)
+    
+    H = strop(code.H)
+    #H = strop(code.L)
+    for h in H.split():
+        print()
+        print(h)
+        op = module.get_pauli(h)
+        #print(op)
+        #lop = (encode.find_left(op))
+        #print("op * h")
+        #print(strop(lop), lop.shape)
+        rop = (encode.find_right(op))
+        print("h * op")
+        print(strop(rop), rop.shape)
+
+        lop = encode.find_left(rop)
+        print(strop(lop), lop.shape)
+
+        #rev = encode.op
+        #rop = rev.find_left(op)
+        #print(strop(rop), rop.shape)
+
+    return
+
+    print(encode)
+    print()
+
+    m = module.MX(0)
+    print(m, m.shape)
+
+    e = m*encode
+    print()
+    print(e)
+
+    dode = get_code(encode)
+    print()
+    print(dode)
+
+    #dode = dode.to_qcode()
+    #print(dode)
+    #print(dode.longstr())
 
 
 
