@@ -154,20 +154,6 @@ def search():
             print(".", end="", flush=True)
 
 
-def matrix_double(S, T=None):
-    ms, ns = S.shape
-    if T is None:
-        T = zeros2(1, 1)
-        T[:] = 1
-    mt, nt = T.shape
-    D = zeros2(ms+mt, 2*ns+nt)
-    D[:ms, :ns] = S
-    D[:ms, ns:2*ns] = S
-    D[ms+mt-1, ns:2*ns] = 1
-    D[ms:ms+mt, 2*ns:] = T
-    return D
-    
-
 
 def te_codes():
     # see: 
@@ -181,7 +167,7 @@ def te_codes():
     S0 = construct.get_713()
     print(S0)
 
-    T1 = get_double(S0)
+    T1 = get_double([S0])
     T1.bz_distance()
     print(T1)
 
@@ -204,25 +190,77 @@ def te_codes():
     IIIIIIIZIIZZIIZII
     """)
 
-    T2 = get_double(S1, T1)
+    T2 = get_double([S0, S1])
     T2.bz_distance()
     print(T2)
 
+    S2 = construct.get_golay(23)
+    print(S2)
+    T3 = get_double([S0, S1, S2])
+    #T3.bz_distance()
+    print(T3)
 
 
-def get_double(bi_code, tri_code=None):
 
-    de = bi_code.to_css()
-    S = de.Hx
-    assert is_morthogonal(S, 2)
+def old_matrix_double(S, T=None):
+    ms, ns = S.shape
+    if T is None:
+        T = zeros2(1, 1)
+        T[:] = 1
+    mt, nt = T.shape
+    D = zeros2(ms+mt, 2*ns+nt)
+    D[:ms, :ns] = S
+    D[:ms, ns:2*ns] = S
+    D[ms+mt-1, ns:2*ns] = 1
+    D[ms:ms+mt, 2*ns:] = T
+    return D
 
-    T = None
-    if tri_code is not None:
-        tri_code = tri_code.to_css()
-        T = tri_code.Hx
-        assert is_morthogonal(T, 3)
 
-    Hx = matrix_double(S, T)
+def matrix_double(Hxs):
+    #print("matrix_double", len(Hxs))
+    assert len(Hxs)
+    m0 = sum(Hx.shape[0] for Hx in Hxs)
+    mx = m0 + len(Hxs)
+    n = 1 + sum(2*Hx.shape[1] for Hx in Hxs)
+
+    N = len(Hxs)
+    Hxs = list(reversed(Hxs)) # big to little
+
+    Dx = zeros2(mx, n)
+    i = j = 0
+    for idx in range(N):
+        Hx = Hxs[idx]
+        m1, n1 = Hx.shape
+        Dx[i:i+m1, j:j+n1] = Hx
+        Dx[i:i+m1, j+n1:j+2*n1] = Hx
+        Dx[m0+idx, j+n1:j+2*n1] = 1
+        if idx:
+            Dx[m0+idx-1, j:j+n1] = 1
+        i += m1
+        j += 2*n1
+
+    Dx[mx-1, n-1] = 1
+    #print(shortstr(Dx), Dx.shape)
+
+    return Dx
+    
+
+def get_double(codes):
+
+    Hxs = []
+    for c in codes:
+        c = c.to_css()
+        Hx = c.Hx
+        assert is_morthogonal(Hx, 2)
+        Hxs.append(Hx)
+
+    #T = None
+    #if tri_code is not None:
+    #    tri_code = tri_code.to_css()
+    #    T = tri_code.Hx
+    #    assert is_morthogonal(T, 3)
+
+    Hx = matrix_double(Hxs)
     #print(Hx, Hx.shape)
 
     r = is_morthogonal(Hx, 3)
