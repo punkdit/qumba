@@ -201,21 +201,6 @@ def te_codes():
     print(T3)
 
 
-
-def old_matrix_double(S, T=None):
-    ms, ns = S.shape
-    if T is None:
-        T = zeros2(1, 1)
-        T[:] = 1
-    mt, nt = T.shape
-    D = zeros2(ms+mt, 2*ns+nt)
-    D[:ms, :ns] = S
-    D[:ms, ns:2*ns] = S
-    D[ms+mt-1, ns:2*ns] = 1
-    D[ms:ms+mt, 2*ns:] = T
-    return D
-
-
 def matrix_double(Hxs):
     #print("matrix_double", len(Hxs))
     assert len(Hxs)

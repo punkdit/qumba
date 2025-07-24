@@ -61,7 +61,7 @@ class Relation(object):
         self.A = left.concatenate(right, axis=1)
         #B = self._left.concatenate(self._right, axis=1)
         #AB = self.A.intersect(B)
-        #assert len(AB) == rank
+        #assert len(AB) == rank # yes
         self.shape = (rank, self.tgt, self.src)
         self.p = p
 
@@ -69,7 +69,8 @@ class Relation(object):
     def nf(self): # normal form
         return self.__class__(self.left, self.right)
 
-    def find_left(self, r): # __mul__ ?
+    def get_left(self, r): # __mul__ ?
+        assert isinstance(r, Matrix)
         if len(r.shape)==1:
             n = len(r)
             r = r.reshape(1, n)
@@ -78,9 +79,10 @@ class Relation(object):
         self = Relation(self.left, self.right)
         op = self*r
         return op.left
-    __call__ = find_left
+    __call__ = get_left
 
-    def find_right(self, l): # __rmul__ ?
+    def get_right(self, l): # __rmul__ ?
+        assert isinstance(l, Matrix)
         if len(l.shape)==1:
             n = len(l)
             l = l.reshape(1, n)
@@ -89,6 +91,21 @@ class Relation(object):
         self = Relation(self.left, self.right)
         op = l*self
         return op.right
+
+    def get_matrix(self):
+        right = self.right
+        m,n = right.shape
+        rows = []
+        for i in range(n):
+            v = [0]*n
+            v[i] = 1
+            v = Matrix(v).reshape(1,n)
+            u = self.get_left(v)
+            assert len(u)==1, "not invertible ...?"
+            u = u.reshape(n)
+            rows.append(u)
+        U = Matrix(rows)
+        return U
 
     @classmethod
     def identity(cls, n, p=2):
@@ -249,10 +266,117 @@ class Lagrangian(Relation):
         m, n = A.shape
         if A.sum() != m:
             return False
-#        for i in range(m):
-#          for j in range(n):
-#            i
         return True
+
+
+class Module:
+    def __init__(self, n):
+        self.space = SymplecticSpace(n)
+        self.n = n
+
+    def get_identity(self):
+        I = self.space.get_identity()
+        return Lagrangian(I)
+
+    # Argggh, why is this transposed
+    def CX(self, i, j):
+        CX = self.space.CX(i, j)
+        CX = Lagrangian(CX.t)
+        return CX
+
+    def CZ(self, i, j):
+        CZ = self.space.CZ(i, j)
+        CZ = Lagrangian(CZ.t)
+        return CZ
+
+    def S(self, i):
+        S = self.space.S(i)
+        S = Lagrangian(S.t)
+        return S
+
+    def H(self, i):
+        H = self.space.H(i)
+        H = Lagrangian(H.t)
+        return H
+
+    def HSH(self, i):
+        HSH = self.space.HSH(i)
+        HSH = Lagrangian(HSH.t)
+        return HSH
+
+    # -----------------------------------------
+    # note: Lagrangian relations act on Pauli's
+    # via get_left, get_right
+
+    def X(self, i):
+        nn = 2*self.n
+        x = [0]*nn
+        x[2*i] = 1
+        x = Matrix(x).reshape(1, nn)
+        return x
+
+    def Z(self, i):
+        nn = 2*self.n
+        z = [0]*nn
+        z[2*i+1] = 1
+        z = Matrix(z).reshape(1, nn)
+        return z
+
+    def Y(self, i):
+        nn = 2*self.n
+        y = [0]*nn
+        y[2*i+1] = 1
+        y = Matrix(y).reshape(1, nn)
+        return y
+
+    def get_pauli(self, desc):
+        assert len(desc) == self.n
+        nn = 2*self.n
+        op = Matrix([0]*nn).reshape(1, nn)
+        for i,c in enumerate(desc):
+            if c in ".I":
+                continue
+            method = getattr(self, c)
+            pauli = method(i)
+            #print(pauli)
+            op = pauli + op
+        return op
+
+    def PX(self, *idxs):
+        "prepare X state"
+        n = self.n
+        ops = [I]*n
+        for i in idxs:
+            ops[i] = b_
+        op = reduce(matmul, ops)
+        return op
+
+    def PZ(self, *idxs):
+        "prepare Z state"
+        n = self.n
+        ops = [I]*n
+        for i in idxs:
+            ops[i] = w_
+        op = reduce(matmul, ops)
+        return op
+
+    def MX(self, *idxs):
+        "measure X on idxs"
+        n = self.n
+        ops = [I]*n
+        for i in idxs:
+            ops[i] = _b
+        op = reduce(matmul, ops)
+        return op
+
+    def MZ(self, *idxs):
+        "measure Z on idxs"
+        n = self.n
+        ops = [I]*n
+        for i in idxs:
+            ops[i] = _w
+        op = reduce(matmul, ops)
+        return op
 
 
 zeros = lambda a,b : Matrix.zeros((a,b))
@@ -872,93 +996,6 @@ def test_code():
                 print()
 
 
-class Module:
-    def __init__(self, n):
-        self.space = SymplecticSpace(n)
-        self.n = n
-
-    def get_identity(self):
-        I = self.space.get_identity()
-        return Lagrangian(I)
-
-    # Argggh, why is this transposed
-    def CX(self, i, j):
-        CX = self.space.CX(i, j)
-        CX = Lagrangian(CX.t)
-        return CX
-
-    def CZ(self, i, j):
-        CZ = self.space.CZ(i, j)
-        CZ = Lagrangian(CZ.t)
-        return CZ
-
-    def S(self, i):
-        S = self.space.S(i)
-        S = Lagrangian(S.t)
-        return S
-
-    def H(self, i):
-        H = self.space.H(i)
-        H = Lagrangian(H.t)
-        return H
-
-    # -----------------------------------------
-    # note: Lagrangian relations act on Pauli's
-    # via get_left, get_right
-
-    def X(self, i):
-        nn = 2*self.n
-        x = [0]*nn
-        x[2*i] = 1
-        x = Matrix(x).reshape(1, nn)
-        return x
-
-    def Z(self, i):
-        nn = 2*self.n
-        z = [0]*nn
-        z[2*i+1] = 1
-        z = Matrix(z).reshape(1, nn)
-        return z
-
-    def Y(self, i):
-        nn = 2*self.n
-        y = [0]*nn
-        y[2*i+1] = 1
-        y = Matrix(y).reshape(1, nn)
-        return y
-
-    def get_pauli(self, desc):
-        assert len(desc) == self.n
-        nn = 2*self.n
-        op = Matrix([0]*nn).reshape(1, nn)
-        for i,c in enumerate(desc):
-            if c in ".I":
-                continue
-            method = getattr(self, c)
-            pauli = method(i)
-            #print(pauli)
-            op = pauli + op
-        return op
-
-    def MX(self, *idxs):
-        n = self.n
-        ops = [I]*n
-        for i in idxs:
-            ops[i] = _b
-        #print(ops)
-        op = reduce(matmul, ops)
-        return op
-
-    def MZ(self, *idxs):
-        n = self.n
-        ops = [I]*n
-        for i in idxs:
-            ops[i] = _w
-        #print(ops)
-        op = reduce(matmul, ops)
-        return op
-
-
             
 def css_prep(code):
     css = code.to_css()
@@ -1075,57 +1112,31 @@ def test_goto():
 
 
 def get_code(U, k=0):
-    #print("get_code")
     assert isinstance(U, Lagrangian)
     rank, tgt, src = U.shape
-    #print(rank, tgt, src)
     module = Module(src//2)
     H = Matrix([]).reshape(0, tgt)
     for i in range(src//2-k):
         r = module.X(i)
-        #print("find_left:")
-        #print(strop(r))
-        op = U.find_left(r)
-        #print(op, op.shape)
+        op = U.get_left(r)
         if len(op):
-            #print(op.shape)
-            #print(strop(op))
             H = H.concatenate(op)
-    #print(H)
-    #H = Matrix(rows)
+    H = H.linear_independent()
     return QCode(H)
 
 
-def test_double():
-    from qumba.triorthogonal import get_double
-
+def test_left_right():
 #    code = construct.get_422()
     code = construct.get_713()
     print(code.longstr())
 
-    #dode = get_double([code])
-    #print(dode)
-
     E = code.get_encoder()
-    
     encode = Lagrangian(E.t)
 
     print("encode:")
     print(encode)
     print()
     
-#    #print(code.H)
-#    prep = css_prep(code) # what is this ??? XXX
-#
-#    print("prep:")
-#    print(prep)
-#    print()
-#
-#    print(prep == prep.op)
-#
-#    return
-
-
     n = code.n
     module = Module(n)
     
@@ -1136,18 +1147,18 @@ def test_double():
         print(h)
         op = module.get_pauli(h)
         #print(op)
-        #lop = (encode.find_left(op))
+        #lop = (encode.get_left(op))
         #print("op * h")
         #print(strop(lop), lop.shape)
-        rop = (encode.find_right(op))
+        rop = (encode.get_right(op))
         print("h * op")
         print(strop(rop), rop.shape)
 
-        lop = encode.find_left(rop)
+        lop = encode.get_left(rop)
         print(strop(lop), lop.shape)
 
         #rev = encode.op
-        #rop = rev.find_left(op)
+        #rop = rev.get_left(op)
         #print(strop(rop), rop.shape)
 
     print(encode)
@@ -1168,6 +1179,224 @@ def test_double():
     #dode = dode.to_qcode()
     #print(dode)
     #print(dode.longstr())
+
+
+def get_subcode(code, dode):
+    code = code.to_qcode()
+    dode = dode.to_qcode()
+
+    idxs = list(range(code.n, dode.n))
+    
+    E = dode.get_encoder()
+    encode = Lagrangian(E.t)
+    module = Module(dode.n)
+    m = module.MZ(*idxs)
+
+    e = m*encode
+    eode = get_code(e, 1)
+    return eode
+
+
+def test_double():
+    from qumba.triorthogonal import get_double
+
+    S0 = construct.get_713()
+
+    T1 = get_double([S0])
+    T1.bz_distance()
+    assert T1.n == 15
+
+    S1 = QCode.fromstr("""
+    XIIIIIIIIXIIXIIXI
+    IXIIIIIIIXIIXIIIX
+    IIXIIIIIIIIXIXXII
+    IIIXIIIIXXIIXIIII
+    IIIIXIIIXIXIXXXXX
+    IIIIIXIIIIXXIXIII
+    IIIIIIXIXXXIIXXXX
+    IIIIIIIXIIXXIIXII
+    ZIIIIIIIIZIIZIIZI
+    IZIIIIIIIZIIZIIIZ
+    IIZIIIIIIIIZIZZII
+    IIIZIIIIZZIIZIIII
+    IIIIZIIIZIZIZZZZZ
+    IIIIIZIIIIZZIZIII
+    IIIIIIZIZZZIIZZZZ
+    IIIIIIIZIIZZIIZII
+    """)
+
+    T2 = get_double([S0, S1])
+    T2.bz_distance()
+    print(T2)
+
+    T2 = T2.to_qcode()
+
+    code = get_subcode(S1, T2)
+    print(S1, T2, code)
+    print(code.is_equiv(S1))
+    
+
+    S2 = construct.get_golay(23)
+    print(S2)
+    T3 = get_double([S0, S1, S2])
+    #T3.bz_distance()
+    print(T3)
+
+    T3 = T3.to_qcode()
+    code = get_subcode(S2, T3)
+    print(code)
+
+
+
+class Gadget:
+    def __init__(self, n):
+
+        m = Module(2*n)
+
+        # Prep,Control,Measure
+        PX, CX, MX = m.PX, m.CX, m.MX
+        PZ, CZ, MZ = m.PZ, m.CZ, m.MZ
+
+        idxs = list(range(n))
+
+        measure = MZ(*idxs)
+        cx = reduce(mul, [CX(i,i+n) for i in idxs])
+        prep = PX(*idxs)
+        fwd = [measure, cx, prep]
+
+        measure = MX(*idxs)
+        cx = reduce(mul, [CX(i+n,i) for i in idxs])
+        prep = PZ(*idxs)
+        rev = [measure, cx, prep]
+
+        self.fwd = fwd
+        self.rev = rev
+
+    def teleport(self, g, rev=False):
+        measure, cx, prep = [self.fwd, self.rev][int(rev)]
+        return measure * cx * g * prep
+        
+
+
+
+def XXX_test_k2():
+
+    module = Module(4)
+
+    gen = [module.CX(0,1), module.H(0), module.H(1), module.S(0), module.S(1)]
+    G = mulclose(gen)
+    assert len(G) == 720
+
+    found = set()
+
+    for idx in range(2):
+        if idx==0:
+        
+            prep = module.PX(0,1)
+            cx = module.CX(0,2) * module.CX(1,3)
+            measure = module.MZ(0,1)
+        
+            op = measure * cx * prep
+        
+            II = Lagrangian.identity(4)
+        
+            assert op == II
+        
+            HSH = lambda i:module.H(i)*module.S(i)*module.H(i)
+            op = measure * cx * HSH(0)*HSH(1)* prep
+        
+            m2 = Module(2)
+            assert op == m2.HSH(0)*m2.HSH(1)
+    
+        else:
+    
+            prep = module.PZ(0,1)
+            cx = module.CX(2,0) * module.CX(3,1)
+            measure = module.MX(0,1)
+        
+            op = measure * cx * prep
+        
+            II = Lagrangian.identity(4)
+        
+            assert op == II
+        
+            S = module.S
+            op = measure * cx * S(0)*S(1)* prep
+        
+            m2 = Module(2)
+            assert op == m2.S(0)*m2.S(1)
+    
+    
+        for g in G:
+            op = measure * cx * g * prep
+            found.add(op)
+    
+
+    gen = []
+    s2 = SymplecticSpace(2)
+    for g in found:
+        #print(g)
+        if g*g.op != II:
+            continue
+        #print()
+        op = g.get_matrix()
+        print(op)
+        assert s2.is_symplectic(op)
+        print(s2.get_name(op))
+        print()
+
+        gen.append(op)
+
+    G = mulclose(gen)
+    print(len(G))
+
+
+def test_k2():
+
+    n = 2
+    module = Module(2*n)
+    II = Lagrangian.identity(2*n)
+
+    gen = [module.CX(0,1), module.H(0), module.H(1), module.S(0), module.S(1)]
+    #G = mulclose(gen)
+    #assert len(G) == 720
+
+    found = set()
+
+    gadget = Gadget(n)
+
+    for g in gen:
+        op = gadget.teleport(g, False)
+        found.add(op)
+    
+        op = gadget.teleport(g, True)
+        found.add(op)
+    
+
+    gen = []
+    s2 = SymplecticSpace(2)
+    for g in found:
+        #print(g)
+        if g*g.op != II:
+            continue
+        #print()
+        op = g.get_matrix()
+        print(op)
+        assert s2.is_symplectic(op)
+        print(s2.get_name(op))
+        print()
+
+        gen.append(op)
+
+    G = mulclose(gen)
+    print(len(G))
+
+
+
+def test_toric():
+
+    code = construct.get_toric(3,3)
+    print(code)
 
 
 

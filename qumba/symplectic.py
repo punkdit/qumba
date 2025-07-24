@@ -138,6 +138,12 @@ class SymplecticSpace(object):
     def get_SH(self, idx=None):
         # X-->Z-->Y-->X 
         return self.S(idx)*self.H(idx)
+    SH = get_SH
+
+    def get_HSH(self, idx=None):
+        # X-->Z-->Y-->X 
+        return self.H(idx)*self.S(idx)*self.H(idx)
+    HSH = get_HSH
 
     def get_CZ(self, idx=0, jdx=1):
         assert idx != jdx
