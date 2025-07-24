@@ -1278,79 +1278,6 @@ class Gadget:
         
 
 
-
-def XXX_test_k2():
-
-    module = Module(4)
-
-    gen = [module.CX(0,1), module.H(0), module.H(1), module.S(0), module.S(1)]
-    G = mulclose(gen)
-    assert len(G) == 720
-
-    found = set()
-
-    for idx in range(2):
-        if idx==0:
-        
-            prep = module.PX(0,1)
-            cx = module.CX(0,2) * module.CX(1,3)
-            measure = module.MZ(0,1)
-        
-            op = measure * cx * prep
-        
-            II = Lagrangian.identity(4)
-        
-            assert op == II
-        
-            HSH = lambda i:module.H(i)*module.S(i)*module.H(i)
-            op = measure * cx * HSH(0)*HSH(1)* prep
-        
-            m2 = Module(2)
-            assert op == m2.HSH(0)*m2.HSH(1)
-    
-        else:
-    
-            prep = module.PZ(0,1)
-            cx = module.CX(2,0) * module.CX(3,1)
-            measure = module.MX(0,1)
-        
-            op = measure * cx * prep
-        
-            II = Lagrangian.identity(4)
-        
-            assert op == II
-        
-            S = module.S
-            op = measure * cx * S(0)*S(1)* prep
-        
-            m2 = Module(2)
-            assert op == m2.S(0)*m2.S(1)
-    
-    
-        for g in G:
-            op = measure * cx * g * prep
-            found.add(op)
-    
-
-    gen = []
-    s2 = SymplecticSpace(2)
-    for g in found:
-        #print(g)
-        if g*g.op != II:
-            continue
-        #print()
-        op = g.get_matrix()
-        print(op)
-        assert s2.is_symplectic(op)
-        print(s2.get_name(op))
-        print()
-
-        gen.append(op)
-
-    G = mulclose(gen)
-    print(len(G))
-
-
 def test_k2():
 
     n = 2
@@ -1358,20 +1285,19 @@ def test_k2():
     II = Lagrangian.identity(2*n)
 
     gen = [module.CX(0,1), module.H(0), module.H(1), module.S(0), module.S(1)]
-    #G = mulclose(gen)
-    #assert len(G) == 720
+    G = mulclose(gen)
+    assert len(G) == 720
 
     found = set()
 
     gadget = Gadget(n)
 
-    for g in gen:
+    for g in G:
         op = gadget.teleport(g, False)
         found.add(op)
     
         op = gadget.teleport(g, True)
         found.add(op)
-    
 
     gen = []
     s2 = SymplecticSpace(2)
@@ -1392,11 +1318,76 @@ def test_k2():
     print(len(G))
 
 
-
 def test_toric():
 
-    code = construct.get_toric(3,3)
+    code = construct.get_toric(1,3)
+    n = code.n
     print(code)
+
+    module = Module(2*n)
+    II = Lagrangian.identity(2*n)
+
+    k = SymplecticSpace(code.k)
+    gen = [k.CX(0,1), k.H(0), k.H(1), k.S(0), k.S(1)]
+    G = mulclose(gen)
+    assert len(G) == 720
+
+    I = Matrix.identity(2*(code.n - code.k))
+    G = [I<<g for g in G]
+
+    E = code.get_encoder()
+    Ei = ~E
+
+    G = [E * g * Ei for g in G]
+
+    for g in G:
+        dode = g*code
+        assert dode.is_equiv(code)
+    
+    I = Matrix.identity(2*code.n)
+    G = [g<<I for g in G]
+    G = [Lagrangian(g) for g in G]
+
+
+    found = set()
+
+    gadget = Gadget(n)
+
+    for g in G:
+        op = gadget.teleport(g, False)
+        found.add(op)
+    
+        op = gadget.teleport(g, True)
+        found.add(op)
+
+    print("#gadget:", len(found))
+
+
+    gen = []
+    space = SymplecticSpace(n)
+    sk = SymplecticSpace(code.k)
+    for g in found:
+        #print(g)
+        if g*g.op != II:
+            continue
+        #print()
+        op = g.get_matrix()
+        assert space.is_symplectic(op)
+
+        dode = op*code
+        assert dode.is_equiv(code)
+
+        op = dode.get_logical(code)
+
+        print(op)
+        assert sk.is_symplectic(op)
+        print(sk.get_name(op))
+        print()
+
+        gen.append(op)
+
+    G = mulclose(gen, verbose=True)
+    print(len(G))
 
 
 
