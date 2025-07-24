@@ -69,32 +69,6 @@ class Relation(object):
     def nf(self): # normal form
         return self.__class__(self.left, self.right)
 
-#    def get_left(self, r): # __mul__ ?
-#        r = Matrix.promote(r)
-#        if len(r.shape)==1:
-#            n = len(r)
-#            r = r.reshape(1, n)
-#        left, right = self.left, self.right
-#        assert r.shape[1] == right.shape[1]
-#        A = right.intersect(r)
-#        f = right.t.solve(A.t).t
-#        l = f*left
-#        return l
-#
-#    def get_right(self, l): # __rmul__ ?
-#        if len(l.shape)==1:
-#            n = len(l)
-#            l = l.reshape(1, n)
-#        left, right = self.left, self.right
-#        assert l.shape[1] == left.shape[1]
-#        #print("get_right", self.shape, l.shape)
-#        A = left.intersect(l)
-#        #print("\t", A.shape)
-#        f = left.t.solve(A.t).t
-#        l = f*right
-#        return l
-
-
     def find_left(self, r): # __mul__ ?
         if len(r.shape)==1:
             n = len(r)
@@ -106,7 +80,7 @@ class Relation(object):
         return op.left
     __call__ = find_left
 
-    def find_right(self, l): # __mul__ ?
+    def find_right(self, l): # __rmul__ ?
         if len(l.shape)==1:
             n = len(l)
             l = l.reshape(1, n)
@@ -115,53 +89,6 @@ class Relation(object):
         self = Relation(self.left, self.right)
         op = l*self
         return op.right
-
-    # XXX XXX BROKEN
-    def XXX_find_left(self, r): # __mul__ ?
-        if len(r.shape)==1:
-            n = len(r)
-            r = r.reshape(1, n)
-        left, right = self.left, self.right
-        assert r.shape[1] == right.shape[1], ( r.shape[1] , right.shape[1] )
-        I = Matrix.identity(left.shape[1])
-        rows = []
-        for row0 in r:
-            for row1 in I: # XXX could vectorize this
-                row = row1.concatenate(row0)
-                rows.append(row)
-        rows = Matrix(rows)
-        print("find_left")
-        print(strop(rows))
-        print("intersect")
-        print(strop(self.A))
-        A = self.A.intersect(rows)
-        #print("intersect:")
-        #print(A)
-        l = A[:, :left.shape[1]]
-        #print(l)
-        return l
-    #__call__ = find_left
-
-    def XXX_find_right(self, l): # __rmul__ ?
-        if len(l.shape)==1:
-            n = len(l)
-            l = l.reshape(1, n)
-        left, right = self.left, self.right
-        assert l.shape[1] == left.shape[1]
-        I = Matrix.identity(right.shape[1])
-        rows = []
-        for row0 in l:
-            for row1 in I: # XXX could vectorize this
-                row = row0.concatenate(row1)
-                rows.append(row)
-        rows = Matrix(rows)
-        #print(rows)
-        A = self.A.intersect(rows)
-        #print("intersect:")
-        #print(A)
-        r = A[:, left.shape[1]:]
-        #print(r)
-        return r
 
     @classmethod
     def identity(cls, n, p=2):
