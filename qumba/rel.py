@@ -1281,28 +1281,65 @@ class Gadget:
 def test_k2():
 
     n = 2
-    module = Module(2*n)
-    II = Lagrangian.identity(2*n)
 
+    module = Module(n)
+    
     gen = [module.CX(0,1), module.H(0), module.H(1), module.S(0), module.S(1)]
     G = mulclose(gen)
     assert len(G) == 720
+
+    if argv.css:
+        # here we restrict the 720 to only CSS state prep:
+        fwd = []
+        rev = []
+        px = module.PX(0,1)
+        pz = module.PZ(0,1)
+        for g in G:
+            op = g * px
+            H = op.left
+            c = QCode(H)
+            if c.is_css():
+                fwd.append(g)
+    
+            op = g * pz
+            H = op.left
+            c = QCode(H)
+            if c.is_css():
+                rev.append(g)
+    else:
+        fwd = rev = G
+
+    print(len(fwd), len(rev))
+
+    module = Module(2*n)
+    II = Lagrangian.identity(2*n)
+
+    #gen = [module.CX(0,1), module.H(0), module.H(1), module.S(0), module.S(1)]
+    #G = mulclose(gen)
+    #assert len(G) == 720
 
     found = set()
 
     gadget = Gadget(n)
 
-    for g in G:
+    I = Lagrangian.identity(n)
+    for g in fwd:
+        g = g<<II
         op = gadget.teleport(g, False)
         found.add(op)
+    #print(len(found))
     
+    for g in rev:
+        g = g<<II
         op = gadget.teleport(g, True)
         found.add(op)
+
+    print(len(found))
 
     gen = []
     s2 = SymplecticSpace(2)
     for g in found:
-        #print(g)
+        #print(g, "?")
         if g*g.op != II:
             continue
         #print()
