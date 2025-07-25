@@ -2349,6 +2349,32 @@ def test_concat():
         print()
 
 
+def test_state():
+    """
+    look for stabilizer states that are not
+    LC equivalent to CSS states: n=5 is minimal"""
+    n = 5
+    space = SymplecticSpace(n)
+    gen = [space.H(i) for i in range(n)]
+    gen += [space.S(i) for i in range(n)]
+    G = mulclose(gen, verbose=True)
+    assert len(G) == 6**n
+    count = 0
+    for code in construct.all_codes(n, 0, 1):
+        print('.', end='', flush=True)
+        if code.is_css():
+            continue
+        for g in G:
+            if (g*code).is_css():
+                break
+        else:
+            print()
+            print(code)
+            print(code.longstr())
+            count += 1
+    print(count)
+
+
 def test():
     print("\ntest()")
     get_422()
