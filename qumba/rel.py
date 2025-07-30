@@ -175,7 +175,10 @@ class Relation(object):
     def __mul__(lhs, rhs):
         #assert isinstance(rhs, lhs.__class__)
         rhs = lhs.promote(rhs)
-        assert lhs.src == rhs.tgt
+        #print()
+        #print(lhs, "*")
+        #print(rhs)
+        assert lhs.src == rhs.tgt, (lhs.src, rhs.tgt)
         l, r = pullback(lhs.right.t, rhs.left.t)
         left = lhs.left.t * l
         right = rhs.right.t * r
@@ -343,38 +346,46 @@ class Module:
         return op
 
     def PX(self, *idxs):
-        "prepare X state"
+        "prepare X state: |+..+>"
         n = self.n
+        if not idxs:
+            idxs = list(range(n))
         ops = [I]*n
         for i in idxs:
-            ops[i] = b_
+            ops[i] = b_ # ?!?! is this right ??
         op = reduce(matmul, ops)
         return op
 
     def PZ(self, *idxs):
-        "prepare Z state"
+        "prepare Z state: |0..0>"
         n = self.n
+        if not idxs:
+            idxs = list(range(n))
         ops = [I]*n
         for i in idxs:
-            ops[i] = w_
+            ops[i] = w_ # ?!?! is this right ??
         op = reduce(matmul, ops)
         return op
 
     def MX(self, *idxs):
         "measure X on idxs"
         n = self.n
+        if not idxs:
+            idxs = list(range(n))
         ops = [I]*n
         for i in idxs:
-            ops[i] = _b
+            ops[i] = _b # ?!?! is this right ??
         op = reduce(matmul, ops)
         return op
 
     def MZ(self, *idxs):
         "measure Z on idxs"
         n = self.n
+        if not idxs:
+            idxs = list(range(n))
         ops = [I]*n
         for i in idxs:
-            ops[i] = _w
+            ops[i] = _w # ?!?! is this right ??
         op = reduce(matmul, ops)
         return op
 
@@ -1088,28 +1099,99 @@ def test_prep():
             assert len(l) == 6
 
 
+def test_module():
+
+    module = Module(2)
+
+    lhs = module.CX(0,1) * module.H(1) * module.PZ(0,1)
+    rhs = module.CX(1,0) * module.H(0) * module.PZ(0,1)
+    assert lhs == rhs
+
+    #print(module.PZ(0,1))
+    lhs = (module.MX(0,1) * module.PZ(0,1))
+    rhs = (module.MZ(0,1) * module.PZ(0,1))
+    #print(lhs.nf, lhs.shape)
+    #print(rhs.nf, rhs.shape)
+
+    def show(op):
+        print(op, op.shape)
+
+    # rank==0 means impossible 
+    # rank>0 means possible 
+    # yes ? ?????
+    assert (_w * b_).rank == 0
+    assert (_w * w_).rank == 1
+    assert (_b * b_).rank == 1
+    assert (_b * w_).rank == 0
+
+    #print( (_b * w_) @ module.get_identity() )
+
+    module = Module(4)
+    op = module.MX(0,1,2,3) * module.PX(0,1,2,3)
+    assert op.rank == 4
+
+
+    
+
+
 def test_goto():
     # See: https://www.nature.com/articles/srep19578
 
     n = 8
     syntax = Syntax()
     CX, H = syntax.CX, syntax.H
+    PX, PZ = syntax.PX, syntax.PZ
 
     prog = (CX(6,7)*CX(5,7)*CX(0,7)
         *CX(6,4)*CX(1,5)*CX(3,6)*CX(2,0)
         *CX(1,4)*CX(2,6)*CX(3,5)*CX(1,0)
         *H(1)*H(2)*H(3))
 
+    prog = (CX(6,7)*CX(5,7)*CX(0,7)
+        *CX(6,4)*CX(1,5)*CX(3,6)*CX(2,0)
+        *CX(1,4)*CX(2,6)*CX(3,5)*CX(1,0))
+
+    # XXX Module can't eat PX/PZ 
+    #for i in reversed(range(n)):
+    #    s = PX(i) if i in [1,2,3] else PZ(i)
+    #    prog = prog*s
+    #for i in [1,2,3]:
+    #    prog = prog*PX(i)
+
     print(prog)
 
     space = SymplecticSpace(n)
-    mod = Module(n)
-    rel = prog*mod
+    module = Module(n)
+    rel = prog*module
 
     print(rel)
 
-    "IIIZZZZ ZIIIIZZ IZIIZIZ IIZIZZI"
+    #for i in reversed(range(n)):
+    #    op = PX(i) if i in [1,2,3] else PZ(i)
+    #    rel = rel*op
 
+    idxs = list(range(n))
+    init = module.PX(*idxs) # ??? PX/PZ ???
+    for i in [1,2,3]:
+        init = module.H(i)*init
+    rel = rel*init
+    print()
+    print(rel)
+
+    print()
+    print(module.MZ(7) * rel)
+    print()
+    print(module.MX(7) * rel)
+
+    """
+    Z....ZZ 
+    .Z..Z.Z 
+    ..Z.ZZ.
+    ...ZZZZ 
+    """
+
+    print(module.MZ(7) * rel == module.MX(7) * rel)
+    print(module.MZ(7) == module.MX(7))
 
 def get_code(U, k=0):
     assert isinstance(U, Lagrangian)

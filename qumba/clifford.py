@@ -169,6 +169,13 @@ class Clifford(object):
         #    #items[-2:] = [items[-2] @ items[-1]]
         #    items[:2] = [items[0] @ items[1]]
         #return items[0]
+
+    def PZ(self):
+        N = 2**self.n
+        K = self.K
+        u = [[0] for i in range(N)]
+        u[0] = [1]
+        return Matrix(K, u)
         
     @cache
     def Z(self, i=0):
@@ -1678,6 +1685,16 @@ def test_su2():
     assert set(G) == set(Q)
 
 
+def test_goto():
+
+    n = 8
+    c = Clifford(n)
+
+    u = c.PZ()
+
+    X, Z = c.X, c.Z
+
+    #print(X(2)*Z(2) == -Z(2)*X(2) )
 
     
 def test():
