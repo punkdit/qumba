@@ -1687,6 +1687,16 @@ def test_su2():
 
 def test_goto():
 
+    from qumba.syntax import Syntax
+
+    syntax = Syntax()
+    CX, H = syntax.CX, syntax.H
+
+    prog = (CX(6,7)*CX(5,7)*CX(0,7)
+        *CX(6,4)*CX(1,5)*CX(3,6)*CX(2,0)
+        *CX(1,4)*CX(2,6)*CX(3,5)*CX(1,0)
+        *H(1)*H(2)*H(3))
+
     n = 8
     c = Clifford(n)
 
