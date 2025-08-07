@@ -367,6 +367,17 @@ class Module:
         op = reduce(matmul, ops)
         return op
 
+    def PY(self, *idxs):
+        "prepare Y state"
+        n = self.n
+        if not idxs:
+            idxs = list(range(n))
+        ops = [I]*n
+        for i in idxs:
+            ops[i] = w1_ # ?!?! is this right ??
+        op = reduce(matmul, ops)
+        return op
+
     def MX(self, *idxs):
         "measure X on idxs"
         n = self.n
@@ -389,6 +400,17 @@ class Module:
         op = reduce(matmul, ops)
         return op
 
+    def MY(self, *idxs):
+        "measure Y on idxs"
+        n = self.n
+        if not idxs:
+            idxs = list(range(n))
+        ops = [I]*n
+        for i in idxs:
+            ops[i] = _w1 # ?!?! is this right ??
+        op = reduce(matmul, ops)
+        return op
+
 
 zeros = lambda a,b : Matrix.zeros((a,b))
 
@@ -398,7 +420,7 @@ if 1:
     I = Lagrangian.identity(2)
     h = Lagrangian([[0,1],[1,0]])
     b_ = Lagrangian([[0,1]], zeros(1,0))
-    b1 = Lagrangian([[1,0],[1,1]])
+    b1 = Lagrangian([[1,0],[1,1]]) # S gate
     w1 = h*b1*h
     b1_ = b1*b_
     w1_ = h*b1_
@@ -407,6 +429,8 @@ if 1:
     _b = b_.op
     _w1 = w1_.op
     _w = w_.op
+
+    assert _b1 == _w1
 
     swap = Lagrangian.get_swap()
     
@@ -1338,6 +1362,7 @@ class Gadget:
         # Prep,Control,Measure
         PX, CX, MX = m.PX, m.CX, m.MX
         PZ, CZ, MZ = m.PZ, m.CZ, m.MZ
+        PY, MY = m.PY, m.MY
 
         idxs = list(range(n))
 
@@ -1353,14 +1378,37 @@ class Gadget:
 
         self.fwd = fwd
         self.rev = rev
+        self.my = MY(*idxs)
 
     def teleport(self, g, rev=False):
         measure, cx, prep = [self.fwd, self.rev][int(rev)]
         return measure * cx * g * prep
         
+    def y_teleport(self, g, b0, b1, rev=False):
+        _, cx, prep = [self.fwd, self.rev][int(rev)]
+
+        m = Module(2)
+
+        MX, MZ, MY = m.MX, m.MZ, m.MY
+
+        if rev:
+            ops = [MX, MX]
+        else:
+            ops = [MZ, MZ]
+        if b0:
+            ops[0] = MY
+        if b1:
+            ops[1] = MY
+        measure = ops[0](0) @ ops[1](1)
+
+        return measure * cx * g * prep
+        
 
 
 def test_k2():
+
+    # Note:
+    # CSS state prep & measure in XYZ basis gives whole clifford group on k=2
 
     n = 2
 
@@ -1409,12 +1457,22 @@ def test_k2():
         g = g<<II
         op = gadget.teleport(g, False)
         found.add(op)
+        if argv.css_y:
+            op = gadget.y_teleport(g, 1, 0, False)
+            found.add(op)
+            op = gadget.y_teleport(g, 0, 1, False)
+            found.add(op)
     #print(len(found))
     
     for g in rev:
         g = g<<II
         op = gadget.teleport(g, True)
         found.add(op)
+        if argv.css_y:
+            op = gadget.y_teleport(g, 1, 0, True)
+            found.add(op)
+            op = gadget.y_teleport(g, 0, 1, True)
+            found.add(op)
 
     print(len(found))
 
