@@ -219,7 +219,7 @@ def test_513():
     #tgt = (0,0,1)
     tgt = normalize(+1,+1,-1)
     tgt = normalize(1,1,1)
-    pts = plot_fiber(tgt, 0.1, 100)
+    pts = plot_fiber(tgt, 0.1, 10)
     cvs = render(pts)
     cvs.writePDFfile("test_plot.pdf")
     return
