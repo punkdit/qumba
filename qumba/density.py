@@ -546,6 +546,7 @@ def test_513():
     #return
 
     def plot_fiber(tgt, epsilon=0.1, N=100):
+        target = normalize(*tgt)
         pts = []
         #sign = lambda x : [-1,+1][int(x>EPSILON)]
         def sign(x):
@@ -562,7 +563,7 @@ def test_513():
             sho = distill(rho)
             x1,y1,z1 = coords(sho)
             #if metric( (x,y,z), (x1,y1,z1) ) < 0.05:
-            if metric( tgt, (x1,y1,z1) ) < epsilon:
+            if metric( tgt, (x1,y1,z1) ) < epsilon and (x<0 or y<0 or z<0):
                 pts.append( (x,y,z) )
                 found.add( (sign(x), sign(y), sign(z)) )
                 print(".",end='', flush=True)
@@ -578,8 +579,8 @@ def test_513():
 
     #tgt = (0,0,1)
     tgt = normalize(+1,+1,-1)
-    tgt = (0,1,0)
-    pts = plot_fiber(tgt, 0.05, 100)
+    tgt = normalize(1,1,1)
+    pts = plot_fiber(tgt, 0.1, 100)
     cvs = render(pts)
     cvs.writePDFfile("test_plot.pdf")
     return
