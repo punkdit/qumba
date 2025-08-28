@@ -81,7 +81,7 @@ Z = matrix([[1, 0], [0, -1]])
 Y = matrix([[0, -w4], [w4, 0]])
 S = matrix([[1,0],[0,w4]])
 
-class Coset(object):
+class Coset:
     def __init__(self, group, items):
         self.group = group
         self.items = list(items)
@@ -97,7 +97,7 @@ class Coset(object):
         return id(self)
 
 
-class FactorGroup(object):
+class FactorGroup:
     def __init__(self, G, H):
         remain = set(G)
         cosets = []
@@ -127,7 +127,7 @@ class FactorGroup(object):
         return len(self.cosets)
 
 
-class Clifford(object):
+class Clifford:
     "clifford group on n qubits"
 
     @cache

@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 
 from functools import reduce
-from operator import matmul
+from operator import matmul, add
+
 
 import numpy
 from numpy import linalg
+from numpy import random
 from numpy import exp, pi, cos, arccos, sin
-numpy.set_printoptions(
-    precision=4, threshold=1024, suppress=True, 
-    formatter={'float': '{:0.4f}'.format}, linewidth=200)
 
 from qumba.argv import argv
 
@@ -379,6 +378,22 @@ def test():
     assert S != S.d
     assert S*S.d == I
 
+def eqphase(u, v): # equality up to phase
+    r = u.d*v
+    return abs(r.conjugate()*r - 1) < EPSILON
+
+
+def mix(u, r=0.0):
+    I = Space(1).I
+    uu = (1-r)*(u@u.d) + 0.5*r*I # um ...
+    r = uu.trace()
+    uu = (1/r)*uu
+    return uu
+
+def fidelity(rho, sho):
+    return (sho*rho).trace().real
+
+
 
 def test_513():
     test()
@@ -388,6 +403,7 @@ def test_513():
     H = c.H()
     S = c.S()
     X = c.X()
+    Y = c.Y()
     Z = c.Z()
     I = c.I
 
@@ -406,20 +422,12 @@ def test_513():
     CX = s.CX
 
     E = HSSHSSHSH @ H @ SSSH @ SSS @ SH
-    assert (E * E.d == s.I)
-
     E = CX(1,2) * E
-    assert (E * E.d == s.I)
     E = CX(0,3) * E
-    assert (E * E.d == s.I)
     E = (I @ SSSH @ I @ H @ I ) * E
-    assert (E * E.d == s.I)
     E = CX(3,1) * E
-    assert (E * E.d == s.I)
     E = (I @ S @ I @ (S*H) @ I) * E
-    assert (E * E.d == s.I)
     E = CX(4,1) * CX(4,0) * E
-    assert (E * E.d == s.I)
     E = ((S*H)@I@S@I@I) * CX(0,2)*(HSSS @I@I@I@I) *E
     assert (E * E.d == s.I)
 
@@ -483,48 +491,279 @@ def test_513():
     #print(" u:", u)
     
     r = (eu.d*u)
-    #print(r*r.conjugate())
-    #print(r)
+    assert( eqphase(S.d*H*S*eu, ev) )
 
-    def eq(u, v): # equality up to phase
-        r = u.d*v
-        return abs(r.conjugate()*r - 1) < EPSILON
+    def distill(rho):
+        rho_n = reduce(matmul, [rho]*5)
+    
+        sho = op*rho_n*op.d
+        r = sho.trace()
+        sho = (1/r)*sho
+    
+        cliff = S.d*H*S
+        sho = cliff*sho*cliff.d
+        return sho
 
-    assert( eq(S.d*H*S*eu, ev) )
-
-    def mix(u, r=0.0):
-        uu = (1-r)*(u@u.d) + 0.5*r*I # um ...
-        r = uu.trace()
-        uu = (1/r)*uu
-        return uu
-
-    def fidelity(rho, sho):
-        return (sho*rho).trace().real
-
+    #rho = mix(eu, 0.34)
+    rho = mix(eu, 0.1)
+    #print("fidelity:", fidelity(rho, mix(eu,0)))
     def err(rho):
         return (1 - eu.d*rho*eu).real
 
-    rho = mix(eu, 0.34)
-    #print("fidelity:", fidelity(rho, mix(eu,0)))
-    print(err(rho))
-
-    rho_n = reduce(matmul, [rho]*5)
-
-    sho = op*rho_n*op.d
-    r = sho.trace()
-    sho = (1/r)*sho
-
-    cliff = S.d*H*S
-    sho = cliff*sho*cliff.d
-
-    #print(sho)
-    print(err(sho))
+    sho = distill(rho)
+    #print(err(rho))
+    #print(err(sho))
     #print( fidelity(sho, mix(eu,0)) )
+
+    def to_rho(x, y, z):
+        rho = 0.5*(I + x*X + y*Y + z*Z)
+        return rho
+
+    from huygens.pov import Mat
+    def coords(rho):
+        x = (rho*X).trace().real
+        y = (rho*Y).trace().real
+        z = (rho*Z).trace().real
+        v = Mat([x, y, z])
+        return v
+
+    def conv(a,b,r=0.5):
+        return (1-r)*a + r*b
+
+    def metric(p, q):
+        return sum( (pi-qi)**2 for (pi,qi) in zip(p,q))**0.5
+
+    def normalize(x,y,z):
+        r = (x*x+y*y+z*z)**(1/2)
+        x, y, z = (x/r,y/r,z/r)
+        return x,y,z
+
+    #tgt = normalize(0.3,-0.5,-0.1)
+    tgt = normalize(*random.normal(0,1,3))
+    #pts = [tgt]
+    #cvs = render_points(pts)
+    #cvs.writePDFfile("test_plot.pdf")
+    #return
+
+    if 0:
+        pts = []
+        #sign = lambda x : [-1,+1][int(x>EPSILON)]
+        def sign(x):
+            if x< -0.3:
+                return -1
+            if x> 0.3:
+                return +1
+            return 0
+        found = set()
+        while len(pts) < 100:
+            x,y,z = random.normal(0, 1, 3)
+            x, y, z = normalize(x,y,z)
+            rho = to_rho(x,y,z)
+            sho = distill(rho)
+            x1,y1,z1 = coords(sho)
+            if metric( (x,y,z), (x1,y1,z1) ) < 0.05:
+            #if metric( tgt, (x1,y1,z1) ) < 0.1:
+                pts.append( (x,y,z) )
+                found.add( (sign(x), sign(y), sign(z)) )
+                #print(".",end='', flush=True)
+                print((x,y,z), (sign(x), sign(y), sign(z)) )
+        print()
+        print(found)
+    
+        cvs = render_points(pts)
+        cvs.writePDFfile("test_plot.pdf")
+    
+        return
+
+    if 0:
+        rhos = []
+        N = 17
+        #for i in range(N+1):
+        #  for j in range(N-i+1):
+        for i in range(1,N):
+          for j in range(1,N-i):
+            if i>1 and j!=1 and j!=N-i-1:
+                continue
+            x = (i/N)
+            y = j/N
+            z = 1-x-y
+            #print((x,y,z))
+            x = +conv(x, 1, 0.2)
+            y = +conv(y, 1, 0.2)
+            z = +conv(z, 1, 0.2)
+            r = (x*x+y*y+z*z)**(1/2)
+            rhos.append(to_rho(x/r,y/r,z/r))
+        rhos = [distill(rho) for rho in rhos]
+        pts = [coords(rho) for rho in rhos]
+        cvs = render_points(pts)
+        cvs.writePDFfile("test_plot.pdf")
+
+    rhos = []
+    N = 11
+    #for i in range(N+1):
+    #  for j in range(N-i+1):
+    for i in range(1,N):
+      for j in range(1,N-i):
+        x = (i-N/2)/N
+        y = j/N
+        z = 1-y
+        #print((x,y,z))
+        x = +conv(x, 0, 0.7)
+        y = +conv(y, 0.7, 0.7)
+        z = +conv(z, 0.5, 0.7)
+        r = (x*x+y*y+z*z)**(1/2)
+        rhos.append(to_rho(x/r,y/r,z/r))
+    rhos = [distill(rho) for rho in rhos]
+    pts = [coords(rho) for rho in rhos]
+    cvs = render_points(pts)
+    cvs.writePDFfile("test_plot.pdf")
+
+    return
+
+
+    x = y = z = 0.4
+    rho = to_rho(x,y,z)
+
+    #r = (to_rho(1,0,0))
+    #print(r, r.trace(), (r*r).trace())
+    #print(coords(r))
+
+    #x,y,z = coords(rho)
+    #print(x*x+y*y+z*z)
+    rhos = [rho]
+    for i in range(5):
+        sho = distill(rhos[-1])
+        rhos.append(sho)
+    pts = [coords(rho) for rho in rhos]
+    cvs = render_points(pts)
+    cvs.writePDFfile("test_plot.pdf")
+
+
+def wiremesh(view, polytope, st=[], back=False, front=False):
+    from huygens.namespace import st_thick, orange, st_round
+    _back, _front = [], []
+    for face in polytope:
+        if reduce(add, face).sum() < 0:
+            _back.append(face)
+        else:
+            _front.append(face)
+    if back:
+        polytope = _back
+    if front:
+        polytope = _front
+    count = 0
+    for face in polytope:
+        n = len(face)
+        for i in range(n):
+            v0, v1 = face[i], face[(i+1)%n]
+            if str(v0) > str(v1):
+                continue
+            view.add_line(v0, v1, st_stroke=st_round+st)
+            count += 1
+        #print(face)
+    #print("lines:", count)
+
+
+def render_points(pts=[]):
+    from huygens.namespace import (st_thick, orange, st_round, st_arrow, 
+        Canvas, st_west, st_south, st_north, color, black, grey, green, blue)
+    from huygens.pov import View, Mat
+    from huygens import config
+    config(text="pdflatex")
+
+    from bruhat.platonic import make_octahedron
+
+    polytope = make_octahedron()
+    polytope = [[Mat(list(v)) for v in face] for face in polytope]
+
+
+    view = View()
+    view.perspective()
+
+    #eye = Mat([1.1, 0.4, 1.6])
+    eye = Mat([0.5, 0.4, 1.4])
+    eye = eye / eye.norm()
+    eye = 8*eye
+    center = Mat([0., 0, 0])
+    up = Mat([0, 1, 0])
+    view.lookat(eye, center, up)
+    #view.add_light(point, (1., 1., 1., 1.))
+
+    #lookat = Mat.lookat(eye, center, up)
+
+    fill = (0.9, 0.8, 0., 0.4)
+    stroke = (0, 0, 0, 1)
+
+    #view.translate(-4., 0, 2)
+    st_axis = st_thick+[orange]
+    v0 = Mat([0,0,0])
+    vx = Mat([1,0,0])
+    vy = Mat([0,1,0])
+    vz = Mat([0,0,1])
+    view.add_line(v0, vx, st_stroke=st_axis)
+    view.add_line(v0, vy, st_stroke=st_axis)
+    view.add_line(v0, vz, st_stroke=st_axis)
+
+    #wiremesh(view, cube, [grey], back=True)
+
+    for verts in polytope:
+        #print([v for v in verts])
+        view.add_poly(verts, fill, None)
+
+    #wiremesh(view, cube, [grey], front=True)
+    wiremesh(view, polytope)
+
+    R = 2.0
+    view.add_line(vx, R*vx, st_stroke=st_axis+st_arrow)
+    view.add_line(vy, R*vy, st_stroke=st_axis+st_arrow)
+    view.add_line(vz, R*vz, st_stroke=st_axis+st_arrow)
+    R *= 1.03
+    view.add_cvs(R*vx, Canvas().text(0, 0, r"$x$", st_west))
+    view.add_cvs(R*vy, Canvas().text(0, 0, r"$y$", st_south))
+    view.add_cvs(R*vz, Canvas().text(0, 0, r"$z$", st_north))
+    #view.add_circle(v0, 1, stroke=stroke, fill=None)
+
+    for v in pts:
+        v = Mat(v)
+        view.add_circle(v, 0.3, fill=green)
+
+    bg = color.rgb(0.2, 0.2, 0.2, 1.0)
+
+    cvs = view.render(bg=None)
+
+    #u0 = Mat(lookat[1, :3]) # norm = 1
+    #r0 = view.trafo_view_distance(u0)
+
+    #v0 = view.trafo_view(u0)
+    #x, y = view.trafo_canvas(v0)
+    #cvs.stroke(path.circle(x, y, .1), [blue])
+
+    #print(cvs.get_bound_box())
+    #v0 = face[0]
+    v0 = Mat([0,0,0])
+    u0 = view.trafo_view(v0)
+    x, y = view.trafo_canvas(u0)
+    #cvs.stroke(path.circle(x, y, 1.))
+
+
+    return cvs
+
+
+
+def test_plot():
+    pts = [(0.5,0,0),]
+    cvs = render_points(pts)
+
+    cvs.writePDFfile("test_plot.pdf")
 
 
 
 
 if __name__ == "__main__":
+
+    numpy.set_printoptions(
+        precision=4, threshold=1024, suppress=True, 
+        formatter={'float': '{:0.4f}'.format}, linewidth=200)
 
     from random import seed
     from time import time
