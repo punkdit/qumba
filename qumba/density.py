@@ -541,11 +541,11 @@ def test_513():
     #tgt = normalize(0.3,-0.5,-0.1)
     tgt = normalize(*random.normal(0,1,3))
     #pts = [tgt]
-    #cvs = render_points(pts)
+    #cvs = render(pts)
     #cvs.writePDFfile("test_plot.pdf")
     #return
 
-    if 0:
+    def plot_fiber(tgt, epsilon=0.1, N=100):
         pts = []
         #sign = lambda x : [-1,+1][int(x>EPSILON)]
         def sign(x):
@@ -555,25 +555,34 @@ def test_513():
                 return +1
             return 0
         found = set()
-        while len(pts) < 100:
+        while len(pts) < N:
             x,y,z = random.normal(0, 1, 3)
             x, y, z = normalize(x,y,z)
             rho = to_rho(x,y,z)
             sho = distill(rho)
             x1,y1,z1 = coords(sho)
-            if metric( (x,y,z), (x1,y1,z1) ) < 0.05:
-            #if metric( tgt, (x1,y1,z1) ) < 0.1:
+            #if metric( (x,y,z), (x1,y1,z1) ) < 0.05:
+            if metric( tgt, (x1,y1,z1) ) < epsilon:
                 pts.append( (x,y,z) )
                 found.add( (sign(x), sign(y), sign(z)) )
-                #print(".",end='', flush=True)
-                print((x,y,z), (sign(x), sign(y), sign(z)) )
+                print(".",end='', flush=True)
+                #print((x,y,z), (sign(x), sign(y), sign(z)) )
         print()
-        print(found)
-    
-        cvs = render_points(pts)
-        cvs.writePDFfile("test_plot.pdf")
-    
-        return
+        # ugh, too stupid 
+        #from scipy.cluster.hierarchy import fclusterdata
+        #X = numpy.array(pts)
+        #print(X.shape)
+        #T = fclusterdata(X, t=2.0, depth=3, method="average")
+        #print(T, T.min(), T.max())
+        return pts
+
+    #tgt = (0,0,1)
+    tgt = normalize(+1,+1,-1)
+    tgt = (0,1,0)
+    pts = plot_fiber(tgt, 0.05, 100)
+    cvs = render(pts)
+    cvs.writePDFfile("test_plot.pdf")
+    return
 
     if 0:
         rhos = []
@@ -595,7 +604,7 @@ def test_513():
             rhos.append(to_rho(x/r,y/r,z/r))
         rhos = [distill(rho) for rho in rhos]
         pts = [coords(rho) for rho in rhos]
-        cvs = render_points(pts)
+        cvs = render(pts)
         cvs.writePDFfile("test_plot.pdf")
 
     rhos = []
@@ -613,9 +622,20 @@ def test_513():
         z = +conv(z, 0.5, 0.7)
         r = (x*x+y*y+z*z)**(1/2)
         rhos.append(to_rho(x/r,y/r,z/r))
-    rhos = [distill(rho) for rho in rhos]
+
+    N = 90
+    rhos = []
+    
+    for i in range(N):
+        y = 0.413
+        theta = 2*pi*i/N
+        x,z = sin(theta), cos(theta)
+        x,y,z = normalize(x,y,z)
+        rhos.append(to_rho(x,y,z))
+
+    #rhos = [distill(rho) for rho in rhos]
     pts = [coords(rho) for rho in rhos]
-    cvs = render_points(pts)
+    cvs = render(pts, connect=True)
     cvs.writePDFfile("test_plot.pdf")
 
     return
@@ -635,7 +655,7 @@ def test_513():
         sho = distill(rhos[-1])
         rhos.append(sho)
     pts = [coords(rho) for rho in rhos]
-    cvs = render_points(pts)
+    cvs = render(pts, connect=True)
     cvs.writePDFfile("test_plot.pdf")
 
 
@@ -664,7 +684,7 @@ def wiremesh(view, polytope, st=[], back=False, front=False):
     #print("lines:", count)
 
 
-def render_points(pts=[]):
+def render(pts=[], colors=None, connect=False):
     from huygens.namespace import (st_thick, orange, st_round, st_arrow, 
         Canvas, st_west, st_south, st_north, color, black, grey, green, blue)
     from huygens.pov import View, Mat
@@ -677,7 +697,7 @@ def render_points(pts=[]):
     polytope = [[Mat(list(v)) for v in face] for face in polytope]
 
 
-    view = View()
+    view = View(sort_gitems=True)
     view.perspective()
 
     #eye = Mat([1.1, 0.4, 1.6])
@@ -713,19 +733,26 @@ def render_points(pts=[]):
     #wiremesh(view, cube, [grey], front=True)
     wiremesh(view, polytope)
 
-    R = 2.0
-    view.add_line(vx, R*vx, st_stroke=st_axis+st_arrow)
-    view.add_line(vy, R*vy, st_stroke=st_axis+st_arrow)
-    view.add_line(vz, R*vz, st_stroke=st_axis+st_arrow)
+    R = 1.3
+    view.add_line(vx, 1.3*vx, st_stroke=st_axis+st_arrow)
+    view.add_line(vy, 1.3*vy, st_stroke=st_axis+st_arrow)
+    view.add_line(vz, 1.5*vz, st_stroke=st_axis+st_arrow)
+
     R *= 1.03
     view.add_cvs(R*vx, Canvas().text(0, 0, r"$x$", st_west))
     view.add_cvs(R*vy, Canvas().text(0, 0, r"$y$", st_south))
     view.add_cvs(R*vz, Canvas().text(0, 0, r"$z$", st_north))
     #view.add_circle(v0, 1, stroke=stroke, fill=None)
 
-    for v in pts:
-        v = Mat(v)
-        view.add_circle(v, 0.3, fill=green)
+    if colors is None:
+        colors = [green]*len(pts)
+
+    pts = [Mat(v) for v in pts]
+    for i,v in enumerate(pts):
+        if connect:
+            view.add_line(pts[i], pts[(i+1)%len(pts)], stroke=colors[i])
+        else:
+            view.add_circle(v, 0.3, fill=colors[i])
 
     bg = color.rgb(0.2, 0.2, 0.2, 1.0)
 
@@ -752,7 +779,7 @@ def render_points(pts=[]):
 
 def test_plot():
     pts = [(0.5,0,0),]
-    cvs = render_points(pts)
+    cvs = render(pts)
 
     cvs.writePDFfile("test_plot.pdf")
 
