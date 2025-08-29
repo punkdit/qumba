@@ -7,7 +7,7 @@ from operator import matmul, add
 import numpy
 from numpy import linalg
 from numpy import random
-from numpy import exp, pi, cos, arccos, sin
+from numpy import exp, pi, cos, arccos, sin, arctan
 
 from qumba.argv import argv
 from qumba.dense import EPSILON, scalar, w4, w8, Matrix, Space
@@ -148,6 +148,7 @@ ket1 = Matrix([[0,1]]).d
 c = Space(1)
 H = c.H()
 S = c.S()
+T = c.T()
 X = c.X()
 Y = c.Y()
 Z = c.Z()
@@ -198,7 +199,7 @@ class Distill:
     def distill(self, rho):
         return rho
 
-    def diff(self, x0,y0,z0,d=0.1):
+    def diff(self, x0,y0,z0,d=0.1): # FIX THIS TRASH
         vs = []
         x,y,z = self(x0,y0,z0)
         for (x1,y1,z1) in [
@@ -209,6 +210,7 @@ class Distill:
             x2,y2,z2 = self(x1,y1,z1)
             vs.append([x2-x, y2-y, z2-z])
         vs = numpy.array(vs)
+        #print(vs)
         return (vs*vs).sum()
 
     def plot_fiber(self, tgt, epsilon=0.1, N=100, accept=lambda x,y,z:True):
@@ -421,6 +423,29 @@ class CodeDistill(Distill):
         return x,y,z
 
 
+def get_CH():
+
+    n = 2
+    CZ = Space(2).CZ()
+    CH = I<<H
+
+    plus = (2**(-1/2))*Matrix([[1,1]])
+    zero = Matrix([[1,0]])
+
+    assert abs(plus*plus.d-1) < EPSILON
+    op = (plus@I)*CH
+    #op = (I@zero)*CH
+    #op = (plus@I)*CZ
+
+    proto = GateDistill(n, op)
+
+    return proto
+
+
+# -------------------------------------------------------------
+# testing
+
+
 def test_713():
 
     code = construct.get_713()
@@ -485,6 +510,128 @@ def test_713():
         
         cvs = render(pts)
         cvs.writePDFfile("test_plot_singular_713.pdf")
+    
+
+def test_CH():
+
+    n = 2
+    CZ = Space(2).CZ()
+    CH = I<<H
+
+    plus = (2**(-1/2))*Matrix([[1,1]])
+    zero = Matrix([[1,0]])
+
+    assert abs(plus*plus.d-1) < EPSILON
+    op = (plus@I)*CH
+    #op = (I@zero)*CH
+    #op = (plus@I)*CZ
+
+    proto = GateDistill(n, op)
+
+    src = normalize(1,0,1)
+    x,y,z = proto(*src)
+    print(x,y,z)
+#    theta = arccos(x)
+#    print(360 * theta / (2*pi))
+#
+#    return
+
+    tgt = normalize(+1,+1,+1)
+    tgt = normalize(1,0,0)
+    pts = proto.plot_fiber(tgt, 0.1, 100)
+    cvs = render(pts)
+    cvs.writePDFfile("test_plot_CH.pdf")
+
+
+    from huygens.namespace import green, blue, red, Canvas
+    print("diff")
+    diff = proto.diff
+    pts = []
+    trial = 0
+    colors = []
+    while len(pts) < 100 and trial<100000:
+        trial += 1
+        x,y,z = rnd()
+        r = diff(x,y,z)
+        if r>0.0001:
+            continue
+        pts.append((x,y,z))
+        colors.append(green)
+        x,y,z = proto(x,y,z)
+        pts.append((x,y,z))
+        colors.append(blue)
+        x,y,z = proto(x,y,z)
+        pts.append((x,y,z))
+        colors.append(red)
+        print(".",end='',flush=True)
+    print()
+    
+    left = render(pts, colors, eye=[0.1,1,0.1], up=[0.1,0.1,1])
+    right = render(pts, colors, eye=[1,0,1])
+    mid = render(pts, colors)
+
+    cvs = Canvas()
+
+    x = 0.
+    cvs.insert(x,0,mid); x += 7
+    cvs.insert(x,0,right); x += 7
+    cvs.insert(x,0,left)
+    cvs.writePDFfile("test_plot_singular_CH.pdf")
+    
+
+def test_fixed():
+
+    code = construct.get_512()
+    proto = CodeDistill(code)
+
+    src = normalize(1,0,1)
+    x,y,z = proto(*src)
+    print(x,y,z)
+
+    print(proto.diff(*src))
+
+    return
+
+    from huygens.namespace import green, blue, red, Canvas
+    diff = proto.diff
+
+    pts = []
+    trial = 0
+    colors = []
+    while len(pts) < 300:
+        trial += 1
+        x,y,z = src = rnd()
+        #if x>0 or z>0:
+        #    continue
+        tgt = proto(*src)
+        r = metric(tgt, src)
+        if r>0.05:
+            continue
+        pts.append(src)
+        colors.append(green.alpha(0.6))
+        pts.append(tgt)
+        colors.append(blue.alpha(0.6))
+        tgt = proto(*tgt)
+        pts.append(tgt)
+        colors.append(red.alpha(0.6))
+        
+        print(".",end='',flush=True)
+    print()
+    
+    cs = [
+        render(pts, colors),
+        render(pts, colors, eye=[-1,0.2,-1]),
+        #render(pts, colors, eye=[0.1,1,0.1], up=[0.1,0.1,1]),
+        render(pts, colors, eye=[1,0,1]),
+    ]
+
+    cvs = Canvas()
+
+    x = 0.
+    for c in cs:
+        cvs.insert(x,0,c); 
+        x += 7
+    cvs.writePDFfile("test_plot_fix.pdf")
     
 
 def test_surface():

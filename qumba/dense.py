@@ -13,6 +13,7 @@ from qumba.argv import argv
 
 EPSILON = 1e-4
 scalar = numpy.complex64
+#scalar = numpy.complex128
 
 w8 = numpy.exp(1j*pi/4)
 w4 = 1j
@@ -118,6 +119,14 @@ class Matrix:
         A = numpy.dot(self.A, other.A)
         if A.shape == (1,1):
             return A[0,0]
+        return Matrix(A)
+
+    def __lshift__(self, other):
+        lm,ln = self.shape
+        rm,rn = other.shape
+        A = numpy.zeros((lm+rm, ln+rn), dtype=scalar)
+        A[:lm,:ln] = self.A
+        A[lm:,ln:] = other.A
         return Matrix(A)
 
     @property
