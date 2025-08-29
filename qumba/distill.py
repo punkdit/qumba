@@ -184,6 +184,51 @@ def test_513():
     #cvs.writePDFfile("test_plot.pdf")
     #return
 
+    def rnd():
+        x,y,z = random.normal(0, 1, 3)
+        x, y, z = normalize(x,y,z)
+        return (x,y,z)
+
+    def send(x,y,z):
+        x,y,z = normalize(x,y,z)
+        rho = to_rho(x,y,z)
+        sho = distill(rho)
+        x,y,z = coords(sho)
+        return x,y,z
+
+    print(send(+1,-1,+1))
+    return
+
+    def diff(x0,y0,z0,d=0.1):
+        vs = []
+        x,y,z = send(x0,y0,z0)
+        for (x1,y1,z1) in [
+            (x0+d,y0,z0),
+            (x0,y0+d,z0),
+            (x0,y0,z0+d),
+        ]:
+            x2,y2,z2 = send(x1,y1,z1)
+            vs.append([x2-x, y2-y, z2-z])
+        vs = numpy.array(vs)
+        return (vs*vs).sum()
+
+    #x,y,z = normalize(1,1,1)
+    #print(diff(x,y,z))
+
+    pts = []
+    while len(pts) < 100:
+        x,y,z = rnd()
+        r = diff(x,y,z)
+        if r<0.001:
+            pts.append((x,y,z))
+            print(".",end='',flush=True)
+    print()
+    
+    cvs = render(pts)
+    cvs.writePDFfile("test_plot.pdf")
+
+    return
+
     def plot_fiber(tgt, epsilon=0.1, N=100):
         target = normalize(*tgt)
         pts = []
