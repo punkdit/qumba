@@ -27,11 +27,11 @@ def unify(R, S):
         return R
     if S.coerce_map_from(R) is not None:
         return S
-    assert 0
+    assert 0, "fail to unify %s and %s"%(R, S)
 
 
 
-class Matrix(object):
+class Matrix:
     def __init__(self, ring, rows, name=()):
         M = all_cmdline.Matrix(ring, rows)
         M.set_immutable()
@@ -197,6 +197,14 @@ class Matrix(object):
     @property
     def t(self):
         return self.transpose()
+
+    def conjugate(self):
+        M = self.M.conjugate()
+        return Matrix(self.ring, M)
+
+    def change_ring(self, ring):
+        M = self.M.change_ring(ring)
+        return Matrix(ring, M)
 
     def dagger(self):
         M = self.M.conjugate_transpose()

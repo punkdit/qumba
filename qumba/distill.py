@@ -12,7 +12,7 @@ from numpy import exp, pi, cos, arccos, sin, arctan
 from qumba.argv import argv
 from qumba.dense import EPSILON, scalar, w4, w8, Matrix, Space
 
-from qumba.qcode import strop
+from qumba.qcode import strop, QCode
 from qumba import construct 
 
 
@@ -48,7 +48,7 @@ def wiremesh(view, polytope, st=[], back=False, front=False):
 def render(pts=[], colors=None, connect=False, 
         eye=[0.5,0.4,1.4], up=[0,1,0],
     ):
-    from huygens.namespace import (st_thick, orange, st_round, st_arrow, 
+    from huygens.namespace import (st_thick, orange, st_round, st_arrow, st_center,
         Canvas, st_west, st_south, st_north, color, black, grey, green, blue)
     from huygens.pov import View, Mat
     from huygens import config
@@ -100,10 +100,10 @@ def render(pts=[], colors=None, connect=False,
     view.add_line(vy, 1.3*vy, st_stroke=st_axis+st_arrow)
     view.add_line(vz, 1.5*vz, st_stroke=st_axis+st_arrow)
 
-    R *= 1.03
-    view.add_cvs(R*vx, Canvas().text(0, 0, r"$x$", st_west))
-    view.add_cvs(R*vy, Canvas().text(0, 0, r"$y$", st_south))
-    view.add_cvs(R*vz, Canvas().text(0, 0, r"$z$", st_north))
+    R *= 1.1
+    view.add_cvs(R*vx, Canvas().text(0, 0, r"$|x\rangle$", st_center))
+    view.add_cvs(R*vy, Canvas().text(0, 0, r"$|y\rangle$", st_center))
+    view.add_cvs(1.2*R*vz, Canvas().text(0, 0, r"$|z\rangle$", st_center))
     #view.add_circle(v0, 1, stroke=stroke, fill=None)
 
     if colors is None:
@@ -190,6 +190,10 @@ def rnd():
     x,y,z = random.normal(0, 1, 3)
     x, y, z = normalize(x,y,z)
     return (x,y,z)
+
+def norm(x,y,z):
+    r = (x**2+y**2+z**2)**(1/2)
+    return r
 
 
 class Distill:
@@ -415,6 +419,12 @@ class CodeDistill(Distill):
         rho = (1/rho.trace())*rho
         return rho
 
+    def call(self, x, y, z):
+        rho = to_rho(x,y,z)
+        sho = self.distill(rho)
+        x,y,z = [float(u) for u in self.coords(sho)]
+        return x,y,z
+
     def __call__(self, x,y,z):
         x,y,z = normalize(x,y,z)
         rho = to_rho(x,y,z)
@@ -638,34 +648,64 @@ def test_surface():
     from huygens.namespace import green, blue, red
 
     code = construct.get_512()
+#    code = construct.get_412()
+    #code = construct.get_913()
+    #code = construct.get_surface(3,3) # [[9,1,3]]
+    #code = construct.get_xzzx(2,3) # [[13,1,5]]
+
+    #for code in QCode.load_codetables():
+    #    print(code)
+    #    if str(code) == "[[10, 1, 4]]":
+    #        break
+
     print(code)
+    #S = code.space.S()
+    #code = S*code
     print(code.longstr())
 
-    proto = CodeDistill(code)
+    #return
 
-    print("diff")
+    print("build...", end='', flush=True)
+    proto = CodeDistill(code)
+    print(" done.")
+
+    alpha = 0.990
+
     diff = proto.diff
     colors = []
     pts = []
-    while len(pts) < 100:
+    count = 0
+    while len(pts) < 10 and count<100000:
+        count += 1
         x,y,z = rnd()
-        if x>0 or y<0.3:
-        #if x>0 or y>-0.3:
-            continue
+        #if x>0 or y<0.3:
+        #    continue
+        #print(norm(x,y,z))
         r = diff(x,y,z)
+        #print("(%.5f)"%r, end='', flush=True)
         if r>0.001:
             continue
         #print(x,y,z)
-        print("[%.4f %.4f %.4f]"%(x,y,z), end="")
+        print()
+
+        x *= alpha
+        y *= alpha
+        z *= alpha
+
+        r0 = norm(x,y,z)
+        #print("[%.4f %.4f %.4f]:%.4f"%(x,y,z,r), end="\n")
         pts.append((x,y,z))
         colors.append(green)
 
-        x,y,z = proto(x,y,z)
+        x,y,z = proto.call(x,y,z)
+        r1 = norm(x,y,z)
+        #print("\t[%.4f %.4f %.4f]:%.4f"%(x,y,z,r), end="\n")
         #print("[%.4f %.4f %.4f]"%(x,y,z), end="")
         pts.append((x,y,z))
         colors.append(blue)
 
-        print(".",end='',flush=True)
+        print("%.6f  %.8f"%(1-r0, 1-r1))
+        #print(".",end='',flush=True)
     print()
     
 #    cvs = render(pts, colors, eye=[0.1,5,0.1])
