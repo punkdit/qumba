@@ -16,6 +16,9 @@ from sage import all_cmdline as sage
 
 right_arrow = chr(0x2192)
 
+pystr = lambda u : str(u).replace("^", "**")
+pyfunc = lambda u : eval("lambda x,y,z: %s"%pystr(u))
+
 
 def get_code():
     H = """
@@ -48,6 +51,7 @@ def get_code():
     code = QCode.fromstr(H)
     return code
 
+
 def test():
 
     base = clifford.K
@@ -71,11 +75,11 @@ def test():
     #code = construct.get_422() # no...
     #code = QCode.fromstr("XXXX ZZZZ ZZII")
     #code = QCode.fromstr("XXXXXX ZZZZZZ ZZZZII IIXXXX ZZIIII")
-    #code = QCode.fromstr("YYZI IXXZ ZIYY") # [[4,1,2]]
+    code = QCode.fromstr("YYZI IXXZ ZIYY") # [[4,1,2]]
     #code = construct.get_513()
     #code = construct.get_512()
     #code = construct.get_713()
-    code = construct.get_913()
+    #code = construct.get_913()
     #code = get_code() # too big..
 
     print(code)
@@ -124,9 +128,6 @@ def test():
     z = M*(rho*LZ).trace()
     w = M*div
 
-    pystr = lambda u : str(u).replace("^", "**")
-    pyfunc = lambda u : eval("lambda x,y,z: %s"%pystr(u))
-
     #x,y,z,w = Kx,Ky,Kz,1 # identity
 
     print("x", right_arrow, x)
@@ -142,17 +143,75 @@ def test():
     ix = 2*X/(1+X**2+Y**2)
     iy = 2*Y/(1+X**2+Y**2)
     iz = (X**2+Y**2-1)/(1+X**2+Y**2)
-    print(ix, iy, iz)
+    #print(ix, iy, iz)
 
     u, v = stereo(x/w, y/w, z/w)
     u = u.subs({Kx:ix, Ky:iy, Kz:iz})
     v = v.subs({Kx:ix, Ky:iy, Kz:iz})
-    print("u =", u)
-    print("v =", v)
+    #print("u =", u)
+    #print("v =", v)
 
-    print("Cauchy-Riemann:")
-    print("\t", sage.derivative(u,X) == sage.derivative(v,Y))
-    print("\t", sage.derivative(u,Y) == -sage.derivative(v,X))
+    diff = sage.derivative
+
+    S = sage.PolynomialRing(sage.QQ, list("XY"))
+    S = sage.FractionField(S)
+    u = S(u)
+    v = S(v)
+
+    jac = [
+        [diff(u,X), diff(v,X)],
+        [diff(u,Y), diff(v,Y)],
+    ]
+    assert jac[0][0] == jac[1][1], "Cauchy-Riemann fail"
+    assert jac[1][0] == -jac[0][1], "Cauchy-Riemann fail"
+
+    f, g = jac[0]
+
+    #sage.macaulay2(
+
+    T = sage.PolynomialRing(sage.QQ, list("XY"))
+    I = T.ideal([f.numerator(), g.numerator()])
+    print(I)
+    for J in I.primary_decomposition():
+        print("\t", J) #, J.is_primary(), J.is_prime())
+
+    return
+
+    print(f.numerator())
+    for p,m in sage.factor(f.numerator()):
+        print("\t", p, "mult =", m)
+    print(f.denominator())
+    for p,m in sage.factor(f.denominator()):
+        print("\t", p, "mult =", m)
+    print(g.numerator())
+    for p,m in sage.factor(g.numerator()):
+        print("\t", p, "mult =", m)
+    print(g.denominator())
+    for p,m in sage.factor(g.denominator()):
+        print("\t", p, "mult =", m)
+    return
+
+    pyfunc = lambda u : eval("lambda X,Y: %s"%pystr(u))
+
+    f = pyfunc(jac[0][0].numerator())
+    g = pyfunc(jac[0][1].numerator())
+
+    def fun(XY):
+        X,Y = XY
+        return [1.*f(X,Y), 1.*g(X,Y)]
+    from scipy.optimize import root
+    sol = root(fun, [0,0], )
+    print("success:", sol.success)
+    print("x =", sol.x)
+    if not sol.success:
+        print(sol)
+
+    X, Y = sol.x
+    f = pyfunc(jac[0][0].denominator())
+    g = pyfunc(jac[0][1].denominator())
+    print(f(X,Y), g(X,Y))
+
+    return jac
 
     return
 
