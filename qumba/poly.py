@@ -67,15 +67,15 @@ def test():
     rho = half*(Kw*I + Kx*X + Ky*Y + Kz*Z)
     assert rho.trace() == Kw
 
-    #code = QCode.fromstr("ZZ")
+    code = QCode.fromstr("ZZ")
     #code = construct.get_422() # no...
     #code = QCode.fromstr("XXXX ZZZZ ZZII")
     #code = QCode.fromstr("XXXXXX ZZZZZZ ZZZZII IIXXXX ZZIIII")
-    code = QCode.fromstr("YYZI IXXZ ZIYY") # [[4,1,2]]
+    #code = QCode.fromstr("YYZI IXXZ ZIYY") # [[4,1,2]]
     #code = construct.get_513()
     #code = construct.get_512()
     #code = construct.get_713()
-    #code = construct.get_913()
+    code = construct.get_913()
     #code = get_code() # too big..
 
     print(code)
@@ -150,8 +150,9 @@ def test():
     print("u =", u)
     print("v =", v)
 
-    print(sage.derivative(u,X) == sage.derivative(v,Y))
-    print(sage.derivative(u,Y) == -sage.derivative(v,X))
+    print("Cauchy-Riemann:")
+    print("\t", sage.derivative(u,X) == sage.derivative(v,Y))
+    print("\t", sage.derivative(u,Y) == -sage.derivative(v,X))
 
     return
 
