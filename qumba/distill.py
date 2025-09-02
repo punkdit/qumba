@@ -23,6 +23,10 @@ from qumba import construct
 # ------------------------------------------------------------
 # plot functions: uses https://github.com/punkdit/huygens
 
+def save(cvs, name):
+    print("save", name)
+    cvs.writePDFfile(name)
+
 
 def wiremesh(view, polytope, st=[], back=False, front=False):
     from huygens.namespace import st_thick, orange, st_round
@@ -459,6 +463,52 @@ def get_CH():
 # -------------------------------------------------------------
 # testing
 
+def make_plots(proto, name):
+
+    tgt = normalize(+1,+2,3)
+    #accept = lambda x,y,z:x<0
+    pts = proto.plot_fiber(tgt, 0.1, 100)
+    cvs = render(pts)
+    save(cvs, "test_plot_degree_%s.pdf"%name)
+    #return
+
+    print("diff")
+    diff = proto.diff
+    pts = []
+    while len(pts) < 1000:
+        x,y,z = rnd()
+        r = diff(x,y,z)
+        if r<0.001:
+            pts.append((x,y,z))
+            print(".",end='',flush=True)
+    print()
+    
+    cvs = render(pts)
+    save(cvs, "test_plot_singular_%s.pdf"%name)
+    
+
+
+def test_code():
+    if argv.code:
+        n,k,d = argv.code
+        if (n,k,d) == (4,1,2):
+            code = QCode.fromstr("YYZI IXXZ ZIYY")
+        if (n,k,d) == (5,1,2):
+            code = construct.get_512()
+        if (n,k,d) == (5,1,3):
+            code = construct.get_513()
+        if (n,k,d) == (7,1,3):
+            code = construct.get_713()
+    else:
+        code = QCode.fromstr("XXXX ZZZZ YYII")
+
+    print(code)
+    print(code.longstr())
+    proto = CodeDistill(code)
+    make_plots(proto, "code")
+
+
+
 
 def test_713():
 
@@ -506,7 +556,7 @@ def test_713():
     accept = lambda x,y,z:x<0
     pts = proto.plot_fiber(tgt, 0.1, 10, accept)
     cvs = render(pts)
-    cvs.writePDFfile("test_plot_degree_713.pdf")
+    save(cvs, "test_plot_degree_713.pdf")
     #return
 
 
@@ -523,7 +573,7 @@ def test_713():
         print()
         
         cvs = render(pts)
-        cvs.writePDFfile("test_plot_singular_713.pdf")
+        save(cvs, "test_plot_singular_713.pdf")
     
 
 def test_CH():
@@ -554,7 +604,7 @@ def test_CH():
     tgt = normalize(1,0,0)
     pts = proto.plot_fiber(tgt, 0.1, 100)
     cvs = render(pts)
-    cvs.writePDFfile("test_plot_CH.pdf")
+    save(cvs, "test_plot_CH.pdf")
 
 
     from huygens.namespace import green, blue, red, Canvas
@@ -590,7 +640,7 @@ def test_CH():
     cvs.insert(x,0,mid); x += 7
     cvs.insert(x,0,right); x += 7
     cvs.insert(x,0,left)
-    cvs.writePDFfile("test_plot_singular_CH.pdf")
+    save(cvs, "test_plot_singular_CH.pdf")
     
 
 def test_fixed():
@@ -645,7 +695,7 @@ def test_fixed():
     for c in cs:
         cvs.insert(x,0,c); 
         x += 7
-    cvs.writePDFfile("test_plot_fix.pdf")
+    save(cvs, "test_plot_fix.pdf")
     
 
 def test_surface():
@@ -714,7 +764,7 @@ def test_surface():
     
 #    cvs = render(pts, colors, eye=[0.1,5,0.1])
     cvs = render(pts, colors)
-    cvs.writePDFfile("test_plot_singular_512.pdf")
+    save(cvs, "test_plot_singular_512.pdf")
 
 
 
@@ -737,7 +787,7 @@ def test_513():
         print()
         
         cvs = render(pts)
-        cvs.writePDFfile("test_plot_513.pdf")
+        save(cvs, "test_plot_513.pdf")
     
         return
 
@@ -747,7 +797,7 @@ def test_513():
         tgt = normalize(1,1,1)
         pts = proto.plot_fiber(tgt, 0.1, 10)
         cvs = render(pts)
-        cvs.writePDFfile("test_plot.pdf")
+        save(cvs, "test_plot.pdf")
         return
 
     if 0:
@@ -771,7 +821,7 @@ def test_513():
         rhos = [distill(rho) for rho in rhos]
         pts = [coords(rho) for rho in rhos]
         cvs = render(pts)
-        cvs.writePDFfile("test_plot.pdf")
+        save(cvs, "test_plot.pdf")
 
 
 
@@ -779,7 +829,7 @@ def test_plot():
     pts = [(0.5,0,0),]
     cvs = render(pts)
 
-    cvs.writePDFfile("test_plot.pdf")
+    save(cvs, "test_plot.pdf")
 
 
 

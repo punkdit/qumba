@@ -5,7 +5,7 @@ see also: distil.py
 
 """
 
-from functools import reduce
+from functools import reduce, cache
 from operator import matmul, add
 from random import random
 
@@ -21,6 +21,7 @@ from qumba.matrix_sage import Matrix
 from qumba import clifford
 from qumba.clifford import Clifford, w4
 
+EPSILON = 1e-6
 
 right_arrow = chr(0x2192)
 
@@ -108,6 +109,7 @@ def get_projector(code):
     return P
 
 
+@cache
 def distill(code):
     n = code.n
     space = Clifford(n)
@@ -141,10 +143,15 @@ def distill(code):
     z = M*(rho*LZ).trace()
     w = M*div
 
+    print("x", right_arrow, x)
+    print("y", right_arrow, y)
+    print("z", right_arrow, z)
+    print("w", right_arrow, w) # div
+
     return x, y, z, w
 
 
-def find_zeros(f0, g0, trials=1000):
+def find_zeros(f0, g0, trials=None, nsols=None):
 
     K = f0.parent()
     X, Y = K.gens()
@@ -180,15 +187,12 @@ def find_zeros(f0, g0, trials=1000):
         X, Y = XY
         fv = fn(X,Y)
         gv = gn(X,Y)
-        #for (x,y) in sols:
-        #    r = abs(x-X) + abs(y-Y)
-        #    if r < 0.01:
-        #        fv += 1./r - 0.01
-        #        gv += 1./r - 0.01
         return fv, gv
 
-    rnd = lambda radius=10: 2*radius*random() - radius
-    for trial in range(trials):
+    rnd = lambda radius=100: 2*radius*random() - radius
+    trial = 0
+    while trials is None or trial < trials:
+        trial += 1
         x0, y0 = rnd(), rnd()
         #print("root", x0, y0)
         #print()
@@ -206,13 +210,14 @@ def find_zeros(f0, g0, trials=1000):
             if r < 0.01:
                 break
         else:
-            sols.append((X,Y))
             #print("nfev", sol.nfev)
             #print("find_zeros: %.4f,%.4f" %  (X, Y))
             #print("value:", sol.fun)
             #print("denom:", fd(X,Y), gd(X,Y))
             dx,dy = rnd(1e-4), rnd(1e-4)
             X1,Y1 = X+dx, Y+dy
+            if abs(fd(X1,Y1)) < EPSILON or abs(gd(X1,Y1)) < EPSILON:
+                continue
             vals = fn(X1,Y1)/fd(X1,Y1), gn(X1,Y1)/gd(X1,Y1)
             #print("\t fun:", vals[0], vals[0])
             if abs(vals[0]) > 0.01 or abs(vals[1]) > 0.01:
@@ -220,32 +225,28 @@ def find_zeros(f0, g0, trials=1000):
     
             #print("\t---> %.4f,%.4f" %  (X, Y))
             yield X, Y
+            sols.append((X,Y))
+
+            if nsols and len(sols) >= nsols:
+                #print("nsols", len(sols))
+                return
 
 
-def test():
+def stereo(x,y,z):
+    X, Y = x/(1-z), y/(1-z)
+    return X, Y
 
-    code = QCode.fromstr("ZZ")
-    #code = construct.get_422() # no...
-    #code = QCode.fromstr("XXXX ZZZZ ZZII")
-    #code = QCode.fromstr("XXXXXX ZZZZZZ ZZZZII IIXXXX ZZIIII")
-    code = QCode.fromstr("YYZI IXXZ ZIYY") # [[4,1,2]]
-    code = construct.get_513()
-    #code = construct.get_512()
-    #code = construct.get_713()
-    #code = construct.get_913()
-    #code = get_code() # too big..
+def istereo(X, Y):
+    bot = 1+X**2+Y**2
+    x = 2*X/bot
+    y = 2*Y/bot
+    z = (X**2+Y**2-1)/bot
+    return (x,y,z)
 
-    print(code)
+
+def find_distill(code, trials=1000, nsols=1, top=True):
 
     x, y, z, w = distill(code)
-
-    print("x", right_arrow, x)
-    print("y", right_arrow, y)
-    print("z", right_arrow, z)
-    print("w", right_arrow, w) # div
-
-    def stereo(x,y,z):
-        return x/(1-z), y/(1-z)
 
     R = sage.PolynomialRing(base, list("XY"))
     X, Y = R.gens()
@@ -255,11 +256,13 @@ def test():
     #print(ix, iy, iz)
 
     Kx,Ky,Kz,_ = x.parent().gens()
-    u, v = stereo(x/w, y/w, z/w)
+    z_sign = +1 if top else -1
+    u, v = stereo(x/w, y/w, z_sign*z/w)
+
     u = u.subs({Kx:ix, Ky:iy, Kz:iz})
     v = v.subs({Kx:ix, Ky:iy, Kz:iz})
-    #print("u =", u)
-    #print("v =", v)
+    print("u =", u)
+    print("v =", v)
 
     diff = sage.derivative
 
@@ -272,15 +275,57 @@ def test():
         [diff(u,X), diff(v,X)],
         [diff(u,Y), diff(v,Y)],
     ]
-    assert jac[0][0] == jac[1][1], "Cauchy-Riemann fail"
-    assert jac[1][0] == -jac[0][1], "Cauchy-Riemann fail"
+    assert jac[0][0] == z_sign*jac[1][1], "Cauchy-Riemann fail"
+    assert jac[1][0] == -z_sign*jac[0][1], "Cauchy-Riemann fail"
 
     f, g = jac[0]
 
-    for (x,y) in find_zeros(f, g, 200):
-        print(x,y)
+    for (X,Y) in find_zeros(f, g, trials, nsols):
+        x, y, z = istereo(X, Y)
+        #print(X,Y, "-->", x, y, z)
+        #z *= z_sign
+        yield (x,y,z_sign*z)
 
-    return
+
+def test():
+
+    if argv.code:
+        n,k,d = argv.code
+        if (n,k,d) == (4,1,2):
+            code = QCode.fromstr("YYZI IXXZ ZIYY")
+        if (n,k,d) == (5,1,2):
+            code = construct.get_512()
+        if (n,k,d) == (5,1,3):
+            code = construct.get_513()
+        if (n,k,d) == (7,1,3):
+            code = construct.get_713()
+    #if argv.code:
+    #    import sys
+    #    print(repr(argv.code), sys.argv)
+    #    code = QCode.fromstr(argv.code)
+
+    else:
+        #code = QCode.fromstr("ZZ")
+        #code = construct.get_422() # no...
+        #code = QCode.fromstr("XXXX ZZZZ ZZII")
+        #code = QCode.fromstr("XXXXXX ZZZZZZ ZZZZII IIXXXX ZZIIII")
+        code = QCode.fromstr("YYZI IXXZ ZIYY") # [[4,1,2]]
+        #code = construct.get_513()
+        #code = construct.get_512()
+        #code = construct.get_713()
+        #code = construct.get_913()
+        #code = get_code() # too big..
+
+    print(code)
+
+    for top in [True, False]:
+      for (x,y,z) in find_distill(code, 10000, 10, top):
+        print("%.6f, %.6f, %.6f"%(x, y, z))
+      print("--")
+
+
+
+def junk():
 
     if 0:
         #sage.macaulay2(
@@ -322,7 +367,6 @@ def test():
         for u in [Kx,Ky,Kz]]
 
 
-    EPSILON = 1e-6
     ir2 = 2**(-1/2)
     def ortho(base, vec):
         # make vec ortho to base, which is normalize'd
