@@ -1,23 +1,42 @@
 #!/usr/bin/env python
 
+"""
+see also: distil.py
+
+"""
+
 from functools import reduce
 from operator import matmul, add
+from random import random
+
+import numpy
+from scipy.optimize import root
+
+from sage import all_cmdline as sage
 
 from qumba.argv import argv
-
 from qumba.qcode import strop, QCode
 from qumba import construct 
-
 from qumba.matrix_sage import Matrix
 from qumba import clifford
 from qumba.clifford import Clifford, w4
 
-from sage import all_cmdline as sage
 
 right_arrow = chr(0x2192)
 
 pystr = lambda u : str(u).replace("^", "**")
-pyfunc = lambda u : eval("lambda x,y,z: %s"%pystr(u))
+
+
+base = clifford.K
+one = base.one()
+half = one/2
+
+c = Clifford(1)
+I = c.I
+X = c.X()
+Y = c.Y()
+Z = c.Z()
+
 
 
 def get_code():
@@ -52,37 +71,16 @@ def get_code():
     return code
 
 
-def test():
+class Distill:
+    def __init__(self, n):
+        self.n = n
 
-    base = clifford.K
-    one = base.one()
-    half = one/2
+class CodeDistill(Distill):
+    def __init__(self, code):
+        Distill.__init__(self, code.n)
 
-    K = sage.PolynomialRing(base, list("xyzw"))
-    Kx,Ky,Kz,Kw = K.gens()
 
-    c = Clifford(1)
-    I = c.I
-    X = c.X()
-    Y = c.Y()
-    Z = c.Z()
-
-    Kw = 1
-    rho = half*(Kw*I + Kx*X + Ky*Y + Kz*Z)
-    assert rho.trace() == Kw
-
-    code = QCode.fromstr("ZZ")
-    #code = construct.get_422() # no...
-    #code = QCode.fromstr("XXXX ZZZZ ZZII")
-    #code = QCode.fromstr("XXXXXX ZZZZZZ ZZZZII IIXXXX ZZIIII")
-    code = QCode.fromstr("YYZI IXXZ ZIYY") # [[4,1,2]]
-    #code = construct.get_513()
-    #code = construct.get_512()
-    #code = construct.get_713()
-    #code = construct.get_913()
-    #code = get_code() # too big..
-
-    print(code)
+def get_projector(code):
     H = strop(code.H, "I")
     assert code.k == 1
 
@@ -107,8 +105,23 @@ def test():
     if 0:
         assert P.conjugate()==P
         P = P.change_ring(sage.QQ)
+    return P
 
+
+def distill(code):
+    n = code.n
+    space = Clifford(n)
+    M = 2**code.m
+
+    P = get_projector(code)
     Pd = P.d
+
+    K = sage.PolynomialRing(base, list("xyzw"))
+    Kx,Ky,Kz,Kw = K.gens()
+
+    Kw = 1
+    rho = half*(Kw*I + Kx*X + Ky*Y + Kz*Z)
+    assert rho.trace() == Kw
 
     #print("rho^n ... ", end='', flush=True)
     rho = reduce(matmul, [rho]*n)
@@ -128,7 +141,103 @@ def test():
     z = M*(rho*LZ).trace()
     w = M*div
 
-    #x,y,z,w = Kx,Ky,Kz,1 # identity
+    return x, y, z, w
+
+
+def find_zeros(f0, g0, trials=1000):
+
+    K = f0.parent()
+    X, Y = K.gens()
+
+    #print(K)
+    S = sage.PolynomialRing(sage.QQ, list("XY"))
+
+    pyfunc = lambda u : eval("lambda X,Y: %s"%pystr(u))
+
+    fn = f0.numerator()
+    gn = g0.numerator()
+
+    fn = S(fn)
+    gn = S(gn)
+    X, Y = S.gens()
+    #print(sage.derivative(fn, S.gens()[0]))
+    #return
+
+    d = lambda f,u : pyfunc(sage.derivative(f,u))
+    Jac = [[d(fn, X), d(fn, Y)], [d(gn, X), d(gn, Y)]]
+    def jac(XY):
+        X, Y = XY
+        return [[Jac[j][i](X,Y) for i in [0,1]] for j in [0,1]]
+    
+
+    fn = pyfunc(fn)
+    gn = pyfunc(gn)
+    fd = pyfunc(f0.denominator())
+    gd = pyfunc(g0.denominator())
+
+    sols = []
+    def fun(XY):
+        X, Y = XY
+        fv = fn(X,Y)
+        gv = gn(X,Y)
+        #for (x,y) in sols:
+        #    r = abs(x-X) + abs(y-Y)
+        #    if r < 0.01:
+        #        fv += 1./r - 0.01
+        #        gv += 1./r - 0.01
+        return fv, gv
+
+    rnd = lambda radius=10: 2*radius*random() - radius
+    for trial in range(trials):
+        x0, y0 = rnd(), rnd()
+        #print("root", x0, y0)
+        #print()
+        sol = root(fun, [x0, y0], #jac=jac, 
+            method="hybr", tol=1e-6) # does jac even help?
+        #print("x =", sol.x)
+        if not sol.success:
+            #print(sol)
+            #print("...")
+            continue
+    
+        X, Y = sol.x
+        for (X1,Y1) in sols:
+            r = abs(X1-X) + abs(Y1-Y)
+            if r < 0.01:
+                break
+        else:
+            sols.append((X,Y))
+            #print("nfev", sol.nfev)
+            #print("find_zeros: %.4f,%.4f" %  (X, Y))
+            #print("value:", sol.fun)
+            #print("denom:", fd(X,Y), gd(X,Y))
+            dx,dy = rnd(1e-4), rnd(1e-4)
+            X1,Y1 = X+dx, Y+dy
+            vals = fn(X1,Y1)/fd(X1,Y1), gn(X1,Y1)/gd(X1,Y1)
+            #print("\t fun:", vals[0], vals[0])
+            if abs(vals[0]) > 0.01 or abs(vals[1]) > 0.01:
+                continue
+    
+            #print("\t---> %.4f,%.4f" %  (X, Y))
+            yield X, Y
+
+
+def test():
+
+    code = QCode.fromstr("ZZ")
+    #code = construct.get_422() # no...
+    #code = QCode.fromstr("XXXX ZZZZ ZZII")
+    #code = QCode.fromstr("XXXXXX ZZZZZZ ZZZZII IIXXXX ZZIIII")
+    code = QCode.fromstr("YYZI IXXZ ZIYY") # [[4,1,2]]
+    code = construct.get_513()
+    #code = construct.get_512()
+    #code = construct.get_713()
+    #code = construct.get_913()
+    #code = get_code() # too big..
+
+    print(code)
+
+    x, y, z, w = distill(code)
 
     print("x", right_arrow, x)
     print("y", right_arrow, y)
@@ -145,6 +254,7 @@ def test():
     iz = (X**2+Y**2-1)/(1+X**2+Y**2)
     #print(ix, iy, iz)
 
+    Kx,Ky,Kz,_ = x.parent().gens()
     u, v = stereo(x/w, y/w, z/w)
     u = u.subs({Kx:ix, Ky:iy, Kz:iz})
     v = v.subs({Kx:ix, Ky:iy, Kz:iz})
@@ -167,15 +277,21 @@ def test():
 
     f, g = jac[0]
 
-    #sage.macaulay2(
-
-    T = sage.PolynomialRing(sage.QQ, list("XY"))
-    I = T.ideal([f.numerator(), g.numerator()])
-    print(I)
-    for J in I.primary_decomposition():
-        print("\t", J) #, J.is_primary(), J.is_prime())
+    for (x,y) in find_zeros(f, g, 200):
+        print(x,y)
 
     return
+
+    if 0:
+        #sage.macaulay2(
+    
+        T = sage.PolynomialRing(sage.QQ, list("XY"))
+        I = T.ideal([f.numerator(), g.numerator()])
+        print(I)
+        for J in I.primary_decomposition():
+            print("\t", J) #, J.is_primary(), J.is_prime())
+    
+        return
 
     print(f.numerator())
     for p,m in sage.factor(f.numerator()):
@@ -190,27 +306,6 @@ def test():
     for p,m in sage.factor(g.denominator()):
         print("\t", p, "mult =", m)
     return
-
-    pyfunc = lambda u : eval("lambda X,Y: %s"%pystr(u))
-
-    f = pyfunc(jac[0][0].numerator())
-    g = pyfunc(jac[0][1].numerator())
-
-    def fun(XY):
-        X,Y = XY
-        return [1.*f(X,Y), 1.*g(X,Y)]
-    from scipy.optimize import root
-    sol = root(fun, [0,0], )
-    print("success:", sol.success)
-    print("x =", sol.x)
-    if not sol.success:
-        print(sol)
-
-    X, Y = sol.x
-    f = pyfunc(jac[0][0].denominator())
-    g = pyfunc(jac[0][1].denominator())
-    print(f(X,Y), g(X,Y))
-
     return jac
 
     return
@@ -226,8 +321,6 @@ def test():
         for v in [x/w,y/w,z/w]] 
         for u in [Kx,Ky,Kz]]
 
-    from qumba.distill import normalize, norm, rnd
-    import numpy
 
     EPSILON = 1e-6
     ir2 = 2**(-1/2)
@@ -268,6 +361,7 @@ def test():
         dv = numpy.array([[f(*u) for f in row] for row in jac])
         return (dv**2).sum()
 
+    from qumba.distill import normalize, norm, rnd
     #diff(*rnd())
     u = normalize(1,1,1)
     u = numpy.array(u)

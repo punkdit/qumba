@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+"""
+see also: poly.py
+
+"""
 
 from functools import reduce
 from operator import matmul, add
