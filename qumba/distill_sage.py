@@ -17,25 +17,32 @@ from qumba.argv import argv
 from qumba.qcode import strop, QCode
 from qumba import construct 
 from qumba.matrix_sage import Matrix
-from qumba import clifford
-from qumba.clifford import Clifford, w4
+from qumba.clifford import Clifford, w4, ir2
+from qumba.dense import bitlog
 
 EPSILON = 1e-6
 
-right_arrow = chr(0x2192)
 
 pystr = lambda u : str(u).replace("^", "**")
 
+rnd = lambda radius=10: 2*radius*random() - radius
 
-base = clifford.K
+if argv.latex:
+    mkstr = sage.latex
+    right_arrow = r"&\mapsto "
+else:
+    mkstr = str
+    right_arrow = chr(0x2192)
+
+from qumba.clifford import K as base
 one = base.one()
 half = one/2
 
-c = Clifford(1)
-I = c.I
-X = c.X()
-Y = c.Y()
-Z = c.Z()
+clifford = Clifford(1)
+I = clifford.I
+X = clifford.X()
+Y = clifford.Y()
+Z = clifford.Z()
 
 
 
@@ -71,14 +78,6 @@ def get_code():
     return code
 
 
-class Distill:
-    def __init__(self, n):
-        self.n = n
-
-class CodeDistill(Distill):
-    def __init__(self, code):
-        Distill.__init__(self, code.n)
-
 
 def get_projector(code):
     H = strop(code.H, "I")
@@ -108,50 +107,20 @@ def get_projector(code):
     return P
 
 
-@cache
-def distill(code):
-    n = code.n
-    space = Clifford(n)
-    M = 2**code.m
+def stereo(x,y,z):
+    #assert abs(1-z) > EPSILON, str(z)
+    X, Y = x/(1-z), y/(1-z)
+    return X, Y
 
-    P = get_projector(code)
-    Pd = P.d
-
-    K = sage.PolynomialRing(base, list("xyzw"))
-    Kx,Ky,Kz,Kw = K.gens()
-
-    Kw = 1
-    rho = half*(Kw*I + Kx*X + Ky*Y + Kz*Z)
-    assert rho.trace() == Kw
-
-    #print("rho^n ... ", end='', flush=True)
-    rho = reduce(matmul, [rho]*n)
-    assert rho.trace() == 1
-    #print("P*rho*Pd ... ", end='', flush=True)
-    rho = P*rho*Pd
-    #print("trace ... ", end='', flush=True)
-    div = rho.trace()
-
-    L = strop(code.L, "I").split()
-    LX = space.get_pauli(L[0])
-    LZ = space.get_pauli(L[1])
-    LY = w4*LX*LZ
-
-    x = M*(rho*LX).trace()
-    y = M*(rho*LY).trace()
-    z = M*(rho*LZ).trace()
-    w = M*div
-
-    print("x", right_arrow, x)
-    print("y", right_arrow, y)
-    print("z", right_arrow, z)
-    print("w", right_arrow, w) # div
-
-    return x, y, z, w
+def istereo(X, Y):
+    bot = 1+X**2+Y**2
+    x = 2*X/bot
+    y = 2*Y/bot
+    z = (X**2+Y**2-1)/bot
+    return (x,y,z)
 
 
 def find_zeros(f0, g0, trials=None, nsols=None, verbose=False):
-
 
     K = f0.parent()
     X, Y = K.gens()
@@ -182,19 +151,38 @@ def find_zeros(f0, g0, trials=None, nsols=None, verbose=False):
     fd = pyfunc(f0.denominator())
     gd = pyfunc(g0.denominator())
 
-    sols = []
     def fun(XY):
         X, Y = XY
         fv = fn(X,Y)
         gv = gn(X,Y)
         return fv, gv
 
+    sols = []
+
+    # try some well-known points..
+    for (x,y,z) in [
+        (1,0,0),
+        (-1,0,0),
+        (0,1,0),
+        (0,-1,0),
+        (0,0,-1),
+        # (0,0,1), # singular
+    ]:
+        x0, y0 = stereo(x, y, z)
+        #x0 += rnd(1e-12)
+        #y0 += rnd(1e-12)
+        #print(x,y,z, fn(x0,y0), gn(x0,y0), )
+        if (abs(fn(x0,y0)) < EPSILON and abs(gn(x0,y0)) < EPSILON and \
+            abs(fd(x0,y0)) > EPSILON and abs(gd(x0,y0)) > EPSILON):
+            yield x0, y0
+            sols.append((x0,y0))
+    #return
+
     if verbose:
         print("find_zeros:")
         print("\t", fun([0,0]))
         print("\t", fd(0,0), gd(0,0))
 
-    rnd = lambda radius=10: 2*radius*random() - radius
     trial = 0
     while trials is None or trial < trials:
         trial += 1
@@ -227,16 +215,19 @@ def find_zeros(f0, g0, trials=None, nsols=None, verbose=False):
             X1,Y1 = X+dx, Y+dy
             if abs(fd(X1,Y1)) < 1e-17 or abs(gd(X1,Y1)) < 1e-17:
                 if verbose:
-                    print("\tdiv by zero", abs(fd(X1,Y1)) )
+                    print("\tdiv by zero", abs(fd(X1,Y1)), abs(gd(X1,Y1)) )
                 continue
             vals = fn(X1,Y1)/fd(X1,Y1), gn(X1,Y1)/gd(X1,Y1)
             #print("\t fun:", vals[0], vals[0])
-            if abs(vals[0]) > 0.01 or abs(vals[1]) > 0.01:
+            if abs(vals[0]) > 0.0001 or abs(vals[1]) > 0.0001:
                 if verbose:
-                    print("\tnon-zero") #, abs(vals[0]), abs(vals[1]))
+                    print("\tnon-zero: [%.4f, %.4f]" %(
+                        abs(vals[0]), abs(vals[1])))
                 continue
     
             #print("\t---> %.4f,%.4f" %  (X, Y))
+            if not sol.success:
+                print("Warning: sol.success == False", vals[0], vals[1])
             yield X, Y
             sols.append((X,Y))
 
@@ -245,76 +236,288 @@ def find_zeros(f0, g0, trials=None, nsols=None, verbose=False):
                 return
 
 
-def stereo(x,y,z):
-    X, Y = x/(1-z), y/(1-z)
-    return X, Y
+class Distill:
+    def __init__(self, n):
+        self.n = n
 
-def istereo(X, Y):
-    bot = 1+X**2+Y**2
-    x = 2*X/bot
-    y = 2*Y/bot
-    z = (X**2+Y**2-1)/bot
-    return (x,y,z)
+    def get_variety(self):
+        pass
+
+    def find(self, trials=1000, nsols=1, top=True, verbose=False):
+        sign = +1 if top else -1
+        x, y, z, w = self.get_variety()
+
+        #y = sign*y
+        #z = sign*z
+    
+        R = sage.PolynomialRing(base, list("XY"))
+        X, Y = R.gens()
+        ix = 2*X/(1+X**2+Y**2)
+        iy = sign*2*Y/(1+X**2+Y**2)
+        iz = sign*(X**2+Y**2-1)/(1+X**2+Y**2)
+        #print(ix, iy, iz)
+    
+        Kx,Ky,Kz,_ = x.parent().gens()
+        u, v = stereo(x/w, y/w, z/w)
+    
+        u = u.subs({Kx:ix, Ky:iy, Kz:iz})
+        v = v.subs({Kx:ix, Ky:iy, Kz:iz})
+        print("u =", u)
+        print("v =", v)
+    
+        S = sage.PolynomialRing(sage.QQ, list("XY"))
+        S = sage.FractionField(S)
+        u = S(u)
+        v = S(v)
+    
+        diff = sage.derivative
+        jac = [
+            [diff(u,X), diff(v,X)],
+            [diff(u,Y), diff(v,Y)],
+        ]
+        assert jac[0][0] == jac[1][1], "Cauchy-Riemann fail"
+        assert jac[1][0] == -jac[0][1], "Cauchy-Riemann fail"
+        #print("Cauchy-Riemann: yes")
+        #return
+    
+        f, g = jac[0]
+    
+        for (X,Y) in find_zeros(f, g, trials, nsols, verbose=verbose):
+            x, y, z = istereo(X, Y)
+            #print(X,Y, "-->", x, y, z)
+            yield (x,sign*y,sign*z)
 
 
-def find_distill(code, trials=1000, nsols=1, top=True):
+class GateDistill(Distill):
+    def __init__(self, op):
+        self.op = op
 
-    x, y, z, w = distill(code)
+    @cache
+    def get_projective_variety(self):
+        op = self.op
+        M,N = op.shape
+        n = bitlog(N)
+        assert M==2
 
-    R = sage.PolynomialRing(base, list("XY"))
-    X, Y = R.gens()
-    ix = 2*X/(1+X**2+Y**2)
-    iy = 2*Y/(1+X**2+Y**2)
-    iz = (X**2+Y**2-1)/(1+X**2+Y**2)
-    #print(ix, iy, iz)
+        K = sage.PolynomialRing(base, list("xyzw"))
+        Kx, Ky, Kz, Kw = K.gens()
+    
+        rho = half*(Kw*I + Kx*X + Ky*Y + Kz*Z)
+        assert rho.trace() == Kw
+    
+        #print("rho^n ... ", end='', flush=True)
+        rho = reduce(matmul, [rho]*n)
+        print("rho.trace", rho.trace() )
+        #print("P*rho*Pd ... ", end='', flush=True)
+        sho = op*rho*op.d
+        #print("trace ... ", end='', flush=True)
 
-    Kx,Ky,Kz,_ = x.parent().gens()
-    sign = +1 if top else -1
-    u, v = stereo(x/w, sign*y/w, sign*z/w)
+        scale = N//2
+        assert N%2==0
 
-    u = u.subs({Kx:ix, Ky:iy, Kz:iz})
-    v = v.subs({Kx:ix, Ky:iy, Kz:iz})
-    print("u =", u)
-    print("v =", v)
+        x = scale*(sho*X).trace()
+        y = scale*(sho*Y).trace()
+        z = scale*(sho*Z).trace()
+        w = scale*sho.trace()
+    
+        print(r"\begin{align*}")
+        print("x", right_arrow, mkstr(x), r"\\")
+        print("y", right_arrow, mkstr(y), r"\\")
+        print("z", right_arrow, mkstr(z), r"\\")
+        print("w", right_arrow, mkstr(w), r"\\") # div
+        print(r"\end{align*}")
+    
+        return x, y, z, w
 
-    diff = sage.derivative
+    @cache
+    def get_variety(self, projective=False):
+        if projective:
+            return self.get_projective_variety()
 
-    S = sage.PolynomialRing(sage.QQ, list("XY"))
-    S = sage.FractionField(S)
-    u = S(u)
-    v = S(v)
+        op = self.op
+        M,N = op.shape
+        n = bitlog(N)
+        assert M==2
 
-    jac = [
-        [diff(u,X), diff(v,X)],
-        [diff(u,Y), diff(v,Y)],
-    ]
-    assert jac[0][0] == jac[1][1], "Cauchy-Riemann fail"
-    assert jac[1][0] == -jac[0][1], "Cauchy-Riemann fail"
+        K = sage.PolynomialRing(base, list("xyzw"))
+        Kx, Ky, Kz, Kw = K.gens()
+    
+        Kw = 1
+        rho = half*(Kw*I + Kx*X + Ky*Y + Kz*Z)
+        assert rho.trace() == Kw
+    
+        #print("rho^n ... ", end='', flush=True)
+        rho = reduce(matmul, [rho]*n)
+        assert rho.trace() == 1
+        #print("P*rho*Pd ... ", end='', flush=True)
+        sho = op*rho*op.d
+        #print("trace ... ", end='', flush=True)
+    
+        x = (sho*X).trace()
+        y = (sho*Y).trace()
+        z = (sho*Z).trace()
+        w = sho.trace()
+    
+        print("x", right_arrow, x)
+        print("y", right_arrow, y)
+        print("z", right_arrow, z)
+        print("w", right_arrow, w) # div
 
-    f, g = jac[0]
+#        S = sage.PolynomialRing(sage.QQbar, list("xyzw"))
+#        x = S(x)
+#        y = S(y)
+#        z = S(z)
+#        w = S(w)
+#    
+#        print("x", right_arrow, x)
+#        print("y", right_arrow, y)
+#        print("z", right_arrow, z)
+#        print("w", right_arrow, w) # div
 
-    for (X,Y) in find_zeros(f, g, trials, nsols):
-        x, y, z = istereo(X, Y)
-        #print(X,Y, "-->", x, y, z)
-        yield (x,sign*y,sign*z)
+        return x, y, z, w
+
+
+class CodeDistill(Distill):
+    def __init__(self, code):
+        Distill.__init__(self, code.n)
+        self.code = code
+
+    @cache
+    def get_variety(self, projective=False):
+        code = self.code
+        n = code.n
+        space = Clifford(n)
+        M = 2**code.m
+    
+        P = get_projector(code)
+        Pd = P.d
+    
+        K = sage.PolynomialRing(base, list("xyzw"))
+        Kx, Ky, Kz, Kw = K.gens()
+    
+        if not projective:
+            Kw = 1
+        rho = half*(Kw*I + Kx*X + Ky*Y + Kz*Z)
+        assert rho.trace() == Kw
+    
+        #print("rho^n ... ", end='', flush=True)
+        rho = reduce(matmul, [rho]*n)
+        if not projective:
+            assert rho.trace() == 1
+        #print("P*rho*Pd ... ", end='', flush=True)
+        rho = P*rho*Pd
+        #print("trace ... ", end='', flush=True)
+        div = rho.trace()
+    
+        L = strop(code.L, "I").split()
+        LX = space.get_pauli(L[0])
+        LZ = space.get_pauli(L[1])
+        LY = w4*LX*LZ
+    
+        x = M*(rho*LX).trace()
+        y = M*(rho*LY).trace()
+        z = M*(rho*LZ).trace()
+        w = M*div
+    
+        print("x", right_arrow, mkstr(x))
+        print("y", right_arrow, mkstr(y))
+        print("z", right_arrow, mkstr(z))
+        print("w", right_arrow, mkstr(w)) # div
+    
+        return x, y, z, w
+
+
+def test_stereo():
+    def normalize(x,y,z):
+        r = (x*x+y*y+z*z)**(1/2)
+        x, y, z = (x/r,y/r,z/r)
+        return x,y,z
+    
+    def rnd():
+        x,y,z = numpy.random.normal(0, 1, 3)
+        x, y, z = normalize(x,y,z)
+        return (x,y,z)
+
+    for _ in range(100):
+
+        for sign in [+1, -1]:
+    
+            x,y,z = rnd()
+            #print(x,y,z)
+            u,v = stereo(x,sign*y,sign*z)
+            x1, y1, z1 = istereo(u,v)
+            #print(x1,y1,z1)
+            assert abs(x-x1) < EPSILON, sign
+            assert abs(y-sign*y1) < EPSILON, sign
+            assert abs(z-sign*z1) < EPSILON, sign
+
+test_stereo()
 
 
 def test():
 
+    code = None
+    #if argv.code:
+    #    import sys
+    #    print(repr(argv.code), sys.argv)
+    #    code = QCode.fromstr(argv.code)
+    idx = argv.get("idx", 0)
     if argv.code:
         n,k,d = argv.code
         if (n,k,d) == (4,1,2):
-            code = QCode.fromstr("YYZI IXXZ ZIYY")
+            code = [
+                QCode.fromstr("YYZI IXXZ ZIYY"),
+                QCode.fromstr("XXXX ZZZZ YYII")][idx]
         if (n,k,d) == (5,1,2):
             code = construct.get_512()
         if (n,k,d) == (5,1,3):
             code = construct.get_513()
         if (n,k,d) == (7,1,3):
-            code = construct.get_713()
-    #if argv.code:
-    #    import sys
-    #    print(repr(argv.code), sys.argv)
-    #    code = QCode.fromstr(argv.code)
+            code = [
+                construct.get_713(),
+                QCode.fromstr("""
+            XXIZIZI
+            IXXIZIZ
+            ZIXXIZI
+            IZIXXIZ
+            ZIZIXXI
+            IZIZIXX""")][idx]
+
+        if (n,k,d) == (8,1,3):
+            code = QCode.fromstr("""
+            YYZZIIZZ
+            ZYYZZIIZ
+            ZZYYZZII
+            IZZYYZZI
+            IIZZYYZZ
+            ZIIZZYYZ
+            ZZIIZZYY""")
+        distill = CodeDistill(code)
+
+    elif argv.CH:
+        CH = clifford.I << clifford.H()
+        plus = ir2*Matrix(base, [[1,1]])
+        print(plus)
+        assert (plus*plus.d)[0,0] == 1
+        op = (plus@I)*CH
+        print(op)
+        return # TODO fix the problem with sage rings, etc.
+        distill = GateDistill(op)
+
+    elif argv.CZ:
+        CZ = Clifford(2).CZ()
+        plus = ir2*Matrix(base, [[1,1]])
+        ket0 = Matrix(base, [[1,0]])
+        ket = plus
+        assert (ket*ket.d)[0,0] == 1
+
+        n = argv.get("n", 2)
+        if n==2:
+            op = (ket@I)*CZ
+        elif n==3:
+            op = (ket@ket@I)*(CZ@I)*(I@CZ)*Clifford(3).CZ(0,2)
+        print(op)
+        distill = GateDistill(op)
 
     else:
         #code = QCode.fromstr("ZZ")
@@ -327,14 +530,20 @@ def test():
         #code = construct.get_713()
         #code = construct.get_913()
         #code = get_code() # too big..
+        distill = CodeDistill(code)
 
     print(code)
 
     trials = argv.get("trials", 10000)
     nsols = argv.get("nsols", 10)
+    verbose = argv.get("verbose", False)
+
+    if argv.projective:
+        distill.get_variety(projective=True)
+        return
 
     for top in [True, False]:
-      for (x,y,z) in find_distill(code, trials, nsols, top):
+      for (x,y,z) in distill.find(trials, nsols, top, verbose=verbose):
         print("%.6f, %.6f, %.6f"%(x, y, z))
       print("--")
 

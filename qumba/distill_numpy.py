@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 """
-see also: poly.py
 
 """
 
@@ -465,20 +464,25 @@ def get_CH():
 
 def make_plots(proto, name):
 
-    tgt = normalize(+1,+2,3)
-    #accept = lambda x,y,z:x<0
-    pts = proto.plot_fiber(tgt, 0.1, 100)
-    cvs = render(pts)
-    save(cvs, "test_plot_degree_%s.pdf"%name)
-    #return
+    fiber = argv.get("fiber", 100)
+
+    if fiber:
+        tgt = normalize(+1,+2,3)
+        #accept = lambda x,y,z:x<0
+        pts = proto.plot_fiber(tgt, 0.1, fiber)
+        cvs = render(pts)
+        save(cvs, "test_plot_degree_%s.pdf"%name)
+        #return
 
     print("diff")
+    count = argv.get("count", 100)
+    tol = argv.get("tol", 0.001)
     diff = proto.diff
     pts = []
-    while len(pts) < 1000:
+    while len(pts) < count:
         x,y,z = rnd()
         r = diff(x,y,z)
-        if r<0.001:
+        if r<tol:
             pts.append((x,y,z))
             print(".",end='',flush=True)
     print()
@@ -489,23 +493,69 @@ def make_plots(proto, name):
 
 
 def test_code():
+    code = None
+    idx = argv.get("idx", 0)
     if argv.code:
         n,k,d = argv.code
         if (n,k,d) == (4,1,2):
-            code = QCode.fromstr("YYZI IXXZ ZIYY")
+            code = [
+                QCode.fromstr("YYZI IXXZ ZIYY"),
+                QCode.fromstr("XXXX ZZZZ YYII")][idx]
         if (n,k,d) == (5,1,2):
             code = construct.get_512()
         if (n,k,d) == (5,1,3):
             code = construct.get_513()
         if (n,k,d) == (7,1,3):
-            code = construct.get_713()
+            code = [
+                construct.get_713(),
+                QCode.fromstr("""
+            XXIZIZI
+            IXXIZIZ
+            ZIXXIZI
+            IZIXXIZ
+            ZIZIXXI
+            IZIZIXX""")][idx]
+        if (n,k,d) == (8,1,3):
+            code = QCode.fromstr("""
+            YYZZIIZZ
+            ZYYZZIIZ
+            ZZYYZZII
+            IZZYYZZI
+            IIZZYYZZ
+            ZIIZZYYZ
+            ZZIIZZYY""")
+
+    elif argv.CZ:
+
+        n = argv.get("n", 2)
+        CZ = Space(2).CZ()
+        #CH = I<<H
+    
+        plus = (2**(-1/2))*Matrix([[1,1]])
+        zero = Matrix([[1,0]])
+    
+        assert abs(plus*plus.d-1) < EPSILON
+        #op = (plus@I)*CH
+        #op = (I@zero)*CH
+
+        if n==2:
+            op = (plus@I)*CZ
+        else:
+            op = (plus@plus@I)*(CZ@I)*(I@CZ)*Space(3).CZ(0,2)
+    
+        proto = GateDistill(n, op)
+
     else:
         code = QCode.fromstr("XXXX ZZZZ YYII")
 
-    print(code)
-    print(code.longstr())
-    proto = CodeDistill(code)
-    make_plots(proto, "code")
+    if code is not None:
+        print(code)
+        print(code.longstr())
+        proto = CodeDistill(code)
+
+    name = argv.get("name", "code")
+
+    make_plots(proto, name)
 
 
 
@@ -576,7 +626,7 @@ def test_713():
         save(cvs, "test_plot_singular_713.pdf")
     
 
-def test_CH():
+def test_gate():
 
     n = 2
     CZ = Space(2).CZ()
@@ -586,9 +636,9 @@ def test_CH():
     zero = Matrix([[1,0]])
 
     assert abs(plus*plus.d-1) < EPSILON
-    op = (plus@I)*CH
+    #op = (plus@I)*CH
     #op = (I@zero)*CH
-    #op = (plus@I)*CZ
+    op = (plus@I)*CZ
 
     proto = GateDistill(n, op)
 
@@ -604,7 +654,7 @@ def test_CH():
     tgt = normalize(1,0,0)
     pts = proto.plot_fiber(tgt, 0.1, 100)
     cvs = render(pts)
-    save(cvs, "test_plot_CH.pdf")
+    save(cvs, "test_plot_gate.pdf")
 
 
     from huygens.namespace import green, blue, red, Canvas
@@ -640,7 +690,7 @@ def test_CH():
     cvs.insert(x,0,mid); x += 7
     cvs.insert(x,0,right); x += 7
     cvs.insert(x,0,left)
-    save(cvs, "test_plot_singular_CH.pdf")
+    save(cvs, "test_plot_singular_gate.pdf")
     
 
 def test_fixed():
