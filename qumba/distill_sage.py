@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 """
-see also: distil.py
 
 """
 
@@ -151,7 +150,8 @@ def distill(code):
     return x, y, z, w
 
 
-def find_zeros(f0, g0, trials=None, nsols=None):
+def find_zeros(f0, g0, trials=None, nsols=None, verbose=False):
+
 
     K = f0.parent()
     X, Y = K.gens()
@@ -189,25 +189,34 @@ def find_zeros(f0, g0, trials=None, nsols=None):
         gv = gn(X,Y)
         return fv, gv
 
-    rnd = lambda radius=100: 2*radius*random() - radius
+    if verbose:
+        print("find_zeros:")
+        print("\t", fun([0,0]))
+        print("\t", fd(0,0), gd(0,0))
+
+    rnd = lambda radius=10: 2*radius*random() - radius
     trial = 0
     while trials is None or trial < trials:
         trial += 1
         x0, y0 = rnd(), rnd()
-        #print("root", x0, y0)
-        #print()
         sol = root(fun, [x0, y0], #jac=jac, 
-            method="hybr", tol=1e-6) # does jac even help?
-        #print("x =", sol.x)
-        if not sol.success:
-            #print(sol)
-            #print("...")
-            continue
+            method="hybr", tol=1e-6, 
+            #options = {"xtol":1e-2, "maxfev":10000},
+        ) # does jac even help?
+        if verbose:
+            print("x =", sol.x, sol.success)
+
+        #if not sol.success:
+        #    #print(sol)
+        #    #print("...")
+        #    continue
     
         X, Y = sol.x
         for (X1,Y1) in sols:
             r = abs(X1-X) + abs(Y1-Y)
             if r < 0.01:
+                if verbose:
+                    print("\tskip 1")
                 break
         else:
             #print("nfev", sol.nfev)
@@ -216,11 +225,15 @@ def find_zeros(f0, g0, trials=None, nsols=None):
             #print("denom:", fd(X,Y), gd(X,Y))
             dx,dy = rnd(1e-4), rnd(1e-4)
             X1,Y1 = X+dx, Y+dy
-            if abs(fd(X1,Y1)) < EPSILON or abs(gd(X1,Y1)) < EPSILON:
+            if abs(fd(X1,Y1)) < 1e-17 or abs(gd(X1,Y1)) < 1e-17:
+                if verbose:
+                    print("\tdiv by zero", abs(fd(X1,Y1)) )
                 continue
             vals = fn(X1,Y1)/fd(X1,Y1), gn(X1,Y1)/gd(X1,Y1)
             #print("\t fun:", vals[0], vals[0])
             if abs(vals[0]) > 0.01 or abs(vals[1]) > 0.01:
+                if verbose:
+                    print("\tnon-zero") #, abs(vals[0]), abs(vals[1]))
                 continue
     
             #print("\t---> %.4f,%.4f" %  (X, Y))
@@ -256,8 +269,8 @@ def find_distill(code, trials=1000, nsols=1, top=True):
     #print(ix, iy, iz)
 
     Kx,Ky,Kz,_ = x.parent().gens()
-    z_sign = +1 if top else -1
-    u, v = stereo(x/w, y/w, z_sign*z/w)
+    sign = +1 if top else -1
+    u, v = stereo(x/w, sign*y/w, sign*z/w)
 
     u = u.subs({Kx:ix, Ky:iy, Kz:iz})
     v = v.subs({Kx:ix, Ky:iy, Kz:iz})
@@ -275,16 +288,15 @@ def find_distill(code, trials=1000, nsols=1, top=True):
         [diff(u,X), diff(v,X)],
         [diff(u,Y), diff(v,Y)],
     ]
-    assert jac[0][0] == z_sign*jac[1][1], "Cauchy-Riemann fail"
-    assert jac[1][0] == -z_sign*jac[0][1], "Cauchy-Riemann fail"
+    assert jac[0][0] == jac[1][1], "Cauchy-Riemann fail"
+    assert jac[1][0] == -jac[0][1], "Cauchy-Riemann fail"
 
     f, g = jac[0]
 
     for (X,Y) in find_zeros(f, g, trials, nsols):
         x, y, z = istereo(X, Y)
         #print(X,Y, "-->", x, y, z)
-        #z *= z_sign
-        yield (x,y,z_sign*z)
+        yield (x,sign*y,sign*z)
 
 
 def test():
@@ -318,8 +330,11 @@ def test():
 
     print(code)
 
+    trials = argv.get("trials", 10000)
+    nsols = argv.get("nsols", 10)
+
     for top in [True, False]:
-      for (x,y,z) in find_distill(code, 10000, 10, top):
+      for (x,y,z) in find_distill(code, trials, nsols, top):
         print("%.6f, %.6f, %.6f"%(x, y, z))
       print("--")
 
