@@ -882,6 +882,15 @@ def test_plot():
     save(cvs, "test_plot.pdf")
 
 
+def test_rho():
+    rho = to_rho(*normalize(1,1,1))
+    rho = to_rho(0.9,0,0)
+    print(rho)
+    print(rho.trace())
+    vals, vecs = linalg.eig(rho.A)
+    a, b = vals[0], vals[1]
+    print("%.4f, %.4f"%(a.real, b.real))
+
 
 
 if __name__ == "__main__":
