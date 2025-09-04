@@ -690,6 +690,24 @@ def junk():
 #    print(f.kernel())
 
 
+def test_rho():
+
+    K = sage.PolynomialRing(base, list("xyzw"))
+    x, y, z, w = K.gens()
+
+    rho = half * Matrix(K, [
+        [w+z, x-w4*y], [x+w4*y, w-z]
+    ])
+
+    assert rho == half * ( w*I + x*X + y*Y + z*Z )
+
+    print(rho)
+    print( half * ( w*I + x*X + y*Y + z*Z ) )
+    assert rho.trace() == w
+
+    print( (rho*rho).trace() )
+    
+
 if __name__ == "__main__":
 
     from random import seed
