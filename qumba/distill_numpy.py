@@ -487,9 +487,24 @@ def make_plots(proto, name):
             print(".",end='',flush=True)
     print()
     
-    cvs = render(pts)
+    from huygens.namespace import green, blue, red, Canvas
+    colors = None
+    cs = [
+        render(pts, colors, eye=[-1,0.2,0.9]),
+        render(pts, colors),
+        render(pts, colors, eye=[+0.9, .2,-1]),
+        #render(pts, colors, eye=[0.1,1,0.1], up=[0.1,0.1,1]),
+        #render(pts, colors, eye=[1,0,1]),
+    ]
+
+    cvs = Canvas()
+    x = 0.
+    for c in cs:
+        cvs.insert(x,0,c); 
+        x += 8
     save(cvs, "test_plot_singular_%s.pdf"%name)
     
+
 
 
 def test_code():

@@ -28,7 +28,7 @@ pystr = lambda u : str(u).replace("^", "**")
 rnd = lambda radius=10: 2*radius*random() - radius
 
 if argv.latex:
-    mkstr = sage.latex
+    mkstr = lambda x : sage.latex(x) + r" \\"
     right_arrow = r"&\mapsto "
 else:
     mkstr = str
@@ -321,10 +321,10 @@ class GateDistill(Distill):
         w = scale*sho.trace()
     
         print(r"\begin{align*}")
-        print("x", right_arrow, mkstr(x), r"\\")
-        print("y", right_arrow, mkstr(y), r"\\")
-        print("z", right_arrow, mkstr(z), r"\\")
-        print("w", right_arrow, mkstr(w), r"\\") # div
+        print("x", right_arrow, mkstr(x))
+        print("y", right_arrow, mkstr(y))
+        print("z", right_arrow, mkstr(z))
+        print("w", right_arrow, mkstr(w))
         print(r"\end{align*}")
     
         return x, y, z, w
@@ -419,10 +419,12 @@ class CodeDistill(Distill):
         z = M*(rho*LZ).trace()
         w = M*div
     
+        print(r"\begin{align*}")
         print("x", right_arrow, mkstr(x))
         print("y", right_arrow, mkstr(y))
         print("z", right_arrow, mkstr(z))
         print("w", right_arrow, mkstr(w)) # div
+        print(r"\end{align*}")
     
         return x, y, z, w
 
@@ -692,6 +694,9 @@ def junk():
 
 def test_rho():
 
+    #base = sage.CyclotomicField(4)
+    #w4 = base.gens()[0]
+
     K = sage.PolynomialRing(base, list("xyzw"))
     x, y, z, w = K.gens()
 
@@ -702,10 +707,19 @@ def test_rho():
     assert rho == half * ( w*I + x*X + y*Y + z*Z )
 
     print(rho)
-    print( half * ( w*I + x*X + y*Y + z*Z ) )
     assert rho.trace() == w
 
-    print( (rho*rho).trace() )
+    print( "tr(rho**2) =", (rho*rho).trace() )
+
+    u = Matrix(K, [[w+w4*x,y+w4*z]])
+    ud = Matrix(K, [[w-w4*x,y-w4*z]]).t
+    print(u)
+
+    print( u*ud )
+
+    sho = ud @ u
+    print(sho, sho.shape)
+    print(sho.trace())
     
 
 if __name__ == "__main__":
