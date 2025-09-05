@@ -263,7 +263,13 @@ class Distill:
         u = u.subs({Kx:ix, Ky:iy, Kz:iz})
         v = v.subs({Kx:ix, Ky:iy, Kz:iz})
         print("u =", u)
+        #print("\t=", sage.factor(u.numerator()))
+        #print("\t /")
+        #print("\t ", sage.factor(u.denominator()))
         print("v =", v)
+        #print("\t=", sage.factor(v.numerator()))
+        #print("\t /")
+        #print("\t ", sage.factor(v.denominator()))
     
         S = sage.PolynomialRing(sage.QQ, list("XY"))
         S = sage.FractionField(S)
@@ -285,7 +291,8 @@ class Distill:
         for (X,Y) in find_zeros(f, g, trials, nsols, verbose=verbose):
             x, y, z = istereo(X, Y)
             #print(X,Y, "-->", x, y, z)
-            yield (x,sign*y,sign*z)
+            x, y, z = (x, sign*y, sign*z)
+            yield x, y, z
 
 
 class GateDistill(Distill):
@@ -362,6 +369,7 @@ class GateDistill(Distill):
         print("y", right_arrow, y)
         print("z", right_arrow, z)
         print("w", right_arrow, w) # div
+        print()
 
 #        S = sage.PolynomialRing(sage.QQbar, list("xyzw"))
 #        x = S(x)
@@ -506,6 +514,21 @@ def test():
         return # TODO fix the problem with sage rings, etc.
         distill = GateDistill(op)
 
+    elif argv.CX:
+        CX = Clifford(2).CX()
+        plus = ir2*Matrix(base, [[1,1]])
+        ket0 = Matrix(base, [[1,0]])
+        op = (plus@I)*CX
+        distill = GateDistill(op)
+
+    elif argv.CX1:
+        CX = Clifford(2).CX()
+        plus = ir2*Matrix(base, [[1,1]])
+        ket0 = Matrix(base, [[1,0]])
+        assert (plus*plus.d)[0,0] == 1
+        op = (I@ket0)*CX
+        distill = GateDistill(op)
+
     elif argv.CZ:
         CZ = Clifford(2).CZ()
         plus = ir2*Matrix(base, [[1,1]])
@@ -544,9 +567,37 @@ def test():
         distill.get_variety(projective=True)
         return
 
+    x, y, z, w = distill.get_variety()
+    pyfunc = lambda u : eval("lambda x,y,z,w=1.0: %s"%pystr(u))
+    fx = pyfunc(x)
+    fy = pyfunc(y)
+    fz = pyfunc(z)
+    fw = pyfunc(w)
+    def func(x,y,z):
+        rx,ry,rz,rw = (
+            fx(x,y,z),
+            fy(x,y,z),
+            fz(x,y,z),
+            fw(x,y,z))
+        return (rx/rw, ry/rw, rz/rw)
+
+    def norm(x,y,z):
+        return (x*x+y*y+z*z)**(1/2)
+
+    #print("x", right_arrow, x)
+    #print("y", right_arrow, y)
+    #print("z", right_arrow, z)
+    #print("w", right_arrow, w)
     for top in [True, False]:
       for (x,y,z) in distill.find(trials, nsols, top, verbose=verbose):
-        print("%.6f, %.6f, %.6f"%(x, y, z))
+        alpha = 1 - 0.01
+        x0, y0, z0 = alpha*x, alpha*y, alpha*z
+        x1, y1, z1 = func(x0,y0,z0)
+        r0 = norm(x0, y0, z0)
+        r1 = norm(x1, y1, z1)
+        squeeze = (1-r0) / (1-r1)
+        #print("%.6f --> %.6f"%(1-r0, 1-r1))
+        print("%.6f, %.6f, %.6f"%(x, y, z), "squeeze = %.2f"%squeeze)
       print("--")
 
 
