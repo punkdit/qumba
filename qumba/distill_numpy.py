@@ -639,6 +639,10 @@ def test_plot():
 
     save(cvs, "test_plot.pdf")
 
+def test_bloch():
+    cvs = render([], eye=[1,1,0.5], up=[0,0,1])
+    save(cvs, "bloch_sphere.pdf")
+
 
 def test_rho():
     rho = to_rho(*normalize(1,1,1))

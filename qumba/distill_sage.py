@@ -263,6 +263,8 @@ class Distill:
         u = u.subs({Kx:ix, Ky:iy, Kz:iz})
         v = v.subs({Kx:ix, Ky:iy, Kz:iz})
         print("u =", u)
+        #print("zeros:", u.numerator().roots())
+        #print("poles:", u.denominator().roots())
         #print("\t=", sage.factor(u.numerator()))
         #print("\t /")
         #print("\t ", sage.factor(u.denominator()))
@@ -275,6 +277,12 @@ class Distill:
         S = sage.FractionField(S)
         u = S(u)
         v = S(v)
+
+        #f = u.numerator()
+        #g = v.numerator()
+        #print("zeros:")
+        #for (X1,Y1) in find_zeros(f, g, trials, nsols, verbose=verbose):
+        #    print("\t", X1, Y1)
     
         diff = sage.derivative
         jac = [
@@ -284,9 +292,10 @@ class Distill:
         assert jac[0][0] == jac[1][1], "Cauchy-Riemann fail"
         assert jac[1][0] == -jac[0][1], "Cauchy-Riemann fail"
         #print("Cauchy-Riemann: yes")
-        #return
     
         f, g = jac[0]
+        #print("f =", f)
+        #print("g =", g)
     
         for (X,Y) in find_zeros(f, g, trials, nsols, verbose=verbose):
             x, y, z = istereo(X, Y)
@@ -462,6 +471,32 @@ def test_stereo():
             assert abs(z-sign*z1) < EPSILON, sign
 
 test_stereo()
+
+
+def test_mobius():
+
+    R = sage.PolynomialRing(sage.QQ, list("wz"))
+    w,z = R.gens()
+
+    K = sage.FractionField(R)
+    w = K(w)
+    z = K(z)
+
+    Hz = (z+1)//(z-1)
+    Hw = (w+1)//(w-1)
+    w = Hz.subs({z:(Hz*Hw)})
+
+    print(w)
+
+    mul = eval("lambda w,z : %s"%pystr(w))
+
+    a,b,c = [rnd() for i in range(3)]
+    print(mul(a,mul(b,c)), mul(mul(a,b), c))
+
+    print( a, mul( 0, a ) )
+    print( a, mul( 1, a ) )
+    print( a, mul( -1, a ) )
+
 
 
 def test():
