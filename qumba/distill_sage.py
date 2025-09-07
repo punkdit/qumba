@@ -580,6 +580,32 @@ def get_code():
         IIIIIIIZIIZZIIZII
         """)
 
+    if (n,k,d) == (19,1,5):
+        code = QCode.fromstr("""
+        XIIIIIIIIXXXXXIXIXI
+        IXIIIIIIIIIXXIXXXXX
+        IIXIIIIIIXXXIXIXIXX
+        IIIXIIIIIXIXIIIXXXI
+        IIIIXIIIIXIXIIXIIII
+        IIIIIXIIIIIIIXIIXXI
+        IIIIIIXIIXIIIIXXIII
+        IIIIIIIXIXXIXXXIXIX
+        IIIIIIIIXIXIIIIIXXI
+        ZIIIIIIIIZZZZZIZIZI
+        IZIIIIIIIIIZZIZZZZZ
+        IIZIIIIIIZZZIZIZIZZ
+        IIIZIIIIIZIZIIIZZZI
+        IIIIZIIIIZIZIIZIIII
+        IIIIIZIIIIIIIZIIZZI
+        IIIIIIZIIZIIIIZZIII
+        IIIIIIIZIZZIZZZIZIZ
+        IIIIIIIIZIZIIIIIZZI
+        """)
+        
+
+    if (n,k,d) == (23,1,7):
+        code = construct.get_golay(23)
+
     print("is_gf4:", code.is_gf4())
     assert code is not None
     return code
