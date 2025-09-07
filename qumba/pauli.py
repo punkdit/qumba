@@ -129,7 +129,7 @@ def fromstr(h):
 
 
 def get_wenum(code):
-    print("get_wenum")
+    print("get_wenum", code)
     #print(code.longstr())
     H = code.H
     #for h in strop(H):
@@ -174,9 +174,13 @@ def get_wenum(code):
             p = p+r
         return p
 
+    result = []
     for g in [LX,LY,LZ,LI]:
         S1 = [g*s for s in S]
-        print(get_poly(S1))
+        p = get_poly(S1)
+        result.append(p)
+
+    return result
 
 
 
@@ -222,11 +226,16 @@ def test():
     assert str(X@Y@Y@I) == "XYYI"
     assert str(nI@X@Z@I) == "-IXZI"
 
+    code = construct.get_15_1_3()
+    op = code.space.S()
+    assert (op*code).is_equiv(code)
+
     #code = construct.get_412()
     #code = QCode.fromstr("YYZI IXXZ ZIYY")
-    #code = QCode.fromstr("XXXX ZZZZ YYII")
     #code = construct.get_10_2_3()
-    code = QCode.fromstr("ZZZII IIZZZ XIXXI IXXIX")
+    #code = QCode.fromstr("ZZZII IIZZZ XIXXI IXXIX")
+
+    code = QCode.fromstr("XXXX ZZZZ YYII")
     get_wenum(code)
 
 

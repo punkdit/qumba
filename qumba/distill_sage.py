@@ -19,6 +19,7 @@ from qumba import construct
 from qumba.matrix_sage import Matrix
 from qumba.clifford import Clifford, w4, ir2
 from qumba.dense import bitlog
+from qumba import pauli
 
 EPSILON = 1e-6
 
@@ -43,39 +44,6 @@ I = clifford.I
 X = clifford.X()
 Y = clifford.Y()
 Z = clifford.Z()
-
-
-
-def get_code():
-    H = """
-    XXZZIZIIIZIZZ
-    ZXXZZIZIIIZIZ
-    ZZXXZZIZIIIZI
-    IZZXXZZIZIIIZ
-    ZIZZXXZZIZIII
-    IZIZZXXZZIZII
-    IIZIZZXXZZIZI
-    IIIZIZZXXZZIZ
-    ZIIIZIZZXXZZI
-    IZIIIZIZZXXZZ
-    ZIZIIIZIZZXXZ
-    ZZIZIIIZIZZXX
-    """ # [[13,1,5]] gf4
-
-    H = """
-    XIIIIXXIIIX
-    IXIIIIXIIXX
-    IIXIIIXXIIX
-    IIIXIIXIXIX
-    IIIIXXXXXXI
-    ZIIIIZZIIIZ
-    IZIIIIZIIZZ
-    IIZIIIZZIIZ
-    IIIZIIZIZIZ
-    IIIIZZZZZZI
-    """ # [[11,1,3]] s.d.
-    code = QCode.fromstr(H)
-    return code
 
 
 
@@ -262,13 +230,13 @@ class Distill:
     
         u = u.subs({Kx:ix, Ky:iy, Kz:iz})
         v = v.subs({Kx:ix, Ky:iy, Kz:iz})
-        print("u =", u)
+        #print("u =", u)
         #print("zeros:", u.numerator().roots())
         #print("poles:", u.denominator().roots())
         #print("\t=", sage.factor(u.numerator()))
         #print("\t /")
         #print("\t ", sage.factor(u.denominator()))
-        print("v =", v)
+        #print("v =", v)
         #print("\t=", sage.factor(v.numerator()))
         #print("\t /")
         #print("\t ", sage.factor(v.denominator()))
@@ -394,6 +362,34 @@ class GateDistill(Distill):
         return x, y, z, w
 
 
+class PauliDistill(Distill): # much faster than CodeDistill
+    def __init__(self, code):
+        Distill.__init__(self, code.n)
+        self.code = code
+
+    @cache
+    def get_variety(self, projective=False):
+        code = self.code
+        n = code.n
+
+        result = pauli.get_wenum(code)
+
+        if not projective:
+            R = result[0].parent()
+            w = R.gens()[3]
+            result = [p.subs({w:1}) for p in result]
+
+        x, y, z, w = result
+
+        print("x", right_arrow, x)
+        print("y", right_arrow, y)
+        print("z", right_arrow, z)
+        print("w", right_arrow, w) # div
+
+        return x, y, z, w
+
+
+
 class CodeDistill(Distill):
     def __init__(self, code):
         Distill.__init__(self, code.n)
@@ -498,6 +494,97 @@ def test_mobius():
     print( a, mul( -1, a ) )
 
 
+def get_code():
+    idx = argv.get("idx", 0)
+    n,k,d = argv.code
+    code = None
+    if (n,k,d) == (4,1,2):
+        code = [
+            QCode.fromstr("YYZI IXXZ ZIYY"),
+            QCode.fromstr("XXXX ZZZZ YYII")][idx]
+    if (n,k,d) == (5,1,2):
+        code = construct.get_512()
+    if (n,k,d) == (5,1,3):
+        code = construct.get_513()
+    if (n,k,d) == (7,1,3):
+        code = [
+            construct.get_713(),
+            QCode.fromstr("""
+        XXIZIZI
+        IXXIZIZ
+        ZIXXIZI
+        IZIXXIZ
+        ZIZIXXI
+        IZIZIXX""")][idx]
+
+    if (n,k,d) == (8,1,3):
+        code = QCode.fromstr("""
+        YYZZIIZZ
+        ZYYZZIIZ
+        ZZYYZZII
+        IZZYYZZI
+        IIZZYYZZ
+        ZIIZZYYZ
+        ZZIIZZYY""")
+    if (n,k,d) == (11,1,3):
+        H = """
+        XIIIIXXIIIX
+        IXIIIIXIIXX
+        IIXIIIXXIIX
+        IIIXIIXIXIX
+        IIIIXXXXXXI
+        ZIIIIZZIIIZ
+        IZIIIIZIIZZ
+        IIZIIIZZIIZ
+        IIIZIIZIZIZ
+        IIIIZZZZZZI
+        """ # [[11,1,3]] s.d.
+        code = QCode.fromstr(H)
+    if (n,k,d) == (13,1,5):
+        H = """
+        XXZZIZIIIZIZZ
+        ZXXZZIZIIIZIZ
+        ZZXXZZIZIIIZI
+        IZZXXZZIZIIIZ
+        ZIZZXXZZIZIII
+        IZIZZXXZZIZII
+        IIZIZZXXZZIZI
+        IIIZIZZXXZZIZ
+        ZIIIZIZZXXZZI
+        IZIIIZIZZXXZZ
+        ZIZIIIZIZZXXZ
+        ZZIZIIIZIZZXX
+        """ # [[13,1,5]] gf4
+        code = QCode.fromstr(H)
+
+    if (n,k,d) == (15,1,3):
+        code = construct.get_15_1_3()
+
+    if (n,k,d) == (17,1,5):
+        code = QCode.fromstr("""
+        XIIIIIIIIXIIXIIXI
+        IXIIIIIIIXIIXIIIX
+        IIXIIIIIIIIXIXXII
+        IIIXIIIIXXIIXIIII
+        IIIIXIIIXIXIXXXXX
+        IIIIIXIIIIXXIXIII
+        IIIIIIXIXXXIIXXXX
+        IIIIIIIXIIXXIIXII
+        ZIIIIIIIIZIIZIIZI
+        IZIIIIIIIZIIZIIIZ
+        IIZIIIIIIIIZIZZII
+        IIIZIIIIZZIIZIIII
+        IIIIZIIIZIZIZZZZZ
+        IIIIIZIIIIZZIZIII
+        IIIIIIZIZZZIIZZZZ
+        IIIIIIIZIIZZIIZII
+        """)
+
+    print("is_gf4:", code.is_gf4())
+    assert code is not None
+    return code
+
+
 
 def test():
 
@@ -506,38 +593,11 @@ def test():
     #    import sys
     #    print(repr(argv.code), sys.argv)
     #    code = QCode.fromstr(argv.code)
-    idx = argv.get("idx", 0)
     if argv.code:
-        n,k,d = argv.code
-        if (n,k,d) == (4,1,2):
-            code = [
-                QCode.fromstr("YYZI IXXZ ZIYY"),
-                QCode.fromstr("XXXX ZZZZ YYII")][idx]
-        if (n,k,d) == (5,1,2):
-            code = construct.get_512()
-        if (n,k,d) == (5,1,3):
-            code = construct.get_513()
-        if (n,k,d) == (7,1,3):
-            code = [
-                construct.get_713(),
-                QCode.fromstr("""
-            XXIZIZI
-            IXXIZIZ
-            ZIXXIZI
-            IZIXXIZ
-            ZIZIXXI
-            IZIZIXX""")][idx]
-
-        if (n,k,d) == (8,1,3):
-            code = QCode.fromstr("""
-            YYZZIIZZ
-            ZYYZZIIZ
-            ZZYYZZII
-            IZZYYZZI
-            IIZZYYZZ
-            ZIIZZYYZ
-            ZZIIZZYY""")
-        distill = CodeDistill(code)
+        code = get_code()
+        #distill = CodeDistill(code)
+        distill = PauliDistill(code)
+        
 
     elif argv.CH:
         CH = clifford.I << clifford.H()
@@ -631,8 +691,8 @@ def test():
         r0 = norm(x0, y0, z0)
         r1 = norm(x1, y1, z1)
         squeeze = (1-r0) / (1-r1)
-        #print("%.6f --> %.6f"%(1-r0, 1-r1))
-        print("%.6f, %.6f, %.6f"%(x, y, z), "squeeze = %.2f"%squeeze)
+        #print("%.8f --> %.8f"%(1-r0, 1-r1))
+        print("%.8f, %.8f, %.8f"%(x, y, z), "squeeze = %.2f"%squeeze)
       print("--")
 
 

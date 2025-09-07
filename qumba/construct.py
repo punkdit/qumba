@@ -314,6 +314,24 @@ def reed_muller(r=1, m=4):
         return code
 
 
+def get_15_1_3():
+    code = QCode.fromstr("""
+    X.X.X.X.X.X.X.X
+    .XX..XX..XX..XX
+    ...XXXX....XXXX
+    .......XXXXXXXX
+    Z.Z.Z.Z.Z.Z.Z.Z
+    .ZZ..ZZ..ZZ..ZZ
+    ...ZZZZ....ZZZZ
+    .......ZZZZZZZZ
+    ZZZZ...Z...Z...
+    Z.Z....Z.Z.....
+    .ZZZZ..........
+    .ZZ....ZZ......
+    Z.ZZ.Z.........
+    ...ZZZZ........
+    """, Ls="XXXXXXXXXXXXXXX ZZZZZZZZZZZZZZZ", d=3)
+    return code
 
 
 def biplanar(w=24, h=12):
