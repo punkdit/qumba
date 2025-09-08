@@ -23,8 +23,15 @@ from qumba import pauli
 
 EPSILON = 1e-6
 
+diff = sage.derivative
+latex = sage.latex
 
-pystr = lambda u : str(u).replace("^", "**")
+def pystr(u):
+    s = str(u)
+    s = s.replace("zeta8^2", "1j")
+    assert "zeta8" not in s, repr(s)
+    s = s.replace("^", "**")
+    return s
 
 rnd = lambda radius=10: 2*radius*random() - radius
 
@@ -204,6 +211,101 @@ def find_zeros(f0, g0, trials=None, nsols=None, verbose=False):
                 return
 
 
+def find_roots(f):
+
+    print("find_roots")
+    print("\t", f)
+
+    top = f.numerator()
+    bot = f.denominator()
+
+    stop = ""
+    if "zeta8^2" in str(top):
+        top = w4*top
+        assert "zeta8" not in str(top)
+        stop = "i*"
+
+    if "zeta8^2" in str(bot):
+        bot = w4*bot
+        assert "zeta8" not in str(bot)
+        stop = "-i*"+stop
+
+    R = sage.PolynomialRing(sage.QQ, "z".split())
+    z = R.gens()[0]
+
+    top = R(top)
+    bot = R(bot)
+    print("\t = %s(%s)/(%s)"%( stop, top, bot ))
+
+    ftop = sage.factor(top)
+    fbot = sage.factor(bot)
+    print("\t = %s %s / %s"%( stop, ftop, fbot ))
+
+    for val,m in top.roots(ring=sage.CIF):
+
+        u = bot.subs({z:val})
+        if u == 0:
+            print("FAIL")
+            assert 0
+
+        cval = complex(val)
+        #print("find_roots:", repr(val))
+        yield val, cval, m
+
+
+
+def pprint(f):
+
+    print("f(z) =", f)
+
+    top = f.numerator()
+    bot = f.denominator()
+
+    if "zeta8^2" in str(f) and "zeta8^2" in str(w4*f):
+        print()
+        print(r"\begin{align*}")
+        s = r"f(z) &= \frac{%s}{%s} \\"%( latex(top), latex(bot) )
+        s = s.replace(r"\zeta_{8}^{2}", "i")
+        print(s)
+        print(r"\end{align*}")
+        print()
+        return
+
+    stop = ""
+    if "zeta8^2" in str(top):
+        top = -w4*top
+        assert "zeta8" not in str(top)
+        stop = "i "
+
+    if "zeta8^2" in str(bot):
+        bot = w4*bot
+        assert "zeta8" not in str(bot)
+        stop = "-i "+stop
+        assert 0, "check me"
+
+    R = sage.PolynomialRing(sage.QQ, "z".split())
+    z = R.gens()[0]
+
+    top = R(top)
+    bot = R(bot)
+    print()
+    print(r"\begin{align*}")
+    print(r"f(z) &= %s\frac{%s}{%s} \\"%( stop, latex(top), latex(bot) ))
+
+    ftop = sage.factor(top)
+    fbot = sage.factor(bot)
+    print(r"    &= %s\frac{%s}{%s} \\"%( stop, latex(ftop), latex(fbot) ))
+    print(r"\end{align*}")
+    print()
+    #print("%%    = %s(%s)/(%s)"%( stop, (top), (bot) ))
+    #print("%%    = %s %s / %s"%( stop, ftop, fbot ))
+
+    #top = f.numerator().factor()
+    #bot = f.denominator().factor()
+    #print("f = (%s) / (%s)" % (top, bot))
+
+
+
 class Distill:
     def __init__(self, n):
         self.n = n
@@ -231,16 +333,8 @@ class Distill:
         u = u.subs({Kx:ix, Ky:iy, Kz:iz})
         v = v.subs({Kx:ix, Ky:iy, Kz:iz})
         #print("u =", u)
-        #print("zeros:", u.numerator().roots())
-        #print("poles:", u.denominator().roots())
-        #print("\t=", sage.factor(u.numerator()))
-        #print("\t /")
-        #print("\t ", sage.factor(u.denominator()))
         #print("v =", v)
-        #print("\t=", sage.factor(v.numerator()))
-        #print("\t /")
-        #print("\t ", sage.factor(v.denominator()))
-    
+
         S = sage.PolynomialRing(sage.QQ, list("XY"))
         S = sage.FractionField(S)
         u = S(u)
@@ -252,7 +346,6 @@ class Distill:
         #for (X1,Y1) in find_zeros(f, g, trials, nsols, verbose=verbose):
         #    print("\t", X1, Y1)
     
-        diff = sage.derivative
         jac = [
             [diff(u,X), diff(v,X)],
             [diff(u,Y), diff(v,Y)],
@@ -267,9 +360,55 @@ class Distill:
     
         for (X,Y) in find_zeros(f, g, trials, nsols, verbose=verbose):
             x, y, z = istereo(X, Y)
-            #print(X,Y, "-->", x, y, z)
             x, y, z = (x, sign*y, sign*z)
             yield x, y, z
+
+    def fast_find(self, top=True, verbose=False):
+        sign = +1 if top else -1
+        x, y, z, w = self.get_variety()
+
+        #y = sign*y
+        #z = sign*z
+    
+        R = sage.PolynomialRing(base, list("XY"))
+        X, Y = R.gens()
+        ix = 2*X/(1+X**2+Y**2)
+        iy = sign*2*Y/(1+X**2+Y**2)
+        iz = sign*(X**2+Y**2-1)/(1+X**2+Y**2)
+        #print(ix, iy, iz)
+    
+        Kx,Ky,Kz,_ = x.parent().gens()
+        u, v = stereo(x/w, y/w, z/w)
+    
+        u = u.subs({Kx:ix, Ky:iy, Kz:iz})
+        v = v.subs({Kx:ix, Ky:iy, Kz:iz})
+        #print("u =", u)
+        #print("v =", v)
+
+        T = sage.PolynomialRing(base, "z zb".split())
+        T = sage.FractionField(T)
+        z, zb = T.gens()
+
+        real = half*(z+zb)
+        imag = half*(-w4)*(z-zb)
+        uz = u.subs({X:real,Y:imag}) 
+        vz = v.subs({X:real,Y:imag}) 
+        f = uz + w4*vz
+
+
+        pprint(f)
+        assert f.subs({zb:1234}) == f
+
+        self.f = eval("lambda z: %s"%pystr(f))
+
+        df = diff(f, z)
+        for val,cval,m in find_roots(df):
+            X = cval.real
+            Y = cval.imag
+            x, y, z = istereo(X, Y)
+            x, y, z = (x, sign*y, sign*z)
+            yield (x, y, z, m, val)
+                
 
 
 class GateDistill(Distill):
@@ -495,9 +634,9 @@ def test_mobius():
 
 
 def get_code():
+    code = None
     idx = argv.get("idx", 0)
     params = argv.code
-    code = None
     if params == (4,1,2):
         code = [
             QCode.fromstr("YYZI IXXZ ZIYY"),
@@ -526,10 +665,15 @@ def get_code():
         IIZZYYZZ
         ZIIZZYYZ
         ZZIIZZYY""")
-    if params == (9,1,3):
-        code = construct.get_surface(3,3)
-    if params == (16,1,4):
-        code = construct.get_surface(4,4)
+    if params == (9,1,3) and idx == 0:
+        code = construct.get_913() # Shor code
+    if params == (9,1,3) and idx == 1:
+        code = construct.get_surface(3, 3)
+
+    if params == (10,1,2):
+        code = QCode.fromstr("XXIXXIIXII IXXXIXIIXI IIIXXXXIIX "
+        "ZZIIIIIIZI IIIZZIIIZI IZIZIIIIIZ IIZIIZIIIZ IIIZIZIZII IIIIZIZZII")
+
     if params == (11,1,3):
         H = """
         XIIIIXXIIIX
@@ -610,8 +754,12 @@ def get_code():
     if params == (23,1,7):
         code = construct.get_golay(23)
 
-    print("is_gf4:", code.is_gf4())
     assert code is not None
+
+    print("is_gf4:", code.is_gf4())
+    print("is_css:", code.is_css())
+    print("is_selfdual:", code.is_selfdual())
+
     return code
 
 
@@ -709,10 +857,23 @@ def test():
     def norm(x,y,z):
         return (x*x+y*y+z*z)**(1/2)
 
-    #print("x", right_arrow, x)
-    #print("y", right_arrow, y)
-    #print("z", right_arrow, z)
-    #print("w", right_arrow, w)
+    
+    for top in [True, False]:
+        print("--")
+        found = 0
+        for (x,y,z,m,val) in distill.fast_find(top, verbose=verbose):
+            val = complex(val)
+            fval = distill.f(complex(val))
+            print(r"& %d \times (%.8f, %.8f, %.8f) \\ %% %s --> %s"%(
+                m, x, y, z, val, fval))
+            found += m
+        print(r"\begin{align*}")
+        print(r"\end{align*}")
+        print("total:", found)
+        #break
+
+    return
+
     for top in [True, False]:
       for (x,y,z) in distill.find(trials, nsols, top, verbose=verbose):
         alpha = 1 - 0.01
