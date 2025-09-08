@@ -128,14 +128,13 @@ def fromstr(h):
 #def get_poly
 
 
-def get_wenum(code):
-    print("get_wenum", code)
+def get_wenum(code, verbose=False):
     #print(code.longstr())
     H = code.H
     #for h in strop(H):
     gens = []
     for h in H:
-        print(strop(h))
+        #print(strop(h))
         g = fromstr(strop(h, "I"))
         #print(g)
         gens.append(g)
@@ -149,10 +148,13 @@ def get_wenum(code):
     LZ = fromstr(strop(L[1], "I"))
     LY = w_phase@LX*LZ
     LI = LX*LX
-    print("LX =", LX)
-    print("LY =", LY)
-    print("LZ =", LZ)
-    print("LI =", LI)
+    if verbose:
+        print("get_wenum", code)
+        print(code.longstr())
+        print("LX =", LX)
+        print("LY =", LY)
+        print("LZ =", LZ)
+        print("LI =", LI)
     assert LX*LZ==-LZ*LX
 
     from sage import all_cmdline as sage

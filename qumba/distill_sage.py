@@ -210,11 +210,15 @@ def find_zeros(f0, g0, trials=None, nsols=None, verbose=False):
                 #print("nsols", len(sols))
                 return
 
+def vprint(verbose, *args):
+    if verbose:
+        print(*args)
 
-def find_roots(f):
 
-    print("find_roots")
-    print("\t", f)
+def find_roots(f, verbose=False):
+
+    vprint(verbose, "find_roots")
+    vprint(verbose, "\t", f)
 
     top = f.numerator()
     bot = f.denominator()
@@ -235,11 +239,11 @@ def find_roots(f):
 
     top = R(top)
     bot = R(bot)
-    print("\t = %s(%s)/(%s)"%( stop, top, bot ))
+    vprint(verbose, "\t = %s(%s)/(%s)"%( stop, top, bot ))
 
     ftop = sage.factor(top)
     fbot = sage.factor(bot)
-    print("\t = %s %s / %s"%( stop, ftop, fbot ))
+    vprint(verbose, "\t = %s %s / %s"%( stop, ftop, fbot ))
 
     for val,m in top.roots(ring=sage.CIF):
 
@@ -395,8 +399,8 @@ class Distill:
         vz = v.subs({X:real,Y:imag}) 
         f = uz + w4*vz
 
-
-        pprint(f)
+        if verbose:
+            pprint(f)
         assert f.subs({zb:1234}) == f
 
         self.f = eval("lambda z: %s"%pystr(f))
@@ -507,7 +511,7 @@ class PauliDistill(Distill): # much faster than CodeDistill
         self.code = code
 
     @cache
-    def get_variety(self, projective=False):
+    def get_variety(self, projective=False, verbose=False):
         code = self.code
         n = code.n
 
@@ -520,10 +524,10 @@ class PauliDistill(Distill): # much faster than CodeDistill
 
         x, y, z, w = result
 
-        print("x", right_arrow, x)
-        print("y", right_arrow, y)
-        print("z", right_arrow, z)
-        print("w", right_arrow, w) # div
+        vprint(verbose, "x", right_arrow, x)
+        vprint(verbose, "y", right_arrow, y)
+        vprint(verbose, "z", right_arrow, z)
+        vprint(verbose, "w", right_arrow, w) # div
 
         return x, y, z, w
 
@@ -890,146 +894,45 @@ def test():
       print("--")
 
 
+def eq(a, b):
+    return abs(a-b) < 1e-8
 
-def junk():
+def search():
 
-    if 0:
-        #sage.macaulay2(
-    
-        T = sage.PolynomialRing(sage.QQ, list("XY"))
-        I = T.ideal([f.numerator(), g.numerator()])
-        print(I)
-        for J in I.primary_decomposition():
-            print("\t", J) #, J.is_primary(), J.is_prime())
-    
-        return
+    n = argv.get("n", 4)
+    k = 1
+    d = 2
+    fn = construct.all_codes
+    if argv.css:
+        fn = construct.all_css
+    print(fn)
 
-    print(f.numerator())
-    for p,m in sage.factor(f.numerator()):
-        print("\t", p, "mult =", m)
-    print(f.denominator())
-    for p,m in sage.factor(f.denominator()):
-        print("\t", p, "mult =", m)
-    print(g.numerator())
-    for p,m in sage.factor(g.numerator()):
-        print("\t", p, "mult =", m)
-    print(g.denominator())
-    for p,m in sage.factor(g.denominator()):
-        print("\t", p, "mult =", m)
-    return
-    return jac
+    skip = [0,1,-1,1j,-1j]
 
-    return
-
-    fx = pyfunc(x/w)
-    fy = pyfunc(y/w)
-    fz = pyfunc(z/w)
-
-
-    #F = sage.FractionField(K)
-    #jac = Matrix(F, [[
-    jac = [[pyfunc(sage.derivative(v,u))
-        for v in [x/w,y/w,z/w]] 
-        for u in [Kx,Ky,Kz]]
-
-
-    ir2 = 2**(-1/2)
-    def ortho(base, vec):
-        # make vec ortho to base, which is normalize'd
-        base = numpy.array(base)
-        assert abs(norm(*base)-1) < EPSILON
-        vec = vec - base*numpy.dot(vec, base)
-        return vec
-
-    #print(ortho(numpy.array([ir2,ir2,0]), numpy.array([0,1,0])))
-    #return
-
-    dx = numpy.array([1,0,0])
-    dy = numpy.array([0,1,0])
-    dz = numpy.array([0,0,1])
-
-#    def diff(u):
-#        r = norm(*u)
-#        total = 1000*abs(1-r) # penalize away from 1 
-#        u = (1/r)*numpy.array(u) # normalize
-#        v = numpy.array([fx(*u), fy(*u), fz(*u)])
-#        r = norm(*v)
-#        v = (1/r)*v # normalize
-#        dv = numpy.array([[f(*u) for f in row] for row in jac])
-#        #print(dv)
-#        for d in [dx,dy,dz]:
-#            d = ortho(u, d)
-#            d_out = numpy.dot(dv, d)
-#            d_out = ortho(v, d_out)
-#            total += (d_out**2).sum()
-#        return total
-
-    def diff(u):
-        r = norm(*u)
-        #total = 1000*abs(1-r) # penalize away from 1 
-        u = (1/r)*numpy.array(u) # normalize
-        dv = numpy.array([[f(*u) for f in row] for row in jac])
-        return (dv**2).sum()
-
-    from qumba.distill import normalize, norm, rnd
-    #diff(*rnd())
-    u = normalize(1,1,1)
-    u = numpy.array(u)
-    #u = (ir2,ir2,0.1)
-    u[0] += 0.1
-    r = diff(u)
-
-    from scipy.optimize import minimize
-
-    method = "Nelder-Mead"
-    for trial in range(20):
-        x0 = rnd()
-        #x0 = normalize(*[-0.28,  -0.9, -0.29])
-        #print(diff(x0))
-        res = minimize(diff, x0, 
-            method=method, tol=1e-6, bounds=[(-1.2,1.2)]*3,
-            options={"maxiter":10000, "maxfev":10000},
-        )
-        #if not res.success:
-        #    print(res)
-        #    continue
-        x = res.x
-        x = normalize(*x)
-        v = numpy.array([fx(*x), fy(*x), fz(*x)])
-        print("fun=%.4f, x=(%.4f, %.4f, %.4f), |x|=%.4f"%(
-            res.fun, x[0], x[1], x[2], norm(*x)), "*" if not res.success else "")
-        print("  -->", v)
-
-    return
-
-
-
-    a,b,c = 0,ir2,ir2
-    u,v,w = (fx(a,b,c), fy(a,b,c), fz(a,b,c))
-
-
-
-
-    #print(sage.macaulay2("3/77"))
-    macaulay2 = sage.macaulay2
-
-    #sub = Kw**n + Kx**n + Ky**n + Kz**n
-    #print(sub)
-
-#    R = macaulay2('QQ[w,x,y,z]', 'R')
-#    #s = "map(R,R,matrix{{%s,%s,%s,%s}})"%(N*div , N*x , N*y , N*z )
-#    s = """matrix{
-#{-10*x*y*z^2+10*x*y*w^2, 10*x*y^2*z-10*x*z*w^2,-5*x^4-5*y^2*z^2+5*y^2*w^2+5*z^2*w^2, 10*x*y^2*w+10*x*z^2*w},
-#{-5*y^4-5*x^2*z^2+5*x^2*w^2+5*z^2*w^2, 10*x^2*y*z-10*y*z*w^2, -10*x*y*z^2+10*x*y*w^2, 10*x^2*y*w+10*y*z^2*w},
-#{-10*x^2*y*z+10*y*z*w^2, 5*x^2*y^2+5*z^4-5*x^2*w^2-5*y^2*w^2, -10*x*y^2*z+10*x*z*w^2, 10*x^2*z*w+10*y^2*z*w},
-#{10*x^2*y*w+10*y*z^2*w, -10*x^2*z*w-10*y^2*z*w, 10*x*y^2*w+10*x*z^2*w, 5*x^2*y^2+5*x^2*z^2+5*y^2*z^2+5*w^4}
-#    }
-#    """.replace("\n", " ")
-#    print(s)
-#    f = macaulay2(s)
-#    print(f)
-#    print("kernel:")
-#    print(f.kernel())
+    found = 0
+    for code in fn(n,k,d):
+        if "Y" in code.longstr():
+            continue
+        #print(code)
+        #print(code.longstr())
+        found += 1
+        distill = PauliDistill(code)
+        try:
+            for (x,y,z,m,val) in distill.fast_find():
+                val = complex(val)
+                fval = distill.f(complex(val))
+                if not eq(val, fval):
+                    continue
+                for v in skip:
+                    if eq(val, v):
+                        break
+                else:
+                    print(code)
+                    print(code.longstr())
+                    print("\t", val, "-->", fval, flush=True)
+        except ArithmeticError:
+            print("ArithmeticError")
+    print("found:", found)
 
 
 def test_rho():
