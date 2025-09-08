@@ -234,9 +234,12 @@ def test():
     #code = QCode.fromstr("YYZI IXXZ ZIYY")
     #code = construct.get_10_2_3()
     #code = QCode.fromstr("ZZZII IIZZZ XIXXI IXXIX")
+    #code = QCode.fromstr("XXXX ZZZZ YYII")
 
-    code = QCode.fromstr("XXXX ZZZZ YYII")
-    get_wenum(code)
+    code = construct.get_surface(4,4)
+    print(code)
+    result = get_wenum(code)
+    print(result[0])
 
 
 if __name__ == "__main__":

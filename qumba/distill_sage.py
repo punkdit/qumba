@@ -496,17 +496,17 @@ def test_mobius():
 
 def get_code():
     idx = argv.get("idx", 0)
-    n,k,d = argv.code
+    params = argv.code
     code = None
-    if (n,k,d) == (4,1,2):
+    if params == (4,1,2):
         code = [
             QCode.fromstr("YYZI IXXZ ZIYY"),
             QCode.fromstr("XXXX ZZZZ YYII")][idx]
-    if (n,k,d) == (5,1,2):
+    if params == (5,1,2):
         code = construct.get_512()
-    if (n,k,d) == (5,1,3):
+    if params == (5,1,3):
         code = construct.get_513()
-    if (n,k,d) == (7,1,3):
+    if params == (7,1,3):
         code = [
             construct.get_713(),
             QCode.fromstr("""
@@ -517,7 +517,7 @@ def get_code():
         ZIZIXXI
         IZIZIXX""")][idx]
 
-    if (n,k,d) == (8,1,3):
+    if params == (8,1,3):
         code = QCode.fromstr("""
         YYZZIIZZ
         ZYYZZIIZ
@@ -526,7 +526,11 @@ def get_code():
         IIZZYYZZ
         ZIIZZYYZ
         ZZIIZZYY""")
-    if (n,k,d) == (11,1,3):
+    if params == (9,1,3):
+        code = construct.get_surface(3,3)
+    if params == (16,1,4):
+        code = construct.get_surface(4,4)
+    if params == (11,1,3):
         H = """
         XIIIIXXIIIX
         IXIIIIXIIXX
@@ -540,7 +544,7 @@ def get_code():
         IIIIZZZZZZI
         """ # [[11,1,3]] s.d.
         code = QCode.fromstr(H)
-    if (n,k,d) == (13,1,5):
+    if params == (13,1,5):
         H = """
         XXZZIZIIIZIZZ
         ZXXZZIZIIIZIZ
@@ -557,10 +561,10 @@ def get_code():
         """ # [[13,1,5]] gf4
         code = QCode.fromstr(H)
 
-    if (n,k,d) == (15,1,3):
+    if params == (15,1,3):
         code = construct.get_15_1_3()
 
-    if (n,k,d) == (17,1,5):
+    if params == (17,1,5):
         code = QCode.fromstr("""
         XIIIIIIIIXIIXIIXI
         IXIIIIIIIXIIXIIIX
@@ -580,7 +584,7 @@ def get_code():
         IIIIIIIZIIZZIIZII
         """)
 
-    if (n,k,d) == (19,1,5):
+    if params == (19,1,5):
         code = QCode.fromstr("""
         XIIIIIIIIXXXXXIXIXI
         IXIIIIIIIIIXXIXXXXX
@@ -603,7 +607,7 @@ def get_code():
         """)
         
 
-    if (n,k,d) == (23,1,7):
+    if params == (23,1,7):
         code = construct.get_golay(23)
 
     print("is_gf4:", code.is_gf4())
