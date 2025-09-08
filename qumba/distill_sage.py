@@ -670,6 +670,9 @@ def get_code():
     if params == (9,1,3) and idx == 1:
         code = construct.get_surface(3, 3)
 
+    if params == (16,1,4):
+        code = construct.get_surface(4, 4)
+
     if params == (10,1,2):
         code = QCode.fromstr("XXIXXIIXII IXXXIXIIXI IIIXXXXIIX "
         "ZZIIIIIIZI IIIZZIIIZI IZIZIIIIIZ IIZIIZIIIZ IIIZIZIZII IIIIZIZZII")
