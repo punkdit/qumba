@@ -912,7 +912,18 @@ def test():
 def eq(a, b):
     return abs(a-b) < 1e-8
 
-def search():
+def getkey(val):
+    val = complex(val)
+    r = val.real
+    i = val.imag
+    if abs(r) < 1e-8:
+        r = 0.
+    if abs(i) < 1e-8:
+        i = 0.
+    return "(%.5f+%.5fj)"%(r, i)
+
+
+def search_fix():
 
     n = argv.get("n", 4)
     d = argv.get("d", 2)
@@ -922,15 +933,13 @@ def search():
         fn = construct.all_css
     print(fn)
 
-    skip = [0,1,-1,1j,-1j]
+    r2 = 2**0.5
+    skip = [0,1,-1,1j,-1j,r2+1,-(r2+1), r2-1, 1-r2]
+    skip = set(getkey(x) for x in skip)
 
     found = 0
     for code in fn(n,k,d):
         code.build()
-        #if "Y" in code.longstr():
-        #    continue
-        #print(code)
-        #print(code.longstr())
         assert code.L is not None
         found += 1
         distill = PauliDistill(code)
@@ -938,18 +947,93 @@ def search():
             for (x,y,z,m,val) in distill.fast_find():
                 val = complex(val)
                 fval = distill.f(complex(val))
-                if not eq(val, fval):
+                if not eq(val, fval): # <<-- look for fix points
                     continue
-                for v in skip:
-                    if eq(val, v):
-                        break
-                else:
+                if getkey(val) not in skip:
                     print(code)
                     print(code.longstr())
                     print("\t", val, "-->", fval, flush=True)
         except ArithmeticError:
             print("ArithmeticError")
     print("found:", found)
+
+
+def search_compose():
+
+    n = argv.get("n", 4)
+    k = 1
+    d = argv.get("d", 2)
+
+    fn = construct.all_codes
+    if argv.css:
+        fn = construct.all_css
+    print(fn)
+
+    r2 = 2**0.5
+    skip = [0,1,-1,1j,-1j]
+    skip += [1/r2+1j/r2]
+    skip += [-1/r2+1j/r2]
+    skip += [-1/r2-1j/r2]
+    skip += [1/r2-1j/r2]
+    for u in [r2+1,-(r2+1), r2-1, 1-r2]:
+        skip.append(u)
+        skip.append(u*1j)
+    skip = set(getkey(x) for x in skip)
+
+    src = {}
+    tgt = {}
+    verts = set()
+
+    found = 0
+    for code in fn(n,k,d):
+        code.build()
+        assert code.L is not None
+        distill = PauliDistill(code)
+        for (x,y,z,m,val) in distill.fast_find():
+            val = complex(val)
+            fval = distill.f(complex(val))
+
+            s = getkey(val)
+            t = getkey(fval)
+
+            if s in skip or t in skip:
+                continue
+
+            verts.add(s)
+            verts.add(t)
+
+            src.setdefault(s, set()).add(t)
+            tgt.setdefault(t, set()).add(s)
+
+            t1 = src.get(t)
+            if t1:
+                print("%s --> %s --> %s"%(s, t, t1))
+                found += 1
+
+            s0 = tgt.get(s)
+            if s0:
+                print("%s --> %s --> %s"%(s0, s, t))
+                found += 1
+
+        #if found>10:
+        #    break
+
+    names = {}
+    for i,v in enumerate(verts):
+        names[v] = "v%d"%i
+
+    dot = "distill_%s%s%s.dot"%(n,k,d)
+    print("writing", dot)
+    f = open(dot, "w")
+    print("digraph {", file=f)
+    for s in verts:
+        for t in src.get(s, []):
+            if src.get(t):
+                print("  %s -> %s;"%(names[s], names[t]), file=f)
+    print("}", file=f)
+
+    print("found:", found)
+
 
 
 def test_rho():
