@@ -223,27 +223,18 @@ def find_roots(f, verbose=False):
     top = f.numerator()
     bot = f.denominator()
 
-    stop = ""
-    if "zeta8^2" in str(top):
-        top = w4*top
-        assert "zeta8" not in str(top)
-        stop = "i*"
+    ring = sage.I.parent()
+    R = sage.PolynomialRing(ring, ["z"])
 
-    if "zeta8^2" in str(bot):
-        bot = w4*bot
-        assert "zeta8" not in str(bot)
-        stop = "-i*"+stop
-
-    R = sage.PolynomialRing(sage.QQ, "z".split())
     z = R.gens()[0]
 
     top = R(top)
     bot = R(bot)
-    vprint(verbose, "\t = %s(%s)/(%s)"%( stop, top, bot ))
+    #vprint(verbose, "\t = %s(%s)/(%s)"%( stop, top, bot ))
 
-    ftop = sage.factor(top)
-    fbot = sage.factor(bot)
-    vprint(verbose, "\t = %s %s / %s"%( stop, ftop, fbot ))
+    #ftop = sage.factor(top)
+    #fbot = sage.factor(bot)
+    #vprint(verbose, "\t = %s %s / %s"%( stop, ftop, fbot ))
 
     for val,m in top.roots(ring=sage.CIF):
 
@@ -406,6 +397,8 @@ class Distill:
         self.f = eval("lambda z: %s"%pystr(f))
 
         df = diff(f, z)
+        if df == 0:
+            return
         for val,cval,m in find_roots(df):
             X = cval.real
             Y = cval.imag
@@ -645,10 +638,26 @@ def get_code():
         code = [
             QCode.fromstr("YYZI IXXZ ZIYY"),
             QCode.fromstr("XXXX ZZZZ YYII")][idx]
+    if params == (5,1,1):
+        code = QCode.fromstr("""
+        XZX.Z
+        ZXX.Z
+        ZZ.XX
+        ZZZ..
+        """)
     if params == (5,1,2):
         code = construct.get_512()
     if params == (5,1,3):
         code = construct.get_513()
+    if params == (6,1,2):
+        code = QCode.fromstr("""
+        X.ZZX.
+        .X.ZXZ
+        ZZX..X
+        Z..X.X
+        ZZ..Z.
+        """)
+
     if params == (7,1,3):
         code = [
             construct.get_713(),
@@ -714,6 +723,10 @@ def get_code():
 
     if params == (15,1,3):
         code = construct.get_15_1_3()
+        #n = code.n
+        #space = code.space
+        #for idx in [0,1,2,4,8]:
+        #    code = space.H(n-1-idx)*code # ???
 
     if params == (17,1,5):
         code = QCode.fromstr("""
@@ -766,6 +779,8 @@ def get_code():
     print("is_gf4:", code.is_gf4())
     print("is_css:", code.is_css())
     print("is_selfdual:", code.is_selfdual())
+
+    print(code.longstr())
 
     return code
 
@@ -900,8 +915,8 @@ def eq(a, b):
 def search():
 
     n = argv.get("n", 4)
+    d = argv.get("d", 2)
     k = 1
-    d = 2
     fn = construct.all_codes
     if argv.css:
         fn = construct.all_css
@@ -911,10 +926,12 @@ def search():
 
     found = 0
     for code in fn(n,k,d):
-        if "Y" in code.longstr():
-            continue
+        code.build()
+        #if "Y" in code.longstr():
+        #    continue
         #print(code)
         #print(code.longstr())
+        assert code.L is not None
         found += 1
         distill = PauliDistill(code)
         try:
