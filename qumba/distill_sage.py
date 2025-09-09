@@ -920,21 +920,29 @@ def getkey(val):
         r = 0.
     if abs(i) < 1e-8:
         i = 0.
-    return "(%.5f+%.5fj)"%(r, i)
+    return "(%.6f+%.6fj)"%(r, i)
 
 
 def search_fix():
 
     n = argv.get("n", 4)
-    d = argv.get("d", 2)
+    d = argv.get("d", 1)
     k = 1
     fn = construct.all_codes
     if argv.css:
         fn = construct.all_css
     print(fn)
+    print((n,k,d))
 
     r2 = 2**0.5
-    skip = [0,1,-1,1j,-1j,r2+1,-(r2+1), r2-1, 1-r2]
+    skip = [0,1,-1,1j,-1j]
+    skip += [1/r2+1j/r2]
+    skip += [-1/r2+1j/r2]
+    skip += [-1/r2-1j/r2]
+    skip += [1/r2-1j/r2]
+    for u in [r2+1,-(r2+1), r2-1, 1-r2]:
+        skip.append(u)
+        skip.append(u*1j)
     skip = set(getkey(x) for x in skip)
 
     found = 0
@@ -952,7 +960,7 @@ def search_fix():
                 if getkey(val) not in skip:
                     print(code)
                     print(code.longstr())
-                    print("\t", val, "-->", fval, flush=True)
+                    print("\t", m, "x", val, "-->", fval, flush=True)
         except ArithmeticError:
             print("ArithmeticError")
     print("found:", found)
@@ -962,12 +970,13 @@ def search_compose():
 
     n = argv.get("n", 4)
     k = 1
-    d = argv.get("d", 2)
+    d = argv.get("d", 1)
 
     fn = construct.all_codes
     if argv.css:
         fn = construct.all_css
     print(fn)
+    print((n,k,d))
 
     r2 = 2**0.5
     skip = [0,1,-1,1j,-1j]
@@ -1005,14 +1014,16 @@ def search_compose():
             src.setdefault(s, set()).add(t)
             tgt.setdefault(t, set()).add(s)
 
+            print("%s --> %s"%(s, t))
+
             t1 = src.get(t)
             if t1:
-                print("%s --> %s --> %s"%(s, t, t1))
+                #print("%s --> %s --> %s"%(s, t, t1))
                 found += 1
 
             s0 = tgt.get(s)
             if s0:
-                print("%s --> %s --> %s"%(s0, s, t))
+                #print("%s --> %s --> %s"%(s0, s, t))
                 found += 1
 
         #if found>10:
