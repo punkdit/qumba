@@ -23,6 +23,9 @@ from qumba import pauli
 
 EPSILON = 1e-6
 
+def eq(a, b):
+    return abs(a-b) < 1e-8
+
 diff = sage.derivative
 latex = sage.latex
 
@@ -394,7 +397,10 @@ class Distill:
             pprint(f)
         assert f.subs({zb:1234}) == f
 
-        self.f = eval("lambda z: %s"%pystr(f))
+        pyfunc = lambda u : eval("lambda z: %s"%pystr(u))
+        self.f = pyfunc(f)
+        self.numerator = pyfunc(f.numerator())
+        self.denominator = pyfunc(f.denominator())
 
         df = diff(f, z)
         if df == 0:
@@ -887,7 +893,7 @@ def test():
             val = complex(val)
             fval = distill.f(complex(val))
             print(r"& %d \times (%.8f, %.8f, %.8f) \\ %% %s --> %s"%(
-                m, x, y, z, val, fval))
+                m, x, y, z, val, fval), eq(val,fval), eq(0, distill.denominator(val)) )
             found += m
         print(r"\begin{align*}")
         print(r"\end{align*}")
@@ -908,9 +914,6 @@ def test():
         print("%.8f, %.8f, %.8f"%(x, y, z), "squeeze = %.2f"%squeeze)
       print("--")
 
-
-def eq(a, b):
-    return abs(a-b) < 1e-8
 
 def getkey(val):
     val = complex(val)
