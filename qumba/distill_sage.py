@@ -22,6 +22,7 @@ from qumba.qcode import strop, QCode
 from qumba import construct 
 from qumba.matrix_sage import Matrix
 from qumba.clifford import Clifford, w4, ir2
+from qumba.action import mulclose
 from qumba.dense import bitlog
 from qumba import pauli
 
@@ -33,10 +34,14 @@ def eq(a, b):
 diff = sage.derivative
 latex = sage.latex
 
+py_w8 = (2**(-1/2))*(1+1j)
+assert eq(py_w8**2, 1j)
+
 def pystr(u):
     s = str(u)
     s = s.replace("zeta8^2", "1j")
-    assert "zeta8" not in s, repr(s)
+    #assert "zeta8" not in s, repr(s)
+    s = s.replace("zeta8", "py_w8")
     s = s.replace("^", "**")
     return s
 
@@ -59,6 +64,86 @@ X = clifford.X()
 Y = clifford.Y()
 Z = clifford.Z()
 
+
+class Mobius:
+    R = sage.I.parent()
+    Rz = sage.PolynomialRing(R, ["z"])
+    K = sage.FractionField(Rz)
+    z = K.gens()[0]
+
+    def __init__(self, f):
+        f = Mobius.K(f)
+        self.f = f
+
+    @classmethod
+    def build(cls, a=1, b=0, c=0, d=1):
+        z = Mobius.z
+        assert a*d - b*c != 0
+        f = (a*z + b) / (c*z + d)
+        return cls(f)
+
+    @classmethod
+    def promote(cls, item):
+        if isinstance(item, Mobius):
+            return item
+        return Mobius(item)
+
+    def __str__(self):
+        return "Mobius(%s)"%(self.f)
+    __repr__ = __str__
+
+    def __mul__(self, other):
+        other = Mobius.promote(other)
+        z = Mobius.z
+        f = self.f.subs({z:other.f})
+        return Mobius(f)
+
+    def __eq__(self, other):
+        other = Mobius.promote(other)
+        return self.f == other.f
+
+    def __hash__(self):
+        return hash(self.f)
+
+
+def build_mobius():
+
+    I = Mobius.build()
+    assert I*I == I
+
+    X = Mobius.build(0,1,1,0)
+    assert X != I
+    assert X*X == I
+
+    Z = Mobius.build(-1,0,0,1)
+    assert Z*Z == I
+    assert Z*X == X*Z
+    assert Z*X != I
+
+    Pauli = mulclose([X,Z])
+    assert len(Pauli) == 4
+
+    H = Mobius.build(1,1,1,-1)
+    assert H*H == I
+
+    S = Mobius.build(sage.I, 0, 0, 1) # is this S or S dagger ???
+    assert S*S == Z
+
+    Clifford = mulclose([S,H])
+    assert len(Clifford) == 24
+
+    Mobius.Clifford = Clifford
+    Mobius.Pauli = Pauli
+
+    z = Mobius.z
+    f = Mobius((z**2 + 1)/(2*z)) # XXX rename Mobius as Meromorphic
+    f = Mobius(z**2)
+
+    for g in Clifford:
+        gf = g*f
+
+
+build_mobius()
 
 
 def get_projector(code):
@@ -406,6 +491,8 @@ class Distill:
         py_f = pyfunc(f)
         self.f = py_f
 
+        print("f =", mkstr(f))
+
         top = (f.numerator())
         bot = (f.denominator())
         py_top = pyfunc(top)
@@ -418,8 +505,11 @@ class Distill:
 
         if top:
           for val in [0,1,-1,1j,-1j]:
-            if eq(val, py_f(val)):
+            try:
+              if eq(val, py_f(val)):
                 print("FIXED:", val, istereo(val.real, val.imag), py_df(val))
+            except ZeroDivisionError:
+                pass
 
         if df == 0:
             return
@@ -551,6 +641,7 @@ class PauliDistill(Distill): # much faster than CodeDistill
         n = code.n
 
         result = pauli.get_wenum(code)
+        #print(result)
 
         if not projective:
             R = result[0].parent()
@@ -558,6 +649,8 @@ class PauliDistill(Distill): # much faster than CodeDistill
             result = [p.subs({w:1}) for p in result]
 
         x, y, z, w = result
+
+        #verbose = True
 
         vprint(verbose, "x", right_arrow, x)
         vprint(verbose, "y", right_arrow, y)
@@ -620,6 +713,119 @@ class CodeDistill(Distill):
         return x, y, z, w
 
 
+class MultiDistill(Distill):
+    def __init__(self, code):
+        Distill.__init__(self, code.n)
+        self.code = code
+
+    def build(self, projective=False):
+        code = self.code
+        n = code.n
+        space = Clifford(n)
+        M = 2**code.m
+    
+        P = get_projector(code)
+        Pd = P.d
+
+        assert not projective
+        Kw = 1
+    
+        gens = []
+        for i in range(n):
+            gens.append("x%d"%i)
+            gens.append("y%d"%i)
+            gens.append("z%d"%i)
+        K = sage.PolynomialRing(base, gens)
+        gens = K.gens()
+        #print(gens)
+    
+        clifford = Clifford(1)
+        I = clifford.I
+        X = clifford.X()
+        Y = clifford.Y()
+        Z = clifford.Z()
+
+        rhos = []
+        for i in range(n):
+            Kx, Ky, Kz = gens[3*i:3*i+3]
+            rho = half*(Kw*I + Kx*X + Ky*Y + Kz*Z)
+            assert rho.trace() == Kw
+            #print(rho)
+            rhos.append(rho)
+    
+        #print("rho^n ... ", end='', flush=True)
+        rho = reduce(matmul, rhos)
+        if not projective:
+            assert rho.trace() == 1
+        #print("P*rho*Pd ... ", end='', flush=True)
+        rho = P*rho*Pd
+        #print("trace ... ", end='', flush=True)
+        div = rho.trace()
+    
+        L = strop(code.L, "I").split()
+        LX = space.get_pauli(L[0])
+        LZ = space.get_pauli(L[1])
+        LY = w4*LX*LZ
+    
+        x = M*(rho*LX).trace()
+        y = M*(rho*LY).trace()
+        z = M*(rho*LZ).trace()
+        w = M*div
+    
+        #print("x", right_arrow, mkstr(x))
+        #print("y", right_arrow, mkstr(y))
+        #print("z", right_arrow, mkstr(z))
+        #print("w", right_arrow, mkstr(w)) # div
+    
+        u, v = stereo(x/w, y/w, z/w)
+        #print("u =", u)
+        #print("v =", v)
+
+        hens = []
+        for i in range(n):
+            hens.append("X%d"%i) # real
+            hens.append("Y%d"%i) # imag
+        R = sage.PolynomialRing(base, hens)
+        hens = R.gens()
+        subs = {}
+        for i in range(n):
+            X, Y = hens[2*i:2*i+2]
+            ix = 2*X/(1+X**2+Y**2)
+            iy = 2*Y/(1+X**2+Y**2)
+            iz = (X**2+Y**2-1)/(1+X**2+Y**2)
+            subs[gens[3*i]] = ix
+            subs[gens[3*i+1]] = iy
+            subs[gens[3*i+2]] = iz
+
+        u = u.subs(subs)
+        v = v.subs(subs)
+
+        kens = []
+        for i in range(n):
+            kens.append("z%d"%i) # complex
+            kens.append("zb%d"%i) # complex conjugate
+        T = sage.PolynomialRing(base, kens)
+        T = sage.FractionField(T)
+        kens = T.gens()
+
+        subs = {}
+        for i in range(n):
+            z, zb = kens[2*i:2*i+2]
+            real = half*(z+zb)
+            imag = half*(-w4)*(z-zb)
+            subs[hens[2*i]] = real
+            subs[hens[2*i+1]] = imag
+        uz = u.subs(subs)
+        vz = v.subs(subs)
+        f = uz + w4*vz
+        assert f.subs({zb:1234}) == f
+        assert "zb" not in str(f)
+        self.f = f
+        self.gens = [kens[2*i] for i in range(n)]
+
+        return f
+
+
 def test_stereo():
     def normalize(x,y,z):
         r = (x*x+y*y+z*z)**(1/2)
@@ -679,7 +885,9 @@ def get_code():
     if params == (4,1,2):
         code = [
             QCode.fromstr("YYZI IXXZ ZIYY"),
-            QCode.fromstr("XXXX ZZZZ YYII")][idx]
+            QCode.fromstr("XXXX ZZZZ YYII"),
+            QCode.fromstr("XYZI IXYZ ZIXY"),
+        ][idx]
     if params == (5,1,1):
         code = QCode.fromstr("""
         XZX.Z
@@ -690,7 +898,8 @@ def get_code():
     if params == (5,1,2):
         code = construct.get_512()
     if params == (5,1,3):
-        code = construct.get_513()
+        #code = construct.get_513()
+        code = QCode.fromstr("XZZX.  .XZZX X.XZZ ZX.XZ", None, "ZXZII YZYII")
     if params == (6,1,2):
         code = QCode.fromstr("""
         X.ZZX.
@@ -827,6 +1036,26 @@ def get_code():
     return code
 
 
+def multi():
+    code = get_code()
+    distill = MultiDistill(code)
+
+    distill.build()
+
+    f = distill.f
+    gens = distill.gens
+    print(f)
+
+    df = [diff(f, z) for z in gens]
+    print(len(df))
+
+    z = 1.3660254037844386+1.3660254037844386j
+    subs = {g:z for g in gens}
+    df = [dfi.subs(subs) for dfi in df]
+    for dfi in df:
+        print(dfi)
+
+
 
 def test():
 
@@ -839,7 +1068,10 @@ def test():
         code = get_code()
         #distill = CodeDistill(code)
         distill = PauliDistill(code)
-        
+
+    elif argv.stab:
+        code = QCode.fromstr(argv.stab, argv.destab, argv.logical)
+        distill = PauliDistill(code)
 
     elif argv.CH:
         CH = clifford.I << clifford.H()
@@ -848,7 +1080,8 @@ def test():
         assert (plus*plus.d)[0,0] == 1
         op = (plus@I)*CH
         print(op)
-        return # TODO fix the problem with sage rings, etc.
+        # TODO fix the problem with sage rings, etc. somehow...
+        assert 0, "TODO"
         distill = GateDistill(op)
 
     elif argv.CX:
@@ -881,20 +1114,8 @@ def test():
         print(op)
         distill = GateDistill(op)
 
-    else:
-        #code = QCode.fromstr("ZZ")
-        #code = construct.get_422() # no...
-        #code = QCode.fromstr("XXXX ZZZZ ZZII")
-        #code = QCode.fromstr("XXXXXX ZZZZZZ ZZZZII IIXXXX ZZIIII")
-        code = QCode.fromstr("YYZI IXXZ ZIYY") # [[4,1,2]]
-        #code = construct.get_513()
-        #code = construct.get_512()
-        #code = construct.get_713()
-        #code = construct.get_913()
-        #code = get_code() # too big..
-        distill = CodeDistill(code)
-
     print(code)
+    print(code.longstr())
 
     trials = argv.get("trials", 10000)
     nsols = argv.get("nsols", 10)
@@ -903,6 +1124,22 @@ def test():
     if argv.projective:
         distill.get_variety(projective=True)
         return
+
+    for top in [True, False]:
+        print("--")
+        found = 0
+        for (x,y,z,m,val) in distill.fast_find(top, verbose=verbose):
+            val = complex(val)
+            fval = distill.f(complex(val))
+            print(r"& %d \times (%.8f, %.8f, %.8f) \\ %% %s --> %s"%(
+                m, x, y, z, val, fval))
+            found += m
+        print(r"\begin{align*}")
+        print(r"\end{align*}")
+        print("total:", found)
+        #break
+
+    return
 
     x, y, z, w = distill.get_variety()
     pyfunc = lambda u : eval("lambda x,y,z,w=1.0: %s"%pystr(u))
@@ -922,22 +1159,6 @@ def test():
         return (x*x+y*y+z*z)**(1/2)
 
     
-    for top in [True, False]:
-        print("--")
-        found = 0
-        for (x,y,z,m,val) in distill.fast_find(top, verbose=verbose):
-            val = complex(val)
-            fval = distill.f(complex(val))
-            print(r"& %d \times (%.8f, %.8f, %.8f) \\ %% %s --> %s"%(
-                m, x, y, z, val, fval))
-            found += m
-        print(r"\begin{align*}")
-        print(r"\end{align*}")
-        print("total:", found)
-        #break
-
-    return
-
     for top in [True, False]:
       for (x,y,z) in distill.find(trials, nsols, top, verbose=verbose):
         alpha = 1 - 0.01
