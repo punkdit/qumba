@@ -126,7 +126,7 @@ def build_mobius():
     H = Mobius.build(1,1,1,-1)
     assert H*H == I
 
-    S = Mobius.build(sage.I, 0, 0, 1) # is this S or S dagger ???
+    S = Mobius.build(-sage.I, 0, 0, 1) # i hope this is S not S dagger 
     assert S*S == Z
 
     Clifford = mulclose([S,H])
@@ -1049,11 +1049,18 @@ def multi():
     df = [diff(f, z) for z in gens]
     print(len(df))
 
-    z = 1.3660254037844386+1.3660254037844386j
+    params = code.n, code.k, code.d
+    if params == (5,1,3):
+        z = 1.3660254037844386+1.3660254037844386j
+    elif params == (5,1,2):
+        z = -0.5-1.3228756555322954j # df != 0
+        z = 1 # df == 0
+    elif params == (7,1,3):
+        z = 0.
     subs = {g:z for g in gens}
     df = [dfi.subs(subs) for dfi in df]
     for dfi in df:
-        print(dfi)
+        print(eq(dfi, 0), dfi)
 
 
 
