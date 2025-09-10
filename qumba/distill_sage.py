@@ -4,6 +4,10 @@
 
 """
 
+import warnings
+warnings.filterwarnings('ignore')
+
+
 from functools import reduce, cache
 from operator import matmul, add
 from random import random
@@ -24,7 +28,7 @@ from qumba import pauli
 EPSILON = 1e-6
 
 def eq(a, b):
-    return abs(a-b) < 1e-8
+    return abs(a-b) < 1e-6
 
 diff = sage.derivative
 latex = sage.latex
@@ -396,16 +400,48 @@ class Distill:
         if verbose:
             pprint(f)
         assert f.subs({zb:1234}) == f
+        assert "zb" not in str(f)
 
         pyfunc = lambda u : eval("lambda z: %s"%pystr(u))
-        self.f = pyfunc(f)
-        self.numerator = pyfunc(f.numerator())
-        self.denominator = pyfunc(f.denominator())
+        py_f = pyfunc(f)
+        self.f = py_f
 
+        top = (f.numerator())
+        bot = (f.denominator())
+        py_top = pyfunc(top)
+        py_bot = pyfunc(bot)
+
+        #print(top, "==", z*bot)
+        #print("\t", top == z*bot)
         df = diff(f, z)
+        py_df = pyfunc(df)
+
+        if top:
+          for val in [0,1,-1,1j,-1j]:
+            if eq(val, py_f(val)):
+                print("FIXED:", val, istereo(val.real, val.imag), py_df(val))
+
         if df == 0:
             return
-        for val,cval,m in find_roots(df):
+
+        gz = top.parent().gens()[0]
+        tops = []
+        bots = []
+        t,b = top, bot
+        while t != 0 or b != 0:
+            tops.append(t)
+            bots.append(b)
+            t = diff(t, gz)
+            b = diff(b, gz)
+
+        py_tops = [pyfunc(t) for t in tops]
+        py_bots = [pyfunc(b) for b in bots]
+
+        for val, cval, m in find_roots(df):
+            #print()
+            #print("df(z)  =", py_df(cval))
+            #print("\t", eq(py_dtop(cval)*py_bot(cval), py_dbot(cval)*py_top(cval)))
+            #print([eq(pyt(cval), cval*pyb(cval)) for (pyt,pyb) in zip(py_tops, py_bots)])
             X = cval.real
             Y = cval.imag
             x, y, z = istereo(X, Y)
@@ -893,7 +929,7 @@ def test():
             val = complex(val)
             fval = distill.f(complex(val))
             print(r"& %d \times (%.8f, %.8f, %.8f) \\ %% %s --> %s"%(
-                m, x, y, z, val, fval), eq(val,fval), eq(0, distill.denominator(val)) )
+                m, x, y, z, val, fval))
             found += m
         print(r"\begin{align*}")
         print(r"\end{align*}")
