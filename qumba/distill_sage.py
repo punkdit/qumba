@@ -785,7 +785,7 @@ class MultiDistill(Distill):
         Distill.__init__(self, code.n)
         self.code = code
 
-    def build(self, projective=False):
+    def get_xyzw(self, projective=False):
         code = self.code
         n = code.n
         space = Clifford(n)
@@ -838,11 +838,54 @@ class MultiDistill(Distill):
         y = M*(rho*LY).trace()
         z = M*(rho*LZ).trace()
         w = M*div
+        return x,y,z,w
+
+    def fast_xyzw(self, projective=False):
+        code = self.code
+        n = self.n
+        x,y,z,w = pauli.get_full_wenum(code)
+
+        if projective:
+            return x,y,z,w
+
+        K = x.parent()
+        gens = K.gens()
+
+        hens = []
+        for i in range(n):
+            hens.append("x%d"%i)
+            hens.append("y%d"%i)
+            hens.append("z%d"%i)
+        K = sage.PolynomialRing(base, hens)
+        hens = K.gens()
+        #print(gens)
+
+        subs = {}
+        for i in range(n):
+            # x,y,z,w -> x,y,z,1
+            subs[gens[4*i+1]] = hens[3*i+0] # x
+            subs[gens[4*i+2]] = hens[3*i+1] # y
+            subs[gens[4*i+3]] = hens[3*i+2] # z
+            subs[gens[4*i+0]] = 1
+        x,y,z,w = [p.subs(subs) for p in [x,y,z,w]]
+
+        x,y,z,w = [K(p) for p in [x,y,z,w]]
+        return x,y,z,w
     
+
+    def build(self, projective=False):
+        n = self.n
+
+        #x,y,z,w = self.get_xyzw(projective)
+        x,y,z,w = self.fast_xyzw(projective)
+
         #print("x", right_arrow, mkstr(x))
         #print("y", right_arrow, mkstr(y))
         #print("z", right_arrow, mkstr(z))
         #print("w", right_arrow, mkstr(w)) # div
+
+        K = x.parent()
+        gens = K.gens()
     
         u, v = stereo(x/w, y/w, z/w)
         #print("u =", u)
@@ -1118,6 +1161,13 @@ def orbit():
     for g in Mobius.Clifford:
         gf = g*f
         print("\t", gf.f)
+
+
+def full_wenum():
+    code = get_code()
+    result = pauli.get_full_wenum(code)
+
+
 
 
 def multi():

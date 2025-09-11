@@ -106,6 +106,17 @@ class Pauli:
             ws[i] += 1
         return tuple(ws)
 
+    def get_full_wenum(self):
+        vec = self.vec
+        n = self.n
+        ws = []
+        for i in range(n):
+            u = vec[2*i:2*i+2]
+            i = {'..':0,'1.':1,'11':2,'.1':3}[str(u)] # w,x,y,z
+            ws.append(i)
+        return tuple(ws)
+
+
 
 #    @classmethod
 #    def fromstr(cls, h):
@@ -128,7 +139,74 @@ def fromstr(h):
 #def get_poly
 
 
+
+def get_full_wenum(code, verbose=False):
+    #print(code.longstr())
+    H = code.H
+    #for h in strop(H):
+    stabs = []
+    for h in H:
+        #print(strop(h))
+        g = fromstr(strop(h, "I"))
+        #print(g)
+        stabs.append(g)
+
+    for h in stabs:
+      for g in stabs:
+        assert h*g == g*h
+
+    L = code.L
+    LX = fromstr(strop(L[0], "I"))
+    LZ = fromstr(strop(L[1], "I"))
+    LY = w_phase@LX*LZ
+    LI = LX*LX
+    if verbose:
+        print("get_wenum", code)
+        print(code.longstr())
+        print("LX =", LX)
+        print("LY =", LY)
+        print("LZ =", LZ)
+        print("LI =", LI)
+    assert LX*LZ==-LZ*LX
+
+    from sage import all_cmdline as sage
+    n = code.n
+    gens = []
+    for i in range(n):
+        gens.append("w%d"%i)
+        gens.append("x%d"%i)
+        gens.append("y%d"%i)
+        gens.append("z%d"%i)
+    R = sage.PolynomialRing(sage.ZZ, gens)
+    gens = R.gens()
+
+    def get_poly(S):
+        p = 0
+        for s in S:
+            r = s.sign()
+            idxs = s.get_full_wenum()
+            for i,idx in enumerate(idxs): 
+                g = gens[4*i + idx]
+                r = g*r
+            #print(r, s, ws)
+            p = p+r
+        return p
+
+    S = mulclose(stabs)
+    p = get_poly(S)
+
+    result = []
+    for g in [LX,LY,LZ,LI]:
+        S1 = [g*s for s in S]
+        p = get_poly(S1)
+        #print(S1, p)
+        result.append(p)
+
+    return result
+
+
 def get_wenum(code, verbose=False):
+    #print("get_wenum")
     #print(code.longstr())
     H = code.H
     #for h in strop(H):
@@ -167,8 +245,8 @@ def get_wenum(code, verbose=False):
     def get_poly(S):
         p = 0
         for s in S:
-            #print(repr(s), s)
             wenum = s.get_wenum()
+            #print(repr(s), s, wenum)
             r = s.sign()
             for e,v in zip(wenum, (w,x,y,z)):
                 #print(r,v,e)
@@ -180,6 +258,7 @@ def get_wenum(code, verbose=False):
     for g in [LX,LY,LZ,LI]:
         S1 = [g*s for s in S]
         p = get_poly(S1)
+        #print(S1, p)
         result.append(p)
 
     return result
