@@ -8,6 +8,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
+from math import gcd
 from functools import reduce, cache
 from operator import matmul, add
 from random import random
@@ -36,6 +37,29 @@ latex = sage.latex
 
 py_w8 = (2**(-1/2))*(1+1j)
 assert eq(py_w8**2, 1j)
+
+def simplify(f):
+    top = f.numerator()
+    bot = f.denominator()
+    #print("simplify:", [ti for ti in top], [bi for bi in bot])
+
+    factor = None
+    for (c,e) in list(top)+list(bot):
+        c = int(c)
+        if factor is None:
+            factor = c
+        else:
+            factor = gcd(factor, c)
+
+    top = top / factor
+    bot = bot / factor
+
+    assert f == top/bot
+
+    f = top / bot
+
+    return f
+
 
 def pystr(u):
     s = str(u)
@@ -482,6 +506,8 @@ class Distill:
         vz = v.subs({X:real,Y:imag}) 
         f = uz + w4*vz
 
+        f = simplify(f)
+
         if verbose:
             pprint(f)
         assert f.subs({zb:1234}) == f
@@ -820,6 +846,9 @@ class MultiDistill(Distill):
         f = uz + w4*vz
         assert f.subs({zb:1234}) == f
         assert "zb" not in str(f)
+
+        f = simplify(f)
+
         self.f = f
         self.gens = [kens[2*i] for i in range(n)]
 
@@ -1046,21 +1075,35 @@ def multi():
     gens = distill.gens
     print(f)
 
+    R = sage.PolynomialRing(base, ["z"])
+    F = sage.FractionField(R)
+    z = F.gens()[0]
+    fz = f.subs({g:z for g in gens})
+    print(fz)
+    dfz = diff(fz, z)
+
+
     df = [diff(f, z) for z in gens]
-    print(len(df))
 
     params = code.n, code.k, code.d
     if params == (5,1,3):
-        z = 1.3660254037844386+1.3660254037844386j
+        z0 = 1.3660254037844386+1.3660254037844386j
     elif params == (5,1,2):
-        z = -0.5-1.3228756555322954j # df != 0
-        z = 1 # df == 0
+        z0 = 1 # df == 0
     elif params == (7,1,3):
-        z = 0.
-    subs = {g:z for g in gens}
+        z0 = 0.
+    else:
+        z0 = argv.get("z0", 0)
+    print("z0 =", z0)
+    subs = {g:z0 for g in gens}
     df = [dfi.subs(subs) for dfi in df]
+    total = 0
     for dfi in df:
-        print(eq(dfi, 0), dfi)
+        print(eq(dfi, 0), "df(z0,...,z0) =", dfi)
+        total += dfi
+    print("total =", total)
+
+    print("df(z0) =", dfz.subs({z:z0}) )
 
 
 
@@ -1144,7 +1187,7 @@ def test():
         print(r"\begin{align*}")
         print(r"\end{align*}")
         print("total:", found)
-        #break
+        break
 
     return
 
