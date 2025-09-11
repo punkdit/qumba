@@ -871,7 +871,6 @@ class MultiDistill(Distill):
 
         x,y,z,w = [K(p) for p in [x,y,z,w]]
         return x,y,z,w
-    
 
     def build(self, projective=False):
         n = self.n
@@ -907,7 +906,9 @@ class MultiDistill(Distill):
             subs[gens[3*i+1]] = iy
             subs[gens[3*i+2]] = iz
 
+        print("u.subs")
         u = u.subs(subs)
+        print("v.subs")
         v = v.subs(subs)
 
         kens = []
@@ -925,12 +926,90 @@ class MultiDistill(Distill):
             imag = half*(-w4)*(z-zb)
             subs[hens[2*i]] = real
             subs[hens[2*i+1]] = imag
+        print("uz = u.subs")
         uz = u.subs(subs)
+        print("vz = v.subs")
         vz = v.subs(subs)
+        print("f = uz + w4*vz")
         f = uz + w4*vz
         assert f.subs({zb:1234}) == f
         assert "zb" not in str(f)
 
+        f = simplify(f)
+
+        self.f = f
+        self.gens = [kens[2*i] for i in range(n)]
+
+        return f
+
+
+    def fast_build(self, projective=False):
+        n = self.n
+
+        #x,y,z,w = self.get_xyzw(projective)
+        x,y,z,w = self.fast_xyzw(projective)
+
+        #print("x", right_arrow, mkstr(x))
+        #print("y", right_arrow, mkstr(y))
+        #print("z", right_arrow, mkstr(z))
+        #print("w", right_arrow, mkstr(w)) # div
+
+        K = x.parent()
+        gens = K.gens()
+    
+        u, v = stereo(x/w, y/w, z/w)
+        #print("u =", u)
+        #print("v =", v)
+
+        #hens = []
+        #for i in range(n):
+        #    hens.append("X%d"%i) # real
+        #    hens.append("Y%d"%i) # imag
+        #R = sage.PolynomialRing(base, hens)
+        #hens = R.gens()
+
+        kens = []
+        for i in range(n):
+            kens.append("z%d"%i) # complex
+            kens.append("zb%d"%i) # complex conjugate
+        base = sage.I.parent()
+        w4 = sage.I
+        T = sage.PolynomialRing(base, kens)
+        T = sage.FractionField(T)
+        kens = T.gens()
+
+        hens = []
+        for i in range(n):
+            z, zb = kens[2*i:2*i+2]
+            real = half*(z+zb)
+            imag = half*(-w4)*(z-zb)
+            hens.append(real)
+            hens.append(imag)
+
+        subs = {}
+        for i in range(n):
+            X, Y = hens[2*i:2*i+2]
+            ix = 2*X/(1+X**2+Y**2)
+            iy = 2*Y/(1+X**2+Y**2)
+            iz = (X**2+Y**2-1)/(1+X**2+Y**2)
+            subs[gens[3*i]] = ix
+            subs[gens[3*i+1]] = iy
+            subs[gens[3*i+2]] = iz
+
+        print("uz = u.subs")
+        uz = u.subs(subs)
+        print("vz = v.subs")
+        vz = v.subs(subs)
+        print("T(uz);T(vz)")
+        uz = T(uz)
+        vz = T(vz)
+        print("f = uz + w4*vz")
+        f = uz + w4*vz
+        print("assert")
+        #assert f.subs({zb:1234}) == f
+        assert "zb" not in str(f)
+
+        print("simplify")
         f = simplify(f)
 
         self.f = f
@@ -1142,12 +1221,6 @@ def get_code():
 
     assert code is not None
 
-    print("is_gf4:", code.is_gf4())
-    print("is_css:", code.is_css())
-    print("is_selfdual:", code.is_selfdual())
-
-    print(code.longstr())
-
     return code
 
 
@@ -1174,7 +1247,7 @@ def multi():
     code = get_code()
     distill = MultiDistill(code)
 
-    distill.build()
+    distill.fast_build()
 
     f = distill.f
     gens = distill.gens
@@ -1271,6 +1344,10 @@ def test():
 
     print(code)
     print(code.longstr())
+
+    print("is_gf4:", code.is_gf4())
+    print("is_css:", code.is_css())
+    print("is_selfdual:", code.is_selfdual())
 
     trials = argv.get("trials", 10000)
     nsols = argv.get("nsols", 10)
@@ -1500,21 +1577,21 @@ if __name__ == "__main__":
 
     profile = argv.profile
     name = argv.next() or "test"
+    fn = eval(name)
+
     _seed = argv.get("seed")
     if _seed is not None:
         print("seed(%s)"%(_seed))
         seed(_seed)
 
     if profile:
-        import cProfile as profile
-        profile.run("%s()"%name)
-
-    elif name is not None:
-        fn = eval(name)
-        fn()
+        from pyinstrument import Profiler
+        with Profiler(interval=0.01) as profiler:
+            fn()
+        profiler.print()
 
     else:
-        test()
+        fn()
 
 
     t = time() - start_time
