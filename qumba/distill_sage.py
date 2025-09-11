@@ -39,13 +39,20 @@ py_w8 = (2**(-1/2))*(1+1j)
 assert eq(py_w8**2, 1j)
 
 def simplify(f):
+    #return f
+
     top = f.numerator()
     bot = f.denominator()
     #print("simplify:", [ti for ti in top], [bi for bi in bot])
 
     factor = None
     for (c,e) in list(top)+list(bot):
-        c = int(c)
+        #print("int(c)", c)
+        try:
+            c = int(c)
+        except TypeError:
+            print("simplify: TypeError")
+            return f
         if factor is None:
             factor = c
         else:
@@ -473,6 +480,40 @@ class Distill:
             x, y, z = istereo(X, Y)
             x, y, z = (x, sign*y, sign*z)
             yield x, y, z
+
+    def build(self):
+        x, y, z, w = self.get_variety()
+        R = sage.PolynomialRing(base, list("XY"))
+        X, Y = R.gens()
+        ix = 2*X/(1+X**2+Y**2)
+        iy = 2*Y/(1+X**2+Y**2)
+        iz = (X**2+Y**2-1)/(1+X**2+Y**2)
+        #print(ix, iy, iz)
+    
+        Kx,Ky,Kz,_ = x.parent().gens()
+        u, v = stereo(x/w, y/w, z/w)
+    
+        u = u.subs({Kx:ix, Ky:iy, Kz:iz})
+        v = v.subs({Kx:ix, Ky:iy, Kz:iz})
+        #print("u =", u)
+        #print("v =", v)
+
+        T = sage.PolynomialRing(base, "z zb".split())
+        T = sage.FractionField(T)
+        z, zb = T.gens()
+
+        real = half*(z+zb)
+        imag = half*(-w4)*(z-zb)
+        uz = u.subs({X:real,Y:imag}) 
+        vz = v.subs({X:real,Y:imag}) 
+        f = uz + w4*vz
+
+        f = simplify(f)
+
+        assert f.subs({zb:1234}) == f
+        assert "zb" not in str(f)
+
+        return f
 
     def fast_find(self, top=True, verbose=False):
         sign = +1 if top else -1
@@ -911,6 +952,8 @@ def get_code():
     code = None
     idx = argv.get("idx", 0)
     params = argv.code
+    if params == (3,1,1):
+        code = QCode.fromstr("ZZZ XXI")
     if params == (4,1,2):
         code = [
             QCode.fromstr("YYZI IXXZ ZIYY"),
@@ -1063,6 +1106,18 @@ def get_code():
     print(code.longstr())
 
     return code
+
+
+def orbit():
+    code = get_code()
+    distill = PauliDistill(code)
+    f = distill.build()
+
+    print(f)
+
+    for g in Mobius.Clifford:
+        gf = g*f
+        print("\t", gf.f)
 
 
 def multi():
