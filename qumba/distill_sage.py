@@ -1626,7 +1626,9 @@ def test_density():
 
     rows = [[((g@h) * density).trace() for g in pauli] for h in pauli]
     op = Matrix(R, rows)
-    print(op)
+
+    M = op.subs({u0[3]:1, u1[3]:0})
+    print(M)
     
 
 if __name__ == "__main__":

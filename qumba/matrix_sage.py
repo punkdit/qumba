@@ -158,6 +158,10 @@ class Matrix:
         M = self.M(val)
         return Matrix(self.ring, M)
 
+    def subs(self, kw):
+        M = self.M.subs(kw)
+        return Matrix(self.ring, M)
+
     def _latex_(self):
         M = self.M
         s = M._latex_()
