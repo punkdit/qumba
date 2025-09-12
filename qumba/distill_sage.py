@@ -11,7 +11,7 @@ warnings.filterwarnings('ignore')
 from math import gcd
 from functools import reduce, cache
 from operator import matmul, add
-from random import random
+from random import random, randint
 
 import numpy
 from scipy.optimize import root
@@ -785,7 +785,7 @@ class MultiDistill(Distill):
         Distill.__init__(self, code.n)
         self.code = code
 
-    def get_xyzw(self, projective=False):
+    def slow_xyzw(self, projective=False):
         code = self.code
         n = code.n
         space = Clifford(n)
@@ -872,81 +872,81 @@ class MultiDistill(Distill):
         x,y,z,w = [K(p) for p in [x,y,z,w]]
         return x,y,z,w
 
+#    def build(self, projective=False):
+#        n = self.n
+#
+#        #x,y,z,w = self.slow_xyzw(projective)
+#        x,y,z,w = self.fast_xyzw(projective)
+#
+#        #print("x", right_arrow, mkstr(x))
+#        #print("y", right_arrow, mkstr(y))
+#        #print("z", right_arrow, mkstr(z))
+#        #print("w", right_arrow, mkstr(w)) # div
+#
+#        K = x.parent()
+#        gens = K.gens()
+#    
+#        u, v = stereo(x/w, y/w, z/w)
+#        #print("u =", u)
+#        #print("v =", v)
+#
+#        hens = []
+#        for i in range(n):
+#            hens.append("X%d"%i) # real
+#            hens.append("Y%d"%i) # imag
+#        R = sage.PolynomialRing(base, hens)
+#        hens = R.gens()
+#        subs = {}
+#        for i in range(n):
+#            X, Y = hens[2*i:2*i+2]
+#            ix = 2*X/(1+X**2+Y**2)
+#            iy = 2*Y/(1+X**2+Y**2)
+#            iz = (X**2+Y**2-1)/(1+X**2+Y**2)
+#            subs[gens[3*i]] = ix
+#            subs[gens[3*i+1]] = iy
+#            subs[gens[3*i+2]] = iz
+#
+#        print("u.subs")
+#        u = u.subs(subs)
+#        print("v.subs")
+#        v = v.subs(subs)
+#
+#        kens = []
+#        for i in range(n):
+#            kens.append("z%d"%i) # complex
+#            kens.append("zb%d"%i) # complex conjugate
+#        T = sage.PolynomialRing(base, kens)
+#        T = sage.FractionField(T)
+#        kens = T.gens()
+#
+#        subs = {}
+#        for i in range(n):
+#            z, zb = kens[2*i:2*i+2]
+#            real = half*(z+zb)
+#            imag = half*(-w4)*(z-zb)
+#            subs[hens[2*i]] = real
+#            subs[hens[2*i+1]] = imag
+#        print("uz = u.subs")
+#        uz = u.subs(subs)
+#        print("vz = v.subs")
+#        vz = v.subs(subs)
+#        print("f = uz + w4*vz")
+#        f = uz + w4*vz
+#        assert f.subs({zb:1234}) == f
+#        assert "zb" not in str(f)
+#
+#        f = simplify(f)
+#
+#        self.f = f
+#        self.gens = [kens[2*i] for i in range(n)]
+#
+#        return f
+
+
     def build(self, projective=False):
         n = self.n
 
-        #x,y,z,w = self.get_xyzw(projective)
-        x,y,z,w = self.fast_xyzw(projective)
-
-        #print("x", right_arrow, mkstr(x))
-        #print("y", right_arrow, mkstr(y))
-        #print("z", right_arrow, mkstr(z))
-        #print("w", right_arrow, mkstr(w)) # div
-
-        K = x.parent()
-        gens = K.gens()
-    
-        u, v = stereo(x/w, y/w, z/w)
-        #print("u =", u)
-        #print("v =", v)
-
-        hens = []
-        for i in range(n):
-            hens.append("X%d"%i) # real
-            hens.append("Y%d"%i) # imag
-        R = sage.PolynomialRing(base, hens)
-        hens = R.gens()
-        subs = {}
-        for i in range(n):
-            X, Y = hens[2*i:2*i+2]
-            ix = 2*X/(1+X**2+Y**2)
-            iy = 2*Y/(1+X**2+Y**2)
-            iz = (X**2+Y**2-1)/(1+X**2+Y**2)
-            subs[gens[3*i]] = ix
-            subs[gens[3*i+1]] = iy
-            subs[gens[3*i+2]] = iz
-
-        print("u.subs")
-        u = u.subs(subs)
-        print("v.subs")
-        v = v.subs(subs)
-
-        kens = []
-        for i in range(n):
-            kens.append("z%d"%i) # complex
-            kens.append("zb%d"%i) # complex conjugate
-        T = sage.PolynomialRing(base, kens)
-        T = sage.FractionField(T)
-        kens = T.gens()
-
-        subs = {}
-        for i in range(n):
-            z, zb = kens[2*i:2*i+2]
-            real = half*(z+zb)
-            imag = half*(-w4)*(z-zb)
-            subs[hens[2*i]] = real
-            subs[hens[2*i+1]] = imag
-        print("uz = u.subs")
-        uz = u.subs(subs)
-        print("vz = v.subs")
-        vz = v.subs(subs)
-        print("f = uz + w4*vz")
-        f = uz + w4*vz
-        assert f.subs({zb:1234}) == f
-        assert "zb" not in str(f)
-
-        f = simplify(f)
-
-        self.f = f
-        self.gens = [kens[2*i] for i in range(n)]
-
-        return f
-
-
-    def fast_build(self, projective=False):
-        n = self.n
-
-        #x,y,z,w = self.get_xyzw(projective)
+        #x,y,z,w = self.slow_xyzw(projective)
         x,y,z,w = self.fast_xyzw(projective)
 
         #print("x", right_arrow, mkstr(x))
@@ -1219,6 +1219,10 @@ def get_code():
     if params == (23,1,7):
         code = construct.get_golay(23)
 
+    if argv.stab:
+        assert code is None
+        code = QCode.fromstr(argv.stab, argv.destab, argv.logical)
+
     assert code is not None
 
     return code
@@ -1234,6 +1238,9 @@ def orbit():
     for g in Mobius.Clifford:
         gf = g*f
         print("\t", gf.f)
+        top = gf.f.numerator()
+        bot = gf.f.denominator()
+        #print("\t\t", sage.factor(top), "/", sage.factor(bot))
 
 
 def full_wenum():
@@ -1247,7 +1254,7 @@ def multi():
     code = get_code()
     distill = MultiDistill(code)
 
-    distill.fast_build()
+    distill.build()
 
     f = distill.f
     gens = distill.gens
@@ -1567,6 +1574,59 @@ def test_rho():
     sho = ud @ u
     print(sho, sho.shape)
     print(sho.trace())
+
+
+def test_ring():
+
+    H = Clifford(1).H()
+    r = H[0,0]
+
+    H = (1/r)*H
+    #print(H)
+
+    R = sage.PolynomialRing(sage.ZZ, "u v".split())
+    K = sage.FractionField(R)
+
+    u, v = K.gens()
+
+    mul = lambda u,v : K(u)*K(v)
+    add = lambda u,v : (K(u) + v) / (1 + u*v)
+
+    
+    for trial in range(10):
+        a, b, c, d = [randint(-10, 10) for i in range(4)]
+        #print (add(add(a,b), c) , add(a, add(b, c)))
+        assert (add(add(a,b), c) == add(a, add(b, c)))
+
+        print( mul(a, add(b, c)) == add(mul(a, b), mul(a, c)))
+
+
+def test_density():
+    N = 4
+
+    R = sage.PolynomialRing(base, "a0 b0 c0 d0 a1 b1 c1 d1".split())
+    gens = R.gens()
+    u0 = gens[:N]
+    u1 = gens[N:]
+
+    rows = []
+    coords = "abcd"
+    for i in range(N):
+        #r = [coords[i] + "*" + coords[j] + "^" for j in range(N)]
+        r = [u0[i] * u1[j] for j in range(N)]
+        rows.append(r)
+    density = Matrix(R, rows)
+
+    print(density)
+
+    c = Clifford(1)
+    I, X, Z, Y = c.I, c.X(), c.Z(), c.Y()
+    #Pauli = mulclose([X@I, Z@I, I@X, I@Z])
+    pauli = [I, X, Y, Z]
+
+    rows = [[((g@h) * density).trace() for g in pauli] for h in pauli]
+    op = Matrix(R, rows)
+    print(op)
     
 
 if __name__ == "__main__":
