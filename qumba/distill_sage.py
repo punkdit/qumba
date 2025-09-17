@@ -19,6 +19,7 @@ from scipy.optimize import root
 from sage import all_cmdline as sage
 
 from qumba.argv import argv
+from qumba.smap import SMap
 from qumba.qcode import strop, QCode
 from qumba import construct 
 from qumba.matrix_sage import Matrix
@@ -41,6 +42,9 @@ assert eq(py_w8**2, 1j)
 def simplify(f):
     #return f
 
+    if not hasattr(f, "numerator"):
+        return f
+
     top = f.numerator()
     bot = f.denominator()
     #print("simplify:", [ti for ti in top], [bi for bi in bot])
@@ -51,7 +55,7 @@ def simplify(f):
         try:
             c = int(c)
         except TypeError:
-            print("simplify: TypeError")
+            #print("simplify: TypeError")
             return f
         if factor is None:
             factor = c
@@ -427,6 +431,7 @@ def pprint(f):
 class Distill:
     def __init__(self, n):
         self.n = n
+        self.f = None
 
     def get_variety(self):
         pass
@@ -482,6 +487,9 @@ class Distill:
             yield x, y, z
 
     def build(self):
+        if self.f is not None:
+            return self.f
+
         x, y, z, w = self.get_variety()
         R = sage.PolynomialRing(base, list("XY"))
         X, Y = R.gens()
@@ -510,55 +518,65 @@ class Distill:
 
         f = simplify(f)
 
-        assert f.subs({zb:1234}) == f
         assert "zb" not in str(f)
+        #assert f.subs({zb:1234}) == f
+        self.f = f
 
         return f
 
     def fast_find(self, top=True, verbose=False):
-        sign = +1 if top else -1
-        x, y, z, w = self.get_variety()
+#        sign = +1 if top else -1
+#        x, y, z, w = self.get_variety()
+#
+#        #y = sign*y
+#        #z = sign*z
+#    
+#        R = sage.PolynomialRing(base, list("XY"))
+#        X, Y = R.gens()
+#        ix = 2*X/(1+X**2+Y**2)
+#        iy = sign*2*Y/(1+X**2+Y**2)
+#        iz = sign*(X**2+Y**2-1)/(1+X**2+Y**2)
+#        #print(ix, iy, iz)
+#    
+#        Kx,Ky,Kz,_ = x.parent().gens()
+#        u, v = stereo(x/w, y/w, z/w)
+#    
+#        u = u.subs({Kx:ix, Ky:iy, Kz:iz})
+#        v = v.subs({Kx:ix, Ky:iy, Kz:iz})
+#        #print("u =", u)
+#        #print("v =", v)
+#
+#        T = sage.PolynomialRing(base, "z zb".split())
+#        T = sage.FractionField(T)
+#        z, zb = T.gens()
+#
+#        real = half*(z+zb)
+#        imag = half*(-w4)*(z-zb)
+#        uz = u.subs({X:real,Y:imag}) 
+#        vz = v.subs({X:real,Y:imag}) 
+#        f = uz + w4*vz
+#
+#        f = simplify(f)
+#
+#        if verbose:
+#            pprint(f)
+#        #assert f.subs({zb:1234}) == f
+#        assert "zb" not in str(f)
+#
+#        pyfunc = lambda u : eval("lambda z: %s"%pystr(u))
+#        py_f = pyfunc(f)
+#        self.f = py_f
 
-        #y = sign*y
-        #z = sign*z
-    
-        R = sage.PolynomialRing(base, list("XY"))
-        X, Y = R.gens()
-        ix = 2*X/(1+X**2+Y**2)
-        iy = sign*2*Y/(1+X**2+Y**2)
-        iz = sign*(X**2+Y**2-1)/(1+X**2+Y**2)
-        #print(ix, iy, iz)
-    
-        Kx,Ky,Kz,_ = x.parent().gens()
-        u, v = stereo(x/w, y/w, z/w)
-    
-        u = u.subs({Kx:ix, Ky:iy, Kz:iz})
-        v = v.subs({Kx:ix, Ky:iy, Kz:iz})
-        #print("u =", u)
-        #print("v =", v)
-
-        T = sage.PolynomialRing(base, "z zb".split())
-        T = sage.FractionField(T)
-        z, zb = T.gens()
-
-        real = half*(z+zb)
-        imag = half*(-w4)*(z-zb)
-        uz = u.subs({X:real,Y:imag}) 
-        vz = v.subs({X:real,Y:imag}) 
-        f = uz + w4*vz
-
-        f = simplify(f)
-
-        if verbose:
-            pprint(f)
-        assert f.subs({zb:1234}) == f
-        assert "zb" not in str(f)
-
+        assert top
+        f = self.build()
         pyfunc = lambda u : eval("lambda z: %s"%pystr(u))
         py_f = pyfunc(f)
-        self.f = py_f
+        self.py_f = py_f
 
-        print("f =", mkstr(f))
+        if not hasattr(f, "numerator"):
+            return
+
+        #print("f =", mkstr(f))
 
         top = (f.numerator())
         bot = (f.denominator())
@@ -567,16 +585,25 @@ class Distill:
 
         #print(top, "==", z*bot)
         #print("\t", top == z*bot)
-        df = diff(f, z)
+        if "z" not in str(f).replace("zeta","") :
+            return
+
+        z = f.parent().gens()[0]
+        try:
+            df = diff(f, z)
+        except TypeError:
+            print("TypeError:", f)
+            raise
         py_df = pyfunc(df)
 
-        if top:
-          for val in [0,1,-1,1j,-1j]:
+        for val in [0,1,-1,1j,-1j]:
             try:
-              if eq(val, py_f(val)):
-                print("FIXED:", val, istereo(val.real, val.imag), py_df(val))
+                fval = py_f(val)
             except ZeroDivisionError:
-                pass
+                continue
+            result = eq(val, fval)
+            result = "   FIX" if result else "NONFIX"
+            #print(result, val, istereo(val.real, val.imag), fval)
 
         if df == 0:
             return
@@ -602,7 +629,8 @@ class Distill:
             X = cval.real
             Y = cval.imag
             x, y, z = istereo(X, Y)
-            x, y, z = (x, sign*y, sign*z)
+            #x, y, z = (x, sign*y, sign*z)
+            x, y, z = (x, y, z)
             yield (x, y, z, m, val)
                 
 
@@ -1075,12 +1103,15 @@ def get_code():
     idx = argv.get("idx", 0)
     params = argv.code
     if params == (3,1,1):
-        code = QCode.fromstr("ZZZ XXI")
+        code = [
+            QCode.fromstr("ZZZ XXI"),
+        ][idx]
     if params == (4,1,2):
         code = [
-            QCode.fromstr("YYZI IXXZ ZIYY"),
-            QCode.fromstr("XXXX ZZZZ YYII"),
-            QCode.fromstr("XYZI IXYZ ZIXY"),
+            QCode.fromstr("YYZI IXXZ ZIYY"), # 0
+            QCode.fromstr("XXXX ZZZZ YYII"), # 1
+            QCode.fromstr("XYZI IXYZ ZIXY"), # 2
+            QCode.fromstr("ZZZZ XXII IIXX"), # 3
         ][idx]
     if params == (5,1,1):
         code = QCode.fromstr("""
@@ -1122,18 +1153,29 @@ def get_code():
         IZZYYZZI
         IIZZYYZZ
         ZIIZZYYZ
-        ZZIIZZYY""")
+        ZZIIZZYY""", None)
     if params == (9,1,3) and idx == 0:
         code = construct.get_913() # Shor code
     if params == (9,1,3) and idx == 1:
-        code = construct.get_surface(3, 3)
+        #code = construct.get_surface(3, 3)
+        code = QCode.fromstr("""
+        ZZ.ZZ....
+        .XX.XX...
+        ...XX.XX.
+        ....ZZ.ZZ
+        XX.......
+        .......XX
+        ...Z..Z..
+        ..Z..Z...
+        """, None, "X..X..X.. ZZZ......")
 
     if params == (16,1,4):
         code = construct.get_surface(4, 4)
 
     if params == (10,1,2):
         code = QCode.fromstr("XXIXXIIXII IXXXIXIIXI IIIXXXXIIX "
-        "ZZIIIIIIZI IIIZZIIIZI IZIZIIIIIZ IIZIIZIIIZ IIIZIZIZII IIIIZIZZII")
+        "ZZIIIIIIZI IIIZZIIIZI IZIZIIIIIZ IIZIIZIIIZ IIIZIZIZII IIIIZIZZII",
+        None, "XXXXXXXIII ZZZZZZZIII")
 
     if params == (11,1,3):
         H = """
@@ -1148,7 +1190,7 @@ def get_code():
         IIIZIIZIZIZ
         IIIIZZZZZZI
         """ # [[11,1,3]] s.d.
-        code = QCode.fromstr(H)
+        code = QCode.fromstr(H, None, "XXXXXXXXXXX ZZZZZZZZZZZ".split())
     if params == (13,1,5):
         H = """
         XXZZIZIIIZIZZ
@@ -1164,7 +1206,7 @@ def get_code():
         ZIZIIIZIZZXXZ
         ZZIZIIIZIZZXX
         """ # [[13,1,5]] gf4
-        code = QCode.fromstr(H)
+        code = QCode.fromstr(H, None, "X"*13 + " " + "Z"*13)
 
     if params == (15,1,3):
         code = construct.get_15_1_3()
@@ -1219,11 +1261,32 @@ def get_code():
     if params == (23,1,7):
         code = construct.get_golay(23)
 
+    if argv.concat:
+        smap = SMap()
+        lhs = QCode.fromstr("ZZI IZZ", None, "XXX ZII")
+        smap[0,0] = (lhs.longstr(False))
+        rhs = QCode.fromstr("XXI IXX", None, "XII ZZZ")
+        smap[0,8] = (rhs.longstr(False))
+        print(smap)
+        #print(rhs.longstr())
+        print( "lhs =", PauliDistill(lhs).build() )
+        print( "rhs =", PauliDistill(rhs).build() )
+        code = lhs.concat(rhs)
+
     if argv.stab:
         assert code is None
         code = QCode.fromstr(argv.stab, argv.destab, argv.logical)
 
+    if argv.xy:
+        space = code.space
+        S = space.S()
+        H = space.H()
+        code = H*S*H * code
+
     assert code is not None
+
+    print(code)
+    print(code.longstr(False))
 
     return code
 
@@ -1234,13 +1297,31 @@ def orbit():
     f = distill.build()
 
     print(f)
+    print(latex(f))
+    print(sage.factor(f.numerator()), "/", sage.factor(f.denominator()))
 
+    best = None
     for g in Mobius.Clifford:
         gf = g*f
-        print("\t", gf.f)
+        s = str(gf.f)
+        print("  ", s, len(s))
+        if best is None or len(best)>len(s):
+            best = s
         top = gf.f.numerator()
         bot = gf.f.denominator()
         #print("\t\t", sage.factor(top), "/", sage.factor(bot))
+    print()
+    print("best:", best)
+
+
+def wenum():
+    code = get_code()
+    distill = PauliDistill(code)
+    f = distill.build()
+
+    print(f)
+    print(latex(f))
+    print(sage.factor(f.numerator()), "/", sage.factor(f.denominator()))
 
 
 def full_wenum():
@@ -1248,6 +1329,26 @@ def full_wenum():
     result = pauli.get_full_wenum(code)
 
 
+def dessin():
+
+    #  stab="XXXX ZZII IIZZ" logical="XXII ZIZI"
+
+    code = get_code()
+    distill = PauliDistill(code)
+
+    f = distill.build()
+    print(f, right_arrow, end=" ")
+
+    f = (f+1)/2
+    print(f)
+
+    print("f(z) == 0:")
+    for z,zv,m in find_roots(f):
+        print("\tz =", z, "degree", m)
+
+    print("f(z) == 1:")
+    for z,zv,m in find_roots(f-1):
+        print("\tz =", z, "degree", m)
 
 
 def multi():
@@ -1295,20 +1396,8 @@ def multi():
 def test():
 
     code = None
-    #if argv.code:
-    #    import sys
-    #    print(repr(argv.code), sys.argv)
-    #    code = QCode.fromstr(argv.code)
-    if argv.code:
-        code = get_code()
-        #distill = CodeDistill(code)
-        distill = PauliDistill(code)
 
-    elif argv.stab:
-        code = QCode.fromstr(argv.stab, argv.destab, argv.logical)
-        distill = PauliDistill(code)
-
-    elif argv.CH:
+    if argv.CH:
         CH = clifford.I << clifford.H()
         plus = ir2*Matrix(base, [[1,1]])
         print(plus)
@@ -1349,12 +1438,10 @@ def test():
         print(op)
         distill = GateDistill(op)
 
-    print(code)
-    print(code.longstr())
-
-    print("is_gf4:", code.is_gf4())
-    print("is_css:", code.is_css())
-    print("is_selfdual:", code.is_selfdual())
+    else:
+        code = get_code()
+        #distill = CodeDistill(code)
+        distill = PauliDistill(code)
 
     trials = argv.get("trials", 10000)
     nsols = argv.get("nsols", 10)
@@ -1364,19 +1451,22 @@ def test():
         distill.get_variety(projective=True)
         return
 
-    for top in [True, False]:
+    f = distill.build()
+    print(f)
+
+    for top in [True]:
         print("--")
         found = 0
         for (x,y,z,m,val) in distill.fast_find(top, verbose=verbose):
             val = complex(val)
-            fval = distill.f(complex(val))
+            fval = distill.py_f(complex(val))
             print(r"& %d \times (%.8f, %.8f, %.8f) \\ %% %s --> %s"%(
                 m, x, y, z, val, fval))
             found += m
         print(r"\begin{align*}")
         print(r"\end{align*}")
         print("total:", found)
-        break
+        #break
 
     return
 
@@ -1422,6 +1512,16 @@ def getkey(val):
     return "(%.6f+%.6fj)"%(r, i)
 
 
+def all_cyclic(n, k, d):
+    from qumba import cyclic 
+    for code in cyclic.all_cyclic(n):
+        if code.k != k:
+            continue
+        if code.d < d:
+            continue
+        yield code
+
+
 def search_fix():
 
     n = argv.get("n", 4)
@@ -1430,6 +1530,8 @@ def search_fix():
     fn = construct.all_codes
     if argv.css:
         fn = construct.all_css
+    if argv.cyclic:
+        fn = all_cyclic
     print(fn)
     print((n,k,d))
 
@@ -1443,17 +1545,19 @@ def search_fix():
         skip.append(u)
         skip.append(u*1j)
     skip = set(getkey(x) for x in skip)
+    #skip = set()
 
     found = 0
     for code in fn(n,k,d):
         code.build()
         assert code.L is not None
+        #print(code)
         found += 1
         distill = PauliDistill(code)
         try:
             for (x,y,z,m,val) in distill.fast_find():
                 val = complex(val)
-                fval = distill.f(complex(val))
+                fval = distill.py_f(complex(val))
                 if not eq(val, fval): # <<-- look for fix points
                     continue
                 if getkey(val) not in skip:
@@ -1463,6 +1567,45 @@ def search_fix():
         except ArithmeticError:
             print("ArithmeticError")
     print("found:", found)
+
+
+def search_poly():
+
+    n = argv.get("n", 4)
+    d = argv.get("d", 1)
+    k = 1
+    fn = construct.all_codes
+    if argv.css:
+        fn = construct.all_css
+    if argv.cyclic:
+        fn = all_cyclic
+    print(fn)
+    print((n,k,d))
+
+    found = set()
+    count = 0
+    for code in fn(n,k,d):
+        count += 1
+        code.build()
+        assert code.L is not None
+        distill = PauliDistill(code)
+        f = distill.build()
+        s = str(f).replace("zeta", "")
+        bot = str(f.denominator())
+        if "z" not in bot and f not in found:
+            print(f)
+            found.add(f)
+            if s == "z + 1":
+                print(code.longstr(False))
+    print("count:", count)
+
+
+def search_unitary():
+
+    n = argv.get("n", 2)
+
+    
+
 
 
 def search_compose():
@@ -1499,7 +1642,7 @@ def search_compose():
         distill = PauliDistill(code)
         for (x,y,z,m,val) in distill.fast_find():
             val = complex(val)
-            fval = distill.f(complex(val))
+            fval = distill.py_f(complex(val))
 
             s = getkey(val)
             t = getkey(fval)
