@@ -103,41 +103,41 @@ Y = clifford.Y()
 Z = clifford.Z()
 
 
-class Mobius:
+class Meromorphic:
     R = sage.I.parent()
     Rz = sage.PolynomialRing(R, ["z"])
     K = sage.FractionField(Rz)
     z = K.gens()[0]
 
     def __init__(self, f):
-        f = Mobius.K(f)
+        f = Meromorphic.K(f)
         self.f = f
 
     @classmethod
     def build(cls, a=1, b=0, c=0, d=1):
-        z = Mobius.z
+        z = Meromorphic.z
         assert a*d - b*c != 0
         f = (a*z + b) / (c*z + d)
         return cls(f)
 
     @classmethod
     def promote(cls, item):
-        if isinstance(item, Mobius):
+        if isinstance(item, Meromorphic):
             return item
-        return Mobius(item)
+        return Meromorphic(item)
 
     def __str__(self):
-        return "Mobius(%s)"%(self.f)
+        return "Meromorphic(%s)"%(self.f)
     __repr__ = __str__
 
     def __mul__(self, other):
-        other = Mobius.promote(other)
-        z = Mobius.z
+        other = Meromorphic.promote(other)
+        z = Meromorphic.z
         f = self.f.subs({z:other.f})
-        return Mobius(f)
+        return Meromorphic(f)
 
     def __eq__(self, other):
-        other = Mobius.promote(other)
+        other = Meromorphic.promote(other)
         return self.f == other.f
 
     def __hash__(self):
@@ -146,14 +146,14 @@ class Mobius:
 
 def build_mobius():
 
-    I = Mobius.build()
+    I = Meromorphic.build()
     assert I*I == I
 
-    X = Mobius.build(0,1,1,0)
+    X = Meromorphic.build(0,1,1,0)
     assert X != I
     assert X*X == I
 
-    Z = Mobius.build(-1,0,0,1)
+    Z = Meromorphic.build(-1,0,0,1)
     assert Z*Z == I
     assert Z*X == X*Z
     assert Z*X != I
@@ -161,21 +161,21 @@ def build_mobius():
     Pauli = mulclose([X,Z])
     assert len(Pauli) == 4
 
-    H = Mobius.build(1,1,1,-1)
+    H = Meromorphic.build(1,1,1,-1)
     assert H*H == I
 
-    S = Mobius.build(-sage.I, 0, 0, 1) # i hope this is S not S dagger 
+    S = Meromorphic.build(-sage.I, 0, 0, 1) # i hope this is S not S dagger 
     assert S*S == Z
 
     Clifford = mulclose([S,H])
     assert len(Clifford) == 24
 
-    Mobius.Clifford = Clifford
-    Mobius.Pauli = Pauli
+    Meromorphic.Clifford = Clifford
+    Meromorphic.Pauli = Pauli
 
-    z = Mobius.z
-    f = Mobius((z**2 + 1)/(2*z)) # XXX rename Mobius as Meromorphic
-    f = Mobius(z**2)
+    z = Meromorphic.z
+    f = Meromorphic((z**2 + 1)/(2*z)) # XXX rename Mobius as Meromorphic
+    f = Meromorphic(z**2)
 
     for g in Clifford:
         gf = g*f
@@ -1028,20 +1028,20 @@ class MultiDistill(Distill):
             subs[gens[3*i+1]] = iy
             subs[gens[3*i+2]] = iz
 
-        print("uz = u.subs")
+        #print("uz = u.subs")
         uz = u.subs(subs)
-        print("vz = v.subs")
+        #print("vz = v.subs")
         vz = v.subs(subs)
-        print("T(uz);T(vz)")
+        #print("T(uz);T(vz)")
         uz = T(uz)
         vz = T(vz)
-        print("f = uz + w4*vz")
+        #print("f = uz + w4*vz")
         f = uz + w4*vz
-        print("assert")
+        #print("assert")
         #assert f.subs({zb:1234}) == f
         assert "zb" not in str(f)
 
-        print("simplify")
+        #print("simplify")
         f = simplify(f)
 
         self.f = f
@@ -1118,12 +1118,23 @@ def get_code():
             QCode.fromstr("ZZZZ XXII IIXX"), # 3
         ][idx]
     if params == (5,1,1):
-        code = QCode.fromstr("""
+        code = [
+        QCode.fromstr("""
         XZX.Z
         ZXX.Z
         ZZ.XX
         ZZZ..
-        """)
+        """),
+        QCode.fromstr("""
+        Y.XXY
+        ZXXXZ
+        ZZ.Z.
+        ZZZ..
+        """, None, """
+        YYIII
+        IXXXI"""),
+        ][idx]
+
     if params == (5,1,2):
         code = construct.get_512()
     if params == (5,1,3):
@@ -1323,7 +1334,7 @@ def orbit():
     print(sage.factor(f.numerator()), "/", sage.factor(f.denominator()))
 
     best = None
-    for g in Mobius.Clifford:
+    for g in Meromorphic.Clifford:
         gf = g*f
         s = str(gf.f)
         print("  ", s, len(s))
@@ -1376,9 +1387,7 @@ def dessin():
 def multi():
     code = get_code()
     distill = MultiDistill(code)
-
     distill.build()
-
     f = distill.f
     gens = distill.gens
     print(f)
@@ -1611,14 +1620,19 @@ def search_poly():
         code.build()
         assert code.L is not None
         distill = PauliDistill(code)
-        f = distill.build()
-        s = str(f).replace("zeta", "")
-        bot = str(f.denominator())
-        if "z" not in bot and f not in found:
-            print(f)
-            found.add(f)
+        f0 = distill.build()
+        for u in Meromorphic.Clifford:
+            f = (u*f0).f
+            s = str(f).replace("zeta", "")
+            bot = str(f.denominator())
+            if "z" in bot or "I" in s:
+                continue
+            if f not in found:
+                print(f, code)
+                found.add(f)
             if s == "z + 1":
                 print(code.longstr(False))
+
     print("count:", count)
 
 
@@ -1703,6 +1717,76 @@ def search_unitary():
             continue
         found.add(f)
         print(f)
+
+
+def search_expr():
+    R = sage.I.parent()
+    base = sage.PolynomialRing(R, list("wz"))
+    K = sage.FractionField(base)
+    w,z = K.gens()
+
+    p = w*z
+    q = (w*z + 1) / (w+z)
+
+    clifford = [K(f.f) for f in Meromorphic.Clifford]
+
+    gen = [0, 1, -1, sage.I, -sage.I]
+    gen = [K(g) for g in gen]
+    gen += [p, q] + clifford
+
+    pairs = [(g,h) for g in gen for h in gen]
+
+    expr = {}
+
+    def dump(f):
+        
+        print("==============")
+        print("dump", f)
+        while 1:
+            item = expr.get(f)
+            print(f, "<---", item)
+            if item is None:
+                break
+            f = item[0]
+        print("==============")
+
+    found = set(gen)
+    bdy = list(found)
+    while bdy and len(found) < 20000:
+
+        _bdy = []
+        for g in bdy:
+            s = str(g)
+            for h,k in pairs:
+                try:
+                    f = g.subs({w:h, z:k})
+                except ZeroDivisionError:
+                    continue
+                #assert f != 2, str(f)
+                if f in found: 
+                    continue
+                found.add(f); 
+                assert f not in expr, f
+                expr[f] = (g, h, k)
+                if f==z+1 or f==w+z:
+                    dump(f)
+                if len(str(f))>20: 
+                    continue
+                if h==1 and k==1:
+                    print("-->", f)
+                top = f.numerator()
+                if top.degree() > 3:
+                    continue
+                bot = f.denominator()
+                if bot.degree() > 3:
+                    continue
+                _bdy.append(f)
+                #if "/" not in str(f):
+                if bot == 1:
+                    print("\t", f)
+
+        bdy = _bdy
+        print("[%d, %d]"%(len(found), len(bdy)))
 
 
 
