@@ -62,6 +62,9 @@ def simplify(f):
         else:
             factor = gcd(factor, c)
 
+    if factor == 0:
+        return f
+
     top = top / factor
     bot = bot / factor
 
@@ -429,9 +432,10 @@ def pprint(f):
 
 
 class Distill:
+
+    f = None
     def __init__(self, n):
         self.n = n
-        self.f = None
 
     def get_variety(self):
         pass
@@ -1604,7 +1608,84 @@ def search_unitary():
 
     n = argv.get("n", 2)
 
-    
+    wmul = Matrix(base, [[1,0,0,0],[0,0,0,1]])
+    bmul = Matrix(base, [[1,0,0,1],[0,1,1,0]])
+
+    zs = ["z%d"%i for i in range(n)]
+    K = sage.PolynomialRing(base, zs)
+    zs = K.gens()
+    vecs = [Matrix(K, [[zs[i]],[1]]) for i in range(n)]
+
+    v = reduce(matmul, vecs)
+
+    def normalize(v):
+        r = v[len(v)-1, 0]
+        if r == 0:
+            return v
+        v = (1/r)*v
+        return v
+
+    c = Clifford(n)
+    gens = [c.S(i) for i in range(n)]
+    gens += [c.H(i) for i in range(n)]
+    gens += [c.CZ(i,j) for i in range(n) for j in range(i+1,n)]
+
+    #cliff = mulclose(gens, verbose=True, maxsize=None)
+    #print()
+
+    #print(normalize(bmul*v))
+
+    bdy = [v]
+    found = set(bdy)
+    seen = set()
+    while bdy:
+        _bdy = []
+        for g in gens:
+            for v in bdy:
+                gv = g*v
+                if gv in found:
+                    continue
+                _bdy.append(gv)
+                found.add(gv)
+                #gv = normalize(gv)
+                #for u in [wmul*gv, bmul*gv]:
+                #    f = normalize(u)[0,0]
+                f = normalize(gv)[0,0]
+                try:
+                    f = f.subs({zs[i]:zs[0] for i in range(n)})
+                except ZeroDivisionError:
+                    continue
+                s = str(f)
+                if "zeta" in s:
+                    continue
+                if s in seen:
+                    continue
+                seen.add(s)
+                top = (f.numerator()) 
+                bot = f.denominator()
+                if "z" not in str(top) or "z" not in str(bot):
+                    print(f)
+
+        bdy = _bdy
+        print("[%s, %s]"%(len(found), len(bdy)))
+
+    return
+
+    for g in cliff:
+      for w in [wmul*g*v, bmul*g*v]:
+        w = normalize(w)
+        f = w[0,0]
+        if "zeta" in str(f):
+            continue
+        try:
+            f = f.subs({zs[i]:zs[0] for i in range(n)})
+        except ZeroDivisionError:
+            continue
+        if f in found:
+            continue
+        found.add(f)
+        print(f)
+
 
 
 
