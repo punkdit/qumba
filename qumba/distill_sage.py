@@ -2097,6 +2097,100 @@ def test_density():
 
     M = op.subs({u0[3]:1, u1[3]:0})
     print(M)
+
+
+def test_wnode():
+
+    
+    #S = Matrix(base, [[1,0],[0,w4]])
+
+    S = Clifford(1).S()
+    Z = S*S
+    H = Clifford(1).H()
+
+    b_bb = Matrix(base, [
+        [1,0,0,1], 
+        [0,1,1,0],
+    ])
+
+
+    w_ww = Matrix(base, [
+        [1,0,0,0], 
+        [0,0,0,1],
+    ])
+
+    W = Matrix(base, [
+        [0,1,1,0], 
+        [0,0,0,1],
+    ])
+
+    assert W.norm() < 2
+    cliff = mulclose([S,H])
+    assert len(cliff)==192
+
+    W = Matrix(base, [
+        [1,1],
+        [0,1],
+    ])
+
+    target = set(g*W for g in cliff)
+
+    b_ = Matrix(base, [[1],[0]])
+    #assert b_bb * (b_@I) == I
+    #assert b_bb * (I@b_) == I
+    
+    w_ = Matrix(base, [[1],[1]])
+    assert ( w_ww * (w_@I) ) == I
+    assert ( w_ww * (I@w_) ) == I
+
+    _b = b_.t
+    _w = w_.t
+    bb_b = b_bb.t
+    ww_w = w_ww.t
+
+    single = [I, S, H, _b, b_, _w, w_] #, b_bb, w_ww] #, bb_b, ww_w]
+    pair = [a@b for a in single for b in single]
+
+    gen = single + pair
+    gen += [Clifford(2).CX()]
+
+    found = set(gen)
+    bdy = list(found)
+    while bdy:
+
+        _bdy = []
+
+        for g in bdy:
+          for h in gen:
+            if g.shape[1] != h.shape[0]:
+                continue
+            op = g*h
+            if op in found:
+                continue
+            found.add(op)
+            if op in target:
+                print("FOUND!!!\n\n\n"*4)
+                return
+            #if len(found) > 10000:
+            #    return
+            #if op.shape[0]*op.shape[1] > 4*4:
+            #    continue
+            if op.shape[0] > 4 or op.shape[1] > 4:
+                continue
+            if op.norm() > 2:
+                continue
+            if "1/4" in str(op):
+                continue
+            _bdy.append(op)
+            if len(_bdy)%100==0:
+                print(op)
+
+        bdy = _bdy
+        print(len(found), len(bdy))
+
+    print("found:", len(found))
+
+
     
 
 if __name__ == "__main__":

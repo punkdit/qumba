@@ -45,8 +45,8 @@ class Matrix:
     def __eq__(self, other):
         assert isinstance(other, Matrix)
         #assert self.ring == other.ring
-        assert self.shape == other.shape
-        return self.M == other.M
+        #assert self.shape == other.shape # too strong
+        return self.shape==other.shape and self.M == other.M
 
     def __hash__(self):
         return hash(self.M)
@@ -264,6 +264,9 @@ class Matrix:
 
     def charpoly(self):
         return self.M.characteristic_polynomial()
+
+    def norm(self):
+        return self.M.norm()
 
 
 
