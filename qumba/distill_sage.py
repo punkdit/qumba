@@ -1616,13 +1616,23 @@ def search_poly():
     found = set()
     count = 0
     for code in fn(n,k,d):
+        if argv.no_Y and "Y" in code.longstr():
+            continue
         count += 1
         code.build()
         assert code.L is not None
         distill = PauliDistill(code)
-        f0 = distill.build()
+        try:
+            f0 = distill.build()
+        except:
+            print("distill.build: Fail")
+            print(code.longstr(False))
+            continue
         for u in Meromorphic.Clifford:
-            f = (u*f0).f
+            try:
+                f = (u*f0).f
+            except ZeroDivisionError:
+                continue
             s = str(f).replace("zeta", "")
             bot = str(f.denominator())
             if "z" in bot or "I" in s:
@@ -1772,13 +1782,13 @@ def search_expr():
                     dump(f)
                 if len(str(f))>20: 
                     continue
-                if h==1 and k==1:
-                    print("-->", f)
+                #if h==1 and k==1:
+                #    print("-->", f)
                 top = f.numerator()
-                if top.degree() > 3:
+                if top.degree() > 4:
                     continue
                 bot = f.denominator()
-                if bot.degree() > 3:
+                if bot.degree() > 4:
                     continue
                 _bdy.append(f)
                 #if "/" not in str(f):
@@ -1787,6 +1797,138 @@ def search_expr():
 
         bdy = _bdy
         print("[%d, %d]"%(len(found), len(bdy)))
+
+
+def search_heap():
+    R = sage.I.parent()
+    base = sage.PolynomialRing(R, list("wz"))
+    K = sage.FractionField(base)
+    w,z = K.gens()
+    one = K.one()
+
+    p = w*z
+    q = (w*z + 1) / (w+z)
+
+    clifford = [K(f.f) for f in Meromorphic.Clifford]
+
+    gen = [0, 1, -1, sage.I, -sage.I]
+    gen = [K(g) for g in gen]
+    gen += [p, q] + clifford
+
+    gen = [g for g in gen if "I" not in str(g)] # Real only
+    clifford = [g for g in clifford if "I" not in str(g)] # Real only
+
+    pairs = [(g,h) for g in gen for h in gen]
+
+    expr = {}
+
+    def dump(f):
+        
+        print()
+        print("==============")
+        print("dump", f)
+        while 1:
+            item = expr.get(f)
+            print(f, "<---", item)
+            if item is None:
+                break
+            f = item[0]
+        print("==============")
+        print()
+
+    target = [w+z, w-z, -w+z, -w-z]
+    target += [1/g for g in target]
+    target = set(target)
+    target.add(z/(w+z))
+    target.add(w/(w+z))
+    print(target)
+    for h in list(target):
+      for g in clifford:
+        k = g.subs({z:h})
+        target.add(k)
+    print(target)
+    print()
+
+    pystr = lambda f : str(f).replace("^", "**")
+
+    found = set(gen)
+    bdy = list(found)
+    count = 0
+    while bdy and len(found) < 50000:
+        count += 1
+
+        N = len(bdy)
+        #bdy.sort(key = lambda f: -len(str(f)))
+        bdy.sort(key = lambda f: -(f.numerator().degree() + f.denominator().degree() + str(f).count("/")))
+
+        if N < 10 or 1:
+            g = bdy.pop()
+        else:
+            idx = randint(N - 10, N - 1)
+            g = bdy.pop(idx)
+
+        #g = simplify(g)
+        #g = K(g)
+        print(str(g).replace(" ", ""), end=" ", flush=True)
+        #assert g not in target # wahh??
+        if g in target:
+            dump(g)
+            return
+
+        sg = pystr(g)
+        for h,k in pairs:
+            #try:
+            #    f0 = g.subs({w:h, z:k})
+            #except ZeroDivisionError:
+            #    continue
+            s1 = sg.replace("z", "Z")
+            s1 = s1.replace("w", "("+pystr(h)+")")
+            s1 = s1.replace("Z", "("+pystr(k)+")")
+            s1 = "one*"+s1
+            s1 = s1.replace("/", "//")
+            try:
+                f = eval(s1, {"w":w, "z":z, "one":one})
+            except ZeroDivisionError:
+                continue
+            assert "." not in str(f)
+
+            try:
+                f = K(simplify(f))
+            except TypeError:
+                pass
+
+            if f in found: 
+                #print("(found %s)"%f, end=" ")
+                continue
+            #print("\n(%s --> %s)"%(f, f1))
+            found.add(f); 
+            assert f not in expr, f
+            #if f not in expr:
+            expr[f] = (g, h, k)
+            if f in target:
+                dump(f)
+                return
+            #if len(str(f))>20: 
+            #    continue
+            #if h==1 and k==1:
+            #    print("-->", f)
+            #top = f.numerator()
+            #bot = f.denominator()
+            #if top.degree() + bot.degree() > 10:
+            #    continue
+            s = str(f)
+            if "8" in s:
+                continue
+            if "w" in s and "z" in s:
+                bdy.append(f)
+            #if "/" not in str(f):
+            #if bot == 1:
+            #    print("\t", f)
+
+        if len(found) % 1000 == 0:
+            print("\n[%d, %d]"%(len(found), len(bdy)))
+
+    print("\n[%d, %d]"%(len(found), len(bdy)))
 
 
 
