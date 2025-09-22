@@ -1135,8 +1135,17 @@ def get_code():
         IXXXI"""),
         ][idx]
 
-    if params == (5,1,2):
+    if params == (5,1,2) and idx == 0:
         code = construct.get_512()
+    if params == (5,1,2) and idx == 1:
+        code = QCode.fromstr("""
+        XIXIX
+        IXXXI
+        ZZZII
+        IIZZZ
+        """, None, "XXIII ZIIIZ")
+        space = code.space
+        #code = space.H(1)*space.H(3) * code
     if params == (5,1,3):
         #code = construct.get_513()
         code = QCode.fromstr("XZZX.  .XZZX X.XZZ ZX.XZ", None, "ZXZII YZYII")
@@ -1493,6 +1502,7 @@ def test():
             fval = distill.py_f(complex(val))
             print(r"& %d \times (%.8f, %.8f, %.8f) \\ %% %s --> %s"%(
                 m, x, y, z, val, fval))
+            print("\t\t%% --> %s "%(istereo(fval.real, fval.imag),))
             found += m
         print(r"\begin{align*}")
         print(r"\end{align*}")
@@ -2099,8 +2109,7 @@ def test_density():
     print(M)
 
 
-def test_wnode():
-
+def search_clifford():
     
     #S = Matrix(base, [[1,0],[0,w4]])
 
@@ -2191,6 +2200,66 @@ def test_wnode():
     print("found:", len(found))
 
 
+def test_wnode():
+
+    base = sage.CyclotomicField(6)
+    w = base.gens()[0]
+
+    I = Matrix(base, [[1,0],[0,1]])
+    X = Matrix(base, [[0,1],[1,0]])
+    Z3 = Matrix(base, [[1,0],[0,w]])
+
+    b_bb = Matrix(base, [
+        [1,0,0,1], 
+        [0,1,1,0],
+    ])
+
+    W = Matrix(base, [
+        [0,1,1,0], 
+        [0,0,0,1],
+    ])
+
+    cap = Matrix(base, [[1,0,0,1]])
+    cup = cap.t
+
+    assert Z3**6 == I
+
+    op = (Z3@I) * cup
+    op = I @ op @ I
+    op = (b_bb @ b_bb) * op
+    op = (Z3@Z3) * op
+    op = b_bb * op
+    op = X * op
+
+
+    r = 1 // (2*w - 1)
+    op = r*op
+    
+    print(op)
+    assert op == W
+
+
+def test_512():
+
+    from qumba.symplectic import SymplecticSpace
+
+    n = 5
+
+    space = SymplecticSpace(n)
+    CX = space.CX
+    H = space.H
+
+    E = CX(4,3) * CX(2,3) * CX(2,1) * CX(0,1) 
+    E = CX(0,4) * E
+    E = H(1)*H(3) * E
+
+    E = ~E
+
+    print(E)
+
+    code = QCode.from_encoder(E, k=1)
+    print(code)
+    print(code.longstr())
     
 
 if __name__ == "__main__":
