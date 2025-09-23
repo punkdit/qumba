@@ -1412,14 +1412,17 @@ def multi():
     df = [diff(f, z) for z in gens]
 
     params = code.n, code.k, code.d
-    if params == (5,1,3):
+    z0 = argv.get("z0")
+    if z0 is not None:
+        pass
+    elif params == (5,1,3):
         z0 = 1.3660254037844386+1.3660254037844386j
     elif params == (5,1,2):
         z0 = 1 # df == 0
     elif params == (7,1,3):
         z0 = 0.
     else:
-        z0 = argv.get("z0", 0)
+        z0 = 0.
     print("z0 =", z0)
     subs = {g:z0 for g in gens}
     df = [dfi.subs(subs) for dfi in df]
