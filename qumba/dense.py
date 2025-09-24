@@ -11,7 +11,7 @@ from numpy import exp, pi, cos, arccos, sin
 
 from qumba.argv import argv
 
-EPSILON = 1e-4
+EPSILON = 1e-6
 scalar = numpy.complex64
 #scalar = numpy.complex128
 
@@ -48,6 +48,12 @@ class Matrix:
     def __repr__(self):
         return "Matrix(%s)"%(self.shape,)
 
+    def __getitem__(self, key):
+        val = self.A[key]
+        if type(val) is scalar:
+            val = complex(val)
+        return val
+
     def __str__(self):
         n = self.n
         m = self.m
@@ -77,9 +83,9 @@ class Matrix:
             elif abs(a+1)<EPSILON:
                 term = "-"+term
             elif abs(a.real)<EPSILON:
-                term = "%.4fj"%(a.imag)+term
+                term = "%.7fj"%(a.imag)+term
             elif abs(a.imag)<EPSILON:
-                term = "%.4f"%(a.real)+term
+                term = "%.7f"%(a.real)+term
             else:
                 term = str(a)+term
             terms.append(term)
@@ -93,6 +99,9 @@ class Matrix:
     def identity(self, N):
         A = numpy.identity(N)
         return Matrix(A)
+
+    #def __len__(self): # ARGHH breaks show() below XXX
+    #    return len(self.A)
 
     def __add__(self, other):
         assert self.shape == other.shape
@@ -144,6 +153,23 @@ class Matrix:
 
     def trace(self):
         return self.A.trace()
+
+    def eigenvectors(self):
+        A = self.A
+        vals, vecs = linalg.eig(A) # tuple of (evals, evecs)
+        n = len(vals)
+        return [(vals[i], Matrix(vecs[:,i:i+1])) for i in range(n)]
+
+    def order(self):
+        I = Matrix.identity(self.shape[0])
+        i = 1
+        A = self
+        while A != I and i < 999999:
+            A = self*A
+            i += 1
+        if i < 999999:
+            return i
+        assert 0
 
 
 class Space:
@@ -350,6 +376,7 @@ class Space:
             names.append("X(%d)"%i)
             names.append("Z(%d)"%i)
             gen += [X, Z]
+        assert 0, "no hash"
         names = mulclose_names(gen, names)
         return names
 
@@ -388,6 +415,100 @@ def test():
     assert S*S.d == I
 
 
+def mulclose_slow(gen):
+    found = list(gen)
+    bdy = list(gen)
+    while bdy:
+        _bdy = []
+        for g in gen:
+          for h in bdy:
+            gh = g*h
+            if gh not in found:
+                found.append(gh)
+                _bdy.append(gh)
+        bdy = _bdy
+        #print(len(found), len(bdy))
+    return found
+
+
+def test_eigs():
+    c = Space(1)
+    S, H = c.S(), c.H()
+    I = c.I
+
+    gen = [S,H]
+
+    Cliff = mulclose_slow(gen)
+    assert len(Cliff) == 192
+
+    # unitary
+    for g in Cliff:
+        assert g*g.d == I
+        
+    phases = [g for g in Cliff if abs(g[0,1])+abs(g[1,0])<EPSILON 
+        and abs(g[0,0]-g[1,1])<EPSILON]
+    assert len(phases) == 8, len(phases)
+
+    def eq(l, r):
+        for g in phases:
+            if g*l == r:
+                return True
+        return False
+
+
+    def cgy(g):
+        found = [g]
+        for h in Cliff:
+            k = h*g*h.d
+            for l in found:
+                if eq(l, k):
+                    break
+            else:
+                found.append(k)
+        return found
+
+    F = S*H
+
+    faces = cgy(F)
+    print("Face:", len(faces))
+
+    # remove inverse Face operators
+    i = 0
+    while i < len(faces):
+        for j in range(i+1, len(faces)):
+            if eq(faces[j].d, faces[i]):
+                faces.pop(j)
+                break
+        i += 1
+    print("Face:", len(faces)) # = 4
+
+    edges = cgy(H)
+    print("Edge:", len(edges)) # = 6
+
+    def show(M):
+        print("="*79)
+        print("show", M)
+        evals = M.eigenvectors()
+    
+        for val, vec in evals:
+            a, b = vec[:,0]
+            print(val, vec, a/b)
+            assert M*vec == val*vec
+
+    print("H:")
+
+    for M in edges:
+        show(M)
+        print(M.order())
+        if M==S*H:
+            print("S*H")
+        if M==H:
+            print("H")
+        #show(M.d) # dagger has same eigenvectors but conjugate evals
+        print()
+
+
+
 
 if __name__ == "__main__":
 
@@ -419,7 +540,7 @@ if __name__ == "__main__":
 
 
     t = time() - start_time
-    print("OK! finished in %.3f seconds\n"%t)
+    print("\nOK! finished in %.3f seconds\n"%t)
 
 
 

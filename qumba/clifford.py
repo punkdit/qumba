@@ -1706,6 +1706,15 @@ def test_goto():
 
     #print(X(2)*Z(2) == -Z(2)*X(2) )
 
+
+def test_eigs():
+    c = Clifford(1)
+    S, H = c.S(), c.H()
+
+    F = S*H
+
+    print(F.eigenvectors()) # FAIL
+
     
 def test():
     test_clifford()

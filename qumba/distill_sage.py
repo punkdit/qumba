@@ -143,6 +143,16 @@ class Meromorphic:
     def __hash__(self):
         return hash(self.f)
 
+    def order(self):
+        A = self
+        z = Meromorphic.z
+        I = Meromorphic(z)
+        i = 1
+        while A != z:
+            A = A*self
+            i += 1
+        return i
+
 
 def build_mobius():
 
@@ -163,9 +173,11 @@ def build_mobius():
 
     H = Meromorphic.build(1,1,1,-1)
     assert H*H == I
+    Meromorphic.H = H
 
     S = Meromorphic.build(-sage.I, 0, 0, 1) # i hope this is S not S dagger 
     assert S*S == Z
+    Meromorphic.S = S
 
     Clifford = mulclose([S,H])
     assert len(Clifford) == 24
@@ -180,6 +192,8 @@ def build_mobius():
     for g in Clifford:
         gf = g*f
 
+    F = S*H
+    assert F.order() == 3
 
 build_mobius()
 
@@ -2263,6 +2277,35 @@ def test_512():
     code = QCode.from_encoder(E, k=1)
     print(code)
     print(code.longstr())
+
+
+def test_H():
+
+    base = sage.CyclotomicField(24)
+    w24 = base.gens()[0]
+    R = sage.PolynomialRing(base, "z")
+    K = sage.FractionField(R)
+    z = K.gens()[0]
+
+    w24 = K(w24)
+    w6 = w24**4
+    assert w6**3 == -1
+    w8 = w24**3
+    w4 = w24**6
+    assert w4**2 == -1
+
+    r2 = w8 + w8**7
+    assert r2**2 == 2
+
+    H = Meromorphic.H.f
+    SH = (Meromorphic.S * Meromorphic.H).f
+
+    H = K(H)
+    SH = K(SH)
+
+    assert( H.subs({z : 1+r2}) == 1+r2 )
+    assert( H.subs({z : 1-r2}) == 1-r2 )
+
     
 
 if __name__ == "__main__":
