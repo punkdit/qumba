@@ -2,7 +2,7 @@
 
 from functools import reduce
 from operator import matmul, add
-
+import cmath
 
 import numpy
 from numpy import linalg
@@ -494,6 +494,21 @@ def test_eigs():
             a, b = vec[:,0]
             print(val, vec, a/b)
             assert M*vec == val*vec
+
+    show(F)
+    print("F")
+    print()
+
+    M = exp(2*pi*1j*(-1/24))*F
+    show(M)
+    print("1^{-1/24} F")
+    print()
+
+    M = exp(2*pi*1j*(7/24))*F
+    show(M)
+    print("1^{7/24} F")
+    print()
+    return
 
     print("H:")
 
