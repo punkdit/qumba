@@ -451,6 +451,7 @@ def test_bring():
         base = cover.base
         base.distance("z3")
         print(base)
+        print(base.longstr(False))
         #print(strop(base.H))
         codes.append(base)
 

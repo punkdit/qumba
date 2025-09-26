@@ -2485,7 +2485,7 @@ def test_surface():
         print(val, m)
 
 
-def test_golay():
+def test_poly():
     R = sage.PolynomialRing(sage.ZZ, "z")
     R = sage.FractionField(R)
     z = R.gens()[0]
@@ -2496,7 +2496,12 @@ def test_golay():
     # [[17,1,5]] wenum
     f = (z**17 + 17*z**13 + 187*z**9 + 51*z**5) // (51*z**12 + 187*z**8 + 17*z**4 + 1)
 
+    # CZ 
+    f = (z**2 + z) / (z-1)
+
     print(f)
+
+    find(f)
 
     df = diff(f, z)
 
@@ -2524,9 +2529,8 @@ def run_selfdual(code):
         w = v.sum()
         assert w%4 == 0, str(v)
         wenum[w] += 1
-    print("wenum", wenum)
+    print("wenum", wenum, code)
 
-    
     base = sage.PolynomialRing(sage.ZZ, "z")
     R = sage.FractionField(base)
     z = R.gens()[0]
@@ -2538,6 +2542,17 @@ def run_selfdual(code):
         top += w*(z**(n-i))
 
     f = top // bot
+    find(f)
+
+
+def find(f):
+    base = sage.PolynomialRing(sage.ZZ, "z")
+    R = sage.FractionField(base)
+    z = R.gens()[0]
+
+    top = f.numerator()
+    bot = f.denominator()
+
     print(f)
 
     print("fixed points:")
@@ -2564,13 +2579,18 @@ def test_selfdual():
 
 def test_binary():
 
-    from qumba.selfdual.load import items
+    from qumba.selfdual import load
+    items = load.get_items("32-II.magma")
+
     for item in items:
         H = numpy.array(item)
         H = H[1:, 1:]
         #print(H, H.shape)
         code = QCode.build_css(H, H)
         assert code.is_selfdual()
+        #if code.d < 7:
+        #    continue
+
         print(code)
 
         run_selfdual(code)

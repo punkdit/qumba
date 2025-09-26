@@ -653,7 +653,7 @@ class QCode(object):
             return
 
         from qumba.distance import distance_meetup
-        max_m = argv.get("max_m", 3)
+        max_m = argv.get("max_m", 5)
         d = distance_meetup(self, max_m)
         if d is None:
             self.d_lower_bound = 2*max_m + 1
