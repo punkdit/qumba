@@ -2524,7 +2524,7 @@ def run_selfdual(code):
         w = v.sum()
         assert w%4 == 0, str(v)
         wenum[w] += 1
-    print(wenum)
+    print("wenum", wenum)
 
     
     base = sage.PolynomialRing(sage.ZZ, "z")
@@ -2564,7 +2564,7 @@ def test_selfdual():
 
 def test_binary():
 
-    from qumba.load_magma import items
+    from qumba.selfdual.load import items
     for item in items:
         H = numpy.array(item)
         H = H[1:, 1:]
@@ -2573,7 +2573,7 @@ def test_binary():
         assert code.is_selfdual()
         print(code)
 
-        #run_selfdual(code)
+        run_selfdual(code)
         #break
 
 
