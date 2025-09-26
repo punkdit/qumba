@@ -1123,10 +1123,9 @@ def test_mobius():
     print( a, mul( -1, a ) )
 
 
-def get_code():
-    code = None
+def get_code(code=None, verbose=True):
     idx = argv.get("idx", 0)
-    params = argv.code
+    params = argv.get("code", code)
     if params == (3,1,1):
         code = [
             QCode.fromstr("ZZZ XXI"),
@@ -1446,8 +1445,9 @@ ZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIIIIIZZZIZIIZZ
 
     assert code is not None
 
-    print(code)
-    print(code.longstr(False))
+    if verbose:
+        print(code)
+        print(code.longstr(False))
 
     return code
 
@@ -2507,9 +2507,7 @@ def test_golay():
     print(r"\frac{%s}{(%s)^2}"%(latex(top), latex(f.denominator())))
 
 
-def test_selfdual():
-
-    code = get_code()
+def run_selfdual(code):
     print(code)
 
     rows = strop(code.H).split()
@@ -2545,7 +2543,7 @@ def test_selfdual():
     print("fixed points:")
     g = base(top-z*bot)
     for val,m in (g).roots(ring=sage.CIF):
-        print(val, "mul=%d"%m)
+        print("\t(%d)"%m, val)
 
     df = diff(f, z)
 
@@ -2557,8 +2555,26 @@ def test_selfdual():
 
     print("stationary points:")
     for val,m in top.roots(ring=sage.CIF):
-        print(val, "mul=%d"%m)
+        print("\t(%d)"%m, val, "->", f.subs({z:val}))
 
+
+def test_selfdual():
+    code = get_code(verbose=False)
+    run_selfdual(code)
+
+def test_binary():
+
+    from qumba.load_magma import items
+    for item in items:
+        H = numpy.array(item)
+        H = H[1:, 1:]
+        #print(H, H.shape)
+        code = QCode.build_css(H, H)
+        assert code.is_selfdual()
+        print(code)
+
+        #run_selfdual(code)
+        #break
 
 
 if __name__ == "__main__":
