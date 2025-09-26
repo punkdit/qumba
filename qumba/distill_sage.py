@@ -34,7 +34,6 @@ def eq(a, b):
     return abs(a-b) < 1e-6
 
 diff = sage.derivative
-latex = sage.latex
 
 py_w8 = (2**(-1/2))*(1+1j)
 assert eq(py_w8**2, 1j)
@@ -84,6 +83,14 @@ def pystr(u):
     return s
 
 rnd = lambda radius=10: 2*radius*random() - radius
+
+#latex = sage.latex
+
+def latex(a):
+    s = sage.latex(a)
+    s = s.replace(r"\cdot", "")
+    s = s.replace("  ", " ")
+    return s
 
 if argv.latex:
     mkstr = lambda x : sage.latex(x) + r" \\"
@@ -1129,7 +1136,7 @@ def get_code():
             QCode.fromstr("YYZI IXXZ ZIYY"), # 0
             QCode.fromstr("XXXX ZZZZ YYII"), # 1
             QCode.fromstr("XYZI IXYZ ZIXY"), # 2
-            QCode.fromstr("ZZZZ XXII IIXX"), # 3
+            QCode.fromstr("ZZZZ XXII IIXX", None, "XIXI ZZII"), # 3
         ][idx]
     if params == (5,1,1):
         code = [
@@ -1233,6 +1240,18 @@ def get_code():
         "ZZIIIIIIZI IIIZZIIIZI IZIZIIIIIZ IIZIIZIIIZ IIIZIZIZII IIIIZIZZII",
         None, "XXXXXXXIII ZZZZZZZIII")
 
+    if params == (10,1,3):
+        code = QCode.fromstr("""
+        XX..Z..Z..
+        .XX..Z..Z.
+        ..XX..Z..Z
+        Z..XX..Z..
+        .Z..XX..Z.
+        ..Z..XX..Z
+        Z..Z..XX..
+        .Z..Z..XX.
+        ..Z..Z..XX""", None, "YZZY......  ZZZ...X...")
+
     if params == (11,1,3):
         H = """
         XIIIIXXIIIX
@@ -1317,6 +1336,92 @@ def get_code():
     if params == (23,1,7):
         code = construct.get_golay(23)
 
+    if params == (31,1,7):
+        code = QCode.fromstr("""
+        XIIXIIXIXIIIXXIXXIIIIIIIIIIIIII
+        IIXIIXIXIIIXXIXXIIIIIIIIIIIIIIX
+        IXIIXIXIIIXXIXXIIIIIIIIIIIIIIXI
+        XIIXIXIIIXXIXXIIIIIIIIIIIIIIXII
+        IIXIXIIIXXIXXIIIIIIIIIIIIIIXIIX
+        IXIXIIIXXIXXIIIIIIIIIIIIIIXIIXI
+        XIXIIIXXIXXIIIIIIIIIIIIIIXIIXII
+        IXIIIXXIXXIIIIIIIIIIIIIIXIIXIIX
+        XIIIXXIXXIIIIIIIIIIIIIIXIIXIIXI
+        IIIXXIXXIIIIIIIIIIIIIIXIIXIIXIX
+        IIXXIXXIIIIIIIIIIIIIIXIIXIIXIXI
+        IXXIXXIIIIIIIIIIIIIIXIIXIIXIXII
+        XXIXXIIIIIIIIIIIIIIXIIXIIXIXIII
+        XIXXIIIIIIIIIIIIIIXIIXIIXIXIIIX
+        IXXIIIIIIIIIIIIIIXIIXIIXIXIIIXX
+        ZIIZIIZIZIIIZZIZZIIIIIIIIIIIIII
+        IIZIIZIZIIIZZIZZIIIIIIIIIIIIIIZ
+        IZIIZIZIIIZZIZZIIIIIIIIIIIIIIZI
+        ZIIZIZIIIZZIZZIIIIIIIIIIIIIIZII
+        IIZIZIIIZZIZZIIIIIIIIIIIIIIZIIZ
+        IZIZIIIZZIZZIIIIIIIIIIIIIIZIIZI
+        ZIZIIIZZIZZIIIIIIIIIIIIIIZIIZII
+        IZIIIZZIZZIIIIIIIIIIIIIIZIIZIIZ
+        ZIIIZZIZZIIIIIIIIIIIIIIZIIZIIZI
+        IIIZZIZZIIIIIIIIIIIIIIZIIZIIZIZ
+        IIZZIZZIIIIIIIIIIIIIIZIIZIIZIZI
+        IZZIZZIIIIIIIIIIIIIIZIIZIIZIZII
+        ZZIZZIIIIIIIIIIIIIIZIIZIIZIZIII
+        ZIZZIIIIIIIIIIIIIIZIIZIIZIZIIIZ
+        IZZIIIIIIIIIIIIIIZIIZIIZIZIIIZZ
+        """, None, "X"*31+" "+"Z"*31)
+
+    if params == (49,1,9):
+        code = QCode.fromstr("""
+XXXIXIIIIIIIIIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIII
+XXIXIIIIIIIIIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIX
+XIXIIIIIIIIIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXX
+IXIIIIIIIIIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXX
+XIIIIIIIIIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXI
+IIIIIIIIIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIX
+IIIIIIIIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXI
+IIIIIIIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXII
+IIIIIIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIII
+IIIIIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIII
+IIIIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIII
+IIIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIIII
+IIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIIIII
+IXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIIIIII
+XXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIIIIIII
+XXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIIIIIIIX
+XIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIIIIIIIXX
+IXIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIIIIIIIXXX
+XIIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIIIIIIIXXXI
+IIXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIIIIIIIXXXIX
+IXXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIIIIIIIXXXIXI
+XXXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIIIIIIIXXXIXII
+XXIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIIIIIIIXXXIXIIX
+XIXIIIIIIIIIIIIIIIIIIIIIIIXXXIXIIIIIIIIIXXXIXIIXX
+ZZZIZIIIIIIIIIZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIII
+ZZIZIIIIIIIIIZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZ
+ZIZIIIIIIIIIZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZ
+IZIIIIIIIIIZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZ
+ZIIIIIIIIIZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZI
+IIIIIIIIIZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZ
+IIIIIIIIZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZI
+IIIIIIIZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZII
+IIIIIIZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIII
+IIIIIZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIII
+IIIIZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIII
+IIIZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIII
+IIZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIII
+IZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIIII
+ZZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIIIII
+ZZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIIIIIZ
+ZIZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIIIIIZZ
+IZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIIIIIZZZ
+ZIIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIIIIIZZZI
+IIZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIIIIIZZZIZ
+IZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIIIIIZZZIZI
+ZZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIIIIIZZZIZII
+ZZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIIIIIZZZIZIIZ
+ZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIIIIIZZZIZIIZZ
+        """, None, "X"*49+" "+"Z"*49)
+
     if argv.concat:
         smap = SMap()
         lhs = QCode.fromstr("ZZI IZZ", None, "XXX ZII")
@@ -1372,6 +1477,41 @@ def orbit():
 
 def wenum():
     code = get_code()
+
+    result = pauli.get_wenum(code)
+    for p in result:
+        pass
+
+    ring = p.parent()
+    x,y,z,w = ring.gens()
+    for p in result:
+        print(p)
+        print(p.subs({x:x, y:0, z:0, w:1}))
+        print()
+    #print(sage.factor(p))
+
+    return
+
+    print()
+    print(p.subs({x:1, y:1, z:1, w:1}))
+    print(p.subs({x:z, y:1, z:1, w:1}))
+    print(p.subs({x:1, y:z, z:1, w:1}))
+    print(p.subs({x:1, y:1, z:z, w:1}))
+    print(p.subs({x:1, y:1, z:1, w:z}))
+    print(p.subs({x:z, y:z, z:1, w:1}))
+    print(p.subs({x:z, y:1, z:z, w:1}))
+    print(p.subs({x:z, y:1, z:1, w:z}))
+    print(p.subs({x:1, y:z, z:z, w:1}))
+    print(p.subs({x:1, y:z, z:1, w:z}))
+    print(p.subs({x:1, y:1, z:z, w:z}))
+    print(p.subs({x:z, y:z, z:z, w:1}))
+    print(p.subs({x:z, y:z, z:1, w:z}))
+    print(p.subs({x:z, y:1, z:z, w:z}))
+    print(p.subs({x:1, y:z, z:z, w:z}))
+    print(p.subs({x:z, y:z, z:z, w:z}))
+
+    return
+
     distill = PauliDistill(code)
     f = distill.build()
 
@@ -1379,6 +1519,18 @@ def wenum():
     print(latex(f))
     print(sage.factor(f.numerator()), "/", sage.factor(f.denominator()))
 
+
+def test_diff():
+
+    code = get_code()
+    distill = PauliDistill(code)
+    f = distill.build()
+    print("f =", f)
+
+    z = f.parent().gens()[0]
+
+    df = diff(f, z)
+    print("df =", df)
 
 def full_wenum():
     code = get_code()
@@ -1578,6 +1730,23 @@ def all_cyclic(n, k, d):
         if code.d < d:
             continue
         yield code
+
+
+def search_cyclic():
+
+    n = argv.get("n", 4)
+    d = argv.get("d", 1)
+    k = 1
+    
+    for code in all_cyclic(n, k, d):
+        print(code)
+        print(code.longstr(False))
+
+        distill = PauliDistill(code)
+        f = distill.build()
+        print(f)
+        break
+
 
 
 def search_fix():
@@ -2306,7 +2475,91 @@ def test_H():
     assert( H.subs({z : 1+r2}) == 1+r2 )
     assert( H.subs({z : 1-r2}) == 1-r2 )
 
+
+def test_surface():
+    R = sage.PolynomialRing(sage.ZZ, "z")
+    z = R.gens()[0]
+    f = z**16 + 4*z**14 + 16*z**12 + 44*z**10 + 126 * z**8 + 44*z**6 + 16*z**4 + 4*z**2 + 1
+
+    for val,m in f.roots(ring=sage.CIF):
+        print(val, m)
+
+
+def test_golay():
+    R = sage.PolynomialRing(sage.ZZ, "z")
+    R = sage.FractionField(R)
+    z = R.gens()[0]
+
+    # Golay code wenum
+    f = (z**23 + 506*z**15 + 1288*z**11 + 253*z**7) // (253*z**16 + 1288*z**12 + 506*z**8 + 1)
+
+    # [[17,1,5]] wenum
+    f = (z**17 + 17*z**13 + 187*z**9 + 51*z**5) // (51*z**12 + 187*z**8 + 17*z**4 + 1)
+
+    print(f)
+
+    df = diff(f, z)
+
+    top = df.numerator()
+    bot = df.denominator()
+
+    top = (sage.factor(top))
+    print(r"\frac{%s}{(%s)^2}"%(latex(top), latex(f.denominator())))
+
+
+def test_selfdual():
+
+    code = get_code()
+    print(code)
+
+    rows = strop(code.H).split()
+    rows = [r for r in rows if "X" in r]
+    rows = [r.replace("X","1").replace(".","0") for r in rows]
+    H = [[int(c) for c in row] for row in rows]
+    H = numpy.array(H)
+    #print(H, H.shape)
+
+    m, n = H.shape
+    wenum = [0]*(n+1)
+    for bits in numpy.ndindex((2,)*m):
+        v = numpy.dot(bits, H)%2
+        w = v.sum()
+        assert w%4 == 0, str(v)
+        wenum[w] += 1
+    print(wenum)
+
     
+    base = sage.PolynomialRing(sage.ZZ, "z")
+    R = sage.FractionField(base)
+    z = R.gens()[0]
+
+    bot = 0
+    top = 0
+    for (i,w) in enumerate(wenum):
+        bot += w*(z**i)
+        top += w*(z**(n-i))
+
+    f = top // bot
+    print(f)
+
+    print("fixed points:")
+    g = base(top-z*bot)
+    for val,m in (g).roots(ring=sage.CIF):
+        print(val, "mul=%d"%m)
+
+    df = diff(f, z)
+
+    top = df.numerator()
+    bot = df.denominator()
+
+    #top = (sage.factor(top))
+    #print(r"\frac{%s}{(%s)^2}"%(latex(top), latex(f.denominator())))
+
+    print("stationary points:")
+    for val,m in top.roots(ring=sage.CIF):
+        print(val, "mul=%d"%m)
+
+
 
 if __name__ == "__main__":
 
