@@ -23,7 +23,7 @@ from qumba.smap import SMap
 from qumba.qcode import strop, QCode
 from qumba import construct 
 from qumba.matrix_sage import Matrix
-from qumba.clifford import Clifford, w4, ir2
+from qumba.clifford import Clifford, w4, r2, ir2
 from qumba.action import mulclose
 from qumba.dense import bitlog
 from qumba import pauli
@@ -1168,7 +1168,8 @@ def get_code(code=None, verbose=True):
         #code = space.H(1)*space.H(3) * code
     if params == (5,1,3):
         #code = construct.get_513()
-        code = QCode.fromstr("XZZX.  .XZZX X.XZZ ZX.XZ", None, "ZXZII YZYII")
+        #code = QCode.fromstr("XZZX.  .XZZX X.XZZ ZX.XZ", None, "ZXZII YZYII")
+        code = QCode.fromstr("XZZX.  .XZZX X.XZZ ZX.XZ", None, "XXXXX ZZZZZ")
     if params == (6,1,2):
         code = QCode.fromstr("""
         X.ZZX.
@@ -2512,8 +2513,8 @@ def test_poly():
     print(r"\frac{%s}{(%s)^2}"%(latex(top), latex(f.denominator())))
 
 
-def run_selfdual(code):
-    print(code)
+def build_selfdual(code):
+    #print(code)
 
     rows = strop(code.H).split()
     rows = [r for r in rows if "X" in r]
@@ -2529,7 +2530,7 @@ def run_selfdual(code):
         w = v.sum()
         assert w%4 == 0, str(v)
         wenum[w] += 1
-    print("wenum", wenum, code)
+    #print("wenum", wenum, code)
 
     base = sage.PolynomialRing(sage.ZZ, "z")
     R = sage.FractionField(base)
@@ -2542,13 +2543,16 @@ def run_selfdual(code):
         top += w*(z**(n-i))
 
     f = top // bot
-    find(f)
+    return f
+
 
 
 def find(f):
     base = sage.PolynomialRing(sage.ZZ, "z")
     R = sage.FractionField(base)
     z = R.gens()[0]
+
+    f = R(f)
 
     top = f.numerator()
     bot = f.denominator()
@@ -2561,27 +2565,45 @@ def find(f):
         print("\t(%d)"%m, val)
 
     df = diff(f, z)
-
     top = df.numerator()
     bot = df.denominator()
-
-    #top = (sage.factor(top))
-    #print(r"\frac{%s}{(%s)^2}"%(latex(top), latex(f.denominator())))
+    print(r"f'(z) = \frac{%s}{(%s)^2}"%(latex(sage.factor(top)), latex(f.denominator())))
 
     print("stationary points:")
     for val,m in top.roots(ring=sage.CIF):
         print("\t(%d)"%m, val, "->", f.subs({z:val}))
 
 
+def test_find():
+
+    code = get_code()
+    distill = PauliDistill(code)
+    f = distill.build()
+    find(f)
+
+
+
 def test_selfdual():
     code = get_code(verbose=False)
-    run_selfdual(code)
+    f = build_selfdual(code)
+    find(f)
 
 def test_binary():
 
-    from qumba.selfdual import load
-    items = load.get_items("32-II.magma")
+    base = sage.PolynomialRing(sage.ZZ, "z")
+    R = sage.FractionField(base)
 
+    from qumba.selfdual import load
+    #items = load.get_items("24-II.magma")
+    #items = load.get_items("32-II.magma")
+    items = load.get_items("40-II8.magma")
+
+    z = base.gens()[0]
+    F4p = z**4 + 2*z**3 + 2*z**2 - 2*z + 1
+    F4m = z**4 - 2*z**3 + 2*z**2 + 2*z + 1
+    Pz = z
+
+    z = R.gens()[0]
     for item in items:
         H = numpy.array(item)
         H = H[1:, 1:]
@@ -2591,10 +2613,38 @@ def test_binary():
         #if code.d < 7:
         #    continue
 
-        print(code)
 
-        run_selfdual(code)
+        f = build_selfdual(code)
+
+        df = diff(f, z)
+        top = df.numerator()
+        bot = df.denominator()
+
+        #print(top)
+        #if top % F4p == 0:
+        #    print("\t", top//F4p)
+
+        print(code, end=" ")
+
+        ftop = sage.factor(top)
+        for factor,m in ftop:
+            if factor == Pz:
+                print("Pz^%d"%m, end=" ")
+            if factor == F4p:
+                print("F4p^%d"%m, end=" ")
+            if factor == F4m:
+                print("F4m^%d"%m, end=" ")
+
+            #print(code)
+            #print(f)
+            #print(r"f'(z) = \frac{%s}{(%s)^2}"%(latex(sage.factor(top)), latex(f.denominator())))
+
+        #find(f)
         #break
+
+        print()
+        #break
+
 
 
 if __name__ == "__main__":
