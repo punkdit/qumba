@@ -90,6 +90,8 @@ def latex(a):
     s = sage.latex(a)
     s = s.replace(r"\cdot", "")
     s = s.replace("  ", " ")
+    #s = s.replace(r"\zeta_{8}^{2}", "i") # ??
+    s = s.replace("r_{2}", r"\sqrt{2}")
     return s
 
 if argv.latex:
@@ -1370,6 +1372,55 @@ def get_code(code=None, verbose=True):
         IZZIIIIIIIIIIIIIIZIIZIIZIZIIIZZ
         """, None, "X"*31+" "+"Z"*31)
 
+    if params == (47,1,11):
+        code = QCode.fromstr("""
+XXIIXIXIIXIIXXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIII
+XIIXIXIIXIIXXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIX
+IIXIXIIXIIXXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXX
+IXIXIIXIIXXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXI
+XIXIIXIIXXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXII
+IXIIXIIXXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIX
+XIIXIIXXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXI
+IIXIIXXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIX
+IXIIXXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXI
+XIIXXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXII
+IIXXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXIIX
+IXXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXIIXI
+XXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXIIXII
+XIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXIIXIIX
+IXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXIIXIIXX
+XXIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXIIXIIXXI
+XIIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXIIXIIXXIX
+IIXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXIIXIIXXIXX
+IXXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXIIXIIXXIXXI
+XXIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXIIXIIXXIXXII
+XIIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXIIXIIXXIXXIIX
+IIIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXIIXIIXXIXXIIXX
+IIXIIIIIIIIIIIIIIIIIIIIIIXXIIXIXIIXIIXXIXXIIXXI
+ZZIIZIZIIZIIZZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIII
+ZIIZIZIIZIIZZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZ
+IIZIZIIZIIZZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZ
+IZIZIIZIIZZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZI
+ZIZIIZIIZZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZII
+IZIIZIIZZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZ
+ZIIZIIZZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZI
+IIZIIZZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZ
+IZIIZZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZI
+ZIIZZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZII
+IIZZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZIIZ
+IZZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZIIZI
+ZZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZIIZII
+ZIZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZIIZIIZ
+IZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZIIZIIZZ
+ZZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZIIZIIZZI
+ZIIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZIIZIIZZIZ
+IIZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZIIZIIZZIZZ
+IZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZIIZIIZZIZZI
+ZZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZIIZIIZZIZZII
+ZIIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZIIZIIZZIZZIIZ
+IIIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZIIZIIZZIZZIIZZ
+IIZIIIIIIIIIIIIIIIIIIIIIIZZIIZIZIIZIIZZIZZIIZZI
+        """, None, "X"*47+" "+"Z"*47)
     if params == (49,1,9):
         code = QCode.fromstr("""
 XXXIXIIIIIIIIIXXXIXIIXXXIXIIIIIIIIIIIIIIIIIIIIIII
@@ -1615,7 +1666,7 @@ def test():
         op = (plus@I)*CH
         print(op)
         # TODO fix the problem with sage rings, etc. somehow...
-        assert 0, "TODO"
+        #assert 0, "TODO"
         distill = GateDistill(op)
 
     elif argv.CX:
@@ -2513,24 +2564,38 @@ def test_poly():
     print(r"\frac{%s}{(%s)^2}"%(latex(top), latex(f.denominator())))
 
 
-def build_selfdual(code):
-    #print(code)
+@cache
+def get_bits(m):
+    rows = numpy.array(list(numpy.ndindex((2,)*m)), dtype=int)
+    return rows
 
-    rows = strop(code.H).split()
-    rows = [r for r in rows if "X" in r]
-    rows = [r.replace("X","1").replace(".","0") for r in rows]
-    H = [[int(c) for c in row] for row in rows]
-    H = numpy.array(H)
-    #print(H, H.shape)
-
+def classical_wenum(H):
     m, n = H.shape
+
+    if 0:
+        wenum = [0]*(n+1)
+        for bits in numpy.ndindex((2,)*m):
+            v = numpy.dot(bits, H)%2
+            w = v.sum()
+            assert w%4 == 0, str(v)
+            wenum[w] += 1
+        #print("wenum", wenum)
+
+    A = get_bits(m)
+    AH = numpy.dot(A, H)%2
+    w = AH.sum(axis=1)
+    assert (w%4).sum() == 0
+    w = list(w)
+    assert w[0] == 0
+    #print(w.count(8))
     wenum = [0]*(n+1)
-    for bits in numpy.ndindex((2,)*m):
-        v = numpy.dot(bits, H)%2
-        w = v.sum()
-        assert w%4 == 0, str(v)
-        wenum[w] += 1
-    #print("wenum", wenum, code)
+    #print(len(w), "/", end='', flush=True)
+    for i in w:
+        wenum[i] += 1
+    #print("\\")
+    #print(wenum)
+
+    #assert 0
 
     base = sage.PolynomialRing(sage.ZZ, "z")
     R = sage.FractionField(base)
@@ -2543,6 +2608,22 @@ def build_selfdual(code):
         top += w*(z**(n-i))
 
     f = top // bot
+    return f
+
+
+
+
+def build_selfdual(code):
+    #print(code)
+
+    rows = strop(code.H).split()
+    rows = [r for r in rows if "X" in r]
+    rows = [r.replace("X","1").replace(".","0") for r in rows]
+    H = [[int(c) for c in row] for row in rows]
+    H = numpy.array(H)
+    #print(H, H.shape)
+
+    f = classical_wenum(H)
     return f
 
 
@@ -2582,11 +2663,57 @@ def test_find():
     find(f)
 
 
-
 def test_selfdual():
     code = get_code(verbose=False)
     f = build_selfdual(code)
     find(f)
+
+
+def gen_latex():
+    code = get_code(verbose=False)
+
+    print(code.longstr(False))
+
+    base = sage.PolynomialRing(sage.ZZ, "z")
+    R = sage.FractionField(base)
+    z = R.gens()[0]
+
+    if code.is_css() and code.is_selfdual() and not argv.se: # and code.is_doublyeven():
+        f = build_selfdual(code)
+    else:
+        f = PauliDistill(code).build()
+    f = R(f)
+
+    if argv.Z:
+        f = -f
+
+    top = f.numerator()
+    bot = f.denominator()
+
+    r = sage.factor(top - z*bot)
+
+    df = sage.diff(f, z)
+    df_top = df.numerator()
+    df_bot = df.denominator()
+
+    print(r"\begin{align*}")
+    print("f(z) &= %s \\\\" % latex(f))
+    print("r(z) &= %s \\\\" % latex(r))
+
+    if df_bot == bot**2:
+        print(r"f'(z) &= \frac{%s}{%s^2}"%(
+            latex(sage.factor(df_top)), (latex( sage.factor(bot) ))))
+    else:
+        print(r"f'(z) &= \frac{%s}{%s} %% df_bot != bot**2"%(
+            latex(sage.factor(df_top)), (latex( sage.factor(df_bot) ))))
+    print(r"\end{align*}")
+
+    from qumba.clifford import K
+    ring = sage.PolynomialRing(K, "z")
+    df_bot = ring(df_bot)
+    print("df_bot:", sage.factor(df_bot))
+    
+
 
 def test_binary():
 
@@ -2596,7 +2723,9 @@ def test_binary():
     from qumba.selfdual import load
     #items = load.get_items("24-II.magma")
     #items = load.get_items("32-II.magma")
-    items = load.get_items("40-II8.magma")
+    items = load.get_items("40-II8.magma") # 16470
+
+    print("items:", len(items))
 
     z = base.gens()[0]
     F4p = z**4 + 2*z**3 + 2*z**2 - 2*z + 1
@@ -2604,17 +2733,17 @@ def test_binary():
     Pz = z
 
     z = R.gens()[0]
-    for item in items:
+    for idx,item in enumerate(items):
         H = numpy.array(item)
         H = H[1:, 1:]
         #print(H, H.shape)
-        code = QCode.build_css(H, H)
-        assert code.is_selfdual()
+        #code = QCode.build_css(H, H)
+        #assert code.is_selfdual()
         #if code.d < 7:
         #    continue
 
-
-        f = build_selfdual(code)
+        #f = build_selfdual(code)
+        f = classical_wenum(H)
 
         df = diff(f, z)
         top = df.numerator()
@@ -2624,16 +2753,18 @@ def test_binary():
         #if top % F4p == 0:
         #    print("\t", top//F4p)
 
-        print(code, end=" ")
+        #print(code, end=" ")
+
+        print("%d"%idx, end="", flush=True)
 
         ftop = sage.factor(top)
         for factor,m in ftop:
             if factor == Pz:
-                print("Pz^%d"%m, end=" ")
+                print("(Pz^%d)"%m, end="")
             if factor == F4p:
-                print("F4p^%d"%m, end=" ")
+                print("(F4p^%d)"%m, end="")
             if factor == F4m:
-                print("F4m^%d"%m, end=" ")
+                print("(F4m^%d)"%m, end="")
 
             #print(code)
             #print(f)
@@ -2642,8 +2773,211 @@ def test_binary():
         #find(f)
         #break
 
-        print()
+        print(" ", end='', flush=True)
         #break
+
+
+def test_de():
+
+    base = sage.PolynomialRing(sage.ZZ, "z")
+    R = sage.FractionField(base)
+
+    from qumba.selfdual import load
+    #items = load.get_items("24-II.magma")
+    #items = load.get_items("32-II.magma")
+    #items = load.get_items("40-II8.magma") # 16470
+    items = load.get_items("40-II-d4-p1.magma")
+
+    print("items:", len(items))
+
+    z = base.gens()[0]
+    F4p = z**4 + 2*z**3 + 2*z**2 - 2*z + 1
+    F4m = z**4 - 2*z**3 + 2*z**2 + 2*z + 1
+    Pz = z
+
+    items = reversed(items)
+
+    z = R.gens()[0]
+    for idx,item in enumerate(items):
+        H = numpy.array(item)
+        H = H[1:, 1:]
+        f = classical_wenum(H)
+
+        #print(f.numerator())
+
+        df = diff(f, z)
+        top = df.numerator()
+        bot = df.denominator()
+
+        ftop = sage.factor(top)
+
+        print(("%d"%idx).ljust(6), end="")
+
+        for factor,m in ftop:
+            if "z" not in str(factor):
+                continue
+            #if factor.degree() <= 4:
+            #    continue
+            #print("\t( %s )^%d" % (factor, m))
+            print("(%d^%d)"%(factor.degree(),m), end="")
+        print()
+
+
+def test_CH():
+
+    x = sage.polygen(sage.ZZ, "x")
+    base = sage.NumberField(x**2 - 2, "r2")
+    r2 = base.gens()[0]
+    ir2 = (1/r2)
+    print(base)
+
+    I = Matrix.identity(base, 2)
+    H = Matrix(base, [[1,1],[1,-1]])
+    H = ir2*H
+    assert H*H == I
+
+    CH = I<<H
+    print(CH)
+
+    plus = ir2*Matrix(base, [[1,1]])
+    #print(plus)
+    assert (plus*plus.d)[0,0] == 1
+    op = (plus@I)*CH
+
+    #post = Matrix(base, [[0,1]])
+    #op = (post@I)*CH
+
+    print(op)
+
+    R = sage.PolynomialRing(base, "z")
+    z = R.gens()[0]
+
+    op = Matrix(R, op)
+    print(op)
+
+    u = Matrix(R, [z**2, z, z, 1]).t
+    v = op*u
+    #print(v, v.shape)
+    top = v[0,0]
+    bot = v[1,0]
+
+    K = sage.FractionField(R)
+    top, bot = K(top), K(bot)
+    f = top / bot
+    print(f)
+
+    df = diff(f, z)
+
+    r = sage.factor(top - z*bot)
+
+    df = sage.diff(f, z)
+    df_top = df.numerator()
+    df_bot = df.denominator()
+
+    print(r"\begin{align*}")
+    print("f(z) &= %s \\\\" % latex(f))
+    print("r(z) &= %s \\\\" % latex(r))
+
+    if df_bot == bot**2:
+        print(r"f'(z) &= \frac{%s}{%s^2}"%(
+            latex(sage.factor(df_top)), (latex( sage.factor(bot) ))))
+    else:
+        print(r"f'(z) &= \frac{%s}{%s} %% df_bot != bot**2"%(
+            latex(sage.factor(df_top)), (latex( sage.factor(df_bot) ))))
+    print(r"\end{align*}")
+
+
+def test_ctrl():
+
+    base = sage.PolynomialRing(sage.ZZ, list("abcd"))
+    print(base)
+    a,b,c,d = base.gens()
+
+    I = Matrix.identity(base, 2)
+    A = Matrix(base, [[a,b],[c,d]])
+
+    for _ in range(2):
+        CA = I<<A
+        print(CA)
+    
+        plus = Matrix(base, [[1,1]])
+        op = (plus@I)*CA
+    
+        #post = Matrix(base, [[0,1]])
+        #op = (post@I)*CA
+    
+        print(op)
+    
+        R = sage.PolynomialRing(base, "z")
+        z = R.gens()[0]
+    
+        op = Matrix(R, op)
+        print(op)
+    
+        u = Matrix(R, [z**2, z, z, 1]).t
+        v = op*u
+        #print(v, v.shape)
+        top = v[0,0]
+        bot = v[1,0]
+    
+        K = sage.FractionField(R)
+        top, bot = K(top), K(bot)
+        #a, b, c, d = K(a),K(b),K(c),K(d)
+
+        f = top / bot
+        print(f)
+    
+        df = diff(f, z)
+    
+        r = sage.factor(top - z*bot)
+    
+        df = sage.diff(f, z)
+        df_top = df.numerator()
+        df_bot = df.denominator()
+    
+        print(r"\begin{align*}")
+        print("f(z) &= %s \\\\" % latex(f))
+        print("r(z) &= %s \\\\" % latex(r))
+    
+        if df_bot == bot**2:
+            print(r"f'(z) &= \frac{%s}{%s^2}"%(
+                latex(sage.factor(df_top)), (latex( sage.factor(bot) ))))
+        else:
+            print(r"f'(z) &= \frac{%s}{%s} %% df_bot != bot**2"%(
+                latex(sage.factor(df_top)), (latex( sage.factor(df_bot) ))))
+        print(r"\end{align*}")
+    
+        char = (a-z)*(d-z) - b*c
+        print("char:", latex(char))
+
+        #top = top.subs({a:1,b:1,c:1,d:-1})
+        #bot = bot.subs({a:1,b:1,c:1,d:-1})
+        print()
+
+        A = Matrix(base, [[1,1],[1,-1]])
+
+def old_CH():
+    CH = clifford.I << clifford.H()
+
+    plus = ir2*Matrix(base, [[1,1]])
+    #print(plus)
+    assert (plus*plus.d)[0,0] == 1
+    op = (plus@I)*CH
+    #print(op)
+    distill = GateDistill(op)
+
+    f = distill.build()
+    p = f.numerator()
+    q = f.denominator()
+
+    print(f)
+
+    z, zb = f.parent().gens()
+
+    df = diff(f, z)
+    print(df)
+
+    
 
 
 
