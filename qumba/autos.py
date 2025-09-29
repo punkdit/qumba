@@ -318,7 +318,7 @@ class Graph:
                     assert u[i] == 0
         return graph
 
-    def get_nauty(self):
+    def get_nauty(self, verbose=False):
         from pynauty import Graph
         verts, edges = self.verts, self.edges
         N = len(verts)
@@ -328,7 +328,7 @@ class Graph:
         directed = False # True is much slower ?!?!
         graph = Graph(N, directed)
 
-        print("Graph: |verts|=%d ... " % N, end="", flush=True)
+        if verbose: print("Graph: |verts|=%d ... " % N, end="", flush=True)
         adj = {i:[] for i in range(N)}
         for (i,j) in edges:
             adj[i].append(j)
@@ -396,7 +396,7 @@ def _get_autos(code, span, keys):
 
 
 @cache
-def get_spankeys(code, maxw=None):
+def get_spankeys(code, maxw=None, verbose=False):
 
     #assert code.tp == "selfdualcss"
     code = code.to_qcode()
@@ -412,7 +412,7 @@ def get_spankeys(code, maxw=None):
         maxw = 3*nn
 
     N = 2**m
-    print("get_spankeys...", end=" ", flush=True)
+    if verbose: print("get_spankeys...", end=" ", flush=True)
 
     span = {}
     for u in enum2(m):
@@ -439,12 +439,12 @@ def get_spankeys(code, maxw=None):
     w = sum(keys[0])
     #print(keys)
 
-    print("N=%d"%N, "keys:", len(keys))
+    if verbose: print("N=%d"%N, "keys:", len(keys))
     return span, keys
 
 
 
-def get_iso(code, dode, maxw=None):
+def get_iso(code, dode, maxw=None, verbose=False):
     if (code.n,code.k) != (dode.n,dode.k):
         return False
 
@@ -474,13 +474,13 @@ def get_iso(code, dode, maxw=None):
 
         f = hraph.get_isomorphism(graph)
         if f is None:
-            print("not")
+            if verbose: print("not")
             return False
         f = f[:n]
 
         eode = code.space.get_perm(f)*code
         if eode.is_equiv(dode):
-            print("iso")
+            if verbose: print("iso")
             return f
         idx += 1
 

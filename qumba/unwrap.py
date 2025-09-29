@@ -440,26 +440,32 @@ def test_bring():
     total = construct.get_bring()
     total.distance()
     print(total)
+
+    #items = get_zx_dualities(total.to_qcode())
+    #print(items)
+    #return
+
+    #zxs = total.find_zx_dualities(False, False) # 120 of these
+
     zxs = total.find_zx_dualities()
-    print(len(zxs))
+    print("involutory fixed-point free zx-dualities:", len(zxs))
 
     total = total.to_qcode()
 
     codes = []
     for zx in zxs:
+        #print(zx)
         cover = Cover.fromzx(total, zx)
         base = cover.base
         base.distance("z3")
         print(base)
-        print(base.longstr(False))
+        #print(base.longstr(False))
         #print(strop(base.H))
         codes.append(base)
 
-#    for a in codes:
-#      for b in codes:
-#        print(int(is_iso(a,b)), end=" ", flush=True)
-#      print()
-
+    for a in codes:
+      for b in codes:
+        assert is_iso(a,b)
 
 
 

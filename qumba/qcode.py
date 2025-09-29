@@ -453,7 +453,7 @@ class QCode(object):
     def is_isomorphic(self, other):
         return self.get_isomorphism(other) is not None
 
-    def find_zx_dualities(code):
+    def find_zx_dualities(code, inv=True, fpf=True):
         from qumba import csscode
         from qumba.action import Perm
         n = code.n
@@ -477,10 +477,10 @@ class QCode(object):
         zxs = []
         for g in G:
             zx = g*duality
-            if zx*zx != I:
+            if inv and zx*zx != I:
                 continue
             for i in items:
-                if zx[i] == i:
+                if fpf and zx[i] == i:
                     break
             else:
                 zxs.append(zx)

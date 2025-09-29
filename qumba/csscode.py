@@ -862,7 +862,7 @@ class CSSCode(object):
 
         return found
 
-    def find_zx_dualities(code):
+    def find_zx_dualities(code, inv=True, fpf=True):
         n = code.n
         Ax, Az = code.Ax, code.Az
         duality = find_zx_duality(Ax, Az)
@@ -876,10 +876,10 @@ class CSSCode(object):
         zxs = []
         for g in G:
             zx = g*duality
-            if zx*zx != I:
+            if inv and zx*zx != I:
                 continue
             for i in items:
-                if zx[i] == i:
+                if fpf and zx[i] == i:
                     break
             else:
                 zxs.append(zx)
