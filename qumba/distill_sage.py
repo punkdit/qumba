@@ -26,6 +26,7 @@ from qumba.matrix_sage import Matrix
 from qumba.clifford import Clifford, w4, r2, ir2
 from qumba.action import mulclose
 from qumba.dense import bitlog
+from qumba.util import choose
 from qumba import pauli
 
 EPSILON = 1e-6
@@ -2956,28 +2957,50 @@ def test_ctrl():
 
         A = Matrix(base, [[1,1],[1,-1]])
 
-def old_CH():
-    CH = clifford.I << clifford.H()
 
-    plus = ir2*Matrix(base, [[1,1]])
-    #print(plus)
-    assert (plus*plus.d)[0,0] == 1
-    op = (plus@I)*CH
-    #print(op)
-    distill = GateDistill(op)
 
-    f = distill.build()
-    p = f.numerator()
-    q = f.denominator()
+def get_coords(v): # todo: could unroll all of this into py code
+    m, n = v.shape
+    coords = {}
+    for idxs in choose(list(range(m)), n):
+        w = v[idxs, :]
+        a = w.determinant()
+        if a != 0:
+            #print("[%s:%s]"%(idxs,a), end='', flush=True)
+            coords[idxs] = a
+    return coords
 
-    print(f)
 
-    z, zb = f.parent().gens()
+def test_kl():
 
-    df = diff(f, z)
-    print(df)
+    code = construct.get_422()
+    print(code)
+    print(code.longstr(False))
 
+    P = code.get_projector()
+    space = Clifford(code.n)
+    I = space.I
+
+    assert P*P == P
+
+    evecs = P.eigenvectors()
+    for val,vec,d in evecs:
+        if val == 1:
+            assert d == 2**code.k
+            break
+    else:
+        assert 0
+
+    v = vec
+    print("v =")
+    print(v)
+
+    print(get_coords(v))
+
+    op = space.X(0)
+    u = op*v
     
+    print(get_coords(u))
 
 
 

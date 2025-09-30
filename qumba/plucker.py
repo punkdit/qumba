@@ -91,7 +91,7 @@ def test_plucker(m, n):
     assert AmP == coords(A*M)
 
     
-def test():
+def test_projector():
 
     #for m in range(1, 5):
     #  for n in range(m, m+2):
@@ -120,6 +120,9 @@ def test():
 
     P = numpy.array(P, dtype=int)
     print(P, P.shape)
+    found = numpy.where(P)
+    found = list(zip(*found))
+    print("found:", len(found))
 
     #P = P[:10, :10]
     PK = npy_exterior(P, K)
@@ -130,7 +133,21 @@ def test():
     found = list(zip(*found))
     #for (i,j) in zip(*found):
     #    print(i,j,PK[i,j])
-    print("PK", len(found))
+    print("found:", len(found))
+
+
+def test_exterior():
+
+    n = 4
+
+    R = sage.ZZ
+    I = Matrix.identity(R, n)
+    O = Matrix.zeros(R, 2, 2)
+
+    A = I<<O
+    print(A)
+
+    print(exterior(A, 2))
 
 
 

@@ -17,7 +17,6 @@ from sage.all_cmdline import (FiniteField, CyclotomicField, latex, block_diagona
     PolynomialRing)
 from sage import all_cmdline 
 
-from qumba.lin import zeros2, identity2
 from qumba.action import mulclose, mulclose_names, mulclose_find
 from qumba.argv import argv
 
@@ -175,6 +174,14 @@ class Matrix:
         for i in range(n):
             row = [0]*n
             row[i] = 1
+            rows.append(row)
+        return Matrix(ring, rows)
+
+    @classmethod
+    def zeros(cls, ring, m, n):
+        rows = []
+        for i in range(m):
+            row = [0]*n
             rows.append(row)
         return Matrix(ring, rows)
 
