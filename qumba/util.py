@@ -43,6 +43,8 @@ assert factorial(4) == 2*3*4
 
 
 def choose(items, n):
+    if type(items) is int:
+        items = list(range(items))
     if n > len(items):
         return
     if n == 0:

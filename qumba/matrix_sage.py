@@ -242,7 +242,7 @@ class Matrix:
             #print(val, dim)
             #print(vec[0])
             #print(type(vec[0]))
-            vec = all_cmdline.Matrix(ring, vec[0])
+            vec = all_cmdline.Matrix(ring, vec)
             vec = vec.transpose() 
             vec = Matrix(ring, vec)
             vecs.append((val, vec, dim))
