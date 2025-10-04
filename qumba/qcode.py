@@ -226,7 +226,7 @@ class QCode(object):
 
     def __hash__(self):
         self.build()
-        key = self.longstr()
+        key = self.longstr(True)
         return hash(key)
 
     def __add__(self, other):
@@ -296,7 +296,7 @@ class QCode(object):
             else '%d<=d<=%d'%(self.d_lower_bound, self.d_upper_bound))
         return "[[%s, %s, %s]]"%(self.n, self.k, d)
 
-    def longstr(self, showt = True):
+    def longstr(self, showt = False):
         s = "H =\n%s"%strop(self.H)
         T = self.T
         if showt and T is not None and len(T):

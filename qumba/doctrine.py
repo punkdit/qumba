@@ -708,6 +708,7 @@ def test_doctrine_csssd():
         print(count, end=" ", flush=True)
       print()
 
+
 def test_sd():
     from bruhat.algebraic import qchoose_2
     d = 0
@@ -716,6 +717,31 @@ def test_sd():
       for k in range(n+1):
         if (n+k)%2:
             print(".", end=" ", flush=True)
+            continue
+        m = (n-k)//2
+        count = 0
+        for H in qchoose_2(n,m):
+            assert H.shape == (m,n)
+            if dot2(H, H.transpose()).sum() == 0:
+                code = QCode.build_css(H, H)
+                assert code.n == n
+                assert code.k == k, (str(code), n, k)
+                code.get_distance()
+                #if code.k and code.d>1:
+                #    print(code)
+                count += 1
+        print(count, end=" ", flush=True)
+      print()
+
+
+
+def test_selfdual():
+    from bruhat.algebraic import qchoose_2
+    d = 0
+    for n in range(argv.get("n0", 1), argv.get("n1", 10)):
+      print("n=%s"%n, end=" ")
+      for k in [1]:
+        if (n+k)%2:
             continue
         m = (n-k)//2
         count = 0

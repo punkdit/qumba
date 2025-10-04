@@ -27,7 +27,9 @@ from qumba.clifford import Clifford, w4, r2, ir2
 from qumba.action import mulclose
 from qumba.dense import bitlog
 from qumba.util import choose
+from qumba.triorthogonal import is_morthogonal, strong_morthogonal
 from qumba import pauli
+from qumba import lin
 
 EPSILON = 1e-6
 
@@ -546,8 +548,8 @@ class Distill:
 
         f = simplify(f)
 
-        assert "zb" not in str(f)
-        #assert f.subs({zb:1234}) == f
+        #assert f.subs({zb:-99}) == f, (f.subs({zb:1})-f.subs({zb:-2}))
+        assert "zb" not in str(f), str(f)
         self.f = f
 
         return f
@@ -755,6 +757,7 @@ class GateDistill(Distill):
 
 class PauliDistill(Distill): # much faster than CodeDistill
     def __init__(self, code):
+        assert code.k == 1
         Distill.__init__(self, code.n)
         self.code = code
 
@@ -786,6 +789,7 @@ class PauliDistill(Distill): # much faster than CodeDistill
 
 class CodeDistill(Distill):
     def __init__(self, code):
+        assert code.k == 1
         Distill.__init__(self, code.n)
         self.code = code
 
@@ -838,6 +842,7 @@ class CodeDistill(Distill):
 
 class MultiDistill(Distill):
     def __init__(self, code):
+        assert code.k == 1
         Distill.__init__(self, code.n)
         self.code = code
 
@@ -1339,7 +1344,41 @@ def get_code(code=None, verbose=True):
     if params == (23,1,7):
         code = construct.get_golay(23)
 
-    if params == (31,1,7):
+    if params == (31,1,3):
+        code = QCode.fromstr("""
+X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X
+.XX..XX..XX..XX..XX..XX..XX..XX
+...XXXX....XXXX....XXXX....XXXX
+.......XXXXXXXX........XXXXXXXX
+...............XXXXXXXXXXXXXXXX
+.ZZZZ..........................
+Z.ZZ.Z.........................
+ZZ.Z..Z........................
+.ZZ....ZZ......................
+Z.Z....Z.Z.....................
+ZZ.....Z..Z....................
+ZZZZ...Z...Z...................
+Z..Z...Z....Z..................
+.Z.Z...Z.....Z.................
+..ZZ...Z......Z................
+.ZZ............ZZ..............
+Z.Z............Z.Z.............
+ZZ.............Z..Z............
+ZZZZ...........Z...Z...........
+Z..Z...........Z....Z..........
+.Z.Z...........Z.....Z.........
+..ZZ...........Z......Z........
+ZZZ....Z.......Z.......Z.......
+Z......Z.......Z........Z......
+.Z.....Z.......Z.........Z.....
+..Z....Z.......Z..........Z....
+...Z...Z.......Z...........Z...
+.ZZZ...Z.......Z............Z..
+Z.ZZ...Z.......Z.............Z.
+ZZ.Z...Z.......Z..............Z
+    """, None, "X"*31+" "+"Z"*31)
+
+    if params == (31,1,7) and idx==0:
         code = QCode.fromstr("""
         XIIXIIXIXIIIXXIXXIIIIIIIIIIIIII
         IIXIIXIXIIIXXIXXIIIIIIIIIIIIIIX
@@ -1373,6 +1412,40 @@ def get_code(code=None, verbose=True):
         IZZIIIIIIIIIIIIIIZIIZIIZIZIIIZZ
         """, None, "X"*31+" "+"Z"*31)
 
+    if params == (31,1,7) and idx==1:
+        code = QCode.fromstr("""
+        X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X
+        .XX..XX..XX..XX..XX..XX..XX..XX
+        ...XXXX....XXXX....XXXX....XXXX
+        .......XXXXXXXX........XXXXXXXX
+        ...............XXXXXXXXXXXXXXXX
+        ..X...X...X...X...X...X...X...X
+        ....X.X.....X.X.....X.X.....X.X
+        ........X.X.X.X.........X.X.X.X
+        ................X.X.X.X.X.X.X.X
+        .....XX......XX......XX......XX
+        .........XX..XX..........XX..XX
+        .................XX..XX..XX..XX
+        ...........XXXX............XXXX
+        ...................XXXX....XXXX
+        .......................XXXXXXXX
+        Z.Z.Z.Z.Z.Z.Z.Z.Z.Z.Z.Z.Z.Z.Z.Z
+        .ZZ..ZZ..ZZ..ZZ..ZZ..ZZ..ZZ..ZZ
+        ...ZZZZ....ZZZZ....ZZZZ....ZZZZ
+        .......ZZZZZZZZ........ZZZZZZZZ
+        ...............ZZZZZZZZZZZZZZZZ
+        ..Z...Z...Z...Z...Z...Z...Z...Z
+        ....Z.Z.....Z.Z.....Z.Z.....Z.Z
+        ........Z.Z.Z.Z.........Z.Z.Z.Z
+        ................Z.Z.Z.Z.Z.Z.Z.Z
+        .....ZZ......ZZ......ZZ......ZZ
+        .........ZZ..ZZ..........ZZ..ZZ
+        .................ZZ..ZZ..ZZ..ZZ
+        ...........ZZZZ............ZZZZ
+        ...................ZZZZ....ZZZZ
+        .......................ZZZZZZZZ
+            """, None, "X"*31+" "+"Z"*31) # same as idx==1 ?!?
+    
     if params == (47,1,11):
         code = QCode.fromstr("""
 XXIIXIXIIXIIXXIXXIIXXIIIXIIIIIIIIIIIIIIIIIIIIII
@@ -2670,10 +2743,96 @@ def test_selfdual():
     find(f)
 
 
+def test_rm():
+    from qumba.matrix import Matrix
+
+    r = argv.get("r", 1)
+    m = argv.get("m", 4)
+    code = construct.reed_muller(r, m)
+    print(code)
+    if code is None:
+        return
+
+    css = code.to_css()
+    Hx = css.Hx
+    print("is_morthogonal(2)", is_morthogonal(Hx,2))
+    print("is_morthogonal(3)", is_morthogonal(Hx,3))
+
+    n = code.n
+
+    H = strop(code.H)
+    print(H)
+    print()
+    rows = H.split()
+    rows = [r[1:] for r in rows if "X" in r]
+    #rows.remove("X"*n) # logop
+    H = '\n'.join(rows)
+    #H = fromstr(H)
+    print(H)
+    Hx = Matrix.parse(H)
+    Hz = Hx.kernel()
+    print(str(Hz).replace("1", "Z"))
+
+    #return
+
+    code = QCode.fromstr("""
+X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X
+.XX..XX..XX..XX..XX..XX..XX..XX
+...XXXX....XXXX....XXXX....XXXX
+.......XXXXXXXX........XXXXXXXX
+...............XXXXXXXXXXXXXXXX
+.ZZZZ..........................
+Z.ZZ.Z.........................
+ZZ.Z..Z........................
+.ZZ....ZZ......................
+Z.Z....Z.Z.....................
+ZZ.....Z..Z....................
+ZZZZ...Z...Z...................
+Z..Z...Z....Z..................
+.Z.Z...Z.....Z.................
+..ZZ...Z......Z................
+.ZZ............ZZ..............
+Z.Z............Z.Z.............
+ZZ.............Z..Z............
+ZZZZ...........Z...Z...........
+Z..Z...........Z....Z..........
+.Z.Z...........Z.....Z.........
+..ZZ...........Z......Z........
+ZZZ....Z.......Z.......Z.......
+Z......Z.......Z........Z......
+.Z.....Z.......Z.........Z.....
+..Z....Z.......Z..........Z....
+...Z...Z.......Z...........Z...
+.ZZZ...Z.......Z............Z..
+Z.ZZ...Z.......Z.............Z.
+ZZ.Z...Z.......Z..............Z
+    """, None, "X"*31+" "+"Z"*31)
+
+    print(code)
+    #css = code.to_css()
+    #print(css.bz_distance()) # (15,3)
+    
+    #f = build_selfdual(code)
+    #find(f)
+
+    #distill = PauliDistill(code)
+    #f = distill.build()
+    #print("f(z) =", f)
+
+
 def gen_latex():
     code = get_code(verbose=False)
 
     print(code.longstr(False))
+    print("is_selfdual", code.is_selfdual())
+    if code.is_css():
+        css = code.to_css()
+        Hx = css.Hx
+        #print(Hx)
+        print("is_morthogonal(2)", is_morthogonal(Hx, 2))
+        print("is_morthogonal(3)", is_morthogonal(Hx, 3))
+        print("strong_morthogonal(2)", strong_morthogonal(Hx, 2))
+        print("strong_morthogonal(3)", strong_morthogonal(Hx, 3))
 
     base = sage.PolynomialRing(sage.ZZ, "z")
     R = sage.FractionField(base)
@@ -2822,6 +2981,7 @@ def test_de():
             #print("\t( %s )^%d" % (factor, m))
             print("(%d^%d)"%(factor.degree(),m), end="")
         print()
+
 
 
 def test_CH():
