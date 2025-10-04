@@ -1501,14 +1501,15 @@ def selfdual_z3():
     H[:,m:] = A
 
     add(A*A.t == Im)
-    add(Lx*Tz.t == 0)
-    add(Lx*H.t == 0)
-    Ik = Matrix.identity(k)
-    add(Lx*Lz.t == Ik)
-    add(Tx*Lz.t == 0)
-    add(H*Lz.t == 0)
 
-    if 1:
+    if k>0:
+        add(Lx*Tz.t == 0)
+        add(Lx*H.t == 0)
+        Ik = Matrix.identity(k)
+        add(Lx*Lz.t == Ik)
+        add(Tx*Lz.t == 0)
+        add(H*Lz.t == 0)
+
         # constrain code distance
         L = UMatrix.unknown(1, n)
         t_parity = (H*L.t == 0)
@@ -1516,6 +1517,8 @@ def selfdual_z3():
         t_distance = Sum([If(L[0,i].v,1,0) for i in range(n)]) >= d
         term = If(And(t_parity, t_logical),t_distance,True)
         add(ForAll([L[0,i].v for i in range(n)], term))
+
+    found = {}
 
     while 1:
     
@@ -1535,21 +1538,28 @@ def selfdual_z3():
 
         code = CSSCode(Hx=H.A, Hz=H.A, Lx=_Lx.A, Lz=_Lz.A, Tx=_Tx.A, Tz=_Tz.A)
         #print(code.longstr())
-        d_x, d_z = code.bz_distance()
-        if d_x < d:
-            print(d_x, d_z)
-            #print(distance_meetup(code))
-            print("/", end='', flush=True)
-            #assert 0
-            continue
+        if k>0:
+            d_x, d_z = code.bz_distance()
+        #if d_x < d:
+        #    print(d_x, d_z)
+        #    #print(distance_meetup(code))
+        #    print("/", end='', flush=True)
+        #    #assert 0
+        #    continue
 
-        print(code)
-        print("wenum:", selfdual_wenum(code.Hx))
-        break
+        w = selfdual_wenum(code.Hx)
+        if w in found:
+            found[w] += 1
+            continue
+        found[w] = 1
+        print(code, w)
+        #break
 
     #print()
-    print(code.longstr())
-    write_to_db(code, "qumba.csscode.selfdual_z3")
+    #print(code.longstr())
+    #write_to_db(code, "qumba.csscode.selfdual_z3")
+    for k,v in found.items():
+        print(k, v)
 
 
 

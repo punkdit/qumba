@@ -4,7 +4,11 @@ from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
 from operator import add, mul, matmul
 
-from qumba.lin import kernel, dot2, normal_form, enum2, shortstr
+import numpy
+
+from qumba.lin import (
+    kernel, dot2, normal_form, enum2, shortstr, zeros2, solve,
+    linear_independent, row_reduce)
 from qumba.qcode import QCode, strop, Matrix, SymplecticSpace
 from qumba.construct import all_codes
 from qumba.unwrap import unwrap
@@ -732,6 +736,39 @@ def test_sd():
                 count += 1
         print(count, end=" ", flush=True)
       print()
+
+
+def test_classical_sd():
+    from bruhat.algebraic import qchoose_2
+    #for m in range(1, 6):
+    for m in [6]:
+        n = 2*m
+        count = 0
+        u = zeros2(1, n)
+        u[:] = 1
+        L = u[:, :-1]
+        found = set()
+        for H in qchoose_2(n,m):
+            assert H.shape == (m,n)
+            if dot2(H, H.transpose()).sum() != 0:
+                continue
+            count += 1
+            #U = solve(H.transpose(), u.transpose())
+            #assert U is not None
+            H = numpy.concatenate((u, H))
+            H = row_reduce(H)
+            assert H.shape == (m, n)
+            H = H[1:, 1:]
+            assert dot2(H, H.transpose()).sum() == 0
+            code = QCode.build_css(H, H, None, None, L, L)
+            w = Matrix(H).get_wenum()
+            if w in found:
+                continue
+            found.add(w)
+            print(shortstr(H), code, w)
+            print()
+
+        print((m,n), count)
 
 
 
