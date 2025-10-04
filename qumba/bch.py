@@ -50,6 +50,7 @@ def main_sd():
         code = QCode.build_css(H,H)
         if code.d < 3:
             print(".", end='', flush=True)
+            continue
         key = str(C.weight_enumerator())
         print(code, "*" if key in found else "")
 
