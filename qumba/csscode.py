@@ -1553,7 +1553,13 @@ def selfdual_z3():
             continue
         found[w] = 1
         print(code, w)
+        #Hx = Matrix(code.Hx)
+        #for h in Hx.rowspan():
+        #    print(h, h.sum())
+        #print()
         #break
+
+    print(result)
 
     #print()
     #print(code.longstr())
@@ -1574,6 +1580,185 @@ def write_to_db(code, desc):
         db.add(code)
         print()
 
+def is_symmetric(items):
+    n = len(items)
+    for i0 in range(n):
+        if items[i0]:
+            break
+    i1 = n-1
+    while i1:
+        if items[i1]:
+            break
+        i1 -= 1
+
+
+def pad(items, n):
+    items = list(items)
+    items += [0] * (n-len(items))
+    return numpy.array(items)
+
+
+def find_wenum(src, tgt):
+    n = len(src[0])
+
+    src = [numpy.array(a) for a in src]
+    tgt = [pad(a, n) for a in tgt]
+
+    def refl(items):
+        return numpy.array(list(reversed(items)))
+    def eq(a, b):
+        return list(a)==list(b)
+    def astr(a):
+        return str(a).replace(" 0", " .").replace("\n", "").replace("  ", " ")
+
+    for i,s in enumerate(src):
+        for j,t in enumerate(tgt):
+            st = (s-t)
+            if st.min() < 0:
+                continue
+            match = eq(refl(st), t)
+            if not match:
+                continue
+            print(" ", astr(s), "src", i)
+            print("-", astr(t), "tgt", j)
+            print("=", astr(st))
+            print()
+            #print()
+
+
+def test_wenum():
+
+    src = [
+        (1, 0, 0, 0, 14, 0, 49, 0, 49, 0, 14, 0, 0, 0, 1),
+        (1, 0, 1, 0, 15, 0, 47, 0, 47, 0, 15, 0, 1, 0, 1),
+        (1, 0, 3, 0, 17, 0, 43, 0, 43, 0, 17, 0, 3, 0, 1),
+        (1, 0, 7, 0, 21, 0, 35, 0, 35, 0, 21, 0, 7, 0, 1),
+    ]
+
+    tgt = [
+        (1, 0, 0, 0, 10, 0, 28, 0, 21, 0, 4, 0, 0, 0, 0),  #  [[13, 1, 3]] 
+        (1, 0, 2, 0, 15, 0, 28, 0, 15, 0, 2, 0, 1, 0, 0),  #  [[13, 1, 1]] 
+        (1, 0, 3, 0, 10, 0, 22, 0, 21, 0, 7, 0, 0, 0, 0),  #  [[13, 1, 3]] 
+        (1, 0, 0, 0, 15, 0, 32, 0, 15, 0, 0, 0, 1, 0, 0),  #  [[13, 1, 1]] 
+        (1, 0, 1, 0, 10, 0, 26, 0, 21, 0, 5, 0, 0, 0, 0),  #  [[13, 1, 3]] 
+        (1, 0, 6, 0, 15, 0, 20, 0, 15, 0, 6, 0, 1, 0, 0),  #  [[13, 1, 1]] 
+    ]
+    #find_wenum(src, tgt)
+
+    src = [
+        (1, 0, 0, 0, 9, 0, 75, 0, 171, 0, 171, 0, 75, 0, 9, 0, 0, 0, 1),
+        (1, 0, 3, 0, 18, 0, 78, 0, 156, 0, 156, 0, 78, 0, 18, 0, 3, 0, 1),
+        (1, 0, 5, 0, 24, 0, 80, 0, 146, 0, 146, 0, 80, 0, 24, 0, 5, 0, 1),
+        (1, 0, 1, 0, 28, 0, 28, 0, 198, 0, 198, 0, 28, 0, 28, 0, 1, 0, 1),
+        (1, 0, 1, 0, 12, 0, 76, 0, 166, 0, 166, 0, 76, 0, 12, 0, 1, 0, 1),
+        (1, 0, 0, 0, 17, 0, 51, 0, 187, 0, 187, 0, 51, 0, 17, 0, 0, 0, 1), # << [[17,1,5]]
+        (1, 0, 2, 0, 15, 0, 77, 0, 161, 0, 161, 0, 77, 0, 15, 0, 2, 0, 1),
+        (1, 0, 9, 0, 36, 0, 84, 0, 126, 0, 126, 0, 84, 0, 36, 0, 9, 0, 1),
+    ]
+
+    tgt = [
+        (1, 0, 0, 0, 7, 0, 50, 0, 95, 0, 76, 0, 25, 0, 2, 0, 0, 0), # [[17, 1, (3, 3)]] 
+        (1, 0, 3, 0, 13, 0, 47, 0, 83, 0, 73, 0, 31, 0, 5, 0, 0, 0), # [[17, 1, (3, 3)]] 
+        (1, 0, 1, 0, 9, 0, 49, 0, 91, 0, 75, 0, 27, 0, 3, 0, 0, 0), # [[17, 1, (3, 3)]] 
+        (1, 0, 2, 0, 11, 0, 48, 0, 87, 0, 74, 0, 29, 0, 4, 0, 0, 0), # [[17, 1, (3, 3)]] 
+        (1, 0, 0, 0, 13, 0, 36, 0, 99, 0, 88, 0, 15, 0, 4, 0, 0, 0), # [[17, 1, (3, 3)]] 
+        (1, 0, 0, 0, 12, 0, 64, 0, 102, 0, 64, 0, 12, 0, 0, 0, 1, 0), # [[17, 1, (1, 1)]] 
+        (1, 0, 1, 0, 21, 0, 21, 0, 99, 0, 99, 0, 7, 0, 7, 0, 0, 0), # [[17, 1, (3, 3)]] 
+        (1, 0, 0, 0, 28, 0, 0, 0, 198, 0, 0, 0, 28, 0, 0, 0, 1, 0), # [[17, 1, (1, 1)]] 
+        (1, 0, 5, 0, 17, 0, 45, 0, 75, 0, 71, 0, 35, 0, 7, 0, 0, 0), # [[17, 1, (3, 3)]] 
+        (1, 0, 8, 0, 28, 0, 56, 0, 70, 0, 56, 0, 28, 0, 8, 0, 1, 0), # [[17, 1, (1, 1)]] 
+        (1, 0, 4, 0, 20, 0, 60, 0, 86, 0, 60, 0, 20, 0, 4, 0, 1, 0), # [[17, 1, (1, 1)]] 
+        (1, 0, 0, 0, 17, 0, 0, 0, 187, 0, 0, 0, 51, 0, 0, 0, 0, 0), # [[17, 1, (5, 5)]] 
+        (1, 0, 2, 0, 16, 0, 62, 0, 94, 0, 62, 0, 16, 0, 2, 0, 1, 0), # [[17, 1, (1, 1)]] 
+        (1, 0, 1, 0, 14, 0, 63, 0, 98, 0, 63, 0, 14, 0, 1, 0, 1, 0), # [[17, 1, (1, 1)]] 
+    ]
+    find_wenum(src, tgt)
+
+
+def test_classical_sd():
+    from bruhat.algebraic import qchoose_2
+    #for m in range(1, 6):
+    for m in [6]:
+        n = 2*m
+        count = 0
+        u = zeros2(1, n)
+        u[:] = 1
+        L = u[:, :-1]
+        found = set()
+        for H in qchoose_2(n,m):
+            assert H.shape == (m,n)
+            if dot2(H, H.transpose()).sum() != 0:
+                continue
+            count += 1
+            #U = solve(H.transpose(), u.transpose())
+            #assert U is not None
+            H = numpy.concatenate((u, H))
+            H = row_reduce(H)
+            assert H.shape == (m, n)
+            H = H[1:, 1:]
+            assert dot2(H, H.transpose()).sum() == 0
+            code = QCode.build_css(H, H, None, None, L, L)
+            w = Matrix(H).get_wenum()
+            if w in found:
+                continue
+            found.add(w)
+            print(shortstr(H), code, w)
+            print()
+
+        print((m,n), count)
+
+
+
+def test_selfdual():
+    from qumba.lin import row_reduce
+    from qumba.selfdual import load
+
+    name = "24-II.magma"
+    name = "26.magma"
+    name = "28.magma"
+    #name = "30.magma"
+    #name = "32-I.magma"
+    name = argv.get("name", name)
+
+    count = 0
+    found = set()
+    nl = False
+    for H in load.get_items(name):
+        count += 1
+        H = array2(H)
+        m, n = H.shape
+        assert n==2*m
+
+        u = zeros2(1, n)
+        u[:] = 1
+        L = u[:, :-1]
+
+        H = numpy.concatenate((u, H))
+        H = row_reduce(H)
+        assert H.shape == (m, n)
+        H = H[1:, 1:]
+        assert dot2(H, H.transpose()).sum() == 0
+        #code = QCode.build_css(H, H, None, None, L, L)
+        css = CSSCode(Hx=H, Hz=H, Lx=L, Lz=L)
+        css.bz_distance()
+        if css.dx < 5:
+            if count%10==0:
+                print(".", end='', flush=True)
+                nl = True
+            continue
+        w = Matrix(H).get_wenum()
+        if w in found:
+            print("/", end='', flush=True)
+            nl = True
+            continue
+        found.add(w)
+        if nl:
+            print()
+            nl = False
+        print(css, w)
+
+    print("count:", count)
+    
 
 
 

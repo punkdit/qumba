@@ -21,6 +21,7 @@ def get_items(name = "24-II.magma"):
     
     s = "[" +  "\n".join(lines)
     s = s.replace("LinearCode<GF(2),%d|"%n, "[")
+    s = s.replace("GF(2)|", "")
     s = s.replace(">", "]")
     
     f = open("dump.py", "w")
