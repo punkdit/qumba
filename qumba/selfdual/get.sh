@@ -1,95 +1,95 @@
 #!/bin/sh
 
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/2.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/2.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/4.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/4.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/6.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/6.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/8-I.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/8-I.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/8-II.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/8-II.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/10.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/10.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/12.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/12.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/14.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/14.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/16-I.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/16-I.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/16-II.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/16-II.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/18.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/18.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/20.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/20.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/22.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/22.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/24-I.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/24-I.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/24-II.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/24-II.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/26.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/26.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/28.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/28.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/30.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/30.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/32-I.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/32-I.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/32-II.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/32-II.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/34.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/34.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d2.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d2.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-1.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-1.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-2.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-2.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-3.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-3.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-4.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-4.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-5.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-5.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-6.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-6.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-7.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-7.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-8.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-8.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-9.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d4-9.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d6.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d6.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d8.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/36-d8.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/38-d8.magma.gz
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/38-d8.magma.gz
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta0.tar.gz
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta0.tar.gz
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta1.tar.gz
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta1.tar.gz
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta2.magma.gz
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta2.magma.gz
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta3.magma.gz
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta3.magma.gz
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta4.magma.gz
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta4.magma.gz
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta5.magma.gz
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta5.magma.gz
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta6.magma.gz
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta6.magma.gz
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta7.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta7.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta8.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta8.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta10.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-I-beta10.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-II8.magma
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-II8.magma
 sleep 2
-wget http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-II-d4.magma.gz
+wget -c  http://www.math.is.tohoku.ac.jp/%7Emunemasa/research/codes/data/2/40-II-d4.magma.gz
 
 
