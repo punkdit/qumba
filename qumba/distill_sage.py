@@ -91,7 +91,10 @@ rnd = lambda radius=10: 2*radius*random() - radius
 
 def latex(a):
     s = sage.latex(a)
-    s = s.replace(r"\cdot", "")
+    #s = s.replace(r"\cdot", "")
+    s = s.replace(r"\cdot (", "(")
+    s = s.replace(r"\cdot z", "z")
+    #s = s.replace(r"\cdot", r"\times")
     s = s.replace("  ", " ")
     #s = s.replace(r"\zeta_{8}^{2}", "i") # ??
     s = s.replace("r_{2}", r"\sqrt{2}")
@@ -2659,26 +2662,6 @@ def test_surface():
         print(val, m)
 
 
-def test_513():
-    R = sage.PolynomialRing(sage.ZZ, "z")
-    R = sage.FractionField(R)
-    z = R.gens()[0]
-
-    F = z**4 + 2*z**3 + 2*z**2 - 2*z + 1
-    print(F)
-
-    p = (z**5 - 5*z) / (5*z**4 - 1)
-    Q = F.subs({z:p})
-    print(Q)
-    top = Q.numerator()
-    top = sage.factor(top)
-    print(top)
-
-    #Q = sage.factor(Q)
-    #print(Q)
-
-
-
 def test_poly():
     R = sage.PolynomialRing(sage.ZZ, "z")
     R = sage.FractionField(R)
@@ -2910,10 +2893,19 @@ def gen_latex():
         f = build_selfdual(code)
     else:
         f = PauliDistill(code).build()
-    f = R(f)
 
     if argv.Z:
         f = -f
+
+    if argv.H:
+        f = (Meromorphic.H * f).f
+
+    f = R(f)
+
+    if argv.SH:
+        assert 0
+        S, H = Meromorphic.S, Meromorphic.H
+        f = (S*H * f).f
 
     top = f.numerator()
     bot = f.denominator()
@@ -3245,6 +3237,99 @@ def test_fgl():
         assert eq(tanh(x+y), F(tanh(x),tanh(y)))
         assert eq(coth(x+y), G(coth(x), coth(y)))
 
+    base = sage.PolynomialRing(sage.ZZ, list("xy"))
+    R = sage.FractionField(base)
+
+    x,y = R.gens()
+    G = (1+x*y)/(x+y)
+    F = (x+y)/(1+x*y)
+    dG = diff(G, x).subs({y:0})
+    print(dG)
+    dF = diff(F, x).subs({y:0})
+    print(dF)
+
+
+def test_513():
+    R = sage.PolynomialRing(sage.ZZ, "z")
+    R = sage.FractionField(R)
+    z = R.gens()[0]
+
+    F = z**4 + 2*z**3 + 2*z**2 - 2*z + 1
+    print(F)
+
+    p = (z**5 - 5*z) / (5*z**4 - 1)
+    Q = F.subs({z:p})
+    print(Q)
+    top = Q.numerator()
+    top = sage.factor(top)
+    print(top)
+
+    #Q = sage.factor(Q)
+    #print(Q)
+
+
+
+def test_distill():
+    code = get_code(verbose=False)
+
+    print(code.longstr(False))
+    print("is_selfdual", code.is_selfdual())
+
+    base = sage.PolynomialRing(sage.ZZ, "z")
+    R = sage.FractionField(base)
+    z = R.gens()[0]
+
+    if code.is_css() and code.is_selfdual() and not argv.se: # and code.is_doublyeven():
+        f = build_selfdual(code)
+    else:
+        f = PauliDistill(code).build()
+    f = R(f)
+
+    if argv.Z:
+        f = -f
+
+    top = f.numerator()
+    bot = f.denominator()
+
+    r = sage.factor(top - z*bot)
+
+    df = sage.diff(f, z)
+    df_top = df.numerator()
+    df_bot = df.denominator()
+
+    def factor(p):
+        items = sage.factor(p)
+        items = [p for (p,m) in items if "z" in str(p)]
+        return items
+
+    items = factor(df_top)
+    #jtems = factor( 
+
+    print(f)
+
+    for p in items:
+        print()
+        print(p, "= 0")
+        p = p.subs({z:f}) # wtf is this ???
+        p = p.numerator()
+        #print(p)
+        print(sage.factor(p))
+
+    return
+
+    # This says something true, but trivial:
+    # a root of p(z) is a root of q(p(z))-q(0). duh.
+    for p in items:
+        print(p, "= 0")
+        print("-->")
+        print("\tf(%s) = f(0)" % (p,))
+        f1 = f.subs({z:p}) - f.subs({z:0})
+        print("\t%s = 0" % (f1))
+        top = f1.numerator()
+        print("\t%s = 0" % top)
+        print("\t%s = 0" % sage.factor(top))
+
+
 
 
 if __name__ == "__main__":
@@ -3273,7 +3358,7 @@ if __name__ == "__main__":
 
 
     t = time() - start_time
-    print("OK! finished in %.3f seconds\n"%t)
+    print("\nOK! finished in %.3f seconds\n"%t)
 
 
 
