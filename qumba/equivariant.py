@@ -274,6 +274,12 @@ def get_group():
         G = Group.cyclic(n)
         G.name = "C_%d"%n
 
+    elif argv.bicyclic:
+        n = argv.get("n", 10)
+        m = argv.get("m", n)
+        G = Group.cyclic(n) + Group.cyclic(m)
+        G.name = "C_%dxC_%d"%(n, m)
+
     elif argv.dihedral:
         n = argv.get("n", 10)
         G = Group.dihedral(n)

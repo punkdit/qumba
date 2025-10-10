@@ -735,11 +735,11 @@ class GateDistill(Distill):
         z = (sho*Z).trace()
         w = sho.trace()
     
-        print("x", right_arrow, x)
-        print("y", right_arrow, y)
-        print("z", right_arrow, z)
-        print("w", right_arrow, w) # div
-        print()
+        #print("x", right_arrow, x)
+        #print("y", right_arrow, y)
+        #print("z", right_arrow, z)
+        #print("w", right_arrow, w) # div
+        #print()
 
 #        S = sage.PolynomialRing(sage.QQbar, list("xyzw"))
 #        x = S(x)
@@ -1662,6 +1662,16 @@ def full_wenum():
     code = get_code()
     result = pauli.get_full_wenum(code)
 
+def show_wenum():
+    code = get_code()
+    result = pauli.get_wenum(code)
+    #print(result)
+    x, y, z, w = result
+    R = x.parent()
+    x,y,z,w = (R.gens())
+    for p in result:
+        print(p, ":", p.subs({x:1,y:1,z:1,w:1}))
+
 
 def dessin():
 
@@ -1725,6 +1735,44 @@ def multi():
     print("total =", total)
 
     print("df(z0) =", dfz.subs({z:z0}) )
+
+
+def find_clifford():
+    # what states do 2 qubit Clifford's distill?
+    c = Clifford(2)
+    Z, S, H, CX = c.Z, c.S, c.H, c.CX
+
+    #gen = [S(0), S(1), H(0), H(1), CX()]
+    gen = [Z(0), Z(1), H(0), H(1), CX()]
+    G = mulclose(gen, verbose=True, maxsize=None)
+    print(len(G))
+
+    R = sage.I.parent()
+    Rz = sage.PolynomialRing(R, ["z"])
+    K = sage.FractionField(Rz)
+    #z = K.gens()[0]
+    z = Rz.gens()[0]
+
+    meas = ir2*Matrix(base, [[1,1]])
+    meas = Matrix(base, [[1,0]])
+    for g in G:
+        op = (meas@I)*g
+        distill = GateDistill(op)
+        f = distill.build()
+        f = K(f)
+        p, q = f.numerator(), f.denominator()
+        r = p - z*q
+        if r.degree() < 2:
+            continue
+        df = diff(p, z)
+        if df == 0:
+            continue
+        dfs = [u for (u,m) in sage.factor(df)]
+        rs = [u for (u,m) in sage.factor(r)]
+        #print(rs, "df:", dfs)
+        match = ([u for u in dfs if u in rs])
+        if match:
+            print(match, "\tf=%s, r=%s"%(f,r))
 
 
 
@@ -2611,6 +2659,26 @@ def test_surface():
         print(val, m)
 
 
+def test_513():
+    R = sage.PolynomialRing(sage.ZZ, "z")
+    R = sage.FractionField(R)
+    z = R.gens()[0]
+
+    F = z**4 + 2*z**3 + 2*z**2 - 2*z + 1
+    print(F)
+
+    p = (z**5 - 5*z) / (5*z**4 - 1)
+    Q = F.subs({z:p})
+    print(Q)
+    top = Q.numerator()
+    top = sage.factor(top)
+    print(top)
+
+    #Q = sage.factor(Q)
+    #print(Q)
+
+
+
 def test_poly():
     R = sage.PolynomialRing(sage.ZZ, "z")
     R = sage.FractionField(R)
@@ -2620,10 +2688,10 @@ def test_poly():
     f = (z**23 + 506*z**15 + 1288*z**11 + 253*z**7) // (253*z**16 + 1288*z**12 + 506*z**8 + 1)
 
     # [[17,1,5]] wenum
-    f = (z**17 + 17*z**13 + 187*z**9 + 51*z**5) // (51*z**12 + 187*z**8 + 17*z**4 + 1)
+    #f = (z**17 + 17*z**13 + 187*z**9 + 51*z**5) // (51*z**12 + 187*z**8 + 17*z**4 + 1)
 
     # CZ 
-    f = (z**2 + z) / (z-1)
+    #f = (z**2 + z) / (z-1)
 
     print(f)
 
@@ -3161,6 +3229,21 @@ def test_kl():
     u = op*v
     
     print(get_coords(u))
+
+
+def test_fgl():
+    "test some formal group law identities"
+    from sage.all_cmdline import coth, tanh
+
+    epsilon = 1e-6
+    eq = lambda a,b : abs(a-b)<epsilon
+    F = lambda x,y : (x+y)/(1+x*y)
+    G = lambda x,y : (1+x*y)/(x+y)
+    for trial in range(100):
+        x = 10*random() - 5
+        y = 10*random() - 5
+        assert eq(tanh(x+y), F(tanh(x),tanh(y)))
+        assert eq(coth(x+y), G(coth(x), coth(y)))
 
 
 
