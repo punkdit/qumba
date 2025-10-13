@@ -3330,6 +3330,41 @@ def test_distill():
         print("\t%s = 0" % sage.factor(top))
 
 
+def test_yspider():
+
+    vs = []
+    for val,vec,dim in Y.eigenvectors():
+        vs.append(vec)
+    pos, neg = vs
+
+    mul = pos @ pos.d @ pos.d + neg @ neg.d @ neg.d
+    #print(mul)
+
+
+    base = sage.PolynomialRing(sage.QQ, list("uv"))
+    R = sage.FractionField(base)
+    u,v = R.gens()
+
+    f = (u+v)/(1+u*v)
+    print(f)
+    #print(" ".join(dir(f)))
+
+    def partial(i, j):
+        df = f
+        for _ in range(i):
+            df = diff(df, u)
+        for _ in range(j):
+            df = diff(df, v)
+        n = sage.factorial(i) * sage.factorial(j)
+        #return n
+        return df.subs({u:0, v:0}) #// n
+
+    N = 5
+    table = Matrix(sage.QQ, [[partial(i,j) for i in range(N)] for j in range(N)])
+    print(table)
+
+
+
 
 
 if __name__ == "__main__":
