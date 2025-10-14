@@ -3225,17 +3225,21 @@ def test_kl():
 
 def test_fgl():
     "test some formal group law identities"
-    from sage.all_cmdline import coth, tanh
+    from sage.all_cmdline import (
+        coth, tanh, sech, sinh, cosh, csch, 
+            acoth, atanh, asech, asinh, acosh, acsch)
 
     epsilon = 1e-6
     eq = lambda a,b : abs(a-b)<epsilon
     F = lambda x,y : (x+y)/(1+x*y)
     G = lambda x,y : (1+x*y)/(x+y)
+    H = lambda x,y : (x+y)/(1-x*y)
     for trial in range(100):
         x = 10*random() - 5
         y = 10*random() - 5
-        assert eq(tanh(x+y), F(tanh(x),tanh(y)))
+        assert eq(tanh(x+y), F(tanh(x), tanh(y)))
         assert eq(coth(x+y), G(coth(x), coth(y)))
+        assert eq(tanh(x+y), -1j*H(1j*tanh(x), 1j*tanh(y)))
 
     base = sage.PolynomialRing(sage.ZZ, list("xy"))
     R = sage.FractionField(base)
