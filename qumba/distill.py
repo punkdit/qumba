@@ -1134,8 +1134,8 @@ def test_mobius():
     print( a, mul( -1, a ) )
 
 
-def get_code(code=None, verbose=True):
-    idx = argv.get("idx", 0)
+def get_code(code=None, idx=0, verbose=True):
+    idx = argv.get("idx", idx)
     params = argv.get("code", code)
     if params == (3,1,1):
         code = [
@@ -3366,6 +3366,56 @@ def test_yspider():
     N = 5
     table = Matrix(sage.QQ, [[partial(i,j) for i in range(N)] for j in range(N)])
     print(table)
+
+
+def dynamic():
+
+    code = get_code((15,1,3))
+    #code = get_code((7,1,3))
+
+    print(code)
+
+    f = PauliDistill(code).build()
+
+    s = pystr(f)
+    print(s)
+
+    f = eval("lambda z:%s"%s)
+
+
+    N = 10000
+    R = 10
+    items = []
+    for _ in range(N):
+        x = numpy.random.normal(0, R)
+        y = numpy.random.normal(0, R)
+        z = x + 1j*y
+        items.append(z)
+
+    from huygens.namespace import Canvas, path, black, red
+    cvs = Canvas()
+    p = path.rect(-R,-R,2*R,2*R)
+    cvs.stroke(p)
+    cvs.clip(p)
+    #for z in items[::10]:
+    #    cvs.fill(path.circle(z.real, z.imag, 0.2), [red.alpha(0.2)])
+
+    for i in range(20):
+        items = [f(z) for z in items]
+        items = [z for z in items if abs(z) < 1e6]
+
+    items = [z for z in items if abs(z) < 100]
+    print("items:", len(items))
+    print(items[:10])
+
+    for z in items:
+        cvs.fill(path.circle(z.real, z.imag, 0.1), [black.alpha(0.2)])
+
+    for z in [1,-1,1j,-1j, 0]:
+        z = complex(z)
+        cvs.stroke(path.circle(z.real, z.imag, 0.2))
+
+    cvs.writePDFfile("distill_code")
 
 
 
