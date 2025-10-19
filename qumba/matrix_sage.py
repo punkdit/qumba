@@ -80,7 +80,8 @@ class Matrix:
         return self.shape[0]
 
     def __mul__(self, other):
-        assert isinstance(other, Matrix), type(other)
+        if not isinstance(other, Matrix):
+            return NotImplemented
         assert self.shape[1] == other.shape[0], (
             "cant multiply %sx%s by %sx%s"%(self.shape + other.shape))
         ring = unify(self.ring, other.ring)
