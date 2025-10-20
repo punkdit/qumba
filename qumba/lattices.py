@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import numpy
+
 from sage.all_cmdline import QQ
 one = QQ.gens()[0]
 
@@ -9,6 +11,7 @@ from huygens.namespace import (
     Canvas, path, red, black, orange, st_arrow, grey,
     st_southwest, Scale)
 
+from qumba.qcode import QCode, fromstr, lin, shortstr
 from qumba.matrix_sage import Matrix
 from qumba.argv import argv
 
@@ -96,16 +99,21 @@ class Show:
         cvs.stroke(path.line(-1, 0, 3, 0), st)
         cvs.stroke(path.line(0, -1, 0, 3), st)
         self.cvs = cvs
+        self.fg = Canvas()
 
     def show(self, vs, radius=0.05, st=[]):
-        cvs = self.cvs
+        from huygens.namespace import white
+        cvs = self.fg
         for v in vs:
             assert isinstance(v, Matrix)
             x, y, _ = [eval(str(xx)) for xx in v[:, 0]]
-            cvs.stroke(path.circle(x, y, radius), st)
+            p = path.circle(x, y, radius)
+            cvs.fill(p, [white])
+            cvs.stroke(p, st)
         return self
 
     def save(self, name="lattice"):
+        self.cvs.append(self.fg)
         self.cvs.writePDFfile(name)
         return self
 
@@ -127,25 +135,44 @@ class Show:
         if label:
             cvs.text(x, y, label, st_southwest+[Scale(0.5)])
 
-    def draw_poly(self, vs):
-        pts = []
-        for v in vs:
-            x, y = [eval(str(xx)) for xx in v[:, 0]][:2]
-            pts.append([x,y])
-        #print("draw_poly", pts)
+    def draw_poly(self, vs, st=[]):
         from huygens.the_turtle import Turtle
         from huygens.front import RGB
+        from huygens.namespace import st_round
         from random import random
-        st = [RGB(random(),random(),random())]
-        t = Turtle(*pts[0], cvs=self.cvs)
-        for p in pts[:]:
+
+        pts = []
+        x0,y0 = 0,0
+        for v in vs:
+            x, y = [eval(str(xx)) for xx in v[:, 0]][:2]
+            x0 += x; y0 += y
+            pts.append([x,y])
+        x0 /= len(pts)
+        y0 /= len(pts)
+        pts.sort(key = lambda xy:(xy[0]-x0)**2+(xy[1]-y0)**2)
+        ps = [pts.pop()]
+        while pts:
+            best = None
+            rbest = 9999
+            x0,y0 = ps[-1]
+            for (x1,y1) in pts:
+                r = (x1-x0)**2+(y1-y0)**2
+                if r < rbest:
+                    best = [x1,y1]
+                    rbest = r
+            assert best in pts, (best, pts)
+            pts.remove(best)
+            ps.append(best)
+
+        t = Turtle(*ps[0], cvs=self.cvs)
+        for p in ps[:]:
             t.moveto(*p)
-        t.stroke(closepath=True, attrs=st)
+        #st = [RGB(random(),random(),random())]+st_round
+        t.fill(closepath=True, attrs=st)
         
         
     
 
-from qumba.qcode import QCode, fromstr, lin
 def get_sd(n, checks):
     ops = []
     for check in checks:
@@ -157,10 +184,32 @@ def get_sd(n, checks):
             ops.append(op)
     H = fromstr(ops)
     H = lin.linear_independent(H)
-    print(n, H.shape)
+    #print(shortstr(H))
+    #print(n, H.shape)
+
+    # remove dead qubits
+    cols = []
+    for (i,weight) in enumerate(H.sum(axis=0)):
+        if weight:
+            cols.append(i)
+    H = H[:, cols]
 
     code = QCode(H)
+
     return code
+
+
+def get_wenum(code):
+    assert code.is_selfdual()
+    css = code.to_css()
+    H = css.Hx
+    m, n = H.shape
+    wenum = [0]*(n+1)
+    assert m < 21, m
+    for v in numpy.ndindex((2,)*m):
+        d = lin.dot2(v, H).sum()
+        wenum[d] += 1
+    return wenum
 
 
 def test():
@@ -168,18 +217,6 @@ def test():
     I = Matrix(QQ, [
         [1, 0, 0],
         [0, 1, 0],
-        [0, 0, 1],
-    ])
-
-    tx = Matrix(QQ, [
-        [1, 0, 1],
-        [0, 1, 0],
-        [0, 0, 1],
-    ])
-
-    ty = Matrix(QQ, [
-        [1, 0, 0],
-        [0, 1, 1],
         [0, 0, 1],
     ])
 
@@ -216,7 +253,7 @@ def test():
         v = op*v0
         x = v[0,0]
         y = v[1,0]
-        return -one<=x<=3 and -one<=y<=3
+        return -one<=x<=4*one/2 and -2<=y<=2
 
     G = generate(gens, accept)
     print(len(G))
@@ -228,33 +265,51 @@ def test():
     def accept(v):
         x = v[0,0]
         y = v[1,0]
-        return 0<=x and 0<=y and (x+y)<=5*one/2 and  (x-y)<=one/2 
-    bits = set(op*v0 for op in G if accept(op*v0))
-    bits = list(bits)
-    bits.sort(key=str)
-    mask = set(bits)
-    lookup = {bit:i for (i,bit) in enumerate(bits)}
+        return (x-y)>=0  and (x+y)>=0 
+    verts = set(op*v0 for op in G if accept(op*v0))
+    verts = list(verts)
+    verts.sort(key=str)
+
+    mask = set(verts)
+
+    def r_accept(v):
+        x,y = v[0,0], v[1,0]
+        return (x-y)>one/3  and (x+y)>=0 
+    def g_accept(v):
+        x,y = v[0,0], v[1,0]
+        return (x-y)>=0  and (x+y)>one/3
+    def b_accept(v):
+        x,y = v[0,0], v[1,0]
+        return (x-y)>=0  and (x+y)>=0 
+
+    r_mask = {v for v in verts if r_accept(v)}
+    b_mask = {v for v in verts if b_accept(v)}
+    g_mask = {v for v in verts if g_accept(v)}
+
+    lookup = {vert:i for (i,vert) in enumerate(verts)}
 
     s = Show()
-    s.show(bits, st=[black.alpha(0.3)])
+    s.show(verts, st=[black.alpha(0.3)])
     #s.show([v0], st=[red])
     #s.show([C*v0], st=[red])
 
     # act on cosets on the left
     #s.show(set(op*v0 for op in A*B*BC), st=[red])
 
-
     checks = []
+    colours = []
 
-    for H in [AB, AC, BC]:
+    for idx,H in enumerate([AB, AC, BC]):
         faces = find_orbit(G, H)
-        print("faces:", len(faces))
+        #print("faces:", len(faces))
         for face in faces:
             face = set(g*v0 for g in face)
-            face = face & mask
-            if not len(face): continue
+            face = face & [r_mask, g_mask, b_mask][idx]
+            if len(face) < 4:
+                continue
             idxs = [lookup[f] for f in face]
             checks.append(idxs)
+            colours.append(idx)
             #s.show(face, st=[red.alpha(0.5)])
 
 
@@ -262,17 +317,61 @@ def test():
     #s.render(B, r"$B$")
 
     #print(checks)
-    checks = [c for c in checks if len(c) >= 4]
+    #checks = [c for c in checks if len(c) >= 4]
 
-    for idxs in checks:
-        vs = [bits[i] for i in idxs]
-        s.draw_poly(vs)
+    from huygens.namespace import red, green, blue
+
+    for idx,check in zip(colours, checks):
+        vs = [verts[c] for c in check]
+        cl = [red, green, blue][idx]
+        s.draw_poly(vs, [cl])
     s.save()
 
-    n = len(bits)
+    for d in range(1,12,2):
+        n = d**2/2 + d - 1/2
+        print("\t[[%d,1,%d]]"%(n,d))
+
+    n = len(verts)
     code = get_sd(n, checks)
     print(code)
 
+    wenum = get_wenum(code)
+    print(wenum)
+
+    code = QCode.fromstr("""
+XIIXIIXIXIIIXXIXXIIIIIIIIIIIIII
+IIXIIXIXIIIXXIXXIIIIIIIIIIIIIIX
+IXIIXIXIIIXXIXXIIIIIIIIIIIIIIXI
+XIIXIXIIIXXIXXIIIIIIIIIIIIIIXII
+IIXIXIIIXXIXXIIIIIIIIIIIIIIXIIX
+IXIXIIIXXIXXIIIIIIIIIIIIIIXIIXI
+XIXIIIXXIXXIIIIIIIIIIIIIIXIIXII
+IXIIIXXIXXIIIIIIIIIIIIIIXIIXIIX
+XIIIXXIXXIIIIIIIIIIIIIIXIIXIIXI
+IIIXXIXXIIIIIIIIIIIIIIXIIXIIXIX
+IIXXIXXIIIIIIIIIIIIIIXIIXIIXIXI
+IXXIXXIIIIIIIIIIIIIIXIIXIIXIXII
+XXIXXIIIIIIIIIIIIIIXIIXIIXIXIII
+XIXXIIIIIIIIIIIIIIXIIXIIXIXIIIX
+IXXIIIIIIIIIIIIIIXIIXIIXIXIIIXX
+ZIIZIIZIZIIIZZIZZIIIIIIIIIIIIII
+IIZIIZIZIIIZZIZZIIIIIIIIIIIIIIZ
+IZIIZIZIIIZZIZZIIIIIIIIIIIIIIZI
+ZIIZIZIIIZZIZZIIIIIIIIIIIIIIZII
+IIZIZIIIZZIZZIIIIIIIIIIIIIIZIIZ
+IZIZIIIZZIZZIIIIIIIIIIIIIIZIIZI
+ZIZIIIZZIZZIIIIIIIIIIIIIIZIIZII
+IZIIIZZIZZIIIIIIIIIIIIIIZIIZIIZ
+ZIIIZZIZZIIIIIIIIIIIIIIZIIZIIZI
+IIIZZIZZIIIIIIIIIIIIIIZIIZIIZIZ
+IIZZIZZIIIIIIIIIIIIIIZIIZIIZIZI
+IZZIZZIIIIIIIIIIIIIIZIIZIIZIZII
+ZZIZZIIIIIIIIIIIIIIZIIZIIZIZIII
+ZIZZIIIIIIIIIIIIIIZIIZIIZIZIIIZ
+IZZIIIIIIIIIIIIIIZIIZIIZIZIIIZZ
+    """)
+    wenum = get_wenum(code)
+    print(wenum)
 
 
 if __name__ == "__main__":
