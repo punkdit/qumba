@@ -1,15 +1,29 @@
 #!/usr/bin/env python
+"""
+build some k=1 colour codes
+
+https://arxiv.org/abs/1108.5738
+
+"""
+
+import math
+from random import random
 
 import numpy
 
-from sage.all_cmdline import QQ
+from sage import all_cmdline as sage
+QQ = sage.QQ
 one = QQ.gens()[0]
 
 from huygens import config
 config(text="pdflatex")
 from huygens.namespace import (
     Canvas, path, red, black, orange, st_arrow, grey,
-    st_southwest, Scale)
+    st_southwest, Scale, Rotate)
+
+from huygens.the_turtle import Turtle
+from huygens.front import RGB, Rotate, RGBA
+from huygens.namespace import red, green, blue, orange, yellow, white, st_round
 
 from qumba.qcode import QCode, fromstr, lin, shortstr
 from qumba.matrix_sage import Matrix
@@ -91,18 +105,17 @@ def find_orbit(gens, x):
 
 
 class Show:
-    def __init__(self):
-
+    def __init__(self, cvs=None):
         st = st_arrow+[orange.alpha(0.5)]
-        cvs = Canvas()
+        if cvs is None:
+            cvs = Canvas()
         #cvs.stroke(path.rect(0,0,1,1))
-        cvs.stroke(path.line(-1, 0, 3, 0), st)
-        cvs.stroke(path.line(0, -1, 0, 3), st)
+        #cvs.stroke(path.line(-1, 0, 3, 0), st)
+        #cvs.stroke(path.line(0, -1, 0, 3), st)
         self.cvs = cvs
         self.fg = Canvas()
 
     def show(self, vs, radius=0.05, st=[]):
-        from huygens.namespace import white
         cvs = self.fg
         for v in vs:
             assert isinstance(v, Matrix)
@@ -113,6 +126,7 @@ class Show:
         return self
 
     def save(self, name="lattice"):
+        print("save:", name)
         self.cvs.append(self.fg)
         self.cvs.writePDFfile(name)
         return self
@@ -136,11 +150,6 @@ class Show:
             cvs.text(x, y, label, st_southwest+[Scale(0.5)])
 
     def draw_poly(self, vs, st=[]):
-        from huygens.the_turtle import Turtle
-        from huygens.front import RGB
-        from huygens.namespace import st_round
-        from random import random
-
         pts = []
         x0,y0 = 0,0
         for v in vs:
@@ -173,7 +182,7 @@ class Show:
         
     
 
-def get_sd(n, checks):
+def get_sd(n, checks, d=None):
     ops = []
     for check in checks:
         for o in 'XZ':
@@ -183,7 +192,7 @@ def get_sd(n, checks):
             op = ''.join(op)
             ops.append(op)
     H = fromstr(ops)
-    H = lin.linear_independent(H)
+    #H = lin.linear_independent(H)
     #print(shortstr(H))
     #print(n, H.shape)
 
@@ -194,7 +203,7 @@ def get_sd(n, checks):
             cols.append(i)
     H = H[:, cols]
 
-    code = QCode(H)
+    code = QCode(H, d=d)
 
     return code
 
@@ -205,14 +214,16 @@ def get_wenum(code):
     H = css.Hx
     m, n = H.shape
     wenum = [0]*(n+1)
-    assert m < 21, m
+    assert m < 31, m
     for v in numpy.ndindex((2,)*m):
         d = lin.dot2(v, H).sum()
         wenum[d] += 1
     return wenum
 
 
-def test():
+def build_colour_488(d=3):
+    assert d>0, d
+    assert d%2, d
 
     I = Matrix(QQ, [
         [1, 0, 0],
@@ -253,10 +264,11 @@ def test():
         v = op*v0
         x = v[0,0]
         y = v[1,0]
-        return -one<=x<=4*one/2 and -2<=y<=2
+        lim = ((d+1)//2)*one/2 
+        return 0<=x<=lim and -lim<=y<=lim
 
     G = generate(gens, accept)
-    print(len(G))
+    print("G =", len(G))
 
     AB = generate([A, B]) # octa
     AC = generate([A, C]) # octa
@@ -288,10 +300,8 @@ def test():
 
     lookup = {vert:i for (i,vert) in enumerate(verts)}
 
-    s = Show()
-    s.show(verts, st=[black.alpha(0.3)])
-    #s.show([v0], st=[red])
-    #s.show([C*v0], st=[red])
+    s = Show(Canvas([Scale(2), Rotate(math.pi/2)]))
+    s.show(verts, 0.03, st=[0.3*white])
 
     # act on cosets on the left
     #s.show(set(op*v0 for op in A*B*BC), st=[red])
@@ -319,24 +329,98 @@ def test():
     #print(checks)
     #checks = [c for c in checks if len(c) >= 4]
 
-    from huygens.namespace import red, green, blue
+#    scheme = [ 
+#        grey+RGB(0,0,0.0), orange.alpha(0.8), yellow.alpha(0.6),
+#        RGBA(0.10, 0.2000, 0.7000, 0.5000),
+#        green+RGB(0,0,0.2)]
+
+    rgbs = [
+        red.alpha(0.8) + 0.2*white,
+        green+RGB(0,0,0.3),
+        RGBA(0.10, 0.2000, 0.7000, 0.5000),
+    ]
 
     for idx,check in zip(colours, checks):
         vs = [verts[c] for c in check]
-        cl = [red, green, blue][idx]
+        cl = rgbs[idx]
         s.draw_poly(vs, [cl])
-    s.save()
-
-    for d in range(1,12,2):
-        n = d**2/2 + d - 1/2
-        print("\t[[%d,1,%d]]"%(n,d))
+    if argv.save:
+        s.save("lattice_%d"%d)
 
     n = len(verts)
-    code = get_sd(n, checks)
-    print(code)
+    code = get_sd(n, checks, d)
+    return code
 
+
+def test_params():
+
+    for d in range(1,12,2):
+        n = (d**2-1)/2 + d
+        assert int(n) == n
+        print("\t[[%d,1,%d]] 488"%(n,d))
+    print()
+
+    for d in range(1,12,2):
+        n = (3*d**2+1)/4
+        assert int(n) == n
+        print("\t[[%d,1,%d]] 666"%(n,d))
+    print()
+
+    for d in range(1,12,2):
+        n = (3*d**2+5)/2 - 3*d
+        assert int(n) == n
+        print("\t[[%d,1,%d]] 4.6.12"%(n,d))
+    print()
+
+
+def test():
+
+    R = sage.PolynomialRing(sage.ZZ, "x")
+    x = R.gens()[0]
+
+    for d in [3,5,7,9]:
+        code = build_colour_488(d)
+        print(code)
+        wenum = get_wenum(code)
+        print(wenum)
+        w = 0
+        for (i,v) in enumerate(wenum):
+            w += v*(x**i)
+        print(sage.latex(w))
+        #print(sage.factor(w))
+        w1 = w.subs({x:1})
+        print(w1)
+        assert w1 == 2**((code.n-1)//2)
+
+    return
+
+
+
+    code = QCode.fromstr("""
+XIIIIIIIIXIIXIIXI
+IXIIIIIIIXIIXIIIX
+IIXIIIIIIIIXIXXII
+IIIXIIIIXXIIXIIII
+IIIIXIIIXIXIXXXXX
+IIIIIXIIIIXXIXIII
+IIIIIIXIXXXIIXXXX
+IIIIIIIXIIXXIIXII
+ZIIIIIIIIZIIZIIZI
+IZIIIIIIIZIIZIIIZ
+IIZIIIIIIIIZIZZII
+IIIZIIIIZZIIZIIII
+IIIIZIIIZIZIZZZZZ
+IIIIIZIIIIZZIZIII
+IIIIIIZIZZZIIZZZZ
+IIIIIIIZIIZZIIZII
+    """)
     wenum = get_wenum(code)
     print(wenum)
+
+
+    return
+
+    code = build_colour_488(5)
 
     code = QCode.fromstr("""
 XIIXIIXIXIIIXXIXXIIIIIIIIIIIIII
