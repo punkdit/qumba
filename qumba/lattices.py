@@ -104,15 +104,26 @@ def find_orbit(gens, x):
         bdy = _bdy
     return orbit
 
+def pystr(x):
+    s = str(x)
+    s = s.replace("?", "")
+    s = s.replace("r3", str(3**0.5))
+    try: 
+        eval(s)
+    except:
+        print(s)
+        raise
+    return s
 
 class Show:
-    def __init__(self, cvs=None):
+    def __init__(self, cvs=None, axis=False):
         st = st_arrow+[orange.alpha(0.5)]
         if cvs is None:
             cvs = Canvas()
-        #cvs.stroke(path.rect(0,0,1,1))
-        #cvs.stroke(path.line(-1, 0, 3, 0), st)
-        #cvs.stroke(path.line(0, -1, 0, 3), st)
+        if axis:
+            #cvs.stroke(path.rect(0,0,1,1))
+            cvs.stroke(path.line(-3, 0, 3, 0), st)
+            cvs.stroke(path.line(0, -1, 0, 3), st)
         self.cvs = cvs
         self.fg = Canvas()
 
@@ -120,7 +131,7 @@ class Show:
         cvs = self.fg
         for v in vs:
             assert isinstance(v, Matrix)
-            x, y, _ = [eval(str(xx)) for xx in v[:, 0]]
+            x, y, _ = [eval(pystr(xx)) for xx in v[:, 0]]
             p = path.circle(x, y, radius)
             cvs.fill(p, [white])
             cvs.stroke(p, st)
@@ -353,6 +364,102 @@ def build_colour_488(d=3):
     return code
 
 
+def build_colour_666(d=3):
+    global one
+    assert d>0, d
+    assert d%2, d
+
+#    w = sage.polygen(sage.ZZ, 'w')
+#    K = sage.NumberField(w**2+w+1, names=('w',))
+#    w, = K.gens()
+#    print(K)
+#    assert w**3==1
+#
+#    print( (w+w**2) )
+
+
+    if 0:
+        K = sage.QQbar # VERY SLOW ....
+    
+        r3 = (3*one)**(one/2)
+        r3 = K(r3)
+    else:
+
+        r3 = sage.polygen(sage.ZZ, 'r3')
+        K = sage.NumberField(r3**2-3, names=('r3',))
+        r3, = K.gens()
+        assert r3**2==3
+
+    one = K.one()
+
+    I = Matrix(K, [
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+    ])
+
+    A = Matrix(K, [
+        [one/2, r3/2, 0],
+        [r3/2, -one/2, 0],
+        [0, 0, 1],
+    ])
+
+    B = Matrix(K, [
+        [1, 0, 0],
+        [0,-1, 0],
+        [0, 0, 1],
+    ])
+
+    C = Matrix(K, [
+        [-1, 0, one/2],
+        [ 0, 1, 0],
+        [ 0, 0, 1],
+    ])
+
+    assert I*I == I
+    assert A*A == I
+    assert B*B == I
+    assert (A*B)**2 != I
+    assert (A*B)**3 != I
+    assert (A*B)**6 == I
+
+    gens = [A, B, C]
+    v0 = Matrix(K, [[one/2, 0, 1]]).t
+    v0 = Matrix(K, [[one/4, r3/12, 1]]).t
+
+    def accept(op):
+        v = op*v0
+        x = v[0,0]
+        y = v[1,0]
+        lim = ((d+1)//2)*one/2 
+        return -lim<=x<=lim and -one/3<=y<=lim
+
+    G = generate(gens, accept)
+    print("G =", len(G))
+
+    verts = [g*v0 for g in G]
+    #for v in verts:
+    #    print(v[0,0], ",", v[1,0])
+
+    s = Show(Canvas([Scale(2), Rotate(0*math.pi/2)]), axis=True)
+    #s.show(verts, 0.03, st=[black.alpha(0.3)])
+
+    v0 = Matrix(K, [[one/4, r3/12, 1]]).t
+    verts = [g*v0 for g in G]
+    s.show(verts, 0.03, st=[red.alpha(0.3)])
+    s.show([v0], 0.03, st=[red.alpha(0.5)])
+
+    s.save()
+
+
+
+
+def test_666():
+
+    build_colour_666(3)
+
+
+
 def show_params():
 
     for d in range(1,15,2):
@@ -435,22 +542,28 @@ def test():
         print("_"*79)
         print()
 
+
 def find_lw():
     d = argv.get("d", 3)
+
     w = argv.get("w", 4)
+
+    ws = argv.get("ws", [w])
 
     code = build_colour_488(d)
     print(code)
     css = code.to_css()
     Hx = css.Hx
 
-    count = 0
-    for h in transversal.find_lw(Hx, w):
-        #print(h)
-        print('.',flush=True,end='')
-        count += 1
-    print()
-    print(count)
+    for w in ws:
+        count = 0
+        for h in transversal.find_lw(Hx, w):
+            #print(h)
+            if count%100==0:
+                print('.',flush=True,end='')
+            count += 1
+        print()
+        print(w, count)
 
     return
 
