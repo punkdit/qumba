@@ -106,10 +106,12 @@ class Matrix:
         return Matrix(self.ring, M)
 
     def __pow__(self, n):
-       assert n>=0
-       if n==0:
+        if n < 0:
+            return (~self)**(-n)
+        assert n>=0
+        if n==0:
            return Matrix.identity(self.ring, self.shape[0])
-       return reduce(mul, [self]*n)
+        return reduce(mul, [self]*n)
 
     def __rmul__(self, r):
         if isinstance(r, int):
@@ -240,6 +242,7 @@ class Matrix:
 
     def determinant(self):
         return self.M.determinant()
+    det = determinant
 
     def eigenvectors(self, ring=None):
         if ring is None:

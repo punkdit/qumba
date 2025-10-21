@@ -115,6 +115,18 @@ def pystr(x):
         raise
     return s
 
+def pyeval(x):
+    s = pystr(x)
+    return eval(s)
+
+
+# red,green,blue colour scheme
+scheme = [
+    red.alpha(0.8) + 0.2*white,
+    green+RGB(0,0,0.3),
+    RGBA(0.10, 0.2000, 0.7000, 0.5000),
+]
+
 class Show:
     def __init__(self, cvs=None, axis=False):
         st = st_arrow+[orange.alpha(0.5)]
@@ -155,7 +167,7 @@ class Show:
                 break
         else:
             assert 0
-        x, y = [eval(str(xx)) for xx in vec[:, 0]][:2]
+        x, y = [eval(pystr(xx)) for xx in vec[:, 0]][:2]
         cvs = self.cvs
         cvs.stroke(path.line(-x, -y, x, y), [grey])
         if label:
@@ -165,7 +177,7 @@ class Show:
         pts = []
         x0,y0 = 0,0
         for v in vs:
-            x, y = [eval(str(xx)) for xx in v[:, 0]][:2]
+            x, y = [eval(pystr(xx)) for xx in v[:, 0]][:2]
             x0 += x; y0 += y
             pts.append([x,y])
         x0 /= len(pts)
@@ -346,15 +358,9 @@ def build_colour_488(d=3):
 #        RGBA(0.10, 0.2000, 0.7000, 0.5000),
 #        green+RGB(0,0,0.2)]
 
-    rgbs = [
-        red.alpha(0.8) + 0.2*white,
-        green+RGB(0,0,0.3),
-        RGBA(0.10, 0.2000, 0.7000, 0.5000),
-    ]
-
     for idx,check in zip(colours, checks):
         vs = [verts[c] for c in check]
-        cl = rgbs[idx]
+        cl = scheme[idx]
         s.draw_poly(vs, [cl])
     if argv.save:
         s.save("lattice_%d"%d)
@@ -423,16 +429,22 @@ def build_colour_666(d=3):
     assert (A*B)**3 != I
     assert (A*B)**6 == I
 
-    gens = [A, B, C]
-    v0 = Matrix(K, [[one/2, 0, 1]]).t
+    #gens = [A, B, C]
+    AB = A*B
+    BC = B*C
+    gens = [AB, BC] # rotation subgroup
+    #v0 = Matrix(K, [[one/2, 0, 1]]).t
     v0 = Matrix(K, [[one/4, r3/12, 1]]).t
 
     def accept(op):
-        v = op*v0
+        if op.shape == (3,3):
+            v = op*v0
+        else:
+            v = op
         x = v[0,0]
         y = v[1,0]
-        lim = ((d+1)//2)*one/2 
-        return -lim<=x<=lim and -one/3<=y<=lim
+        lim = 3
+        return -lim<=x<=lim and -lim<=y<=lim
 
     G = generate(gens, accept)
     print("G =", len(G))
@@ -442,21 +454,77 @@ def build_colour_666(d=3):
     #    print(v[0,0], ",", v[1,0])
 
     s = Show(Canvas([Scale(2), Rotate(0*math.pi/2)]), axis=True)
-    #s.show(verts, 0.03, st=[black.alpha(0.3)])
 
-    v0 = Matrix(K, [[one/4, r3/12, 1]]).t
-    verts = [g*v0 for g in G]
-    s.show(verts, 0.03, st=[red.alpha(0.3)])
-    s.show([v0], 0.03, st=[red.alpha(0.5)])
+    face = generate([A,B])
+    assert len(face) == 12
+
+    g1 = C*AB*C*AB*C*AB*AB*A
+    g2 = AB*C*AB*C*AB*C*AB*AB*AB*A
+
+    tx = Matrix(K, [
+        [1, 0,  one/2],
+        [ 0, 1, 0],
+        [ 0, 0, 1],
+    ])
+    ty = AB*tx*AB*AB*AB*AB*AB
+    T = [tx**i*ty**j for i in range(-3,3) for j in range(-3,3)]
+
+    v1 = Matrix(K, [[one/8, r3/12, 1]]).t
+
+    #s.show([v1], 0.05, st=[red.alpha(0.5)])
+    #s.show([tx*v1], 0.05, st=[blue.alpha(0.5)])
+    #s.show([ty*v1], 0.05, st=[blue.alpha(0.5)])
+
+    # index 3 sublattice
+    N = 4
+    H = []
+    #verts = []
+    for i in range(-N,N+1):
+      for j in range(-N,N+1):
+        g = g1**i * g2**j
+        v = g*v1
+        if accept(v):
+            #verts.append(v)
+            H.append(g)
+
+    for (i,op) in enumerate([I, tx, ty]):
+      for g in H:
+        ps = [op*g*h*v0 for h in face]
+        s.draw_poly(ps, st=[scheme[i]])
+
+    def accept(v):
+        x, y = v[0,0],v[1,0]
+        dx, dy = one/4, r3/12
+        if y < -r3/12: return False
+        if x*dx+y*dy >= 11*one/24: return False
+        if x*dx-y*dy <= -11*one/24: return False
+        return True
+
+    verts = set([g*v0 for g in G])
+    dx, dy = one/4, r3/12
+    for v in verts:
+        x, y = v[0,0],v[1,0]
+        u = x*dx + y*dy
+        v = x*dx - y*dy
+        print((u,v), end=' ')
+    print()
+
+    verts = [v for v in verts if accept(v)]
+
+    print(len(verts))
+    #print(verts[0])
+    s.show(verts, 0.03, st=[black.alpha(0.3)])
 
     s.save()
+
+    print(ty)
 
 
 
 
 def test_666():
 
-    build_colour_666(3)
+    build_colour_666(5)
 
 
 
