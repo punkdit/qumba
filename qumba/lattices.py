@@ -238,7 +238,7 @@ def get_wenum(code):
     H = css.Hx
     m, n = H.shape
     wenum = [0]*(n+1)
-    assert m < 31, m
+    assert m <= 31, m
     for v in numpy.ndindex((2,)*m):
         d = lin.dot2(v, H).sum()
         wenum[d] += 1
@@ -447,13 +447,13 @@ def build_colour_666(d=3):
         return -lim<=x<=lim and -lim<=y<=lim
 
     G = generate(gens, accept)
-    print("G =", len(G))
+    #print("G =", len(G))
 
     verts = [g*v0 for g in G]
     #for v in verts:
     #    print(v[0,0], ",", v[1,0])
 
-    s = Show(Canvas([Scale(2), Rotate(0*math.pi/2)]), axis=True)
+    s = Show(Canvas([Scale(2), Rotate(+math.pi/6)]))
 
     face = generate([A,B])
     assert len(face) == 12
@@ -490,41 +490,79 @@ def build_colour_666(d=3):
     for (i,op) in enumerate([I, tx, ty]):
       for g in H:
         ps = [op*g*h*v0 for h in face]
-        s.draw_poly(ps, st=[scheme[i]])
+        #s.draw_poly(ps, st=[scheme[i]])
 
+    #print(v0)
+    dx, dy = -one*3/12, r3/4
     def accept(v):
+        i = d//2
+        assert i>0
+        aa = [0,2,5,5,8,8,11,11]
+        bb = [0,3,3,6,6,9,9,]
         x, y = v[0,0],v[1,0]
-        dx, dy = one/4, r3/12
-        if y < -r3/12: return False
-        if x*dx+y*dy >= 11*one/24: return False
-        if x*dx-y*dy <= -11*one/24: return False
+        if x < 0: return False # green bdy
+        #if x*dx-y*dy <= -2*one/8: return False # blue d==3
+        if x*dx-y*dy <= -aa[i]*one/8: return False # blue d==7
+        #if x*dx-y*dy <= -6*one/8: return False # red d==7
+
+        #if x*dx+y*dy <= -3*one/8: return False # red d==3
+        if x*dx+y*dy <= -bb[i]*one/8: return False # red d==7
+        #if x*dx+y*dy <= -5*one/8: return False # blue d==7
         return True
 
     verts = set([g*v0 for g in G])
-    dx, dy = one/4, r3/12
+    found = set()
     for v in verts:
         x, y = v[0,0],v[1,0]
         u = x*dx + y*dy
         v = x*dx - y*dy
-        print((u,v), end=' ')
+        found.add(u)
+        #print((u,v), end=' ')
+    found = list(found)
+    found.sort()
+    #print(found)
     print()
 
     verts = [v for v in verts if accept(v)]
+    verts.sort(key = str)
+    lookup = {v:i for (i,v) in enumerate(verts)}
 
-    print(len(verts))
     #print(verts[0])
     s.show(verts, 0.03, st=[black.alpha(0.3)])
 
+
+    n = len(verts)
+    
+    checks = []
+    for (ii,op) in enumerate([I, tx, ty]):
+      for g in H:
+        vs = [op*g*h*v0 for h in face]
+        idxs = {lookup.get(v) for v in vs if v in lookup}
+        if len(idxs)<4:
+            continue
+        #print(idxs)
+        s.draw_poly([verts[i] for i in idxs], st=[scheme[ii]])
+        h = [0]*n
+        for i in idxs:
+            h[i] = 1
+        checks.append(h)
+
+    H = lin.array2(checks)
+    #print(H.shape)
+
+    s.save("lattice_666_%d"%d)
     s.save()
 
-    print(ty)
+    code = QCode.build_css(H,H, d=d)
+    print(code)
 
-
+    return code
 
 
 def test_666():
 
-    build_colour_666(5)
+    for d in range(3,10,2):
+        code = build_colour_666(d)
 
 
 
@@ -581,7 +619,9 @@ def test():
         return rem
 
     for d in [3,5,7,9]:
-        code = build_colour_488(d)
+        #code = build_colour_488(d)
+        code = build_colour_666(d)
+
         print(code)
 
         code = augment(code)
