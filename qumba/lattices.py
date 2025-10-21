@@ -28,6 +28,7 @@ from huygens.namespace import red, green, blue, orange, yellow, white, st_round
 from qumba.qcode import QCode, fromstr, lin, shortstr
 from qumba.matrix_sage import Matrix
 from qumba.argv import argv
+from qumba import transversal 
 
 
 
@@ -268,7 +269,7 @@ def build_colour_488(d=3):
         return 0<=x<=lim and -lim<=y<=lim
 
     G = generate(gens, accept)
-    print("G =", len(G))
+    #print("G =", len(G))
 
     AB = generate([A, B]) # octa
     AC = generate([A, C]) # octa
@@ -352,25 +353,29 @@ def build_colour_488(d=3):
     return code
 
 
-def test_params():
+def show_params():
 
-    for d in range(1,12,2):
+    for d in range(1,15,2):
         n = (d**2-1)/2 + d
         assert int(n) == n
-        print("\t[[%d,1,%d]] 488"%(n,d))
-    print()
-
-    for d in range(1,12,2):
+        print("$[[%d,1,%d]]$ "%(n,d), end=' ')
         n = (3*d**2+1)/4
         assert int(n) == n
-        print("\t[[%d,1,%d]] 666"%(n,d))
-    print()
-
-    for d in range(1,12,2):
+        print("& $[[%d,1,%d]]$ "%(n,d), end=' ')
         n = (3*d**2+5)/2 - 3*d
         assert int(n) == n
-        print("\t[[%d,1,%d]] 4.6.12"%(n,d))
-    print()
+        print("& $[[%d,1,%d]]$ "%(n,d))
+
+
+def augment(code):
+    H = code.to_css().Hx
+    m, n = H.shape
+
+    H1 = lin.zeros2(m+1, n+1)
+    H1[:m, :n] = H
+    H1[m, :] = 1
+
+    return QCode.build_css(H1, H1)
 
 
 def test():
@@ -378,19 +383,74 @@ def test():
     R = sage.PolynomialRing(sage.ZZ, "x")
     x = R.gens()[0]
 
+    w2 = x**2 + 1
+    w7 = 7*x**4  + 1
+    w8 = 1 + 14*x**4 + x**8
+    w24 = x**24 + 759 *x**16 + 2576*x**12 + 759*x**8 + 1
+
+    #print(sage.factor(w8)) # two factors
+    #print(sage.factor(w24)) # no factors
+    #return
+
+
+    def divide(p, q):
+        print("divide by", q)
+        div = p // q
+        rem = p - div*q
+        if rem == 0:
+            print("div =", div)
+            print("\t =", sage.latex(div))
+        else:
+            print("rem =", rem)
+        assert p == div*q + rem
+        return rem
+
     for d in [3,5,7,9]:
         code = build_colour_488(d)
         print(code)
+
+        code = augment(code)
+        print(code)
+
         wenum = get_wenum(code)
-        print(wenum)
+
         w = 0
         for (i,v) in enumerate(wenum):
             w += v*(x**i)
-        print(sage.latex(w))
-        #print(sage.factor(w))
-        w1 = w.subs({x:1})
-        print(w1)
-        assert w1 == 2**((code.n-1)//2)
+        #print(sage.latex(w))
+        s = sage.latex(w)
+        print("W'(x) = %s"%s)
+        print()
+
+        print(sage.factor(w))
+        print()
+
+        divide(w, w24)
+        divide(w, w8)
+        divide(w, w2)
+
+        #w1 = w.subs({x:1})
+        #assert w1 == 2**((code.n-1)//2)
+
+        print("_"*79)
+        print()
+
+def find_lw():
+    d = argv.get("d", 3)
+    w = argv.get("w", 4)
+
+    code = build_colour_488(d)
+    print(code)
+    css = code.to_css()
+    Hx = css.Hx
+
+    count = 0
+    for h in transversal.find_lw(Hx, w):
+        #print(h)
+        print('.',flush=True,end='')
+        count += 1
+    print()
+    print(count)
 
     return
 
