@@ -1715,6 +1715,157 @@ def test_eigs():
 
     print(F.eigenvectors()) # FAIL
 
+
+def test_fold():
+
+    # ---------------------------------------------------
+
+    c = Clifford(1)
+    I = c.I
+    X, Z, Y = c.X(), c.Z(), c.Y()
+    H, S = c.H(), c.S()
+
+    assert H == H.d
+    assert H*X*H == Z
+    assert H*Y*H == -Y
+
+    conj = lambda a : S.d*a*S
+    assert conj(Z) == Z
+    assert conj(X) == -Y
+    assert conj(Y) == X
+    assert conj(X) == (-w4)*X*Z
+
+    # ---------------------------------------------------
+
+    CZ = Clifford(2).CZ()
+    XI = X@I
+    IX = I@X
+    XX = X@X
+
+    assert CZ*CZ == I@I
+    assert CZ*XI*CZ == X@Z
+    assert CZ*XX*CZ == Y@Y
+
+    # ---------------------------------------------------
+
+    from qumba.qcode import QCode, strop
+    from qumba import construct
+
+    # ---------------------------------------------------
+
+    code = construct.get_422()
+    print(code.longstr())
+
+    space = Clifford(code.n)
+    H, S = space.H, space.S
+    CZ = space.CZ
+    SWAP = space.SWAP
+    get_pauli = space.get_pauli
+    
+    I = space.I
+    P = code.get_projector()
+    assert P*P == P
+
+    l = CZ(0,2) * S(1) * S(3).d
+    assert l*P != P*l
+
+    l = CZ(0,2) * CZ(1,3)
+    assert l*P == P*l
+
+    # ---------------------------------------------------
+
+    code = construct.get_512()
+    print(code.longstr())
+
+    space = Clifford(code.n)
+    H, S = space.H, space.S
+    CZ = space.CZ
+    SWAP = space.SWAP
+    get_pauli = space.get_pauli
+    
+    I = space.I
+    P = code.get_projector()
+    assert P*P == P
+
+    for op in code.L:
+        s = strop(op)
+        g = get_pauli(s)
+        assert g*P == P*g
+
+    for op in code.H:
+        s = strop(op)
+        g = get_pauli(s)
+        assert g*P == P == P*g
+
+    # ---------------------------------------------------
+
+    l = SWAP(1,3)
+    assert l*P != P*l
+
+    for i in range(5):
+        l = H(i)*l
+    assert l*P*l.d == P
+
+
+    # ---------------------------------------------------
+
+    l = space.P(1,4,2,0,3)
+    assert l**4 == I
+    for i in range(5):
+        l = H(i)*l
+    assert l*P*l.d == P
+
+
+    # ---------------------------------------------------
+
+    print("CZ")
+
+    l = CZ(1,3)
+    assert l*P != P*l
+
+    l = S(0).d*S(2)*S(4).d * l
+
+    for h,t in zip(code.H, code.T):
+        h, t = strop(h), strop(t)
+        #print(h, t)
+        #if "X" in h:
+        #    l = l*get_pauli(t) 
+
+    Q = l*P*l.d
+    assert Q == P 
+
+#    for h,t in zip(code.H, code.T):
+#        hs, ts = strop(h), strop(t)
+#        h = get_pauli(hs)
+#        print(Q*h==Q, h*Q==Q, hs)
+    
+    # ---------------------------------------------------
+
+    space = code.space
+    H, S = space.H, space.S
+    CZ = space.CZ
+    SWAP = space.SWAP
+    I = space.I()
+
+    l = CZ(1,3)
+    l = S(0)*S(2)*S(4) * l
+
+    dode = l*code
+    assert (dode.is_equiv(code))
+    #print(dode.longstr())
+
+    # ---------------------------------------------------
+
+    l = space.P(1,4,2,0,3)
+    assert l**4 == I
+    for i in range(5):
+        l = H(i)*l
+
+    dode = l*code
+    #print(dode.longstr())
+    assert (dode.is_equiv(code))
+
+
     
 def test():
     test_clifford()

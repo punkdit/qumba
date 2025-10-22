@@ -436,6 +436,82 @@ def test_gaussian():
       print()
 
 
+def test_zx():
+    from qumba import db
+    from qumba import autos
+    from qumba.action import Perm, Group, mulclose
+    code = list(db.get(_id="67a4b0119edf81e4b7e670ac"))[0]
+    space = code.space
+    n = code.n
+    items = list(range(n))
+
+    dode = space.H() * code
+    print(dode)
+    #print(dode.longstr())
+
+    #tau = dode.get_isomorphism(code)
+    #print(tau)
+    tau = [0, 1, 3, 2, 10, 6, 5, 7, 14, 11, 4, 9, 13, 12, 8]
+    tau = Perm(tau, items)
+
+    #css = code.to_css()
+    #print(css)
+
+    #G = autos.get_autos_css(css) # fails..
+    #print("|G| =", len(G))
+
+    N,perms = code.get_autos()
+    print(N)
+    perms = [Perm(perm,items) for perm in perms]
+    G = mulclose(perms)
+    print(len(G))
+
+    logops = set()
+
+    count = 0
+    for g in G:
+        f = g*tau
+        perm = [f[i] for i in items]
+        lop = space.get_perm(perm)
+        lop = space.H() * lop
+        dode = lop*code
+        assert dode.is_equiv(code)
+        L = dode.get_logical(code)
+        logops.add(L)
+
+        s = f.fixed()
+        if not (f*f).is_identity():
+            continue
+        pairs = [(i,f(i)) for i in range(n) if i<f(i)]
+        print(pairs, s)
+
+        lop = reduce(mul, [space.CZ(i,j) for (i,j) in pairs])
+        lop = lop * reduce(mul, [space.S(i) for i in s])
+        dode = lop*code
+        assert dode.is_equiv(code)
+        L = dode.get_logical(code)
+        logops.add(L)
+
+    print()
+    print(count)
+    #logops = mulclose(logops, verbose=True)
+    print("logops:", len(logops))
+
+    f = open("bring.gap", 'w')
+    vs = []
+    for i,L in enumerate(logops):
+        m = "M%d"%i
+        vs.append(m)
+        print("%s := %s;"%(m, L.gap()), file=f)
+    print("G := Group([%s]);"%(','.join(vs)), file=f)
+
+
+
+
+    #zxs = total.find_zx_dualities()
+    #print("involutory fixed-point free zx-dualities:", len(zxs))
+
+
 def test_bring():
     total = construct.get_bring()
     total.distance()
@@ -445,7 +521,12 @@ def test_bring():
     #print(items)
     #return
 
-    #zxs = total.find_zx_dualities(False, False) # 120 of these
+    G = total.find_autos()
+    print(len(G))
+
+    zxs = total.find_zx_dualities(False, False) # 120 of these
+    print(len(zxs))
+    return
 
     zxs = total.find_zx_dualities()
     print("involutory fixed-point free zx-dualities:", len(zxs))
