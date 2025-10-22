@@ -18,7 +18,7 @@ one = QQ.gens()[0]
 from huygens import config
 config(text="pdflatex")
 from huygens.namespace import (
-    Canvas, path, red, black, orange, st_arrow, grey,
+    Canvas, path, red, black, orange, st_arrow, grey, st_thin, yellow, LineWidth,
     st_southwest, Scale, Rotate)
 
 from huygens.the_turtle import Turtle
@@ -122,10 +122,12 @@ def pyeval(x):
 
 # red,green,blue colour scheme
 scheme = [
-    red.alpha(0.8) + 0.2*white,
-    green+RGB(0,0,0.3),
+    #red.alpha(0.8) + 0.2*white,
+    RGB(1.00, 0.30, 0.2).alpha(0.8),
+    RGB(0.10, 0.5, 0.30).alpha(0.8),
     RGBA(0.10, 0.2000, 0.7000, 0.5000),
 ]
+
 
 class Show:
     def __init__(self, cvs=None, axis=False):
@@ -139,7 +141,7 @@ class Show:
         self.cvs = cvs
         self.fg = Canvas()
 
-    def show(self, vs, radius=0.05, st=[]):
+    def show(self, vs, radius=0.02, st=[0.3*white]+[LineWidth(0.01)]):
         cvs = self.fg
         for v in vs:
             assert isinstance(v, Matrix)
@@ -325,7 +327,7 @@ def build_colour_488(d=3):
     lookup = {vert:i for (i,vert) in enumerate(verts)}
 
     s = Show(Canvas([Scale(2), Rotate(math.pi/2)]))
-    s.show(verts, 0.03, st=[0.3*white])
+    s.show(verts, 0.02, st=[0.3*white]+[LineWidth(0.01)])
 
     # act on cosets on the left
     #s.show(set(op*v0 for op in A*B*BC), st=[red])
@@ -363,7 +365,7 @@ def build_colour_488(d=3):
         cl = scheme[idx]
         s.draw_poly(vs, [cl])
     if argv.save:
-        s.save("lattice_%d"%d)
+        s.save("lattice_488_%d"%d)
 
     n = len(verts)
     code = get_sd(n, checks, d)
@@ -528,8 +530,8 @@ def build_colour_666(d=3):
     lookup = {v:i for (i,v) in enumerate(verts)}
 
     #print(verts[0])
-    s.show(verts, 0.03, st=[black.alpha(0.3)])
-
+    #s.show(verts, 0.03, st=[black.alpha(0.3)])
+    s.show(verts, 0.02, st=[0.3*white]+[LineWidth(0.01)])
 
     n = len(verts)
     
@@ -550,8 +552,9 @@ def build_colour_666(d=3):
     H = lin.array2(checks)
     #print(H.shape)
 
-    s.save("lattice_666_%d"%d)
-    s.save()
+    if argv.save:
+        s.save("lattice_666_%d"%d)
+        s.save()
 
     code = QCode.build_css(H,H, d=d)
     print(code)
@@ -619,10 +622,20 @@ def test():
         return rem
 
     for d in [3,5,7,9]:
-        #code = build_colour_488(d)
+        code = build_colour_488(d)
+        continue
+
         code = build_colour_666(d)
+        #continue
 
         print(code)
+        wenum = get_wenum(code)
+        w = 0
+        for (i,v) in enumerate(wenum):
+            w += v*(x**i)
+        #print(sage.latex(w))
+        s = sage.latex(w)
+        print("W(x) = %s"%s)
 
         code = augment(code)
         print(code)
@@ -651,6 +664,11 @@ def test():
         print()
 
 
+def choose_colour():
+    d = 7
+    build_colour_666(d)
+
+
 def find_lw():
     d = argv.get("d", 3)
 
@@ -658,8 +676,15 @@ def find_lw():
 
     ws = argv.get("ws", [w])
 
-    code = build_colour_488(d)
-    print(code)
+    if d%2:
+        code = build_colour_666(d)
+        print(code)
+    else:
+        code = build_colour_666(d-1)
+        print(code)
+        code = augment(code)
+        print(code)
+
     css = code.to_css()
     Hx = css.Hx
 
@@ -671,7 +696,7 @@ def find_lw():
                 print('.',flush=True,end='')
             count += 1
         print()
-        print(w, count)
+        print("+ %d x^%d"%(count, w))
 
     return
 

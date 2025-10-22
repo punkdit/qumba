@@ -3418,6 +3418,25 @@ def dynamic():
     cvs.writePDFfile("distill_code")
 
 
+def test_golay():
+
+    
+    R = sage.PolynomialRing(sage.ZZ, list("x"))
+    x, = R.gens()
+    #p = x**24 + 759*x**16 + 2576*x**12 + 759*x**8 + 1
+    p = x**8 + 759*x**4 + 2576*x**3 + 759*x**2 + 1
+
+    print(p)
+    print(sage.factor(p))
+    
+    base = (sage.I.parent())
+    R = sage.PolynomialRing(base, list("x"))
+    p = R(p)
+    print(sage.factor(p))
+
+    for val,m in p.roots(ring=sage.CIF):
+        print(val, m)
+
 
 
 
