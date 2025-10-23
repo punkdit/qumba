@@ -267,6 +267,9 @@ def find_lw_css(code):
     H = code.Hx
     hx = list(find_lw(code.Hx))
     hz = list(find_lw(code.Hz))
+    #print("find_lw_css:")
+    #for h in hx:
+    #    print(h)
     return hx, hz
 
 

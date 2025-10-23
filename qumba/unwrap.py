@@ -436,15 +436,7 @@ def test_gaussian():
       print()
 
 
-def test_zx():
-    from qumba import db
-    from qumba import autos
-    from qumba.action import Perm, Group, mulclose
-    code = list(db.get(_id="67a4b0119edf81e4b7e670ac"))[0]
-    space = code.space
-    n = code.n
-    items = list(range(n))
-
+def get_avoid(code):
     css = code.to_css()
     Hx = css.Hx
     Lx = css.Lx
@@ -465,20 +457,30 @@ def test_zx():
                 avoid.append(lh)
 
     print(len(avoid))
+    return avoid
 
+
+def test_zx():
+    from qumba import db
+    from qumba import autos, transversal
+    from qumba.action import Perm, Group, mulclose
+    code = list(db.get(_id="67a4b0119edf81e4b7e670ac"))[0]
+    print(code.longstr())
+    css = code.to_css()
+
+    space = code.space
+    n = code.n
+    items = list(range(n))
 
     dode = space.H() * code
-    print(dode)
     #print(dode.longstr())
 
     #tau = dode.get_isomorphism(code)
-    #print(tau)
     tau = [0, 1, 3, 2, 10, 6, 5, 7, 14, 11, 4, 9, 13, 12, 8]
     tau = Perm(tau, items)
 
     #css = code.to_css()
     #print(css)
-
     #G = autos.get_autos_css(css) # fails..
     #print("|G| =", len(G))
 
@@ -517,10 +519,10 @@ def test_zx():
         # S-type gate
         pairs = [(i,f(i)) for i in range(n) if i<f(i)]
         succ = " "
-        for lh in avoid:
-            for (i,j) in pairs:
-                if lh[i] and lh[j]:
-                    succ = "X"
+        #for lh in avoid:
+        #    for (i,j) in pairs:
+        #        if lh[i] and lh[j]:
+        #            succ = "X"
         print(pairs, s, succ)
 
         lop = reduce(mul, [space.CZ(i,j) for (i,j) in pairs])
@@ -546,6 +548,112 @@ def test_zx():
 
     #zxs = total.find_zx_dualities()
     #print("involutory fixed-point free zx-dualities:", len(zxs))
+
+
+
+def test_logical():
+    from qumba import db
+    from qumba import autos, transversal
+    from qumba.action import Perm, Group, mulclose
+    #code = list(db.get(_id="67a4b0119edf81e4b7e670ac"))[0] # [[15,5,3]]
+    code = list(db.get(_id="67a4b0129edf81e4b7e670ad"))[0] # [[30,8,3]]
+
+    #code = list(db.get(_id="6705236219cca60cf657a938"))[0] # [[21,3,5]]
+    # 120960 autos, cyclic, logicals: 4320
+
+    #code = list(db.get(_id="67476b7f44a05d87e042051b"))[0] # [[21,3,5]]
+    # 5760 autos, logicals: 4320
+
+    #code = list(db.get(_id="672e583d4d73ae0fe405d860"))[0] # [[23,3,5]]
+    # logicals: 4320
+
+    print(code.longstr())
+    css = code.to_css()
+
+    space = code.space
+    n = code.n
+    items = list(range(n))
+
+    #perms = css.find_autos()
+    G = []
+    for g in transversal.find_isomorphisms_css(code):
+        G.append(g)
+        if len(G) > 100:
+            break
+    G = mulclose(G, verbose=True, maxsize=10000)
+    print(len(G))
+
+    dode = space.H() * code
+    tau = iter(transversal.find_isomorphisms_css(code, dode)).__next__()
+
+    logops = set()
+
+    G = list(G)
+    shuffle(G)
+    for g in G[:100]:
+        # some automorphism gates.. these don't seem to help ... ??
+        perm = [None]*n
+        for (i,j) in g.where():
+            perm[i] = j
+        lop = space.get_perm(perm)
+        dode = lop*code
+        assert dode.is_equiv(code)
+        L = dode.get_logical(code)
+        logops.add(L)
+
+    for g in G:
+
+        f = g*tau
+        perm = [None]*n
+        for (i,j) in f.where():
+            perm[i] = j
+        f = Perm(perm, items)
+        #perm = [f[i] for i in items]
+
+        # H-type gate
+        lop = space.get_perm(perm)
+        lop = space.H() * lop
+        dode = lop*code
+        assert dode.is_equiv(code)
+        L = dode.get_logical(code)
+        logops.add(L)
+
+        s = f.fixed()
+        if not (f*f).is_identity():
+            continue
+
+        # S-type gate
+        pairs = [(i,f(i)) for i in range(n) if i<f(i)]
+        succ = " "
+        #for lh in avoid:
+        #    for (i,j) in pairs:
+        #        if lh[i] and lh[j]:
+        #            succ = "X"
+        print(pairs, s, succ)
+
+        lop = space.I()
+        if len(pairs):
+            lop = reduce(mul, [space.CZ(i,j) for (i,j) in pairs])
+        if s:
+            lop = lop * reduce(mul, [space.S(i) for i in s])
+        dode = lop*code
+        assert dode.is_equiv(code)
+        L = dode.get_logical(code)
+        logops.add(L)
+
+    #print("logops:", len(logops))
+    #logops = mulclose(logops, verbose=True, maxsize=1000)
+    print("logops:", len(logops))
+
+    name = "bring.gap"
+    f = open(name, 'w')
+    vs = []
+    for i,L in enumerate(logops):
+        m = "M%d"%i
+        vs.append(m)
+        print("%s := %s;"%(m, L.gap()), file=f)
+    print("G := Group([%s]);"%(','.join(vs)), file=f)
+    print("wrote to", name)
 
 
 def test_bring():

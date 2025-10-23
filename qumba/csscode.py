@@ -837,11 +837,29 @@ class CSSCode(object):
         dz = self.z_distance(min_d)
         return dx, dz
 
-    def find_autos(self):
-        return find_autos(self.Ax, self.Az)
+    def get_Axz(self):
+        Ax, Az = self.Ax, self.Az
+        if Ax is not None:
+            assert Az is not None, "wut"
+            return Ax, Az
+        from qumba.transversal import find_lw
+        hx = list(find_lw(self.Hx))
+        Ax = array2(hx)
+        hz = list(find_lw(self.Hz))
+        Az = array2(hz)
+        self.Ax = Ax
+        self.Az = Az
+        return Ax, Az
+
+    def find_autos(self): # BROKEN ???!?!
+        Ax, Az = self.get_Axz()
+        #print("Ax:")
+        #print(shortstr(Ax))
+        return find_autos(Ax, Az)
 
     def find_zx_duality(self):
-        return find_zx_duality(self.Ax, self.Az)
+        Ax, Az = self.get_Axz()
+        return find_zx_duality(Ax, Az)
 
     def find_zx_duality_for_cz(self):
         "find all the zx dualities that give rise to a cz gate"
@@ -864,7 +882,7 @@ class CSSCode(object):
 
     def find_zx_dualities(code, inv=True, fpf=True):
         n = code.n
-        Ax, Az = code.Ax, code.Az
+        Ax, Az = code.get_Axz()
         duality = find_zx_duality(Ax, Az)
         items = list(range(n))
         duality = Perm.promote(duality, items)
