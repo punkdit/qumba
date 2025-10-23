@@ -445,6 +445,28 @@ def test_zx():
     n = code.n
     items = list(range(n))
 
+    css = code.to_css()
+    Hx = css.Hx
+    Lx = css.Lx
+    print(Hx)
+    mx = len(Hx)
+    k = len(Lx)
+
+    avoid = []
+    for idx in numpy.ndindex((2,)*k):
+        idx = numpy.array(idx)
+        if idx.sum()==0:
+            continue
+        l = dot2(idx, Lx)
+        for jdx in numpy.ndindex((2,)*mx):
+            jdx = numpy.array(jdx)
+            lh = (l + dot2(jdx, Hx)) % 2
+            if lh.sum() == code.d:
+                avoid.append(lh)
+
+    print(len(avoid))
+
+
     dode = space.H() * code
     print(dode)
     #print(dode.longstr())
@@ -460,18 +482,27 @@ def test_zx():
     #G = autos.get_autos_css(css) # fails..
     #print("|G| =", len(G))
 
-    N,perms = code.get_autos()
-    print(N)
+    N, perms = code.get_autos()
     perms = [Perm(perm,items) for perm in perms]
     G = mulclose(perms)
-    print(len(G))
+    assert len(G) == N
 
     logops = set()
 
-    count = 0
     for g in G:
+
+        if 0:
+            # automorphism gate, these don't help any
+            lop = space.get_perm([g[i] for i in items])
+            dode = lop*code
+            assert dode.is_equiv(code)
+            L = dode.get_logical(code)
+            logops.add(L)
+
         f = g*tau
         perm = [f[i] for i in items]
+
+        # H-type gate
         lop = space.get_perm(perm)
         lop = space.H() * lop
         dode = lop*code
@@ -482,8 +513,15 @@ def test_zx():
         s = f.fixed()
         if not (f*f).is_identity():
             continue
+
+        # S-type gate
         pairs = [(i,f(i)) for i in range(n) if i<f(i)]
-        print(pairs, s)
+        succ = " "
+        for lh in avoid:
+            for (i,j) in pairs:
+                if lh[i] and lh[j]:
+                    succ = "X"
+        print(pairs, s, succ)
 
         lop = reduce(mul, [space.CZ(i,j) for (i,j) in pairs])
         lop = lop * reduce(mul, [space.S(i) for i in s])
@@ -492,8 +530,6 @@ def test_zx():
         L = dode.get_logical(code)
         logops.add(L)
 
-    print()
-    print(count)
     #logops = mulclose(logops, verbose=True)
     print("logops:", len(logops))
 
