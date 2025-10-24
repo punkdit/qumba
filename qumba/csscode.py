@@ -1739,7 +1739,7 @@ def test_selfdual():
     name = argv.get("name", name)
 
     count = 0
-    found = set()
+    found = {}
     nl = False
     for H in load.get_items(name):
         count += 1
@@ -1754,29 +1754,60 @@ def test_selfdual():
         H = numpy.concatenate((u, H))
         H = row_reduce(H)
         assert H.shape == (m, n)
-        H = H[1:, 1:]
-        assert dot2(H, H.transpose()).sum() == 0
-        #code = QCode.build_css(H, H, None, None, L, L)
-        css = CSSCode(Hx=H, Hz=H, Lx=L, Lz=L)
-        css.bz_distance()
-        if css.dx < 5:
-            if count%10==0:
-                print(".", end='', flush=True)
-                nl = True
-            continue
-        w = Matrix(H).get_wenum()
-        if w in found:
-            print("/", end='', flush=True)
-            nl = True
-            continue
-        found.add(w)
-        if nl:
-            print()
-            nl = False
-        print(css, w)
+        #print(H)
+        h = H[0, :]
+        assert h.min() == 1
 
-    print("count:", count)
-    
+        for i in range(n):
+            # Puncture column i
+            #print()
+            #print(H)
+            J = H.copy()
+            for j in range(1, m):
+                if J[j, i]:
+                    J[j] += h
+                    J %= 2
+            #print(J)
+            J = J[1:]
+            cols = list(range(n))
+            cols.pop(i)
+            J = J[:, cols]
+            #print(J)
+
+            assert dot2(J, J.transpose()).sum() == 0
+            css = CSSCode(Hx=J, Hz=J, Lx=L, Lz=L)
+            css.bz_distance()
+            w = Matrix(J).get_wenum()
+            if w not in found:
+                print(css, w)
+            found.setdefault(w,[]).append(css)
+
+    print("\ncount:", count)
+    print("found:", len(found))
+
+    total = 0
+    from transversal import find_isomorphisms_selfdual
+    for w in found.keys():
+        codes = found[w]
+        print(len(codes), end=' ', flush=True)
+        i = 0
+        while i+1 < len(codes):
+            j = i+1
+            code = codes[i]
+            while j < len(codes):
+                dode = codes[j]
+                for g in find_isomorphisms_selfdual(code, dode):
+                    print("*", end='', flush=True)
+                    codes.pop(j)
+                    break
+                else:
+                    j += 1
+                    print(".", end='', flush=True)
+            print("/", end='', flush=True)
+            i += 1
+        print("->", len(codes))
+        total += len(codes)
+    print("total:", total)
 
 
 

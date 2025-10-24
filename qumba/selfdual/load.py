@@ -6,7 +6,11 @@
 
 def get_items(name = "24-II.magma"):
 
-    n = int(name[:2])
+    if "-" in name:
+        stem = name.split("-")[0]
+    else:
+        stem = name.split(".")[0]
+    n = int(stem)
 
     import pathlib
     path = pathlib.Path(__file__).parent.resolve()
@@ -21,8 +25,13 @@ def get_items(name = "24-II.magma"):
     
     s = "[" +  "\n".join(lines)
     s = s.replace("LinearCode<GF(2),%d|"%n, "[")
+    s = s.replace("LinearCode<GF(2), %d |"%n, "[")
     s = s.replace("GF(2)|", "")
+    s = s.replace("GF(2) |", "")
     s = s.replace(">", "]")
+
+    assert "GF" not in s
+    assert "LinearCode" not in s
     
     f = open("dump.py", "w")
     print(s, file=f)

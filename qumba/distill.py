@@ -2709,7 +2709,7 @@ def classical_wenum(H):
     A = get_bits(m)
     AH = numpy.dot(A, H)%2
     w = AH.sum(axis=1)
-    assert (w%4).sum() == 0
+    assert (w%4).sum() == 0, "must be doubly even"
     w = list(w)
     assert w[0] == 0
     #print(w.count(8))
@@ -2940,10 +2940,13 @@ def test_binary():
     base = sage.PolynomialRing(sage.ZZ, "z")
     R = sage.FractionField(base)
 
+    name = argv.get("name", "24-II.magma")
+    print(name)
+
     from qumba.selfdual import load
-    #items = load.get_items("24-II.magma")
+    items = load.get_items(name)
     #items = load.get_items("32-II.magma")
-    items = load.get_items("40-II8.magma") # 16470
+    #items = load.get_items("40-II8.magma") # 16470
 
     print("items:", len(items))
 

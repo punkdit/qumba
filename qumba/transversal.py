@@ -446,6 +446,85 @@ def find_isomorphisms_css(code, dode=None, ffinv=False):
 #
 
 
+def find_isomorphisms_selfdual(code, dode=None, ffinv=False):
+
+    # find all automorphism permutations
+
+    if dode is None:
+        dode = code
+
+    if code.n != dode.n or code.k != dode.k:
+        return
+
+    if code.d is not None and dode.d is not None and code.d != dode.d:
+        return
+
+    code = code.to_css()
+    dode = dode.to_css()
+
+    n = code.n
+    mx = code.mx
+    mz = code.mz
+
+    if code.mx != dode.mx or code.mz != dode.mz:
+        return
+
+    assert mx==mz
+
+    solver = Solver()
+    Add = solver.add
+
+    # permutation matrix
+    P = UMatrix.unknown(n, n)
+
+    if ffinv:
+        Add( P == P.t )
+
+    #for i in range(n):
+    #    Add(Sum([If(P[i,j].get(),1,0) for j in range(n)])==1)
+
+    for i in range(n):
+      for j in range(n):
+        rhs = reduce(And, [P[i,k]==0 for k in range(n) if k!=j])
+        Add( Or(P[i,j]==0, rhs) )
+        rhs = reduce(And, [P[k,j]==0 for k in range(n) if k!=i])
+        Add( Or(P[i,j]==0, rhs) )
+
+    for i in range(n):
+        Add( reduce(Or, [P[i,j]!=0 for j in range(n)]) )
+
+    #I = Matrix.identity(n, n)
+    #Add(P * P.t == I)
+
+    #H = code.H
+    #H1 = H * P2
+
+    Rx = UMatrix.unknown(mx, mx)
+    Hx = Matrix(code.Hx)
+    Jx = Matrix(dode.Hx)
+    Add( Rx*Hx == Jx*P )
+
+    gen = []
+    found = set()
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            #print("result:", result)
+            break
+    
+        model = solver.model()
+        g = P.get_interp(model)
+
+        #assert (g*code).is_equiv(dode) # ... fix..
+
+        #print(p)
+        gen.append(g)
+
+        yield g
+        Add(P != g) # could instead add generated perms, see below->
+
+
 def find_autos_lc(code):
 
     # find all local clifford automorphism permutations
