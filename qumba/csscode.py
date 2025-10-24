@@ -1810,6 +1810,61 @@ def test_selfdual():
     print("total:", total)
 
 
+def test_wenum():
+    from qumba.lin import row_reduce
+    from qumba.selfdual import load
+
+    name = "24-II.magma"
+    name = "26.magma"
+    name = "28.magma"
+    #name = "30.magma"
+    #name = "32-I.magma"
+    name = argv.get("name", name)
+
+    count = 0
+    found = {}
+    nl = False
+    for H in load.get_items(name):
+        count += 1
+        H = array2(H)
+        m, n = H.shape
+        assert n==2*m
+
+        u = zeros2(1, n)
+        u[:] = 1
+        L = u[:, :-1]
+
+        H = numpy.concatenate((u, H))
+        H = row_reduce(H)
+        assert H.shape == (m, n)
+        #print(H)
+        h = H[0, :]
+        assert h.min() == 1
+
+        for i in range(n):
+            # Puncture column i
+            #print()
+            #print(H)
+            J = H.copy()
+            for j in range(1, m):
+                if J[j, i]:
+                    J[j] += h
+                    J %= 2
+            #print(J)
+            J = J[1:]
+            cols = list(range(n))
+            cols.pop(i)
+            J = J[:, cols]
+            #print(J)
+
+            assert dot2(J, J.transpose()).sum() == 0
+            css = CSSCode(Hx=J, Hz=J, Lx=L, Lz=L)
+            css.bz_distance()
+            w = Matrix(J).get_wenum()
+            if w not in found:
+                print(css, w)
+            found.setdefault(w,[]).append(css)
+
 
 if __name__ == "__main__":
 
