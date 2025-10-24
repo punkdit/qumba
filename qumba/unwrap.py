@@ -440,7 +440,6 @@ def get_avoid(code):
     css = code.to_css()
     Hx = css.Hx
     Lx = css.Lx
-    print(Hx)
     mx = len(Hx)
     k = len(Lx)
 
@@ -456,7 +455,7 @@ def get_avoid(code):
             if lh.sum() == code.d:
                 avoid.append(lh)
 
-    print(len(avoid))
+    print("avoid:", len(avoid))
     return avoid
 
 
@@ -559,13 +558,13 @@ def test_logical():
     code = list(db.get(_id="67a4b0129edf81e4b7e670ad"))[0] # [[30,8,3]]
 
     #code = list(db.get(_id="6705236219cca60cf657a938"))[0] # [[21,3,5]]
-    # 120960 autos, cyclic, logicals: 4320
+    # 120960 autos, cyclic, logicals: 4320, FT logicals: 12
 
     #code = list(db.get(_id="67476b7f44a05d87e042051b"))[0] # [[21,3,5]]
-    # 5760 autos, logicals: 4320
+    # 5760 autos, logicals: 4320, FT logicals: 36
 
     #code = list(db.get(_id="672e583d4d73ae0fe405d860"))[0] # [[23,3,5]]
-    # logicals: 4320
+    # logicals: 4320, FT logicals: 36
 
     print(code.longstr())
     css = code.to_css()
@@ -581,7 +580,11 @@ def test_logical():
         if len(G) > 100:
             break
     G = mulclose(G, verbose=True, maxsize=10000)
-    print(len(G))
+    print("|G| =", len(G))
+
+    avoid = []
+    if argv.avoid:
+        avoid = get_avoid(code)
 
     dode = space.H() * code
     tau = iter(transversal.find_isomorphisms_css(code, dode)).__next__()
@@ -624,12 +627,15 @@ def test_logical():
 
         # S-type gate
         pairs = [(i,f(i)) for i in range(n) if i<f(i)]
-        succ = " "
-        #for lh in avoid:
-        #    for (i,j) in pairs:
-        #        if lh[i] and lh[j]:
-        #            succ = "X"
-        print(pairs, s, succ)
+        succ = True
+        for lh in avoid:
+            for (i,j) in pairs:
+                if lh[i] and lh[j]:
+                    succ = False
+        if not succ:
+            continue
+
+        print(pairs, s)
 
         lop = space.I()
         if len(pairs):
