@@ -673,7 +673,7 @@ def test_all_css():
             
 
 
-def test_doctrine_css_sd():
+def test_doctrine_css_sd(): # Note: test_sd is much much faster !
     d = 0
     for n in range(argv.get("n0", 1), argv.get("n1", 5)):
       print("n=%s"%n, end=" ")
@@ -693,7 +693,7 @@ def test_doctrine_css_sd():
       print()
 
 
-def test_doctrine_csssd():
+def test_doctrine_csssd(): # Note: test_sd is much faster !
     d = 0
     for n in range(argv.get("n0", 1), argv.get("n1", 5)):
       print("n=%s"%n, end=" ")

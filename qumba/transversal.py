@@ -24,6 +24,7 @@ from qumba import lin
 from qumba.unwrap import unwrap, Cover
 from qumba.argv import argv
 from qumba.umatrix import UMatrix
+from qumba.smap import SMap
 
 
 def find_transversal(*codes, constant=False, verbose=True):
@@ -2789,6 +2790,120 @@ def find_css():
     print(code, d_x, d_z)
 
     print(code.longstr())
+
+
+def is_graph_state(code):
+    assert code.k == 0, "not a state"
+    #print(code.longstr(False))
+    #print()
+    n = code.n
+    H = code.H
+    H = list(H.rowspan())
+    shuffle(H)
+    H = Matrix(H)
+    H = H.reshape(2**n, 2*n)
+    s = strop(H)
+    stabs = s.split("\n")
+    idxs = set()
+    A = lin.zeros2(n,n)
+    for stab in stabs:
+        if stab.count("X") != 1:
+            continue
+        if "Y" in stab:
+            continue
+        #print(stab)
+        idx = stab.index("X")
+        if idx in idxs:
+            return
+        idxs.add(idx)
+        for i,s in enumerate(stab):
+            if s=='Z':
+                A[idx,i] = 1
+    if len(idxs) != n:
+        return
+    A = Matrix(A)
+    #print(A)
+    if A==A.t:
+        return A
+
+
+
+def find_lagrangian():
+    n = 4
+    code = QCode.fromstr(""" XZZZ ZZXZ ZXZZ ZZZX """)
+    code = QCode.fromstr(""" XIZI ZIXZ IXIZ IZZX """) # U shape
+    pode = QCode.fromstr(""" XZZI ZXIZ ZIXZ IZZX """)
+    #pode = QCode.fromstr(""" XZZZ ZXII ZIXI ZIIX """)
+
+    assert is_graph_state(pode) is not None
+
+    H = pode.H.normal_form()
+    assert QCode(H).is_equiv(pode)
+
+    found = set()
+    for code in construct.all_codes(4,0,0):
+        H = code.H.normal_form()
+        dode = QCode(H)
+        found.add(dode)
+        assert dode.is_equiv(code)
+    print(H.shape)
+    print(len(found))
+
+    space = code.space
+    gen = [space.S(i) for i in range(n)]
+    gen += [space.H(i) for i in range(n)]
+    G = mulclose(gen)
+    print("|G| =", len(G))
+
+    orbits = []
+    remain = set(found)
+    graphs = set()
+    while remain:
+        code = remain.pop()
+        orbit = [code]
+        for g in G:
+            dode = g*code
+            H = dode.H.normal_form()
+            eode = QCode(H)
+            assert eode.k == 0
+            assert eode.is_equiv(dode)
+            assert eode in found
+            if eode in remain:
+                remain.remove(eode)
+                orbit.append(eode)
+        orbits.append( orbit )
+    orbits.sort(key = len)
+
+    for orbit in orbits:
+        col = 0
+        smap = SMap()
+        for code in orbit:
+            A = is_graph_state(code)
+            if A is not None:
+                graphs.add(A)
+                smap[0, col] = str(A)
+                col += n+1
+        print(len(orbit))
+        print(smap)
+        print()
+
+    print("graphs:", len(graphs))
+
+    return
+
+
+    found = [code]
+    for g in G:
+        dode = g*code
+        if dode.is_equiv(pode):
+            print("*")
+        for eode in found:
+            if eode.is_equiv(dode):
+                break
+        else:
+            found.append(dode)
+            print("[%d]"%(len(found)), end='', flush=True)
+    print(len(found))
 
 
 

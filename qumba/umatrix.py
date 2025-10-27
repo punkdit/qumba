@@ -344,13 +344,19 @@ def gen_orthogonal(m):
         #    add(H != g)
         #    found.add(g)
 
+
 def test_orthogonal():
-    m = 10
+    m = argv.get("m", 5)
     N = orthogonal_order(m)
+    print(N)
+
+    u = Matrix([1]*m).t
 
     count = 0
     for g in gen_orthogonal(m):
         count += 1
+        assert g*u == u
+        #print((g*u).t)
     assert count==N
 
     return
@@ -425,6 +431,48 @@ def old_test_selfdual():
     # counts are:
     # 1, 2, 6, 48, 720, 23040
     # https://oeis.org/A003053
+
+
+def test_bijection():
+    from qumba.lin import zeros2
+
+    n = argv.get("n", 3)
+    k = argv.get("k", 0)
+    nn = 2*n
+
+    count = 0
+    found = set()
+    for code in construct.all_codes(n, k, 1):
+        count += 1
+        H = code.H
+        #print()
+        #print(H)
+        J = zeros2(n, nn+1)
+        J[:, :nn] = H
+        M = Matrix(J)
+        #print("-"*(nn+1))
+        #print(M)
+        #print("-"*(nn+1))
+        MMt = M*M.t
+        #print(MMt)
+        found.add(MMt)
+
+        for i in range(n):
+            if MMt[i,i]:
+                J[i,nn] = 1
+        M = Matrix(J)
+        #print("-"*(nn+1))
+        #print(M)
+        #print("-"*(nn+1))
+        MMt = M*M.t
+        #print(MMt)
+        
+    print(count)
+    print("MMt's:", len(found))
+    for op in found:
+        #print(op)
+        assert op==op.t
+        #print()
 
 
 
