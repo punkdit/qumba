@@ -53,7 +53,7 @@ def wiremesh(view, polytope, st=[], back=False, front=False):
 
 
 def render(pts=[], colors=None, connect=False, 
-        eye=[0.5,0.4,1.4], up=[0,1,0],
+        eye=[0.5,0.4,1.4], up=[0,1,0], radius=0.3,
     ):
     from huygens.namespace import (st_thick, orange, st_round, st_arrow, st_center,
         Canvas, st_west, st_south, st_north, color, black, grey, green, blue)
@@ -121,7 +121,7 @@ def render(pts=[], colors=None, connect=False,
         if connect:
             view.add_line(pts[i], pts[(i+1)%len(pts)], stroke=colors[i])
         else:
-            view.add_circle(v, 0.3, fill=colors[i])
+            view.add_circle(v, radius, fill=colors[i])
 
     bg = color.rgb(0.2, 0.2, 0.2, 1.0)
 

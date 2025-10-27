@@ -241,6 +241,9 @@ def get_projector(code):
     return P
 
 
+def norm(x,y,z):
+    return (x*x+y*y+z*z)**(1/2)
+
 def stereo(x,y,z):
     #assert abs(1-z) > EPSILON, str(z)
     X, Y = x/(1-z), y/(1-z)
@@ -1181,6 +1184,7 @@ def get_code(code=None, idx=0, verbose=True):
         #code = construct.get_513()
         #code = QCode.fromstr("XZZX.  .XZZX X.XZZ ZX.XZ", None, "ZXZII YZYII")
         code = QCode.fromstr("XZZX.  .XZZX X.XZZ ZX.XZ", None, "XXXXX ZZZZZ")
+        #code = QCode.fromstr("XZZX.  .XZZX X.XZZ ZX.XZ", None, "YYYYY ZZZZZ")
     if params == (6,1,2):
         code = QCode.fromstr("""
         X.ZZX.
@@ -1871,8 +1875,6 @@ def test():
             fw(x,y,z))
         return (rx/rw, ry/rw, rz/rw)
 
-    def norm(x,y,z):
-        return (x*x+y*y+z*z)**(1/2)
 
     
     for top in [True, False]:
@@ -1886,6 +1888,61 @@ def test():
         #print("%.8f --> %.8f"%(1-r0, 1-r1))
         print("%.8f, %.8f, %.8f"%(x, y, z), "squeeze = %.2f"%squeeze)
       print("--")
+
+
+def test_iterate():
+    code = get_code()
+    print(code)
+
+    distill = PauliDistill(code)
+    f = distill.build()
+
+    if argv.H:
+        f = (Meromorphic.H * f).f
+
+    print( f.parent().gens() )
+    v_z = f.parent().gens()[0]
+    print(f)
+    df = sage.diff(f, v_z)
+
+    pyfunc = lambda u : eval("lambda z: %s"%pystr(u))
+    py_f = pyfunc(f)
+
+    N = argv.get("N", 100)
+    M = argv.get("M", 100)
+
+    pts = []
+    for _ in range(M):
+        x, y, z = numpy.random.normal(0,1,3)
+        r = norm(x, y, z)
+        a, b = stereo(x/r, y/r, z/r)
+        z = a+1j*b
+        #print(z, "->", end=" ")
+        for _ in range(N):
+            try:
+                z = py_f(complex(z))
+            except:
+                break
+        else:
+            if "nan" in str(z):
+                continue
+            #print(z)
+            p = istereo(z.real, z.imag)
+            #if p[0] > 0 and p[2] > 0:
+            pts.append(p)
+        #print("|df%s| ="%z, abs(df.subs({v_z:z})))
+            
+    from qumba.distill_numpy import render
+    from huygens.namespace import green
+    colors = [green.alpha(1.0)]*len(pts)
+    print("pts:", len(pts))
+    if argv.show:
+        for p in pts:
+            print(stereo(*p))
+    radius = argv.get("radius", 0.3)
+    cvs = render(pts, colors, radius=radius)
+    cvs.writePDFfile("distill_iterate")
+    cvs.writePDFfile("distill_%d_%d_%d"%(code.n, code.k, code.d))
 
 
 def getkey(val):
@@ -2900,6 +2957,9 @@ def gen_latex():
     if argv.H:
         f = (Meromorphic.H * f).f
 
+    if argv.phase:
+        f = w4*f
+
     f = R(f)
 
     if argv.SH:
@@ -2933,6 +2993,11 @@ def gen_latex():
     df_bot = ring(df_bot)
     print("df_bot:", sage.factor(df_bot))
     
+    print("df at fixed points:")
+    r = top-z*bot
+    r = base(r)
+    for val,m in r.roots(ring=sage.CIF):
+        print("df(%s)"%val, "=", df.subs({z:val}))
 
 
 def test_binary():
@@ -3439,6 +3504,21 @@ def test_golay():
 
     for val,m in p.roots(ring=sage.CIF):
         print(val, m)
+
+def test_e_513():
+
+    
+    R = sage.PolynomialRing(sage.ZZ, list("e"))
+    K = sage.FractionField(R)
+    e, = K.gens()
+    top, bot = e**2*(5-15*e+15*e**2-4*e**3) , (1-5*e+15*e**2-20*e**3+10*e**4)
+    p = top - e*bot
+    p = R(p)
+    print(p)
+    print(sage.factor(p))
+    for val,m in p.roots(ring=sage.CIF):
+        print(val, m)
+
 
 
 
