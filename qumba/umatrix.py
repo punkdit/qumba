@@ -433,49 +433,6 @@ def old_test_selfdual():
     # https://oeis.org/A003053
 
 
-def test_bijection():
-    from qumba.lin import zeros2
-
-    n = argv.get("n", 3)
-    k = argv.get("k", 0)
-    nn = 2*n
-
-    count = 0
-    found = set()
-    for code in construct.all_codes(n, k, 1):
-        count += 1
-        H = code.H
-        #print()
-        #print(H)
-        J = zeros2(n, nn+1)
-        J[:, :nn] = H
-        M = Matrix(J)
-        #print("-"*(nn+1))
-        #print(M)
-        #print("-"*(nn+1))
-        MMt = M*M.t
-        #print(MMt)
-        found.add(MMt)
-
-        for i in range(n):
-            if MMt[i,i]:
-                J[i,nn] = 1
-        M = Matrix(J)
-        #print("-"*(nn+1))
-        #print(M)
-        #print("-"*(nn+1))
-        MMt = M*M.t
-        #print(MMt)
-        
-    print(count)
-    print("MMt's:", len(found))
-    for op in found:
-        #print(op)
-        assert op==op.t
-        #print()
-
-
-
 def test():
     solver = Solver()
     add = solver.add
