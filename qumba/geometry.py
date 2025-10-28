@@ -124,9 +124,11 @@ def build(shape, index):
             len(bodis), len(faces), len(edges), len(verts)))
 
     if argv.selfdual:
-        #H = get_adj(faces, verts) # ?
-        H = get_adj(verts, faces)
-        #print(H.shape)
+
+        if argv.flip:
+            H = get_adj(faces, verts) # ?
+        else:
+            H = get_adj(verts, faces)
 
         H = linear_independent(H)
         Hx = Hz = H
@@ -142,8 +144,8 @@ def build(shape, index):
         Hx = linear_independent(Hx)
         Hz = linear_independent(Hz)
 
-
     A = dot2(Hx, Hz.transpose())
+
     #print("chain condition:", A.sum() == 0)
 
     if A.sum() != 0:
@@ -181,12 +183,15 @@ def main():
         idx += 1
 
         if code is None or code.k == 0:
+            #print(code)
             continue
     
-        if code.n > 140:
+        if code.n > 100:
             break
 
+        print(code, end=' ', flush=True)
         code.bz_distance()
+        #print(code)
         if code.dx < 3 or code.dz < 3:
             continue
         if code.k <= 2:
@@ -209,6 +214,8 @@ def main():
         #print("Hz weights:", Hzs.min(), "to", Hzs.max())
 
         print("\t%s"%code)
+        if argv.show:
+            print(code.longstr())
 
     print("best:")
     for code in best.values():

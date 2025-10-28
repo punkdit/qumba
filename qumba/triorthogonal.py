@@ -35,6 +35,14 @@ def dump_transverse(Hx, Lx, t=3):
     #return zList
 
 
+def report():
+    from qumba.db import get
+    for code in get(tp="selfdualcss", family="hyperbolic_2d"):
+        print(code)
+        css = code.to_css()
+        dump_transverse(css.Hx, css.Lx, t=2)
+
+
 def search():
 
     n, m0, m = 14, 3, 5 # [[14,2,2]]

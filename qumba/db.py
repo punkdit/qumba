@@ -106,6 +106,10 @@ def get(**attrs):
         if k == "_id" and type(v) is str:
             v = ObjectId(v)
             data[k] = v
+        if k == "family":
+            assert "desc" not in data
+            del data[k]
+            data["desc"] = v
     cursor = codes.find(data)
     for data in cursor:
 #        code = QCode.fromstr(
@@ -119,6 +123,8 @@ def get(**attrs):
 #            d_lower_bound = data.get("d_lower_bound"),
 #            d_upper_bound = data.get("d_upper_bound"),
 #        )
+        if argv.dump:
+            print(data)
         attrs = {}
         for k,v in data.items():
             if k not in list("HTL"):
