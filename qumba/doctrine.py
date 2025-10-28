@@ -740,9 +740,10 @@ def test_sd():
 
 def test_classical_sd():
     from bruhat.algebraic import qchoose_2
-    #for m in range(1, 6):
-    for m in [6]:
+    for m in range(1, 6):
+    #for m in [6]:
         n = 2*m
+        print("m=%d, n=%d"%(m, n))
         count = 0
         u = zeros2(1, n)
         u[:] = 1
@@ -752,27 +753,40 @@ def test_classical_sd():
             assert H.shape == (m,n)
             if dot2(H, H.transpose()).sum() != 0:
                 continue
+            H0 = H
             count += 1
             #U = solve(H.transpose(), u.transpose())
             #assert U is not None
             H = numpy.concatenate((u, H))
-            H = row_reduce(H)
+            #H = row_reduce(H)
+            H = normal_form(H)
             assert H.shape == (m, n)
             H = H[1:, 1:]
             assert dot2(H, H.transpose()).sum() == 0
             code = QCode.build_css(H, H, None, None, L, L)
-            w = Matrix(H).get_wenum()
-            if w in found:
-                continue
-            found.add(w)
-            print(shortstr(H), code, w)
-            print()
+            J = Matrix(H)
+            assert J not in found
+            found.add(J)
+            #w = J.get_wenum()
+            #if w in found:
+            #    continue
+            #found.add(w)
+            #print(shortstr(H0))
+            #print("-"*n)
+            #print(shortstr(H), code, w)
+            #print()
 
-        print((m,n), count)
+        print("count =", count, len(found))
+        print()
+
 
 
 def test_bijection():
     from qumba.lin import zeros2
+
+    # The counts for classical self-orthogonal length 2n+1 
+    # are the same as the counts for length n quantum codes...
+    # Is there a natural bijection?
 
     n = argv.get("n", 3)
     k = argv.get("k", 0)
