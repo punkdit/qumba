@@ -1808,6 +1808,30 @@ def test_selfdual():
         print("->", len(codes))
         total += len(codes)
     print("total:", total)
+    
+    n = code.n
+    from qumba.util import factorial
+    K = factorial(n)
+    print("n =", n)
+    print("%d! ="%n, K)
+    result = 0
+    for codes in found.values():
+        for code in codes:
+            N = len(list(find_isomorphisms_selfdual(code)))
+            print(N)
+            assert K%N == 0
+            result += K//N
+    print("result:", result)
+
+    def F(n):
+        r = 1
+        for i in range(1,n):
+            r *= (2**i+1)
+        return r
+
+    print("==", F((n+1)//2))
+    assert result == F((n+1)//2)
+            
 
 
 def __get_wenum4(code):
