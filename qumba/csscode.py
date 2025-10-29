@@ -1859,15 +1859,11 @@ def test_wenum():
     from qumba.lin import row_reduce
     from qumba.selfdual import load
 
-    name = "24-II.magma"
-    name = "26.magma"
-    name = "28.magma"
-    #name = "30.magma"
-    #name = "32-I.magma"
-    name = argv.get("name", name)
+    name = argv.get("name")
 
     count = 0
     found = {}
+    best = None
     nl = False
     for H in load.get_items(name):
         count += 1
@@ -1905,6 +1901,8 @@ def test_wenum():
             assert dot2(J, J.transpose()).sum() == 0
             css = CSSCode(Hx=J, Hz=J, Lx=L, Lz=L)
             css.bz_distance()
+            if best is None or best.d < css.d:
+                best = css
 
             if argv.d and css.d != argv.d:
                 continue
@@ -1916,6 +1914,9 @@ def test_wenum():
                 w4 = get_wenum4(css)
                 print("\t", w4)
             found.setdefault(w,[]).append(css)
+
+    print("best:")
+    print(best)
 
 
 def find_selfdual():
