@@ -1865,7 +1865,7 @@ def test_wenum():
     found = {}
     best = None
     nl = False
-    for H in load.get_items(name):
+    for idx,H in enumerate(load.get_items(name)):
         count += 1
         H = array2(H)
         m, n = H.shape
@@ -1881,6 +1881,8 @@ def test_wenum():
         #print(H)
         h = H[0, :]
         assert h.min() == 1
+
+        print("[%d]"%(idx,))
 
         for i in range(n):
             # Puncture column i
@@ -1914,6 +1916,63 @@ def test_wenum():
                 w4 = get_wenum4(css)
                 print("\t", w4)
             found.setdefault(w,[]).append(css)
+
+    print("best:")
+    print(best)
+
+
+def selfdual_distance():
+    from qumba.lin import row_reduce
+    from qumba.selfdual import load
+
+    name = argv.get("name")
+
+    count = 0
+    found = {}
+    best = None
+    nl = False
+    for idx,H in enumerate(load.get_items(name)):
+        count += 1
+        H = array2(H)
+        m, n = H.shape
+        assert n==2*m
+
+        u = zeros2(1, n)
+        u[:] = 1
+        L = u[:, :-1]
+
+        H = numpy.concatenate((u, H))
+        H = row_reduce(H)
+        assert H.shape == (m, n)
+        #print(H)
+        h = H[0, :]
+        assert h.min() == 1
+
+        print("[%d]"%(idx,), end='', flush=True)
+
+        for i in range(n):
+            # Puncture column i
+            #print()
+            #print(H)
+            J = H.copy()
+            for j in range(1, m):
+                if J[j, i]:
+                    J[j] += h
+                    J %= 2
+            #print(J)
+            J = J[1:]
+            cols = list(range(n))
+            cols.pop(i)
+            J = J[:, cols]
+            #print(J)
+
+            assert dot2(J, J.transpose()).sum() == 0
+            css = CSSCode(Hx=J, Hz=J, Lx=L, Lz=L)
+            css.bz_distance()
+            if best is None or best.d < css.d:
+                best = css
+                print()
+                print(best)
 
     print("best:")
     print(best)
