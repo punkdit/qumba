@@ -2793,11 +2793,18 @@ def find_css():
 
 
 def is_graph_state(code):
-    assert code.k == 0, "not a state"
-    #print(code.longstr(False))
-    #print()
-    n = code.n
-    H = code.H
+    if isinstance(code, QCode):
+        assert code.k == 0, "not a state"
+        #print(code.longstr(False))
+        #print()
+        n = code.n
+        H = code.H
+    else:
+        assert isinstance(code, Matrix)
+        H = code
+        n, nn = H.shape
+        assert 2*n==nn
+
     H = list(H.rowspan())
     shuffle(H)
     H = Matrix(H)
@@ -2905,6 +2912,86 @@ def find_lagrangian():
             print("[%d]"%(len(found)), end='', flush=True)
     print(len(found))
 
+
+def graph_state_orbits():
+
+    n = argv.get("n", 6)
+
+    # first we build all the graph states
+    S = numpy.empty(shape=(n,n), dtype=object)
+    S[:] = '.'
+    I,X,Z = ".XZ"
+
+    def shortstr(S):
+        return ("\n".join(''.join(row) for row in S))
+
+    idxs = [(i,j) for i in range(n) for j in range(i+1,n)]
+    assert len(idxs) == n*(n-1)//2
+    N = len(idxs)
+
+    graphs = set()
+    for bits in numpy.ndindex((2,)*N):
+        S[:] = I
+        for i in range(n):
+            S[i,i] = X
+
+        for (i,bit) in enumerate(bits):
+            if bit==0:
+                continue
+            j,k = idxs[i]
+            S[j,k] = Z
+            S[k,j] = Z
+
+        s = shortstr(S)
+        #print(s)
+        #code = QCode.fromstr(s)
+        #H = code.H.normal_form()
+        H = fromstr(s)
+        H = Matrix(H).normal_form()
+        #print(H)
+        graphs.add(H)
+
+    assert len(graphs) == 2**N
+    print("graphs:", len(graphs))
+
+    space = SymplecticSpace(n)
+    gens = [space.S(i) for i in range(n)]
+    gens += [space.H(i) for i in range(n)]
+
+    #graphs = list(graphs)
+    orbits = []
+    while graphs:
+        H = graphs.pop()
+        orbit = {H}
+        bdy = [H]
+        #A = is_graph_state(H)
+        #print(A)
+        while bdy:
+            _bdy = []
+            for H in bdy:
+              #code = QCode(H)
+              for g in gens:
+                J = H*g.t
+                #dode = g*code
+                #J = dode.H
+                #assert J == H*g.t
+                J = J.normal_form()
+                if J in orbit:
+                    continue
+                #B = is_graph_state(J) 
+                if J in graphs:
+                    graphs.remove(J)
+                _bdy.append(J)
+                orbit.add(J)
+            bdy = _bdy
+        orbits.append(orbit)
+        print(len(orbit), end=' ', flush=True)
+    print()
+
+    print("found %d orbits" % (len(orbits)))
+    orbits.sort(key=len)
+    counts = ([len(orbit) for orbit in orbits])
+    print(counts, "==", sum(counts))
 
 
 if __name__ == "__main__":
