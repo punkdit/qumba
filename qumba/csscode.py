@@ -1950,12 +1950,13 @@ def selfdual_distance():
     from qumba.selfdual import load
 
     name = argv.get("name")
+    n = argv.get("n")
 
     count = 0
     found = {}
     best = None
     nl = False
-    for idx,H in enumerate(load.get_items(name)):
+    for idx,H in enumerate(load.get_items(name, n)):
         count += 1
         H = array2(H)
         m, n = H.shape

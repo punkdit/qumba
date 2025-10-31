@@ -4,13 +4,14 @@
 # https://www.math.is.tohoku.ac.jp/~munemasa/research/codes/sd2.htm
 
 
-def get_items(name = "24-II.magma"):
+def get_items(name = "24-II.magma", n=None):
 
-    if "-" in name:
-        stem = name.split("-")[0]
-    else:
-        stem = name.split(".")[0]
-    n = int(stem)
+    if n is None:
+        if "-" in name:
+            stem = name.split("-")[0]
+        else:
+            stem = name.split(".")[0]
+        n = int(stem)
 
     import pathlib
     path = pathlib.Path(__file__).parent.resolve()
