@@ -74,7 +74,7 @@ def main():
 
 
 
-def is_graph_state(code): # XXX SLOW
+def get_graph(code): # XXX SLOW
     if isinstance(code, QCode):
         assert code.k == 0, "not a state"
         #print(code.longstr(False))
@@ -124,7 +124,7 @@ def find_lagrangian(): # SLOW
     pode = QCode.fromstr(""" XZZI ZXIZ ZIXZ IZZX """)
     #pode = QCode.fromstr(""" XZZZ ZXII ZIXI ZIIX """)
 
-    assert is_graph_state(pode) is not None
+    assert get_graph(pode) is not None
 
     H = pode.H.normal_form()
     assert QCode(H).is_equiv(pode)
@@ -167,7 +167,7 @@ def find_lagrangian(): # SLOW
         col = 0
         smap = SMap()
         for code in orbit:
-            A = is_graph_state(code)
+            A = get_graph(code)
             if A is not None:
                 graphs.add(A)
                 smap[0, col] = str(A)
@@ -179,12 +179,7 @@ def find_lagrangian(): # SLOW
     print("graphs:", len(graphs))
 
 
-
-def find_orbits():
-
-    n = argv.get("n", 4)
-
-    # first we build all the graph states
+def all_graph_states(n):
     S = numpy.empty(shape=(n,n), dtype=object)
     S[:] = '.'
     I,X,Z = ".XZ"
@@ -220,7 +215,16 @@ def find_orbits():
         graphs.add(H)
 
     assert len(graphs) == 2**N
-    print("graphs:", len(graphs))
+    return graphs
+
+
+def lc_graph_states(n, verbose=True):
+
+    # first we build all the graph states
+    graphs = all_graph_states(n)
+
+    if verbose:
+        print("graphs:", len(graphs))
 
     space = SymplecticSpace(n)
     gens = [space.S(i) for i in range(n)]
@@ -232,7 +236,7 @@ def find_orbits():
         H = graphs.pop()
         orbit = {H}
         bdy = [H]
-        #A = is_graph_state(H)
+        #A = get_graph(H)
         #print(A)
         while bdy:
             _bdy = []
@@ -246,24 +250,159 @@ def find_orbits():
                 J = J.normal_form()
                 if J in orbit:
                     continue
-                #B = is_graph_state(J) 
+                #B = get_graph(J) 
                 if J in graphs:
                     graphs.remove(J)
                 _bdy.append(J)
                 orbit.add(J)
             bdy = _bdy
         orbits.append(orbit)
-        print(len(orbit), end=' ', flush=True)
-    print()
+        if verbose:
+            print(len(orbit), end=' ', flush=True)
+    if verbose:
+        print()
 
     orbits.sort(key=len)
+    return orbits
+
+
+def show_entanglement():
+    n = argv.get("n", 3)
+
+    graphs = all_graph_states(n)
+#    for M in graphs:
+#        print(M)
+#        print()
+
+    orbits = lc_graph_states(n)
+
+    P = list(numpy.ndindex((2,)*n))
+    assert len(P) == 2**n
+
+    def get_ent(A):
+        assert A.shape == (n,n)
+        ranks = []
+        for idxs in P:
+            rows = [i for (i,ii) in enumerate(idxs) if ii==1]
+            cols = [i for (i,ii) in enumerate(idxs) if ii==0]
+            B = A[rows, :]
+            B = B[:, cols]
+            ranks.append(B.rank())
+        return tuple(ranks)
+
+    funcs = set()
+    count = 0
+    for orbit in orbits:
+        orbit = [M for M in orbit if M in graphs]
+
+        func = None
+        for M in orbit:
+            A = get_graph(M)
+            gunc = get_ent(A)
+            assert func is None or func==gunc
+            func = gunc
+        assert func
+        funcs.add(func)
+        count += len(orbit)
+
+        print(len(orbit), end=' ', flush=True)
+    print()
+    print("total:", count)
+    print("orbits:", len(orbits))
+    print("funcs:", len(funcs))
+
+    if argv.show_poset:
+        show_poset(n, funcs)
+        return
+
+    if argv.show_stats:
+        show_stats(n, funcs)
+        return
+
+    if argv.dump:
+        f = open("funcs_%d.py"%n, "w")
+        funcs = list(funcs)
+        funcs.sort()
+        for func in funcs:
+            print(func, file=f)
+        f.close()
+        return
+
+    from qumba.util import factorial
+    def choose(m,n):
+        top = factorial(m)
+        bot = factorial(n) * factorial(m-n)
+        assert top%bot == 0
+        return top // bot
+
+    from huygens.namespace import Canvas, path, grey, black
+
+    mod = 99999
+    dx = dy = 1.0
+    r = 0.05
+    if n==4:
+        mod = 6 # 18
+    elif n==5:
+        mod = 3
+        dx = dy = 0.7
+    elif n==6:
+        mod = 6
+        dx = dy = 0.45
+        
+
+    def plot_func(f):
+        cvs = Canvas()
+        cols = [0]*(n+1)
+        coords = {}
+        for idx in P:
+            row = sum(idx)
+            col = cols[row] - 0.5*choose(n,row)
+            x = dx*col
+            y = dy*row
+            coords[idx] = (x,y)
+            cols[row] += 1
+        for idx in P:
+          for jdx in P:
+            kdx = tuple(i-j for (i,j) in zip(idx,jdx))
+            if min(kdx)>=0 and sum(kdx)==1:
+                x0, y0 = coords[idx]
+                x1, y1 = coords[jdx]
+                cvs.stroke(path.line(x0,y0,x1,y1), [grey])
+        for i,idx in enumerate(P):
+            x, y = coords[idx]
+            for j in range(f[i]):
+                cvs.stroke(path.circle(x,y,(j+1)*r), [black])
+        return cvs
+
+    cvs = Canvas()
+
+    funcs = list(funcs)
+    funcs.sort(key = sum)
+    x = 0
+    y = 0
+    for i,f in enumerate(funcs):
+        print(f)
+        fg = plot_func(f)
+        cvs.insert(x, y, fg)
+        bb = fg.get_bound_box()
+        x += 1.1*bb.width
+        if (i+1)%mod==0:
+            x = 0
+            y -= 1.1*bb.height
+
+    cvs.writePDFfile("entanglement_%d.pdf"%n)
+
+
+def show_orbits():
+    n = argv.get("n", 4)
+    orbits = lc_graph_states(n)
 
     print()
     smap = SMap()
     i = 0
     for orbit in orbits:
         for M in orbit:
-            A = is_graph_state(M) # SLOW
+            A = get_graph(M) # SLOW
             if A is not None:
                 break
         col = i*(n+3)
@@ -283,6 +422,81 @@ def find_orbits():
     counts = ([len(orbit) for orbit in orbits])
     print("found %d orbits" % (len(orbits)))
     print(counts, "==", sum(counts))
+
+
+def show_stats(n, fs):
+    print("show_stats", n)
+
+    keys = []
+    for f in fs:
+        key = tuple(f.count(i) for i in range(n-1))
+        keys.append(key)
+    keys.sort()
+    uniq = list(set(keys))
+    uniq.sort(key = lambda key:keys.count(key))
+    for key in uniq:
+        print(keys.count(key), key)
+
+
+def show_graphs_6():
+
+    lines = open("graphs_6.py").readlines()
+    assert len(lines) == 760
+
+    fs = [eval(line) for line in lines]
+    show_stats(6, fs)
+
+
+def show_poset(n, fs):
+    print("show_poset", n)
+
+    fs = list(fs)
+    fs.sort()
+    print(fs[0])
+
+    pairs = set()
+    up = {f:set() for f in fs}
+    dn = {f:set() for f in fs}
+    for f in fs:
+      for g in fs:
+        if f is g:
+            continue
+        for (i,j) in zip(f,g):
+            if i>j:
+                break
+        else:
+            up[f].add(g)
+            dn[g].add(f)
+            pairs.add((f,g))
+
+#    pairs = list(pairs)
+#    shuffle(pairs)
+#    f,g = pairs[0]
+#    print(f)
+#    print("<")
+#    print(g)
+#    return
+    print("pairs:", len(pairs))
+
+    for (f,g) in list(pairs):
+        for h in up[g]:
+            if (f,h) in pairs:
+                pairs.remove((f,h))
+    print("pairs:", len(pairs))
+
+    names = {}
+    for i,f in enumerate(fs):
+        name = ''.join(str(k) for k in f[:len(f)//2])
+        names[f] = "v"+name
+
+    dot = open("poset_%d.dot"%n, "w")
+    print("digraph {", file=dot)
+    for (f,g) in pairs:
+        print("  %s -> %s;"%(names[f], names[g]), file=dot)
+    print("}", file=dot)
+    dot.close()
+
+
 
 
 if __name__ == "__main__":
