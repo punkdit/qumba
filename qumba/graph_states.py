@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from random import shuffle
+from math import sin, cos, pi
 
 import numpy
 
@@ -11,6 +12,8 @@ from qumba.qcode import QCode, fromstr, strop
 from qumba.smap import SMap
 from qumba import lin
 from qumba.argv import argv
+from qumba.util import binomial, factorial
+from qumba.action import Group, Perm
 
 
 
@@ -270,10 +273,6 @@ def show_entanglement():
     n = argv.get("n", 3)
 
     graphs = all_graph_states(n)
-#    for M in graphs:
-#        print(M)
-#        print()
-
     orbits = lc_graph_states(n)
 
     P = list(numpy.ndindex((2,)*n))
@@ -328,14 +327,69 @@ def show_entanglement():
         f.close()
         return
 
-    from qumba.util import factorial
-    def choose(m,n):
-        top = factorial(m)
-        bot = factorial(n) * factorial(m-n)
-        assert top%bot == 0
-        return top // bot
 
+    if argv.plot:
+        plot_ent(n, funcs)
+
+    if argv.structures:
+        structures(n, funcs)
+
+
+def structures_6():
+
+    lines = open("graphs_6.py").readlines()
+    assert len(lines) == 760
+
+    fs = [eval(line) for line in lines]
+    structures(6, fs)
+
+
+def structures(n, funcs):
+
+    P = list(numpy.ndindex((2,)*n))
+    G = Group.symmetric(n)
+    N = factorial(n)
+    assert len(G) == N
+    print("%d!=%d"%(n, N))
+    perms = []
+    action = {}
+    idxs = P
+    lookup = {idx:i for (i,idx) in enumerate(idxs)}
+    for g in G:
+        perm = []
+        for idx in idxs:
+            jdx = tuple(idx[g[i]] for i in range(n))
+            perm.append(lookup[jdx])
+        action[g] = perm
+        perms.append(perm)
+
+    #print()
+    remain = set(funcs)
+    orbits = []
+    while remain:
+        func = remain.pop()
+        orbit = [func]
+        for perm in perms:
+            gunc = tuple(func[i] for i in perm)
+            if gunc in remain:
+                orbit.append(gunc)
+                remain.remove(gunc)
+        #print(orbit)
+        orbits.append(orbit)
+
+    print("%d! orbits:"%n, len(orbits))
+
+    orbits.sort(key=len)
+    for orbit in orbits:
+        K = len(orbit)
+        assert N%K == 0
+        print("\t", "%d funcs, |H|=%d"%(K, N//K))
+
+
+
+def plot_ent(n, funcs):
     from huygens.namespace import Canvas, path, grey, black
+    P = list(numpy.ndindex((2,)*n))
 
     mod = 99999
     dx = dy = 1.0
@@ -356,7 +410,7 @@ def show_entanglement():
         coords = {}
         for idx in P:
             row = sum(idx)
-            col = cols[row] - 0.5*choose(n,row)
+            col = cols[row] - 0.5*binomial(n,row)
             x = dx*col
             y = dy*row
             coords[idx] = (x,y)
@@ -422,6 +476,46 @@ def show_orbits():
     counts = ([len(orbit) for orbit in orbits])
     print("found %d orbits" % (len(orbits)))
     print(counts, "==", sum(counts))
+
+
+    from huygens import config
+    config(text="pdflatex")
+    from huygens.namespace import Canvas, path, grey, black, white, st_west, st_east
+
+    R = 0.5
+    dx = 3*R
+    dy = 3.2*R
+
+    coords = {}
+    for i in range(n):
+        theta = 2*pi*(i+0.5)/n
+        coords[i] = (R*sin(theta), R*cos(theta))
+    def make_cvs(A):
+        cvs = Canvas()
+        cvs.fill(path.circle(0,0,1.2*R),[grey])
+        for i in range(n):
+            cvs.fill(path.circle(*coords[i],0.1*R))
+        for i in range(n):
+          for j in range(i+1,n):
+            if A[i,j]:
+                cvs.stroke(path.line(*coords[i],*coords[j]),[white])
+        return cvs
+
+    cvs = Canvas()
+    y = 0
+    for orbit in orbits:
+        x = 0
+        cvs.text(x-2*R,y,"%s"%(len(orbit),), st_east)
+        for M in orbit:
+            A = get_graph(M)
+            if A is None:
+                continue
+            fg = make_cvs(A)
+            cvs.insert(x, y, fg)
+            x += 2.5*R
+        y -= 3.0*R
+    cvs.writePDFfile("graph_states_%d"%n)
+        
 
 
 def show_stats(n, fs):

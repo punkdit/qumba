@@ -63,6 +63,14 @@ assert len(list(choose(range(4), 2))) == 6
 assert len(list(choose(range(4), 3))) == 4
 
 
+def binomial(m,n):
+    top = factorial(m)
+    bot = factorial(n) * factorial(m-n)
+    assert top%bot == 0
+    return top // bot
+
+
+
 
 def allperms(items):
     items = tuple(items)
