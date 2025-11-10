@@ -13,7 +13,7 @@ from qumba.smap import SMap
 from qumba import lin
 from qumba.argv import argv
 from qumba.util import binomial, factorial
-from qumba.action import Group, Perm
+from qumba import construct
 
 
 
@@ -269,6 +269,59 @@ def lc_graph_states(n, verbose=True):
     return orbits
 
 
+def test_selfdual():
+    n = argv.get("n", 5)
+
+    space = SymplecticSpace(n)
+    gens = [space.S(), space.H()]
+    G = mulclose(gens)
+    assert len(G) == 6
+
+    #graphs = all_graph_states(n)
+    #codes = list(construct.all_codes(n,0,0))
+    #print(len(codes))
+
+    count = 0
+    found = []
+    #for k in range(0,n+1):
+    k = 0
+    for code in construct.all_codes(n,k,0):
+        H = code.H
+        H = H.normal_form()
+        found.append(H)
+    print(len(found))
+
+    #G = Group.symmetric(n)
+    gens = [space.SWAP(i,i+1).t for i in range(n-1)]
+    for i in range(n):
+        gens.append(space.S(i))
+        gens.append(space.H(i))
+    remain = set(found)
+    found = set()
+    orbits = []
+    while remain:
+        H = remain.pop()
+        orbit = [H]
+        found.add(H)
+        bdy = list(orbit)
+        while bdy:
+            _bdy = []
+            for H in bdy:
+              for g in gens:
+                J = (H*g).normal_form()
+                if J in found:
+                    continue
+                _bdy.append(J)
+                found.add(J)
+                remain.remove(J)
+                orbit.append(J)
+            bdy = _bdy
+        orbits.append(orbit)
+    print([len(o) for o in orbits], len(orbits))
+
+
+
+
 def show_entanglement():
     n = argv.get("n", 3)
 
@@ -310,6 +363,10 @@ def show_entanglement():
     print("orbits:", len(orbits))
     print("funcs:", len(funcs))
 
+    if argv.show_structure:
+        show_structure(n, funcs)
+        return
+
     if argv.show_poset:
         show_poset(n, funcs)
         return
@@ -346,6 +403,8 @@ def structures_6():
 
 def structures(n, funcs):
 
+    from bruhat.gset import Group, Perm
+
     P = list(numpy.ndindex((2,)*n))
     G = Group.symmetric(n)
     N = factorial(n)
@@ -360,6 +419,7 @@ def structures(n, funcs):
         for idx in idxs:
             jdx = tuple(idx[g[i]] for i in range(n))
             perm.append(lookup[jdx])
+        perm = Perm(perm)
         action[g] = perm
         perms.append(perm)
 
@@ -383,7 +443,19 @@ def structures(n, funcs):
     for orbit in orbits:
         K = len(orbit)
         assert N%K == 0
-        print("\t", "%d funcs, |H|=%d"%(K, N//K))
+        H = []
+        func = orbit[0]
+        for g in G:
+            perm = action[g]
+            gunc = tuple(func[i] for i in perm)
+            if gunc == func:
+                H.append(perm)
+        assert len(H) == N//K
+        H = Group(H)
+        desc = H.structure_description()
+        print("\t", "%d funcs, |H|=%d  %s"%(K, N//K, desc))
+
+            
 
 
 
@@ -590,6 +662,112 @@ def show_poset(n, fs):
     print("}", file=dot)
     dot.close()
 
+def show_structure_6():
+
+    lines = open("graphs_6.py").readlines()
+    assert len(lines) == 760
+
+    fs = [eval(line) for line in lines]
+    show_structure(6, fs)
+
+
+def show_structure(n, funcs):
+
+    from bruhat.gset import Group, Perm
+
+    P = list(numpy.ndindex((2,)*n))
+    G = Group.symmetric(n)
+    N = factorial(n)
+    assert len(G) == N
+    print("%d!=%d"%(n, N))
+    perms = []
+    action = {}
+    idxs = P
+    lookup = {idx:i for (i,idx) in enumerate(idxs)}
+    for g in G:
+        perm = []
+        for idx in idxs:
+            jdx = tuple(idx[g[i]] for i in range(n))
+            perm.append(lookup[jdx])
+        perm = Perm(perm)
+        action[g] = perm
+        perms.append(perm)
+
+    #print()
+    remain = set(funcs)
+    orbits = []
+    while remain:
+        func = remain.pop()
+        orbit = [func]
+        for perm in perms:
+            gunc = tuple(func[i] for i in perm)
+            if gunc in remain:
+                orbit.append(gunc)
+                remain.remove(gunc)
+        orbit.sort()
+        orbit = tuple(orbit)
+        #print(orbit)
+        orbits.append(orbit)
+    orbits.sort()
+
+    print("%d! orbits:"%n, len(orbits))
+
+    def less_than(orb, prb):
+        if orb is prb:
+            return False
+        # some f in orb is less_than some g in prb?
+        for f in orb:
+          for g in prb:
+            for (i,j) in zip(f,g):
+                if i>j:
+                    break
+            else:
+                return True # yes!
+        return False # no
+
+    pairs = set()
+    up = {f:set() for f in orbits}
+    dn = {f:set() for f in orbits}
+    for f in orbits:
+      for g in orbits:
+        if f is g:
+            continue
+        if less_than(f, g):
+            up[f].add(g)
+            dn[g].add(f)
+            pairs.add((f,g))
+
+    print("pairs:", len(pairs))
+
+    for (f,g) in list(pairs):
+        for h in up[g]:
+            if (f,h) in pairs:
+                pairs.remove((f,h))
+    print("pairs:", len(pairs))
+
+    names = {}
+    found = set()
+    for i,orbit in enumerate(orbits):
+        f = orbit[0]
+        counts = [0]*n
+        for i in range(n):
+            counts[i] = f.count(i)
+        while counts[-1]==0:
+            counts.pop()
+        name = ','.join(str(k) for k in counts)
+        print(name)
+        if name in found:
+            name = name+"*"
+        assert name not in found
+        found.add(name)
+        names[f] = name
+
+    dot = open("structure_%d.dot"%n, "w")
+    print("digraph {", file=dot)
+    for (o,p) in pairs:
+        print('  "(%s)" -> "(%s)";'%(names[o[0]], names[p[0]]), file=dot)
+    print("}", file=dot)
+    dot.close()
 
 
 
