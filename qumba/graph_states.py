@@ -17,7 +17,7 @@ from qumba import construct
 
 
 
-def main():
+def test():
 
     n = argv.get("n", 3)
 
@@ -322,11 +322,8 @@ def test_selfdual():
 
 
 
-def show_entanglement():
+def main():
     n = argv.get("n", 3)
-
-    graphs = all_graph_states(n)
-    orbits = lc_graph_states(n)
 
     P = list(numpy.ndindex((2,)*n))
     assert len(P) == 2**n
@@ -342,30 +339,45 @@ def show_entanglement():
             ranks.append(B.rank())
         return tuple(ranks)
 
-    funcs = set()
-    count = 0
-    for orbit in orbits:
-        orbit = [M for M in orbit if M in graphs]
+    if n==6:
+        lines = open("graphs_6.py").readlines()
+        assert len(lines) == 760
+        funcs = [eval(line) for line in lines]
 
-        func = None
-        for M in orbit:
-            A = get_graph(M)
-            gunc = get_ent(A)
-            assert func is None or func==gunc
-            func = gunc
-        assert func
-        funcs.add(func)
-        count += len(orbit)
+    else:
 
-        print(len(orbit), end=' ', flush=True)
-    print()
-    print("total:", count)
-    print("orbits:", len(orbits))
+        graphs = all_graph_states(n)
+        orbits = lc_graph_states(n)
+    
+        funcs = set()
+        count = 0
+        for orbit in orbits:
+            orbit = [M for M in orbit if M in graphs]
+    
+            func = None
+            for M in orbit:
+                A = get_graph(M)
+                gunc = get_ent(A)
+                assert func is None or func==gunc
+                func = gunc
+            assert func
+            funcs.add(func)
+            count += len(orbit)
+    
+            print(len(orbit), end=' ', flush=True)
+        print()
+        print("total:", count)
+        print("orbits:", len(orbits))
+
+
     print("funcs:", len(funcs))
 
     if argv.show_structure:
         show_structure(n, funcs)
         return
+
+    if argv.structures:
+        structures(n, funcs)
 
     if argv.show_poset:
         show_poset(n, funcs)
@@ -384,30 +396,20 @@ def show_entanglement():
         f.close()
         return
 
+    if argv.plot_funcs:
+        plot_funcs(n, funcs)
 
-    if argv.plot:
-        plot_ent(n, funcs)
-
-    if argv.structures:
-        structures(n, funcs)
-
-
-def structures_6():
-
-    lines = open("graphs_6.py").readlines()
-    assert len(lines) == 760
-
-    fs = [eval(line) for line in lines]
-    structures(6, fs)
+    if argv.render_funcs:
+        render_funcs(n, funcs)
 
 
-def structures(n, funcs):
-
+def get_orbits(n, funcs):
     from bruhat.gset import Group, Perm
 
     P = list(numpy.ndindex((2,)*n))
-    G = Group.symmetric(n)
     N = factorial(n)
+
+    G = Group.symmetric(n)
     assert len(G) == N
     print("%d!=%d"%(n, N))
     perms = []
@@ -435,70 +437,90 @@ def structures(n, funcs):
                 orbit.append(gunc)
                 remain.remove(gunc)
         #print(orbit)
+        orbit.sort()
+        orbit = tuple(orbit)
         orbits.append(orbit)
 
     print("%d! orbits:"%n, len(orbits))
+    return orbits, action
+
+
+def desc_action(G, action, func):
+    from bruhat.gset import Group, Perm
+    H = []
+    for g in G:
+        perm = action[g]
+        gunc = tuple(func[i] for i in perm)
+        if gunc == func:
+            H.append(perm)
+    H = Group(H)
+    desc = H.structure_description()
+    if desc == "D12":
+        desc = "C2xS3"
+    if desc == "D8":
+        desc = "(C2xC2):C2"
+    desc = desc.replace("D8", "((C2xC2):C2)")
+    return desc
+
+
+def structures(n, funcs):
+    from bruhat.gset import Group, Perm
+
+    G = Group.symmetric(n)
+    N = factorial(n)
+    orbits, action = get_orbits(n, funcs)
 
     orbits.sort(key=len)
     for orbit in orbits:
         K = len(orbit)
         assert N%K == 0
-        H = []
         func = orbit[0]
-        for g in G:
-            perm = action[g]
-            gunc = tuple(func[i] for i in perm)
-            if gunc == func:
-                H.append(perm)
-        assert len(H) == N//K
-        H = Group(H)
-        desc = H.structure_description()
-        print("\t", "%d funcs, |H|=%d  %s"%(K, N//K, desc))
+        desc = desc_action(G, action, func)
+        key = tuple(func.count(i) for i in range(n-1))
+        print("\t", "%d funcs, |H|=%d  %s\t%s"%(K, N//K, desc, key))
 
             
 
-
-
-def plot_ent(n, funcs):
+def render_func(n, f, r=0.08):
     from huygens.namespace import Canvas, path, grey, black
     P = list(numpy.ndindex((2,)*n))
+    dx = 4/n
+    dy = 1.4*dx
+    cvs = Canvas()
+    cols = [0]*(n+1)
+    coords = {}
+    for idx in P:
+        row = sum(idx)
+        col = cols[row] - 0.5*binomial(n,row)
+        x = dx*col
+        y = dy*row
+        coords[idx] = (x,y)
+        cols[row] += 1
+    for idx in P:
+      for jdx in P:
+        kdx = tuple(i-j for (i,j) in zip(idx,jdx))
+        if min(kdx)>=0 and sum(kdx)==1:
+            x0, y0 = coords[idx]
+            x1, y1 = coords[jdx]
+            cvs.stroke(path.line(x0,y0,x1,y1), [grey])
+    for i,idx in enumerate(P):
+        x, y = coords[idx]
+        for j in range(f[i]):
+            cvs.stroke(path.circle(x,y,(j+1)*r), [black])
+    return cvs
+
+
+
+def plot_funcs(n, funcs):
+    from huygens.namespace import Canvas, path, grey, black
 
     mod = 99999
-    dx = dy = 1.0
-    r = 0.05
     if n==4:
         mod = 6 # 18
     elif n==5:
         mod = 3
-        dx = dy = 0.7
     elif n==6:
         mod = 6
-        dx = dy = 0.45
-        
-
-    def plot_func(f):
-        cvs = Canvas()
-        cols = [0]*(n+1)
-        coords = {}
-        for idx in P:
-            row = sum(idx)
-            col = cols[row] - 0.5*binomial(n,row)
-            x = dx*col
-            y = dy*row
-            coords[idx] = (x,y)
-            cols[row] += 1
-        for idx in P:
-          for jdx in P:
-            kdx = tuple(i-j for (i,j) in zip(idx,jdx))
-            if min(kdx)>=0 and sum(kdx)==1:
-                x0, y0 = coords[idx]
-                x1, y1 = coords[jdx]
-                cvs.stroke(path.line(x0,y0,x1,y1), [grey])
-        for i,idx in enumerate(P):
-            x, y = coords[idx]
-            for j in range(f[i]):
-                cvs.stroke(path.circle(x,y,(j+1)*r), [black])
-        return cvs
 
     cvs = Canvas()
 
@@ -508,7 +530,7 @@ def plot_ent(n, funcs):
     y = 0
     for i,f in enumerate(funcs):
         print(f)
-        fg = plot_func(f)
+        fg = render_func(n, f)
         cvs.insert(x, y, fg)
         bb = fg.get_bound_box()
         x += 1.1*bb.width
@@ -516,7 +538,42 @@ def plot_ent(n, funcs):
             x = 0
             y -= 1.1*bb.height
 
+    print("entanglement_%d.pdf"%n)
     cvs.writePDFfile("entanglement_%d.pdf"%n)
+
+
+def render_funcs(n, funcs):
+    orbits, action = get_orbits(n, funcs)
+    orbits.sort(key = lambda orbit:sum(orbit[0]))
+
+    from bruhat.gset import Group
+    G = Group.symmetric(n)
+
+    from huygens.namespace import Canvas, path, grey, black
+    from huygens import config
+    config(text="pdflatex")
+
+    mod = argv.get("mod", 4)
+
+    cvs = Canvas()
+
+    x = 0
+    y = 0
+    for i,orbit in enumerate(orbits):
+        func = orbit[0]
+        desc = desc_action(G, action, func)
+        print(func, desc)
+        fg = render_func(n, func)
+        cvs.insert(x, y, fg)
+        cvs.text(x, y, desc)
+        bb = fg.get_bound_box()
+        x += 1.1*bb.width
+        if (i+1)%mod==0:
+            x = 0
+            y -= 1.1*bb.height
+
+    print("render_%d.pdf"%n)
+    cvs.writePDFfile("render_%d.pdf"%n)
 
 
 def show_orbits():
@@ -604,15 +661,6 @@ def show_stats(n, fs):
         print(keys.count(key), key)
 
 
-def show_graphs_6():
-
-    lines = open("graphs_6.py").readlines()
-    assert len(lines) == 760
-
-    fs = [eval(line) for line in lines]
-    show_stats(6, fs)
-
-
 def show_poset(n, fs):
     print("show_poset", n)
 
@@ -662,53 +710,14 @@ def show_poset(n, fs):
     print("}", file=dot)
     dot.close()
 
-def show_structure_6():
-
-    lines = open("graphs_6.py").readlines()
-    assert len(lines) == 760
-
-    fs = [eval(line) for line in lines]
-    show_structure(6, fs)
-
 
 def show_structure(n, funcs):
 
     from bruhat.gset import Group, Perm
 
-    P = list(numpy.ndindex((2,)*n))
     G = Group.symmetric(n)
     N = factorial(n)
-    assert len(G) == N
-    print("%d!=%d"%(n, N))
-    perms = []
-    action = {}
-    idxs = P
-    lookup = {idx:i for (i,idx) in enumerate(idxs)}
-    for g in G:
-        perm = []
-        for idx in idxs:
-            jdx = tuple(idx[g[i]] for i in range(n))
-            perm.append(lookup[jdx])
-        perm = Perm(perm)
-        action[g] = perm
-        perms.append(perm)
-
-    #print()
-    remain = set(funcs)
-    orbits = []
-    while remain:
-        func = remain.pop()
-        orbit = [func]
-        for perm in perms:
-            gunc = tuple(func[i] for i in perm)
-            if gunc in remain:
-                orbit.append(gunc)
-                remain.remove(gunc)
-        orbit.sort()
-        orbit = tuple(orbit)
-        #print(orbit)
-        orbits.append(orbit)
-    orbits.sort()
+    orbits, action = get_orbits(n, funcs)
 
     print("%d! orbits:"%n, len(orbits))
 
@@ -762,6 +771,7 @@ def show_structure(n, funcs):
         found.add(name)
         names[f] = name
 
+    print("structure_%d.dot"%n)
     dot = open("structure_%d.dot"%n, "w")
     print("digraph {", file=dot)
     for (o,p) in pairs:
