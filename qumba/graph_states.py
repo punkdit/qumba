@@ -204,6 +204,35 @@ def all_graphs(n):
         yield graph
 
 
+def all_graphs_perm(n):
+    #from bruhat.gset import Group, Perm
+    #G = Group.symmetric(n)
+    #print(len(G))
+    #assert 0, "untested ..."
+
+    gens = []
+    for i in range(n-1):
+        g = list(range(n))
+        g[i], g[i+1] = i+1,i
+        gens.append(g)
+
+    found = set()
+    for A in all_graphs(n):
+        if A not in found:
+            yield A
+        orbit = {A}
+        bdy = [orbit]
+        while bdy:
+            _bdy = []
+            for g in gens:
+                B = A[g,:]
+                B = B[:,g]
+                if B in found:
+                    continue
+                orbit.add(B)
+                _bdy.append(B)
+                found.add(B)
+            bdy = _bdy
 
 
 def all_graph_states(n):
@@ -293,56 +322,6 @@ def lc_graph_states(n, verbose=True):
     return orbits
 
 
-def test_selfdual():
-    n = argv.get("n", 5)
-
-    space = SymplecticSpace(n)
-    gens = [space.S(), space.H()]
-    G = mulclose(gens)
-    assert len(G) == 6
-
-    #graphs = all_graph_states(n)
-    #codes = list(construct.all_codes(n,0,0))
-    #print(len(codes))
-
-    count = 0
-    found = []
-    #for k in range(0,n+1):
-    k = 0
-    for code in construct.all_codes(n,k,0):
-        H = code.H
-        H = H.normal_form()
-        found.append(H)
-    print(len(found))
-
-    #G = Group.symmetric(n)
-    gens = [space.SWAP(i,i+1).t for i in range(n-1)]
-    for i in range(n):
-        gens.append(space.S(i))
-        gens.append(space.H(i))
-    remain = set(found)
-    found = set()
-    orbits = []
-    while remain:
-        H = remain.pop()
-        orbit = [H]
-        found.add(H)
-        bdy = list(orbit)
-        while bdy:
-            _bdy = []
-            for H in bdy:
-              for g in gens:
-                J = (H*g).normal_form()
-                if J in found:
-                    continue
-                _bdy.append(J)
-                found.add(J)
-                remain.remove(J)
-                orbit.append(J)
-            bdy = _bdy
-        orbits.append(orbit)
-    print([len(o) for o in orbits], len(orbits))
-
 
 @cache
 def get_idxs(n):
@@ -364,12 +343,34 @@ def get_func(A):
     return tuple(ranks)
 
 
+def test_perms():
+    for n in [2,3,4,5,6]:
+        graphs = list(all_graphs_perm(n))
+        print(n, len(graphs))
+
+
+def test_funcs():
+    n = argv.get("n", 3)
+    
+    graphs = list(all_graphs_perm(n))
+    print(n, len(graphs))
+
+    funcs = {get_func(A) for A in graphs}
+    print(len(funcs))
+
+    orbits, action = get_orbits(n, funcs)
+    print(len(orbits))
+
+    print()
+
+
 def main():
     n = argv.get("n", 3)
 
     if argv.dump:
         #graphs = all_graph_states(n)
         graphs = list(all_graphs(n))
+        #graphs = list(all_graphs_lc(n)) # TODO
         print(len(graphs))
 
         #H = graphs.pop()
@@ -378,11 +379,17 @@ def main():
         #print(A)
 
         funcs = set()
+        count = 0
         for A in graphs:
             #A = get_graph(H)
             #assert A is not None
             func = get_func(A)
-            funcs.add(func)
+            if func not in funcs:
+                funcs.add(func)
+                count += 1
+                if count%100==0:
+                    print('.', flush=True,end='')
+        print()
         print(len(funcs))
 
         f = open("funcs_%d.py"%n, "w")
@@ -394,10 +401,10 @@ def main():
 
         return
 
-    if n==6:
-        lines = open("graphs_6.py").readlines()
-        assert len(lines) == 760
+    if n>5:
+        lines = open("funcs_%d.py"%n).readlines()
         funcs = [eval(line) for line in lines]
+        print("read %d funcs"%len(funcs))
 
     else:
 
@@ -440,15 +447,6 @@ def main():
 
     if argv.show_stats:
         show_stats(n, funcs)
-        return
-
-    if argv.dump:
-        f = open("funcs_%d.py"%n, "w")
-        funcs = list(funcs)
-        funcs.sort()
-        for func in funcs:
-            print(func, file=f)
-        f.close()
         return
 
     if argv.plot_funcs:
@@ -834,6 +832,56 @@ def show_structure(n, funcs):
     print("}", file=dot)
     dot.close()
 
+
+def test_selfdual():
+    n = argv.get("n", 5)
+
+    space = SymplecticSpace(n)
+    gens = [space.S(), space.H()]
+    G = mulclose(gens)
+    assert len(G) == 6
+
+    #graphs = all_graph_states(n)
+    #codes = list(construct.all_codes(n,0,0))
+    #print(len(codes))
+
+    count = 0
+    found = []
+    #for k in range(0,n+1):
+    k = 0
+    for code in construct.all_codes(n,k,0):
+        H = code.H
+        H = H.normal_form()
+        found.append(H)
+    print(len(found))
+
+    #G = Group.symmetric(n)
+    gens = [space.SWAP(i,i+1).t for i in range(n-1)]
+    for i in range(n):
+        gens.append(space.S(i))
+        gens.append(space.H(i))
+    remain = set(found)
+    found = set()
+    orbits = []
+    while remain:
+        H = remain.pop()
+        orbit = [H]
+        found.add(H)
+        bdy = list(orbit)
+        while bdy:
+            _bdy = []
+            for H in bdy:
+              for g in gens:
+                J = (H*g).normal_form()
+                if J in found:
+                    continue
+                _bdy.append(J)
+                found.add(J)
+                remain.remove(J)
+                orbit.append(J)
+            bdy = _bdy
+        orbits.append(orbit)
+    print([len(o) for o in orbits], len(orbits))
 
 
 if __name__ == "__main__":
