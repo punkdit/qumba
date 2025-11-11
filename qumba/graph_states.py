@@ -2,7 +2,8 @@
 
 from random import shuffle
 from math import sin, cos, pi
-from functools import cache
+from functools import cache, reduce
+from operator import add
 
 import numpy
 
@@ -204,6 +205,56 @@ def all_graphs(n):
         yield graph
 
 
+
+def orbit_isotropic(n, found):
+    space = SymplecticSpace(n)
+    gens = []
+    #gens = [space.SWAP(i,i+1).t for i in range(n-1)]
+    for i in range(n):
+        gens.append(space.S(i))
+        gens.append(space.H(i))
+    remain = set(found)
+    found = set()
+    orbits = []
+    while remain:
+        H = remain.pop()
+        orbit = [H]
+        found.add(H)
+        bdy = list(orbit)
+        while bdy:
+            _bdy = []
+            for H in bdy:
+              for g in gens:
+                J = (H*g).normal_form()
+                if J in found:
+                    continue
+                _bdy.append(J)
+                found.add(J)
+                remain.remove(J)
+                orbit.append(J)
+            bdy = _bdy
+        orbits.append(orbit)
+    return orbits
+
+def test_codes():
+
+    for n in [1,2,3,4,5,6]:
+      print("n=%d"%n, end=' ', flush=True)
+      for k in range(n+1):
+        k = n-k
+        #print(n, k)
+        found = set()
+        for code in construct.all_codes(n, k, 0):
+            H = code.H
+            H = H.normal_form()
+            found.add(H)
+        orbits = orbit_isotropic(n, found)
+        #print([len(o) for o in orbits], len(orbits))
+        print(len(orbits), end=' ', flush=True)
+      print()
+
+
+
 def all_graphs_perm(n):
     #from bruhat.gset import Group, Perm
     #G = Group.symmetric(n)
@@ -368,6 +419,57 @@ def test_funcs():
         print(func)
 
 
+def test_graphs():
+    # here we try summing over all the LC equivalent graphs
+
+    n = argv.get("n", 4)
+    graphs = all_graph_states(n)
+    orbits = lc_graph_states(n)
+
+    gens = []
+    for i in range(n-1):
+        g = list(range(n))
+        g[i], g[i+1] = i+1,i
+        gens.append(g)
+
+    from bruhat.gset import Group, Perm
+    G = Group.symmetric(n)
+
+    found = set()
+    count = 0
+    for orbit in orbits:
+
+        # get the graphs only
+        orbit = [M for M in orbit if M in graphs] # count multiple copies (are there any?)
+
+        orbit = [get_graph(M).A.astype(int) for M in orbit]
+
+        A = reduce(add, orbit)
+        key = str(A)
+        if key in found:
+            continue
+
+        H = []
+        for g in G:
+            B = A[g, :]
+            B = B[:, g]
+            ley = str(B)
+            if ley == key:
+                H.append(g)
+            found.add(ley)
+        H = Group(H)
+
+        print(key, len(H), H.structure_description())
+        count += 1
+
+        #print(len(orbit), end=' ', flush=True)
+
+    print()
+    print("orbits:", len(orbits))
+    print("keys:", count)
+
+
+
 def main():
     n = argv.get("n", 3)
 
@@ -405,7 +507,7 @@ def main():
 
         return
 
-    if n>5:
+    if n>4:
         lines = open("funcs_%d.py"%n).readlines()
         funcs = [eval(line) for line in lines]
         print("read %d funcs"%len(funcs))
@@ -502,22 +604,23 @@ def get_orbits(n, funcs):
     return orbits, action
 
 
-def desc_action(G, action, func):
+def get_action(G, action, func):
     from bruhat.gset import Group, Perm
     H = []
     for g in G:
         perm = action[g]
         gunc = tuple(func[i] for i in perm)
         if gunc == func:
-            H.append(perm)
+            H.append(g)
     H = Group(H)
     desc = H.structure_description()
+    #print(G.rank, H.rank)
     if desc == "D12":
         desc = "C2xS3"
     if desc == "D8":
         desc = "(C2xC2):C2"
     desc = desc.replace("D8", "((C2xC2):C2)")
-    return desc
+    return desc, H
 
 
 def structures(n, funcs):
@@ -527,14 +630,19 @@ def structures(n, funcs):
     N = factorial(n)
     orbits, action = get_orbits(n, funcs)
 
+    #found = []
     orbits.sort(key=len)
-    for orbit in orbits:
+    for idx,orbit in enumerate(orbits):
         K = len(orbit)
         assert N%K == 0
         func = orbit[0]
-        desc = desc_action(G, action, func)
+        desc, H = get_action(G, action, func)
         key = tuple(func.count(i) for i in range(n-1))
-        print("\t", "%d funcs, |H|=%d  %s\t%s"%(K, N//K, desc, key))
+        print("\tidx=%d"%idx, "\t%d funcs, |H|=%d  %s\t%s"%(K, N//K, desc, key))
+        #if N//K == 48:
+        #    found.append(H)
+    #for H in found:
+    #    print(H.gapstr())
 
             
 
@@ -618,7 +726,7 @@ def render_funcs(n, funcs):
     y = 0
     for i,orbit in enumerate(orbits):
         func = orbit[0]
-        desc = desc_action(G, action, func)
+        desc, H = get_action(G, action, func)
         print(func, desc)
         fg = render_func(n, func)
         cvs.insert(x, y, fg)
@@ -860,6 +968,7 @@ def test_selfdual():
     print(len(found))
 
     #G = Group.symmetric(n)
+
     gens = [space.SWAP(i,i+1).t for i in range(n-1)]
     for i in range(n):
         gens.append(space.S(i))
