@@ -183,6 +183,29 @@ def find_lagrangian(): # SLOW
     print("graphs:", len(graphs))
 
 
+def all_graphs(n):
+    idxs = [(i,j) for i in range(n) for j in range(i+1,n)]
+    assert len(idxs) == n*(n-1)//2
+    N = len(idxs)
+
+    graphs = set()
+    S = numpy.empty(shape=(n,n), dtype=int)
+    for bits in numpy.ndindex((2,)*N):
+        S[:] = 0
+        for (i,bit) in enumerate(bits):
+            if bit==0:
+                continue
+            j,k = idxs[i]
+            S[j,k] = 1
+            S[k,j] = 1
+        graph = Matrix(S)
+        assert graph not in graphs
+        graphs.add(graph)
+        yield graph
+
+
+
+
 def all_graph_states(n):
     S = numpy.empty(shape=(n,n), dtype=object)
     S[:] = '.'
@@ -345,7 +368,8 @@ def main():
     n = argv.get("n", 3)
 
     if argv.dump:
-        graphs = all_graph_states(n)
+        #graphs = all_graph_states(n)
+        graphs = list(all_graphs(n))
         print(len(graphs))
 
         #H = graphs.pop()
@@ -354,9 +378,9 @@ def main():
         #print(A)
 
         funcs = set()
-        for H in graphs:
-            A = get_graph(H)
-            assert A is not None
+        for A in graphs:
+            #A = get_graph(H)
+            #assert A is not None
             func = get_func(A)
             funcs.add(func)
         print(len(funcs))
