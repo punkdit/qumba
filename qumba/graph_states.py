@@ -360,8 +360,12 @@ def test_funcs():
 
     orbits, action = get_orbits(n, funcs)
     print(len(orbits))
-
     print()
+
+    funcs = [orbit[0] for orbit in orbits]
+    funcs.sort()
+    for func in funcs:
+        print(func)
 
 
 def main():
