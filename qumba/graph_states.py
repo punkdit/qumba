@@ -2,6 +2,7 @@
 
 from random import shuffle
 from math import sin, cos, pi
+from functools import cache
 
 import numpy
 
@@ -320,24 +321,54 @@ def test_selfdual():
     print([len(o) for o in orbits], len(orbits))
 
 
+@cache
+def get_idxs(n):
+    idxs = tuple(numpy.ndindex((2,)*n))
+    assert len(idxs) == 2**n
+    return idxs
+
+def get_func(A):
+    n = len(A)
+    assert A.shape == (n,n)
+    ranks = []
+    P = get_idxs(n)
+    for idxs in P:
+        rows = [i for (i,ii) in enumerate(idxs) if ii==1]
+        cols = [i for (i,ii) in enumerate(idxs) if ii==0]
+        B = A[rows, :]
+        B = B[:, cols]
+        ranks.append(B.rank())
+    return tuple(ranks)
 
 
 def main():
     n = argv.get("n", 3)
 
-    P = list(numpy.ndindex((2,)*n))
-    assert len(P) == 2**n
+    if argv.dump:
+        graphs = all_graph_states(n)
+        print(len(graphs))
 
-    def get_ent(A):
-        assert A.shape == (n,n)
-        ranks = []
-        for idxs in P:
-            rows = [i for (i,ii) in enumerate(idxs) if ii==1]
-            cols = [i for (i,ii) in enumerate(idxs) if ii==0]
-            B = A[rows, :]
-            B = B[:, cols]
-            ranks.append(B.rank())
-        return tuple(ranks)
+        #H = graphs.pop()
+        #print(H)
+        #A = get_graph(H)
+        #print(A)
+
+        funcs = set()
+        for H in graphs:
+            A = get_graph(H)
+            assert A is not None
+            func = get_func(A)
+            funcs.add(func)
+        print(len(funcs))
+
+        f = open("funcs_%d.py"%n, "w")
+        funcs = list(funcs)
+        funcs.sort()
+        for func in funcs:
+            print(func, file=f)
+        f.close()
+
+        return
 
     if n==6:
         lines = open("graphs_6.py").readlines()
@@ -357,7 +388,7 @@ def main():
             func = None
             for M in orbit:
                 A = get_graph(M)
-                gunc = get_ent(A)
+                gunc = get_func(A)
                 assert func is None or func==gunc
                 func = gunc
             assert func
