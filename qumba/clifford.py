@@ -19,7 +19,7 @@ import numpy
 
 from sage.all_cmdline import (FiniteField, CyclotomicField, latex, block_diagonal_matrix,
     PolynomialRing)
-from sage import all_cmdline 
+from sage import all_cmdline as sage
 
 from qumba.lin import zeros2, identity2
 from qumba.action import mulclose, mulclose_names, mulclose_find
@@ -1283,8 +1283,8 @@ def test_face_gate():
     #for v in vecs:
     #    print(v)
 
-    E = all_cmdline.E
-    ring = all_cmdline.UniversalCyclotomicField()
+    E = sage.E
+    ring = sage.UniversalCyclotomicField()
 
     I = Matrix.identity(ring, 2)
 
@@ -1864,6 +1864,43 @@ def test_fold():
     dode = l*code
     #print(dode.longstr())
     assert (dode.is_equiv(code))
+
+
+def test_stabilizer():
+    R = sage.CIF
+    epsilon = R(1e-04)
+    rho = Matrix(R, 
+         [[0, 0, 0, 0], 
+         [0, 0, 0, 0], 
+         [0, 0, 0, 0], 
+         [0, 0, 0, 0]] )
+    print(rho)
+
+    x = rho[0,0]
+    print(x, type(x))
+    #print(" ".join(dir(x)))
+
+    c = Clifford(2)
+    gens = [c.CZ(), c.S(0), c.S(1), c.H(0), c.H(1)]
+    G = mulclose(gens, verbose=True)
+    print()
+
+    H = []
+    idxs = [(i,j) for i in range(4) for j in range(4)]
+    for g in G:
+        sho = (~g)*rho*g
+        x = 0
+        tho = rho-sho
+        for (i,j) in idxs:
+            if abs(tho[i,j]) > epsilon:
+                #print("False")
+                break
+        else:
+            H.append(g)
+            #print("H", end='',flush=True)
+            print(g)
+
+    print(len(H))
 
 
     

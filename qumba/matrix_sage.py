@@ -148,6 +148,14 @@ class Matrix:
         ring = unify(self.ring, other.ring)
         return Matrix(ring, self.M.augment(other.M))
 
+    def sum(self):
+        s = self.M.sum()
+        return s
+
+    def abs(self):
+        M = self.M.abs()
+        return Matrix(self.ring, M)
+
     def __getitem__(self, idx):
         if type(idx) is int:
             return self.M[idx]
