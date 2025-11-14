@@ -205,11 +205,137 @@ def all_graphs(n):
         yield graph
 
 
+@cache
+def get_bits(n):
+    bits = tuple(numpy.ndindex((2,)*n))
+    assert len(bits) == 2**n
+    return bits
+
+
+@cache
+def get_idxs(n):
+    idxss = []
+    for bits in get_bits(n):
+        idxs = tuple(i for (i,ii) in enumerate(bits) if ii==1)
+        idxss.append(idxs)
+    return tuple(idxss)
+
+
+def upper_signature(H):
+#    print("upper_signature")
+#    print(H)
+    m, nn = H.shape
+    assert nn%2==0
+    n = nn//2
+    H = H.reshape(m, n, 2)
+    counts = []
+    for cols in get_idxs(n):
+        H1 = H[:, cols, :]
+        r = H1.reshape(m, len(cols)*2).rank()
+#        print("\t", cols, r)
+        counts.append(r)
+    counts = tuple(counts)
+#    print("\t =", counts)
+    return counts
+
+
+def lower_signature(H):
+#    print("lower_signature")
+#    print(H)
+    m, nn = H.shape
+    assert nn%2==0
+    n = nn//2
+    rows = []
+    for i in range(n):
+        row = lin.zeros2(2, nn)
+        row[0,2*i] = 1
+        row[1,2*i+1] = 1
+        rows.append(row)
+        #print(row)
+
+    counts = []
+    for cols in get_idxs(n):
+#        print(cols)
+        A = lin.zeros2(2*len(cols), nn)
+        for i,ii in enumerate(cols):
+            A[2*i:2*i+2, :] = rows[ii]
+#        print(A)
+        B = lin.intersect(H.A, A)
+#        print(B)
+        r = len(B)
+        counts.append(r)
+    counts = tuple(counts)
+#    print("\t =", counts)
+    return counts
+
+
+def test_ul_signature():
+    for n in [1,2,3,4]:
+      for m in range(n+1):
+        #print(n, m)
+        k = n-m
+        print("n=%d"%n, "m=%d"%m)
+        found = set()
+        lsigs = set()
+        usigs = set()
+        count = 0
+        for code in construct.all_codes(n, k, 0):
+            count += 1
+            H = code.H
+            H = H.normal_form()
+            found.add(H)
+            lsig = (lower_signature(H))
+            usig = (upper_signature(H))
+            for (i,j) in zip(lsig, usig):
+                assert i<=j
+            lsigs.add(lsig)
+            usigs.add(usig)
+        lsigs = list(lsigs)
+        lsigs.sort()
+        #for sig in lsigs:
+        #    print("\t", sig)
+        print(len(found), len(lsigs), len(usigs))
+        assert len(lsigs) == len(usigs)
+
+
+
+def test_signature():
+
+    code = construct.get_713()
+    #code = construct.get_422()
+    #print(code.longstr())
+    H = code.H
+
+    sigstr = lambda sig:(''.join(str(i) for i in sig))
+
+    print(sigstr(lower_signature(H)))
+    print(sigstr(upper_signature(H)))
+    print()
+
+    #return
+
+    L = code.L
+    #print(L)
+    usigs = set()
+    lsigs = set()
+    for op in L.rowspan():
+        if op.sum() == 0:
+            continue
+        J = H.concatenate(op)
+        lsigs.add(lower_signature(J))
+        usigs.add(upper_signature(J))
+    print(len(lsigs), len(usigs))
+    l = lsigs.pop()
+    print(sigstr(l))
+    u = usigs.pop()
+    print(sigstr(u))
+
 
 def orbit_isotropic(n, found):
     space = SymplecticSpace(n)
     gens = []
-    #gens = [space.SWAP(i,i+1).t for i in range(n-1)]
+    if argv.perms:
+        gens = [space.SWAP(i,i+1).t for i in range(n-1)]
     for i in range(n):
         gens.append(space.S(i))
         gens.append(space.H(i))
@@ -236,21 +362,37 @@ def orbit_isotropic(n, found):
         orbits.append(orbit)
     return orbits
 
+
 def test_codes():
 
-    for n in [1,2,3,4,5,6]:
+#    #for n in [2,3]:
+#      for k in range(n+1):
+    #for (n,m) in [(2,1), (3,2), (4,3)]:
+    for n in [1,2,3,4, 5]:
       print("n=%d"%n, end=' ', flush=True)
-      for k in range(n+1):
-        k = n-k
-        #print(n, k)
+      for m in range(n+1):
+        #print(n, m)
+        k = n-m
         found = set()
+        #sigs = set()
+        count = 0
         for code in construct.all_codes(n, k, 0):
+            count += 1
             H = code.H
             H = H.normal_form()
             found.add(H)
+            #sigs.add(upper_signature(H))
         orbits = orbit_isotropic(n, found)
         #print([len(o) for o in orbits], len(orbits))
-        print(len(orbits), end=' ', flush=True)
+        orbits.sort(key = len)
+        s = [len(o) for o in orbits]
+        print("%d:%d:%s"%(count, len(orbits), s), end=' ', flush=True)
+        #assert len(sigs) == len(orbits)
+        #sigs = list(sigs)
+        #sigs.sort()
+        #print("sigs:", len(sigs))
+        #for sig in sigs:
+        #    print("\t", sig)
       print()
 
 
@@ -374,17 +516,11 @@ def lc_graph_states(n, verbose=True):
 
 
 
-@cache
-def get_idxs(n):
-    idxs = tuple(numpy.ndindex((2,)*n))
-    assert len(idxs) == 2**n
-    return idxs
-
 def get_func(A):
     n = len(A)
     assert A.shape == (n,n)
     ranks = []
-    P = get_idxs(n)
+    P = get_bits(n)
     for idxs in P:
         rows = [i for (i,ii) in enumerate(idxs) if ii==1]
         cols = [i for (i,ii) in enumerate(idxs) if ii==0]
