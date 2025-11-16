@@ -20,11 +20,11 @@ from qumba.qcode import QCode, fromstr, strop
 from qumba.smap import SMap
 from qumba import lin
 from qumba.argv import argv
-from qumba.util import binomial, factorial
+from qumba.util import binomial, factorial, choose
 from qumba import construct
 
 
-from huygens.namespace import Canvas, path, grey, black, red
+from huygens.namespace import Canvas, path, grey, black, red, white, st_thick
 
 
 
@@ -215,6 +215,7 @@ def lc_orbits(n, items, perms=False):
                 remain.remove(J)
                 orbit.append(J)
             bdy = _bdy
+        orbit.sort(key = str)
         orbits.append(orbit)
     return orbits
 
@@ -238,16 +239,191 @@ def upjump(code):
         yield dode
 
 
+class Graph:
+    def __init__(self):
+        self.rows = []
+        self.items = set()
+        self.links = set()
+
+    def add(self, i, item):
+        assert item not in self.items
+        self.items.add(item)
+        rows = self.rows
+        while i >= len(rows):
+            rows.append([])
+        rows[i].append(item)
+
+    def link(self, item, jtem):
+        assert item in self.items
+        assert jtem in self.items
+        self.links.add((item, jtem))
+
+    def get_crossings(self):
+        links = self.links
+        row, sow = self.rows
+        lookup = {}
+        for (i,H) in enumerate(row):
+            lookup[H] = i
+        for (i,H) in enumerate(sow):
+            lookup[H] = i
+        links = list(links)
+        count = 0
+        for link,mink in choose(links, 2):
+            i0, j0 = lookup[link[0]], lookup[link[1]]
+            i1, j1 = lookup[mink[0]], lookup[mink[1]]
+            if i0==i1 or j0==j1:
+                continue
+            if (i0<i1) != (j0<j1):
+                count += 1
+        return count
+
+    def swap(self, i, j0, j1):
+        row = self.rows[i]
+        assert j0!=j1
+        row[j0], row[j1] = row[j1], row[j0]
+
+    def optimize(self, idx=0):
+        rows = self.rows
+        row = rows[idx]
+        n = len(row)
+        best = self.get_crossings()
+        print("optimize", best, end=" ", flush=True)
+        done = False
+        found = False
+        while not done:
+          done = True
+          for i in range(n-1):
+            self.swap(idx, i, i+1)
+            c = self.get_crossings() 
+            if c >= best:
+                self.swap(idx, i, i+1)
+            else:
+                best = c
+                print(best, end=" ", flush=True)
+                done = False
+                found = True
+        print()
+        return found
+
+    def render(self, name, width=25, height=4):
+
+        rows = self.rows
+        links = self.links
+    
+        radius = None
+        front = Canvas()
+        y = 0
+        xy = {}
+        for row in rows:
+          x = 0
+          dx = width / len(row)
+          for i,H in enumerate(row):
+            sig = Lower(H).signature()
+            print(sig)
+            fg = sig.render(1.)
+            bb = fg.get_bound_box()
+            if radius is None:
+                radius = bb.height * 0.5
+            cx, cy = bb.center
+            fg = Canvas().translate(-cx, -cy).append(fg)
+            p = path.circle(x, y, radius)
+            front.fill(p, [white])
+            front.stroke(p, [black]+st_thick)
+            front.insert(x, y, fg)
+            xy[H] = (x,y)
+            x += dx
+    
+          y -= height
+    
+        cvs = Canvas()
+        for (H,J) in links:
+            x0, y0 = xy[H]
+            x1, y1 = xy[J]
+            x2 = (x0+x1)/2
+            y2 = (y0+y1)/2
+            p = path.curve(x0, y0, x0, y2, x1, y2, x1, y1)
+            cvs.stroke(p, [grey]+st_thick)
+        cvs.append(front)
+    
+        print(name)
+        cvs.writePDFfile(name)
+
+
+            
+
+
 def main():
 
     n = 4
+    perm = True
 
-#    codes = [code for code in construct.all_codes(n, 1)]
-#
-#    send = {c:[] for c in codes}
-#    for code in codes:
-#        for dode in upjump(code):
-#            send[code].append(dode)
+    v0 = {code.H.normal_form() for code in construct.all_codes(n,0)}
+    v1 = {code.H.normal_form() for code in construct.all_codes(n,1)}
+
+    lookup = {}
+
+    orbit0 = lc_orbits(n, v0, perm)
+    orbit0.sort(key = len)
+    print([len(o) for o in orbit0])
+    for orbit in orbit0:
+        for v in orbit:
+            lookup[v] = orbit
+
+    orbit1 = lc_orbits(n, v1, perm)
+    orbit1.sort(key = len)
+    print([len(o) for o in orbit1])
+    for orbit in orbit1:
+        for v in orbit:
+            lookup[v] = orbit
+    assert len(lookup) == len(v0)+len(v1)
+
+    graph = Graph()
+
+    for i,orbit in enumerate(orbit0):
+        H = orbit[0]
+        graph.add(0, H)
+
+    for i,orbit in enumerate(orbit1):
+        H = orbit[0]
+        graph.add(1, H)
+
+    for idx1,orbit in enumerate(orbit1):
+        H = orbit[0]
+        code = QCode(H)
+        for dode in upjump(code):
+            orbit = lookup[dode.H.normal_form()]
+            J = orbit[0]
+            graph.link(H, J)
+
+    found = True
+    while found:
+        graph.optimize(0)
+        found = graph.optimize(1)
+
+    if perm:
+        if n==3:
+            width = 15
+            height = 4
+        else:
+            width = 50
+            height = 6
+        graph.render("jump_perm_%d.pdf"%n, width, height)
+
+    else:
+        if n==3:
+            width = 25
+            height = 4
+        else:
+            width = 140
+            height = 10
+    
+        graph.render("jump_%d.pdf"%n, width, height)
+
+
+
+def render_hecke_dot():
+
+    n = 4
 
     v0 = {code.H.normal_form() for code in construct.all_codes(n,0)}
     v1 = {code.H.normal_form() for code in construct.all_codes(n,1)}
