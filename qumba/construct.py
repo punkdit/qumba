@@ -434,7 +434,7 @@ def uturn_to_zip(n):
     return perm
 
 
-def all_codes(n=4, k=1, d=2):
+def all_codes(n=4, k=1, d=0):
 
     space = SymplecticSpace(n)
     perm = uturn_to_zip(n)

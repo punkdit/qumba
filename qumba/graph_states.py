@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+"""
+see also: lax.py
+"""
+
+
 
 from random import shuffle
 from math import sin, cos, pi
