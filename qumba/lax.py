@@ -24,6 +24,8 @@ from qumba.util import binomial, factorial, choose
 from qumba import construct
 
 
+from huygens import config
+config(text="pdflatex")
 from huygens.namespace import Canvas, path, grey, black, red, white, st_thick
 
 
@@ -32,8 +34,10 @@ from huygens.namespace import Canvas, path, grey, black, red, white, st_thick
 
 @cache
 def get_bits(n, arity=2):
-    bits = tuple(numpy.ndindex((arity,)*n))
+    bits = list(numpy.ndindex((arity,)*n))
     assert len(bits) == arity**n
+    bits.sort(key = sum)
+    bits = tuple(bits)
     return bits
 
 
@@ -155,11 +159,32 @@ class Functor:
         #print("?")
         return U is not None
 
-    def signature(self):
+    def signature(self, strict=True):
         counts = []
+        lookup = {}
         for idxs in get_idxs(self.n):
             F = self.get(idxs)
             counts.append(F.m)
+            lookup[idxs] = F.m
+        if not strict:
+            return Signature(self.n, counts)
+
+        counts = []
+        for idx in get_idxs(self.n):
+            c = lookup[idx]
+            prev = 0
+            for jdx in get_idxs(self.n):
+                if jdx==idx or jdx==() or not set(jdx).issubset(idx):
+                    continue
+                kdx = tuple(i for i in idx if i not in jdx)
+                assert len(kdx) + len(jdx) == len(idx)
+                result = lookup[jdx]+lookup[kdx]
+                prev = max(prev, result)
+                #if result == c:
+                #    print(idx, "=", jdx, "+", kdx, ":", c)
+            assert c>=prev
+            counts.append(c-prev)
+
         return Signature(self.n, counts)
 
 
@@ -260,11 +285,9 @@ class Graph:
 
     def get_crossings(self):
         links = self.links
-        row, sow = self.rows
         lookup = {}
-        for (i,H) in enumerate(row):
-            lookup[H] = i
-        for (i,H) in enumerate(sow):
+        for row in self.rows:
+          for (i,H) in enumerate(row):
             lookup[H] = i
         links = list(links)
         count = 0
@@ -287,7 +310,7 @@ class Graph:
         row = rows[idx]
         n = len(row)
         best = self.get_crossings()
-        print("optimize", best, end=" ", flush=True)
+        print("optimize(%d)"%idx, best, end=" ", flush=True)
         done = False
         found = False
         while not done:
@@ -317,15 +340,20 @@ class Graph:
         for row in rows:
           x = 0
           dx = width / len(row)
+          if len(row)%2:
+            x += 0.5*dx
           for i,H in enumerate(row):
             sig = Lower(H).signature()
-            print(sig)
-            fg = sig.render(1.)
+            d = QCode(H).d
+            print(sig, d)
+            fg = sig.render(1.4)
             bb = fg.get_bound_box()
             if radius is None:
-                radius = bb.height * 0.5
+                radius = max(bb.height, bb.width) * 0.6
             cx, cy = bb.center
             fg = Canvas().translate(-cx, -cy).append(fg)
+            if d and d>1:
+                fg.text(0, -0, str(d))
             p = path.circle(x, y, radius)
             front.fill(p, [white])
             front.stroke(p, [black]+st_thick)
@@ -354,40 +382,32 @@ class Graph:
 
 def main():
 
-    n = 4
+    n = argv.get("n", 3)
     perm = True
 
-    v0 = {code.H.normal_form() for code in construct.all_codes(n,0)}
-    v1 = {code.H.normal_form() for code in construct.all_codes(n,1)}
+    levels = [
+        {code.H.normal_form() for code in construct.all_codes(n,k)}
+        for k in range(n)
+    ]
 
     lookup = {}
-
-    orbit0 = lc_orbits(n, v0, perm)
-    orbit0.sort(key = len)
-    print([len(o) for o in orbit0])
-    for orbit in orbit0:
-        for v in orbit:
-            lookup[v] = orbit
-
-    orbit1 = lc_orbits(n, v1, perm)
-    orbit1.sort(key = len)
-    print([len(o) for o in orbit1])
-    for orbit in orbit1:
-        for v in orbit:
-            lookup[v] = orbit
-    assert len(lookup) == len(v0)+len(v1)
-
     graph = Graph()
 
-    for i,orbit in enumerate(orbit0):
-        H = orbit[0]
-        graph.add(0, H)
+    lcs = []
+    for i,level in enumerate(levels):
+        lc = lc_orbits(n, level, perm)
+        lc.sort(key = len)
+        print([len(o) for o in lc])
+        for orbit in lc:
+            for v in orbit:
+                lookup[v] = orbit
+            H = orbit[0]
+            graph.add(i, H)
+        lcs.append(lc)
 
-    for i,orbit in enumerate(orbit1):
-        H = orbit[0]
-        graph.add(1, H)
 
-    for idx1,orbit in enumerate(orbit1):
+    for lc in lcs[1:]:
+      for idx1,orbit in enumerate(lc):
         H = orbit[0]
         code = QCode(H)
         for dode in upjump(code):
@@ -397,23 +417,27 @@ def main():
 
     found = True
     while found:
-        graph.optimize(0)
-        found = graph.optimize(1)
+        found = False
+        for k in range(n):
+            found = found or graph.optimize(k)
 
     if perm:
-        if n==3:
+        if n<=3:
             width = 15
             height = 4
-        else:
-            width = 50
+        elif n==4:
+            width = 60
             height = 6
-        graph.render("jump_perm_%d.pdf"%n, width, height)
+        elif n==5:
+            width = 150
+            height = 12
+        graph.render("jump_perm_strict_%d.pdf"%n, width, height)
 
     else:
         if n==3:
             width = 25
             height = 4
-        else:
+        elif n==4:
             width = 140
             height = 10
     
