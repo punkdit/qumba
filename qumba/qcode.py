@@ -649,6 +649,15 @@ class QCode(object):
         if self.n > 100:
             return
 
+        if self.k == 0 and self.n < 20:
+            w = self.n
+            for h in H.rowspan():
+                if h.sum() == 0:
+                    continue
+                w1 = get_weight(h.A[0])
+                w = min(w1, w)
+            self.d = w
+
         if self.k == 0:
             return
 

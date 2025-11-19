@@ -344,8 +344,9 @@ class Graph:
             x += 0.5*dx
           for i,H in enumerate(row):
             sig = Lower(H).signature()
-            d = QCode(H).d
-            print(sig, d)
+            code = QCode(H)
+            d = code.d
+            print(sig, code, d)
             fg = sig.render(1.4)
             bb = fg.get_bound_box()
             if radius is None:
