@@ -159,7 +159,7 @@ class Functor:
         #print("?")
         return U is not None
 
-    def signature(self, strict=True):
+    def signature(self, strict=False):
         counts = []
         lookup = {}
         for idxs in get_idxs(self.n):
@@ -431,7 +431,8 @@ def main():
         elif n==5:
             width = 150
             height = 12
-        graph.render("jump_perm_strict_%d.pdf"%n, width, height)
+        #graph.render("jump_perm_strict_%d.pdf"%n, width, height)
+        graph.render("jump_perm_%d.pdf"%n, width, height)
 
     else:
         if n==3:

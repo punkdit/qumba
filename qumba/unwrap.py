@@ -555,31 +555,38 @@ def test_logical():
     from qumba import autos, transversal
     from qumba.action import Perm, Group, mulclose
 
-    #code = construct.get_10_2_3()
-    #  logicals: 12
+    _id = argv._id
+    if _id:
+        print("fetching", _id)
+        code = list(db.get(_id=_id))[0]
 
-    #code = list(db.get(_id="6900a99d0a060a5626b32e6a"))[0] # [[15,5,3]] SD
-    # logicals: O(9,2) x S3 == Sp(8,2)xS3
-
-    #code = list(db.get(_id="67a4b0119edf81e4b7e670ac"))[0] # [[15,5,3]] 5,5 surface
-    # logicals: O(9,2) x S3 == Sp(8,2)xS3
-
-    code = list(db.get(_id="6900a99d0a060a5626b32e6b"))[0] # [[24,4,4]]
-    # logicals: O(9,2) == Sp(8,2), FT logicals: 432
-
-    #code = list(db.get(_id="67a4b0129edf81e4b7e670ad"))[0] # [[30,8,3]]
-
-    #code = list(db.get(_id="6705236219cca60cf657a938"))[0] # [[21,3,5]]
-    # 120960 autos, cyclic, logicals: 4320, FT logicals: 12
-
-    #code = list(db.get(_id="67476b7f44a05d87e042051b"))[0] # [[21,3,5]]
-    # 5760 autos, logicals: 4320, FT logicals: 36
-
-    #code = list(db.get(_id="672e583d4d73ae0fe405d860"))[0] # [[23,3,5]]
-    # logicals: 4320, FT logicals: 36
-
-    #code = list(db.get(_id="67a4c83cfab4d3b49d2d29c1"))[0] # [[21,9,3]]
-    # logicals: more than Sp(16,2)
+    else:
+    
+        #code = construct.get_10_2_3()
+        #  logicals: 12
+    
+        #code = list(db.get(_id="6900a99d0a060a5626b32e6a"))[0] # [[15,5,3]] SD
+        # logicals: O(9,2) x S3 == Sp(8,2)xS3
+    
+        #code = list(db.get(_id="67a4b0119edf81e4b7e670ac"))[0] # [[15,5,3]] 5,5 surface
+        # logicals: O(9,2) x S3 == Sp(8,2)xS3
+    
+        code = list(db.get(_id="6900a99d0a060a5626b32e6b"))[0] # [[24,4,4]]
+        # logicals: O(9,2) == Sp(8,2), FT logicals: 432
+    
+        #code = list(db.get(_id="67a4b0129edf81e4b7e670ad"))[0] # [[30,8,3]]
+    
+        #code = list(db.get(_id="6705236219cca60cf657a938"))[0] # [[21,3,5]]
+        # 120960 autos, cyclic, logicals: 4320, FT logicals: 12
+    
+        #code = list(db.get(_id="67476b7f44a05d87e042051b"))[0] # [[21,3,5]]
+        # 5760 autos, logicals: 4320, FT logicals: 36
+    
+        #code = list(db.get(_id="672e583d4d73ae0fe405d860"))[0] # [[23,3,5]]
+        # logicals: 4320, FT logicals: 36
+    
+        #code = list(db.get(_id="67a4c83cfab4d3b49d2d29c1"))[0] # [[21,9,3]]
+        # logicals: more than Sp(16,2)
 
     print(code.longstr())
     css = code.to_css()

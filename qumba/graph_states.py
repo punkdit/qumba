@@ -391,7 +391,8 @@ def test_codes():
         #print([len(o) for o in orbits], len(orbits))
         orbits.sort(key = len)
         s = [len(o) for o in orbits]
-        print("%d:%d:%s"%(count, len(orbits), s), end=' ', flush=True)
+        #print("%d:%d:%s"%(count, len(orbits), s), end=' ', flush=True)
+        print(len(orbits), end=' ', flush=True)
         #assert len(sigs) == len(orbits)
         #sigs = list(sigs)
         #sigs.sort()
