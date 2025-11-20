@@ -789,20 +789,28 @@ def structures(n, funcs):
             
 
 def render_func(n, f, r=0.08):
-    from huygens.namespace import Canvas, path, grey, black
+    from huygens.namespace import Canvas, path, grey, black, white
     P = list(numpy.ndindex((2,)*n))
     dx = 4/n
     dy = 1.4*dx
     cvs = Canvas()
     cols = [0]*(n+1)
     coords = {}
+    x0 = y0 = x1 = y1 = 0
     for idx in P:
         row = sum(idx)
         col = cols[row] - 0.5*binomial(n,row)
         x = dx*col
         y = dy*row
         coords[idx] = (x,y)
+        x0 = min(x, x0)
+        x1 = max(x, x1)
+        y0 = min(y, y0)
+        y1 = max(y, y1)
         cols[row] += 1
+    # fix bounding box
+    margin = 6*r
+    cvs.stroke(path.rect(x0-margin, y0-margin, x1-x0+2*margin, y1-y0+2*margin), [white])
     for idx in P:
       for jdx in P:
         kdx = tuple(i-j for (i,j) in zip(idx,jdx))
