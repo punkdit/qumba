@@ -827,6 +827,7 @@ def render_func(n, f, r=0.08):
 
 
 def plot_funcs(n, funcs):
+    "render entanglement functions"
     from huygens.namespace import Canvas, path, grey, black
 
     mod = 99999
@@ -858,6 +859,7 @@ def plot_funcs(n, funcs):
 
 
 def render_funcs(n, funcs):
+    "render entanglement functions "
     orbits, action = get_orbits(n, funcs)
     orbits.sort(key = lambda orbit:sum(orbit[0]))
 
