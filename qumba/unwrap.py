@@ -557,7 +557,7 @@ def test_logical():
 
     _id = argv._id
     if _id:
-        print("fetching", _id)
+        print("fetching https://qecdb.org/codes/%s" % _id)
         code = list(db.get(_id=_id))[0]
 
     else:
@@ -588,6 +588,7 @@ def test_logical():
         #code = list(db.get(_id="67a4c83cfab4d3b49d2d29c1"))[0] # [[21,9,3]]
         # logicals: more than Sp(16,2)
 
+    print(code)
     print(code.longstr())
     css = code.to_css()
 
@@ -599,8 +600,10 @@ def test_logical():
     G = []
     for g in transversal.find_isomorphisms_css(code):
         G.append(g)
+        print(".", flush=True, end="")
         if len(G) > 100:
             break
+    print()
     G = mulclose(G, verbose=True, maxsize=10000)
     print("|G| =", len(G))
 
@@ -608,8 +611,10 @@ def test_logical():
     if argv.avoid: # use to find the fault tolerant logicals
         avoid = get_avoid(code)
 
+    print("tau...", end='', flush=True)
     dode = space.H() * code
     tau = iter(transversal.find_isomorphisms_css(code, dode)).__next__()
+    print(" found")
 
     logops = set()
 
@@ -669,8 +674,10 @@ def test_logical():
         L = dode.get_logical(code)
         logops.add(L)
 
-    #print("logops:", len(logops))
-    #logops = mulclose(logops, verbose=True, maxsize=1000)
+    if argv.gen:
+        print("logops:", len(logops))
+        logops = mulclose(logops, verbose=True, maxsize=100000)
+
     print("logops:", len(logops))
 
     name = "bring.gap"
