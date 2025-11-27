@@ -23,7 +23,7 @@ from sage import all_cmdline as sage
 
 from qumba.lin import zeros2, identity2
 from qumba.action import mulclose, mulclose_names, mulclose_find
-from qumba.util import cross
+from qumba.util import cross, allperms
 from qumba.argv import argv
 
 if argv.sage or 1:
@@ -1172,20 +1172,27 @@ def test_CCZ():
         rows.append(row)
     CCZ = Matrix(c3.K, rows)
 
-    g = CCZ * XII*IXI*IIX * CCZ.inverse()
-    print("g =")
-    print(g)
+    X3 = reduce(matmul, [X]*3)
 
-    half = c3.K.one() / 2
-    op = half*(IIX + ZII*IIX + IZI*IIX - ZII*IZI*IIX)
-
-    ns =locals()
+    tgt = CCZ * XII*IXI*IIX * CCZ.inverse()
+    print("tgt =")
+    print(tgt)
 
     #names = "wI SII ISI IIS HII IHI IIH CZ01 CZ02 CZ12".split()
     names = "XII IXI IIX CZ01 CZ02 CZ12".split()
+    ns =locals()
     gen = [ns[name] for name in names]
-    #name = mulclose_find(gen, names, g, verbose=True)
-    #print(name)
+    op = mulclose_find(gen, tgt, verbose=True)
+    #print(op.name)
+
+    items = [CZ01, CZ12, CZ02, XII, IXI, IIX]
+    count = 0
+    for ops in allperms(items):
+        op = reduce(mul, ops)
+        if op == tgt:
+            print(op.name)
+            count += 1
+    print(count)
 
 
 def test_platonic():

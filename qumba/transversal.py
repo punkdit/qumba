@@ -2793,6 +2793,74 @@ def find_css():
 
 
 
+def test_lc_class():
+    print("test_lc_class")
+    if argv.code == (4,2,2):
+        code = QCode.fromstr("XXXX ZZZZ")
+    elif argv.code == (5,1,3):
+        code = construct.get_513()
+    elif argv.code == (4,1,2):
+        code = QCode.fromstr("XYZI IXYZ ZIXY")
+    elif argv.code == (6,2,2):
+        code = QCode.fromstr("XXXIXI ZZIZIZ IYZXII IIYYYY")
+    elif argv.code == (8,2,3):
+        code = QCode.fromstr("""
+            X...YZZZ
+            .X.ZYX.X
+            .ZX.YYZX
+            .ZZYZXZZ
+            ..Z...YX
+            ZZZZZZZZ
+        """)
+    elif argv.code == (8,3,2):
+        code = QCode.fromstr("""
+            XXXXIIII
+            ZIZIZIZI
+            IIYYYYII
+            IZIZIZIZ
+            IIIIXXXX
+        """)
+
+    from qumba import lattices
+    from bruhat.gset import cayley
+    d = argv.get("d", 3)
+
+    if argv.get_surface:
+        code = construct.get_surface(d,d)
+    elif argv.get_toric:
+        a = argv.get("a", 2)
+        b = argv.get("b", 2)
+        code = construct.get_toric(a,b)
+    elif argv.build_colour_488:
+        code = lattices.build_colour_488(d)
+    elif argv.build_colour_666:
+        code = lattices.build_colour_666(d)
+
+    print(code.get_params())
+
+    n = code.n
+    count = 0
+    gen = []
+
+    logicals = set()
+    for M in find_local_cliffords(code):
+        dode = code.apply(M)
+        assert dode.is_equiv(code)
+        L = dode.get_logical(code)
+        #print(M)
+        logicals.add(L)
+        gen.append(M)
+        count += 1
+
+    print(count, "L=",len(logicals))
+    #G = mulclose(gen)
+    #print("|G| =", len(G))
+
+    G = cayley(gen)
+    print(G.structure_description(True))
+
+
+
 if __name__ == "__main__":
     from time import time
     start_time = time()
