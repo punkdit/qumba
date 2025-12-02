@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+black box fault-tolerance
+"""
 
 from random import shuffle, choice, randint
 from functools import reduce, lru_cache
