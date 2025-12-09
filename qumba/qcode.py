@@ -307,7 +307,7 @@ class QCode(object):
         return s
 
     def shortstr(self):
-        H = self.H.view()
+        H = self.H.A.view()
         H.shape = (self.m, 2*self.n)
         return shortstr(H)
 

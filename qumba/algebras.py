@@ -1203,15 +1203,35 @@ def main_unwrap():
     code = construct.get_513()
     #print(get_wenum(code))
     #code = construct.get_14_3_3()
-    #code = construct.get_412()
+    code = construct.get_412()
     #code = construct.toric(2,2).to_qcode()
     #code = construct.get_512()
-    print(code)
-    H = code.H
-    m, nn = H.shape
-    n = nn//2
-    H = H.reshape(m, n, 2)
-    #print(H)
+    #print(code)
+    #print(code.longstr())
+
+    
+
+    codes = [construct.get_412(), construct.get_513(),
+        QCode.fromstr("""
+        XZIZIXIZZI
+        IYIZZYIIZZ
+        IIYZZYIXII
+        IZZYIYZIIZ
+        IZIIXYZYII
+        IZZIZZXXZZ
+        IIZZZZZIXZ
+        IZZZZIIZZX
+        ZZZZZZIIII
+        """)
+    ]
+    Hs = []
+    for code in codes:
+        H = code.H
+        m, nn = H.shape
+        n = nn//2
+        H = H.reshape(m, n, 2)
+        #print(H)
+        Hs.append(H)
 
     swap = Matrix([
         [1,0,0,0],
@@ -1243,40 +1263,50 @@ def main_unwrap():
 
     assert len(G) == 256
 
-    space = SymplecticSpace(nn)
 
     found = 0
     for U in G:
         U = U.reshape(2,2,2,2)
         #J = (H@U).reshape(m, n, 2, 2, 2, 2, 2)
     
-        J = Matrix.einsum("mno,opqr", H, U)
-        #J = J.transpose((0,2,1,3,4))
-        J = J.transpose((0,2,1,4,3))
-        J = J.reshape(2*m, 2*n, 2)
+        Js = []
+        for H in Hs:
+            J = Matrix.einsum("mno,opqr", H, U)
+            J = J.transpose((0,2,1,3,4)) # <--- these give CSS unwrap
+            #J = J.transpose((0,2,1,4,3)) # <--- some other codes..
+            m = J.shape[0]
+            n = J.shape[2]
+            J = J.reshape(2*m, 2*n, 2)
+            J = J.reshape(2*m, 4*n)
     
-        #print(J)
-        J = J.reshape(2*m, 4*n)
+            if J.rank() != 2*m:
+                continue
+    
+            space = SymplecticSpace(2*n)
+            if not space.is_isotropic(J):
+                #print("!!")
+                continue
+            Js.append(J)
 
-        if J.rank() != 2*m:
-            continue
-
-        if not space.is_isotropic(J):
-            continue
-
-        code = QCode(J)
+        tgt = [QCode(J) for J in Js]
     
         #if not code.is_css():
+        #    print("ZX")
         #    continue
+        #print(code.longstr())
 
-        print(code, "*" if code.is_css() else " ", "gf4" if code.is_gf4() else " ",
-            "+" if code.is_selfdual() else " ")
+        for code in tgt:
+            print(code, 
+                "*" if code.is_css() else " ", 
+                "gf4" if code.is_gf4() else "   ",
+                "+" if code.is_selfdual() else " ", end="\t")
+    
+            #if code.is_gf4() and code.d>2:
+            #    print(code.longstr())
+            #    return
+        if tgt:
+            print()
 
-#        if code.is_gf4():
-#            #print(strop(code.H))
-#            H0 = code.H.normal_form()
-#            print(strop(H0))
-        #print(U.reshape(4,4))
         found += 1
 
         #print(code.longstr())
