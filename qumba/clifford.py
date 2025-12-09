@@ -1760,6 +1760,65 @@ def test_fold():
 
     # ---------------------------------------------------
 
+    if 0:
+        c = Clifford(1)
+        X, Y, Z, S = c.X(), c.Y(), c.Z(), c.S()
+    
+        n = 4
+        Xn = reduce(matmul, [X]*n)
+        Yn = reduce(matmul, [Y]*n)
+        Zn = reduce(matmul, [Z]*n)
+        assert Zn*Xn==Xn*Zn
+        XZn = Xn*Zn
+    
+        X1 = reduce(matmul, [X,X,X,I])
+        Z1 = reduce(matmul, [I,Z,Z,Z])
+        assert X1*Z1==Z1*X1
+    
+        c = Clifford(4)
+        S, CZ = c.S, c.CZ
+    
+        g = S(1)*S(2)*CZ(0,3)
+        lhs = g*X1*g.d 
+        rhs = X1*Z1
+        print(int(lhs==rhs), int(lhs==-rhs))
+    
+        g = S(1)*S(2).d*CZ(0,3)
+        lhs = g*X1*g.d 
+        rhs = X1*Z1
+        print(int(lhs==rhs), int(lhs==-rhs))
+    
+        g = S(1).d*S(2)*CZ(0,3)
+        lhs = g*X1*g.d 
+        rhs = X1*Z1
+        print(int(lhs==rhs), int(lhs==-rhs))
+    
+        g = S(1).d*S(2).d*CZ(0,3)
+        lhs = g*X1*g.d 
+        rhs = X1*Z1
+        print(int(lhs==rhs), int(lhs==-rhs))
+    
+    
+        return
+    
+        n = 4
+        Xn = reduce(matmul, [X]*n)
+        Yn = reduce(matmul, [Y]*n)
+        Zn = reduce(matmul, [Z]*n)
+        assert Zn*Xn==Xn*Zn
+        XZn = Xn*Zn
+        print("XZ == Y", XZn==Yn, XZn==-Yn) # True if n%4==0
+        for bits in numpy.ndindex((2,)*(n)):
+            g = reduce(matmul, [[S,S.d][j] for (i,j) in enumerate(bits)])
+            #g = Clifford(2).CZ() @ g
+            lhs = g*Xn*g.d 
+            print(bits, int(sum(bits)%2==0), int(lhs==Yn), int(lhs==-Yn))
+    
+    
+        return
+
+    # ---------------------------------------------------
+
     code = construct.get_422()
     print(code.longstr())
 
@@ -1773,8 +1832,20 @@ def test_fold():
     P = code.get_projector()
     assert P*P == P
 
+    #print(P)
+
     l = CZ(0,2) * S(1) * S(3).d
     assert l*P != P*l
+
+    l = CZ(0,2) * S(1) * S(3)
+    assert l*P == P*l
+
+    l = CZ(0,2) * S(1).d * S(3).d
+    assert l*P == P*l
+
+    #for bits in numpy.ndindex((2,)*4):
+    #    op = reduce(mul, [[S(i),S(i).d][j] for (i,j) in enumerate(bits)])
+    #    print(bits, op*P==P*op)
 
     l = CZ(0,2) * CZ(1,3)
     assert l*P == P*l
@@ -1838,8 +1909,7 @@ def test_fold():
         #if "X" in h:
         #    l = l*get_pauli(t) 
 
-    Q = l*P*l.d
-    assert Q == P 
+    assert l*P == P*l
 
 #    for h,t in zip(code.H, code.T):
 #        hs, ts = strop(h), strop(t)
