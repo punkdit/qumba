@@ -597,14 +597,31 @@ def test_logical():
     items = list(range(n))
 
     #perms = css.find_autos()
-    G = []
+    gen = []
     for g in transversal.find_isomorphisms_css(code):
-        G.append(g)
+        gen.append(g)
         print(".", flush=True, end="")
-        if len(G) > 100:
+        if len(gen) > 3:
             break
     print()
-    G = mulclose(G, verbose=True, maxsize=10000)
+
+    if argv.autos:
+        from bruhat.gset import Group, Perm
+        perms = []
+        for g in gen:
+            perm = g.to_perm()
+            perm = Perm(perm)
+            print(perm)
+            perms.append(perm)
+    
+        G = Group.generate(perms, verbose=True)
+        print(G)
+        print(G.gapstr())
+        print(G.structure_description())
+    
+        return
+
+    G = mulclose(gen, verbose=True, maxsize=10000)
     print("|G| =", len(G))
 
     avoid = []
@@ -664,13 +681,25 @@ def test_logical():
 
         print(pairs, s)
 
-        lop = space.I()
-        if len(pairs):
-            lop = reduce(mul, [space.CZ(i,j) for (i,j) in pairs])
-        if s:
-            lop = lop * reduce(mul, [space.S(i) for i in s])
-        dode = lop*code
+        ops = [space.CZ(i,j) for (i,j) in pairs] + [space.S(i) for i in s]
+        #lop = space.I()
+        #if len(pairs):
+        #    lop = reduce(mul, [space.CZ(i,j) for (i,j) in pairs])
+        #if s:
+        #    lop = lop * reduce(mul, [space.S(i) for i in s])
+
+        dode = code
+        for (i,j) in pairs:
+            dode = space.CZ(i,j) * dode
+            d = dode.distance("z3")
+            assert d>=code.d, d
+        for i in s:
+            dode = space.S(i)*dode
         assert dode.is_equiv(code)
+
+        #lop = reduce(mul, ops)
+        #dode = lop*code
+        #assert dode.is_equiv(code)
         L = dode.get_logical(code)
         logops.add(L)
 
