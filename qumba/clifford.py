@@ -1980,6 +1980,70 @@ def test_stabilizer():
     print(len(H))
 
 
+def test_cv():
+
+    a = (1+w4)/2
+    b = (1-w4)/2
+
+    CV = Matrix(K, 
+        [[1,0,0,0],
+        [0,1,0,0],
+        [0,0,a,b],
+        [0,0,b,a]])
+
+    CS = I<<S
+    IH = I@H
+    assert ((IH)*CS*(IH) == CV)
+
+    #gen = [I@I, I@H, H@I, Z@I, I@Z, X@I, I@X, S@I, I@S, I<<X, I<<Z]
+    #names = "II IH HI ZI IZ XI IX SI IS CX CZ".split()
+    #clifford = mulclose_names(gen, names, verbose=True, maxsize=None)
+    #for g in clifford:
+    #    print(clifford[g])
+
+    tgt = CV
+    #tgt = CS
+    #print(tgt)
+
+    XI = X@I
+    XS = X@S
+    CZ = I<<Z
+    CX = I<<X
+    R = H*S*H
+    print(CV*XI*CV.d == IH*CS*IH*XI*IH*CS.d*IH)
+    print(CV*XI*CV.d == IH*CS*XI*CS.d*IH)
+    print(CV*XI*CV.d == IH*XS*CZ*IH)
+    print(CV*XI*CV.d == IH*XS*IH*CX)
+    print(CV*XI*CV.d == (X@R)*CX)
+
+    return
+    
+    gen = [w8*(I@I)]
+    names = ["w"]
+    labels = 'IXYZSH'
+    for a in labels:
+      for b in labels:
+        g = eval(a)@eval(b)
+        gen.append(g)
+        names.append(a+b)
+    gen += [I<<X, X<<I, I<<Z]
+    names += "CX01 CX10 CZ".split()
+    print(names)
+    clifford = mulclose_names(gen, names, verbose=True, maxsize=None)
+    #for g in clifford:
+    #    print(clifford[g])
+
+    names = 'IXYZ'
+    gen = [eval(name) for name in names]
+    for i in range(4):
+      for j in range(4):
+        op = gen[i]@gen[j]
+        op = tgt*op*tgt.d
+        name = names[i]+names[j]
+        print(name, "-->")
+        print(op, clifford.get(op))
+
+
     
 def test():
     test_clifford()

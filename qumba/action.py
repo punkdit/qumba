@@ -51,6 +51,8 @@ def mulclose_names(gen, names, verbose=False, maxsize=None):
     names = dict((gen[i], (names[i],)) for i in range(len(gen)))
     changed = True 
     while bdy:
+        if verbose:
+            print(len(names), end=" ", flush=True)
         _bdy = []
         for A in gen:
             for B in bdy:
@@ -60,8 +62,13 @@ def mulclose_names(gen, names, verbose=False, maxsize=None):
                     names[C] = names[A] + names[B]
                     _bdy.append(C)
                     if maxsize and len(names)>=maxsize:
-                        return list(names)
+                        #return list(names) # what??
+                        if verbose:
+                            print()
+                        return names
         bdy = _bdy
+    if verbose:
+        print()
     return names 
 
 

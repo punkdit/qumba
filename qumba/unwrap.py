@@ -18,6 +18,7 @@ from qumba import construct
 from qumba.distance import distance_z3
 from qumba.autos import get_isos, is_iso
 from qumba.action import Perm, mulclose_find, mulclose
+from qumba import autos, transversal
 from qumba import csscode 
 from qumba.argv import argv
 
@@ -549,10 +550,185 @@ def test_zx():
     #print("involutory fixed-point free zx-dualities:", len(zxs))
 
 
+def test_fold():
+
+    n = 24
+
+    # https://qecdb.org/codes/6900a99d0a060a5626b32e6b
+    s = ("""
+    IIIIXIIXIIIXIIIXXXIIIIII
+    IIIXXIIIIIIIIXIXIIIIXIXI
+    XIIIIIIIIIXIIXIIIIXIIIXX
+    IIIIIIIIXIIIIIXIIIXXIXIX
+    XIIIIIXXIIXIXIIIXIIIIIII
+    IIXIIIIIIIIXIXXXIIIIIIIX
+    IIIXXIXIIIIIIIIIXIIXIXII
+    IXXIIXIIIXIXIIIIIXIIIIII
+    XIIIIXIXXIIIIIIIIXXIIIII
+    IIXIIIXIIXIIXIXIIIIIIXII
+    """).replace("I", ".").replace("X", "1")
+    H = Matrix.parse(s)
+    H = H.normal_form()
+    print(H, H.shape)
+
+    J = []
+    for v in H.rowspan():
+        if v.sum() == 8:
+            J.append(v[0])
+    J = Matrix(J)
+    print(J.shape)
+    J = J.normal_form()
+    print(J, J.shape)
+    print(J.sum(1))
+    print(J.rank())
+
+
+def send_to_golay(J):
+    n = 24
+    code = construct.get_golay()
+    css = code.to_css()
+    H_G = Matrix(css.Hx)
+    #print()
+    #print("golay:")
+    #print(H_G)
+
+    from qumba.umatrix import UMatrix, Solver, And, Or
+    solver = Solver()
+    Add = solver.add
+
+    # permutation matrix
+    P = UMatrix.unknown(n, n)
+    
+    for i in range(n):
+      for j in range(n):
+        rhs = reduce(And, [P[i,k]==0 for k in range(n) if k!=j])
+        Add( Or(P[i,j]==0, rhs) )
+        rhs = reduce(And, [P[k,j]==0 for k in range(n) if k!=i])
+        Add( Or(P[i,j]==0, rhs) )
+
+    for i in range(n):
+        Add( reduce(Or, [P[i,j]!=0 for j in range(n)]) )
+
+    Add(J*P*H_G.t == 0)
+    #Add(H*P*H_G.t == 0) # unsat
+
+    result = solver.check()
+    result = str(result)
+    if result == "sat":
+        model = solver.model()
+        P1 = P.get_interp(model)
+        return P1
+
+    print(result)
+
+
+
+def test_w8():
+    H = Matrix.parse("""
+    1.......1.1..11....1.11.
+    .1......1.11..1.1.1..1..
+    ..1.....1..1.1.1..11.1..
+    ...1.......111.11111.111
+    ....1...1..11.1.11..1...
+    .....1..1.1.11.1.111111.
+    ......1......1.11..1111.
+    .......1....1..1..1111.1
+    .........1.11...1..11.11 
+    """)
+    print(H.get_wenum())
+
+    code = QCode.build_css(H,H)
+    print(code)
+
+    # https://qecdb.org/codes/67a38c449d65c7b4098268cb 
+    # [[24,8,4]]
+    s = ("""
+    IIIIIIIXXIXIXIIIIXXIIIXX
+    IIIIXXXIIIIIIXXIIXIXIIXI
+    IIIXIIIIXIXIIXXIXIIIXXII
+    IIXIXIXIIIIIIIIXIIXIXXIX
+    IXIXIIIIIIIXIIXIXIIIIXXX
+    IXIXIIIIIIXIXIIXIXXXIIII
+    XIIIIXIIIXIIIXIIIIXXIXXI
+    XIXIIIXIIIIIXXIIXIIXIIXI
+    """).replace("I", ".").replace("X", "1")
+    H = Matrix.parse(s)
+    H = H.normal_form()
+    print(H, H.shape)
+    print(H.get_wenum())
+
+    code = QCode.build_css(H, H)
+    print(code) # Autos: S6xS4 = 17280
+
+    P = send_to_golay(H)
+    #print(P)
+    print(P.to_perm())
+    # [18, 14, 23, 6, 9, 11, 20, 17, 3, 5, 2, 19, 7, 0, 10, 13, 12, 21, 8, 15, 16, 4, 1, 22]
+
+    H = H*P
+
+    code = construct.get_golay()
+    css = code.to_css()
+    H_G = Matrix(css.Hx)
+
+    print(H_G.t.solve(H.t))
+
+    if 0:
+        #perms = css.find_autos()
+        gen = []
+        for g in transversal.find_isomorphisms_css(code):
+            gen.append(g)
+            print(".", flush=True, end="")
+            if len(gen) > 3:
+                break
+        print()
+
+        from bruhat.gset import Group, Perm
+        perms = []
+        for g in gen:
+            perm = g.to_perm()
+            perm = Perm(perm)
+            print(perm)
+            perms.append(perm)
+    
+        G = Group.generate(perms, verbose=True)
+        print(G)
+        print(G.gapstr())
+        print(G.structure_description())
+    
+        return
+
+
+def test_golay():
+
+    code = construct.get_golay()
+    css = code.to_css()
+    H0 = Matrix(css.Hx)
+
+    print(H0, H0.shape)
+    m,n = H0.shape
+
+    while 1:
+        J = Matrix.rand(m,m)
+        H1 = J*H0
+        if H1.rank() == m:
+            break
+        print(H1.rank())
+
+    print(H1)
+    print()
+
+
+    H = H1[:m-1]
+    print(H, H.shape)
+
+    code = QCode.build_css(H,H)
+    print(code)
+
+
 
 def test_logical():
     from qumba import db
-    from qumba import autos, transversal
     from qumba.action import Perm, Group, mulclose
 
     _id = argv._id
@@ -647,6 +823,10 @@ def test_logical():
         assert dode.is_equiv(code)
         L = dode.get_logical(code)
         logops.add(L)
+
+    if argv.limit:
+        G = G[:argv.limit]
+    print("G:", len(G))
 
     for g in G:
 
