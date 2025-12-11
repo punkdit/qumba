@@ -863,10 +863,11 @@ def find_skip(Hx, Lx, R):
 
 
 def dump_transverse(Hx, Lx, t=3):
+    print("dump_transverse")
     import CSSLO
     SX,LX,SZ,LZ = CSSLO.CSSCode(Hx, Lx)
     #CSSLO.CZLO(SX, LX)
-    N = 1<<t
+    N = 1<<t # i don't think this works with "N = 2<<t"
     zList, qList, V, K_M = CSSLO.comm_method(SX, LX, SZ, t, compact=True, debug=False)
     for z,q in zip(zList,qList):
         #print(z, q)

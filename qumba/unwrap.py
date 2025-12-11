@@ -14,11 +14,12 @@ from qumba.lin import (parse, shortstr, linear_independent, eq2, dot2, identity2
     rank, rand2, pseudo_inverse, kernel, direct_sum, zeros2, solve2, normal_form)
 from qumba.matrix import Matrix
 from qumba.qcode import QCode, SymplecticSpace, strop
+from qumba.csscode import CSSCode
 from qumba import construct
 from qumba.distance import distance_z3
 from qumba.autos import get_isos, is_iso
 from qumba.action import Perm, mulclose_find, mulclose
-from qumba import autos, transversal
+#from qumba import autos, transversal
 from qumba import csscode 
 from qumba.argv import argv
 
@@ -568,8 +569,18 @@ def test_fold():
     IIXIIIXIIXIIXIXIIIIIIXII
     """).replace("I", ".").replace("X", "1")
     H = Matrix.parse(s)
+    print(H.sum(1))
     H = H.normal_form()
     print(H, H.shape)
+    m = len(H)
+    print()
+
+#    A = H.A
+#    for i in range(m):
+#      for j in range(m):
+#        print((A[i]*A[j]).sum(), end=' ')
+#      print()
+#    return
 
     J = []
     for v in H.rowspan():
@@ -581,6 +592,27 @@ def test_fold():
     print(J, J.shape)
     print(J.sum(1))
     print(J.rank())
+
+    css = CSSCode(Hx=H, Hz=H)
+    print(css)
+    print(css.longstr())
+    Hx = css.Hx
+
+    Hx = css.Hx.A
+    Lx = css.Lx
+    print(Hx, type(Hx))
+
+    m, n = Hx.shape
+    for i in range(m):
+      for j in range(m):
+        print((Hx[i]*Hx[j]).sum(), end=' ')
+      print()
+
+    return
+
+    from qumba.gcolor import dump_transverse
+    dump_transverse(Hx, Lx)
+    dump_transverse(Hx, Lx)
 
 
 def send_to_golay(J):
@@ -624,6 +656,8 @@ def send_to_golay(J):
 
 
 def test_w8():
+    from qumba import autos, transversal
+
     H = Matrix.parse("""
     1.......1.1..11....1.11.
     .1......1.11..1.1.1..1..
@@ -671,7 +705,10 @@ def test_w8():
     css = code.to_css()
     H_G = Matrix(css.Hx)
 
+    print("solve:")
     print(H_G.t.solve(H.t))
+    #from qumba.gcolor import dump_transverse
+    #dump_transverse(css.Hx, css.Lx)
 
     if 0:
         #perms = css.find_autos()
@@ -728,6 +765,7 @@ def test_golay():
 
 
 def test_logical():
+    from qumba import autos, transversal
     from qumba import db
     from qumba.action import Perm, Group, mulclose
 
@@ -888,16 +926,22 @@ def test_logical():
         logops = mulclose(logops, verbose=True, maxsize=100000)
 
     print("logops:", len(logops))
+    logops = list(logops)
+    shuffle(logops)
+    gen = logops[:100]
 
-    name = "bring.gap"
-    f = open(name, 'w')
-    vs = []
-    for i,L in enumerate(logops):
-        m = "M%d"%i
-        vs.append(m)
-        print("%s := %s;"%(m, L.gap()), file=f)
-    print("G := Group([%s]);"%(','.join(vs)), file=f)
-    print("wrote to", name)
+    if argv.name:
+        f = open(argv.name, 'w')
+        vs = []
+        for i,L in enumerate(gen):
+            m = "M%d"%i
+            vs.append(m)
+            print("%s := %s;"%(m, L.gap()), file=f)
+        print("G := Group([%s]);"%(','.join(vs)), file=f)
+        f.close()
+        print("wrote to", argv.name)
+
+    return logops
 
 
 def test_bring():
