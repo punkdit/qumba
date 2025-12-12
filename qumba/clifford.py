@@ -8,7 +8,7 @@ https://github.com/punkdit/bruhat/blob/master/bruhat/clifford_sage.py
 
 """
 
-from random import choice
+from random import choice, randint
 from operator import mul, matmul, add
 from functools import reduce
 #from functools import cache
@@ -2043,6 +2043,131 @@ def test_cv():
         print(name, "-->")
         print(op, clifford.get(op))
 
+
+def test_quetchup():
+    # see: https://github.com/qubitserfed/Quetchup
+
+    import quetchup as qu
+    qstr = lambda u:qu.to_latex(u)._repr_latex_()
+
+    n = 3
+
+    u = qu.State(n)
+    assert u == qu.State(n)
+
+    v0 = qu.State(n)
+    qu.apply_h(v0,0)
+    qu.apply_cx(v0,0,1)
+    print(qstr(v0))
+
+    v1 = qu.State(n)
+    qu.apply_cx(v1,0,1)
+    qu.apply_h(v1,0)
+    print(qstr(v1))
+    assert v0 != v1
+
+    print()
+
+    c = Clifford(n)
+
+    HI = c.get_H(0)
+    CX = c.get_CX()
+    #print(HI*CX)
+    #print(CX*HI)
+    #print(HI*CX == CX*HI)
+    #return
+
+    lops = []
+    rops = []
+    for i in range(n):
+
+        lops.append(lambda u,i=i:qu.apply_h(u, i))
+        lops.append(lambda u,i=i:qu.apply_s(u, i))
+
+        rops.append( c.get_H(i) )
+        rops.append( c.get_S(i) )
+
+        for j in range(i+1, n):
+            lops.append(lambda u,i=i,j=j:qu.apply_cx(u, i, j))
+            rops.append( c.get_CX(i,j) )
+
+    def get_left(sequence):
+        #print("get_left", sequence)
+        u = qu.State(n)
+        #print("\t", qstr(u))
+        for i in sequence:
+            lops[i](u)
+            #if i==0:
+            #    qu.apply_h(u,0)
+            #elif i==3:
+            #    qu.apply_h(u,1)
+            #else:
+            #    assert 0
+            #print("\t", qstr(u))
+        return u
+        
+    v = [0]*(2**n)
+    v[0] = 1
+    v = matrix(v).t
+    def get_right(sequence):
+        w = v
+        for i in sequence:
+            w = rops[i]*w
+        return w
+
+    N = len(lops)
+
+    count = 0
+    while count < 100:
+        idxs = [randint(0,N-1) for trial in range(10)]
+        jdxs = [randint(0,N-1) for trial in range(10)]
+        #idxs = [2,0]
+        #jdxs = [0,2]
+
+        u0 = get_left(idxs)
+        #print("get_left:", qstr(u0))
+        u1 = get_left(jdxs)
+        #print("get_left:", qstr(u1))
+        ltest = int(u0==u1)
+
+        v0 = get_right(idxs)
+        v1 = get_right(jdxs)
+        rtest = int(v0==v1)
+
+        #if rtest:
+        #    print("(%d:%d)"%(ltest, rtest), end='', flush=True)
+        if ltest and not rtest:
+            print("\n\nFAIL")
+            print(idxs, [rops[i].name for i in idxs])
+            print(jdxs, [rops[i].name for i in jdxs])
+            print(v0.t)
+            print(v1.t)
+            print()
+            print(qstr(u0))
+            print(qstr(u1))
+            return
+
+        assert ltest == rtest
+        count += ltest
+
+        if ltest:
+            print([rops[i].name for i in idxs])
+            print("==")
+            print([rops[i].name for i in jdxs])
+
+    print()
+    print(count)
+
+
+    
+
+
+
+    
+
+        
+    
+    
 
     
 def test():
