@@ -74,11 +74,11 @@ class Expr(object):
             expr = Mul(self, other)
         return expr
 
-    # does this belong here? 
-    def Implies(self, other, expr=True):
-        other = self.promote(other)
-        expr = self.promote(expr)
-        return If(self.get(), other.get(), expr.get())
+#    # does this belong here? 
+#    def Implies(self, other, expr=True):
+#        other = self.promote(other)
+#        expr = self.promote(expr)
+#        return If(self.get(), other.get(), expr.get())
 
 
 class Const(Expr):

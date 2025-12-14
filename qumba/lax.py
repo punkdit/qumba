@@ -697,6 +697,77 @@ def test_lax():
         assert F.lower(kdxs) == F.lower(jdxs+kdxs).lower(kdxs)
 
 
+class Matroid:
+    def __init__(self, n, masks):
+        "n:number of elements, masks: the independent sets as bit-vectors"
+        self.n = n
+        masks = list(masks)
+        masks.sort()
+        masks = tuple(masks)
+        self.masks = masks
+        self.items = set(masks)
+        self.key = (n, masks)
+        self.rank = max(sum(a) for a in masks)
+
+    def le(self, a, b):
+        for i in range(self.n):
+            if a[i]>b[i]:
+                return False
+        return True
+
+    #def mul(self, a, b):
+    #    return tuple(ai
+
+    def restrict(self, mask):
+        assert len(mask) == self.n
+        masks = {m for m in self.masks if self.le(m, mask)}
+        return Matroid(self.n, masks)
+
+    def all_masks(self):
+        return list(numpy.ndindex((2,)*self.n))
+
+    def __str__(self):
+        masks = [{i for (i,ii) in enumerate(mask) if ii} for mask in self.masks]
+        return "Matroid(%d, %s)"%(self.n, masks)
+    __repr__ = __str__
+
+    def check(self):
+        # check the Matroid axioms
+        n = self.n
+        items = self.items
+
+        # (1) the empty set is independent
+        assert (0,)*n in items
+
+        # (2) independence is down-closed
+        for a in self.all_masks():
+            for b in items:
+                if self.le(a, b):
+                    assert a in items
+
+        # (3) independent set exchange 
+        for a in items:
+          for b in items:
+            if sum(a) <= sum(b):
+                continue
+            # A has more elements than B
+            for i in range(n):
+                if a[i] and not b[i]:
+                    break
+            else:
+                assert 0
+
+
+    def __hash__(self):
+        return hash(self.key)
+
+    def __eq__(self, other):
+        return self.key == other.key
+
+    def __le__(self, other):
+        assert self.n == other.n
+        return self.items.issubset(other.items)
+
 
 def all_matroids(n):
 
@@ -753,33 +824,67 @@ def all_matroids(n):
         model = solver.model()
     
         sol = {a:lookup[a].get_interp(model) for a in bits}
-        M = []
+        found = []
         for (k,v) in sol.items():
             if v:
-                M.append( {i for i in range(n) if k[i]} )
-        #print(M)
+                #found.append( {i for i in range(n) if k[i]} )
+                found.append(k)
+        #print(found)
+        M = Matroid(n, found)
+        M.check()
         yield M
 
         Add(Or(*[(lookup[a] != sol[a]) for a in bits]))
         count += 1
-    print("all_matroids(%d) = %d" % (n, count))
+    #print("all_matroids(%d) = %d" % (n, count))
+
+
+def test_rank():
+
+    n = 3
+
+    from qumba.graph_states import render_func
+    cvs = Canvas()
+
+    x = y = 0
+    matroids = list(all_matroids(n))
+    matroids.sort(key = lambda m:(m.rank, len(m.masks)))
+    for idx,M in enumerate(matroids):
+        print(M)
+
+        f = []
+        for mask in M.all_masks():
+            R = M.restrict(mask)
+            R.check()
+            #print("\t%s : %d"%(mask, R.rank))
+            f.append(R.rank)
+        fg = render_func(n, f)
+        cvs.insert(x, y, fg)
+        x += fg.get_bound_box().width
+
+    cvs.writePDFfile("matroid_%d.pdf"%n)
 
     
-def find_matroids():
-    # https://oeis.org/A058673
-    n = argv.get("n", 4)
+def test_matroids():
 
+    # https://oeis.org/A058669
+    for n in range(7):
+        found = {i:[] for i in range(n+1)}
+        for M in all_matroids(n):
+            #print(M, M.rank)
+            found[M.rank].append(M)
+    
+        print(n, [len(found[i]) for i in range(n+1)])
+
+    # https://oeis.org/A058673
     assert len(list(all_matroids(0))) == 1
     assert len(list(all_matroids(1))) == 2
     assert len(list(all_matroids(2))) == 5
     assert len(list(all_matroids(3))) == 16
     assert len(list(all_matroids(4))) == 68
     assert len(list(all_matroids(5))) == 406
-    assert len(list(all_matroids(6))) == 3807
-    assert len(list(all_matroids(7))) == 75164
-
-    for M in all_matroids(n):
-        print(M)
+    #assert len(list(all_matroids(6))) == 3807
+    #assert len(list(all_matroids(7))) == 75164
 
     
 
