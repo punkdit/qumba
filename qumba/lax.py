@@ -698,6 +698,94 @@ def test_lax():
 
 
 
+def all_matroids(n):
+
+    from qumba.umatrix import Solver, UMatrix, Var, And, Or, If
+    bits = list(numpy.ndindex((2,)*n))
+
+    # is this subset an independent set?
+    vs = []
+    lookup = {}
+    for a in bits:
+        name = "v"+''.join(str(i) for i in a)
+        v = Var(name)
+        vs.append(v)
+        lookup[a] = v
+
+    solver = Solver()
+    Add = solver.add
+
+    def le(a, b):
+        for i in range(n):
+            if a[i]>b[i]:
+                return False
+        return True
+
+    pairs = [(a,b) for a in bits for b in bits]
+    for a in bits:
+        if sum(a)==0:
+            Add(lookup[a] == 1)
+
+    for (a,b) in pairs:
+        if le(a,b):
+            Add( If(lookup[b].get(), lookup[a].get(), True) )
+
+    for (a,b) in pairs:
+        if sum(a) <= sum(b):
+            continue
+        terms = []
+        for i in range(n):
+            if a[i] and not b[i]:
+                c = list(b)
+                c[i] = 1
+                c = tuple(c)
+                terms.append(lookup[c].get())
+        assert terms
+        Add( If((lookup[a] * lookup[b]).get(), Or(*terms), True) )
+    
+
+    count = 0
+    while 1:
+        result = solver.check()
+        if str(result) != "sat":
+            break
+
+        model = solver.model()
+    
+        sol = {a:lookup[a].get_interp(model) for a in bits}
+        M = []
+        for (k,v) in sol.items():
+            if v:
+                M.append( {i for i in range(n) if k[i]} )
+        #print(M)
+        yield M
+
+        Add(Or(*[(lookup[a] != sol[a]) for a in bits]))
+        count += 1
+    print("all_matroids(%d) = %d" % (n, count))
+
+    
+def find_matroids():
+    # https://oeis.org/A058673
+    n = argv.get("n", 4)
+
+    assert len(list(all_matroids(0))) == 1
+    assert len(list(all_matroids(1))) == 2
+    assert len(list(all_matroids(2))) == 5
+    assert len(list(all_matroids(3))) == 16
+    assert len(list(all_matroids(4))) == 68
+    assert len(list(all_matroids(5))) == 406
+    assert len(list(all_matroids(6))) == 3807
+    assert len(list(all_matroids(7))) == 75164
+
+    for M in all_matroids(n):
+        print(M)
+
+    
+
+
+
+
 if __name__ == "__main__":
     from time import time
     start_time = time()
