@@ -196,6 +196,9 @@ def test_rank():
             f.append(R.rank)
         fg = render_func(n, f)
         cvs.insert(x, y, fg)
+        #cvs.text(x, y, str(M))
+        for mi,mask in enumerate(M.masks):
+            cvs.text(x, y-0.5*mi, str(mask))
         x += fg.get_bound_box().width
 
     cvs.writePDFfile("matroid_%d.pdf"%n)
