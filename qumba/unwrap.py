@@ -555,6 +555,7 @@ def test_fold():
 
     n = 24
 
+    # [[24, 4, 4]]
     # https://qecdb.org/codes/6900a99d0a060a5626b32e6b
     s = ("""
     IIIIXIIXIIIXIIIXXXIIIIII
@@ -960,6 +961,8 @@ def test_logical():
     print(code)
     print(code.longstr())
     css = code.to_css()
+    Hx = Matrix(css.Hx)
+    print("wenum:", Hx.get_wenum())
 
     space = code.space
     n = code.n
