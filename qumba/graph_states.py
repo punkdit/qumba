@@ -822,6 +822,7 @@ def render_func(n, f, r=0.08):
         x, y = coords[idx]
         for j in range(f[i]):
             cvs.stroke(path.circle(x,y,(j+1)*r), [black])
+    cvs.coords = coords
     return cvs
 
 

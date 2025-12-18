@@ -62,10 +62,20 @@ class Matroid:
     def all_masks(self):
         return list(numpy.ndindex((2,)*self.n))
 
+    def rankfunc(self):
+        #masks = [tuple(mask) for mask in self.all_masks()]
+        func = {mask:self.restrict(mask).rank for mask in self.all_masks()}
+        return func
+
     def __str__(self):
         masks = [{i for (i,ii) in enumerate(mask) if ii} for mask in self.masks]
         return "Matroid(%d, %s)"%(self.n, masks)
     __repr__ = __str__
+
+    def __rmul__(self, g):
+        #print("__rmul__")
+        masks = [tuple(m[g[i]] for i in range(self.n)) for m in self.masks]
+        return Matroid(self.n, masks)
 
     def check(self):
         # check the Matroid axioms
@@ -107,7 +117,7 @@ class Matroid:
 
 def all_matroids(n):
 
-    from qumba.umatrix import Solver, UMatrix, Var, And, Or, If
+    from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver
     bits = list(numpy.ndindex((2,)*n))
 
     # is this subset an independent set?
@@ -115,7 +125,7 @@ def all_matroids(n):
     lookup = {}
     for a in bits:
         name = "v"+''.join(str(i) for i in a)
-        v = Var(name)
+        v = Bool(name)
         vs.append(v)
         lookup[a] = v
 
@@ -131,11 +141,11 @@ def all_matroids(n):
     pairs = [(a,b) for a in bits for b in bits]
     for a in bits:
         if sum(a)==0:
-            Add(lookup[a] == 1)
+            Add(lookup[a])
 
     for (a,b) in pairs:
         if le(a,b):
-            Add( If(lookup[b].get(), lookup[a].get(), True) )
+            Add( If(lookup[b], lookup[a], True) )
 
     for (a,b) in pairs:
         if sum(a) <= sum(b):
@@ -146,12 +156,12 @@ def all_matroids(n):
                 c = list(b)
                 c[i] = 1
                 c = tuple(c)
-                terms.append(lookup[c].get())
+                terms.append(lookup[c])
         assert terms
-        Add( If((lookup[a] * lookup[b]).get(), Or(*terms), True) )
+        Add( If(And(lookup[a], lookup[b]), Or(*terms), True) )
     
-
     count = 0
+    matroids = set()
     while 1:
         result = solver.check()
         if str(result) != "sat":
@@ -159,49 +169,75 @@ def all_matroids(n):
 
         model = solver.model()
     
-        sol = {a:lookup[a].get_interp(model) for a in bits}
+        sol = {a:model.get_interp(lookup[a]) for a in bits}
         found = []
         for (k,v) in sol.items():
             if v:
-                #found.append( {i for i in range(n) if k[i]} )
                 found.append(k)
-        #print(found)
         M = Matroid(n, found)
         M.check()
+        assert M not in matroids
+        matroids.add(M)
         yield M
 
-        Add(Or(*[(lookup[a] != sol[a]) for a in bits]))
+        term = []
+        for a in bits:
+            if sol[a]:
+                term.append(Not(lookup[a]))
+            else:
+                term.append((lookup[a]))
+        term = Or(*term)
+        Add(term)
         count += 1
     #print("all_matroids(%d) = %d" % (n, count))
 
 
-def test_rank():
+def all_orbits(n):
 
-    n = 3
+    from bruhat.gset import Group, Perm
 
-    from qumba.graph_states import render_func
-    cvs = Canvas()
+    G = Group.symmetric(n)
 
-    x = y = 0
-    matroids = list(all_matroids(n))
-    matroids.sort(key = lambda m:(m.rank, len(m.masks)))
-    for idx,M in enumerate(matroids):
-        print(M)
+    remain = set(all_matroids(n))
 
-        f = []
-        for mask in M.all_masks():
-            R = M.restrict(mask)
-            R.check()
-            #print("\t%s : %d"%(mask, R.rank))
-            f.append(R.rank)
-        fg = render_func(n, f)
-        cvs.insert(x, y, fg)
-        #cvs.text(x, y, str(M))
-        for mi,mask in enumerate(M.masks):
-            cvs.text(x, y-0.5*mi, str(mask))
-        x += fg.get_bound_box().width
+    orbits = []
+    while remain:
+        m = remain.pop()
+        orbit = {g*m for g in G}
+        remain.difference_update(orbit)
+        orbit = list(orbit)
+        orbits.append(orbit)
+    return orbits
 
-    cvs.writePDFfile("matroid_%d.pdf"%n)
+
+
+#def test_rank():
+#
+#    n = 3
+#
+#    from qumba.graph_states import render_func
+#    cvs = Canvas()
+#
+#    x = y = 0
+#    matroids = list(all_matroids(n))
+#    matroids.sort(key = lambda m:(m.rank, len(m.masks)))
+#    for idx,M in enumerate(matroids):
+#        print(M)
+#
+#        f = []
+#        for mask in M.all_masks():
+#            R = M.restrict(mask)
+#            R.check()
+#            #print("\t%s : %d"%(mask, R.rank))
+#            f.append(R.rank)
+#        fg = render_func(n, f)
+#        cvs.insert(x, y, fg)
+#        #cvs.text(x, y, str(M))
+#        for mi,mask in enumerate(M.masks):
+#            cvs.text(x, y-0.5*mi, str(mask))
+#        x += fg.get_bound_box().width
+#
+#    cvs.writePDFfile("matroid_%d.pdf"%n)
 
     
 def test_matroids():
