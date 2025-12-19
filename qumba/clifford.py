@@ -2161,6 +2161,112 @@ def test_quetchup():
 
     
 
+def test_2local():
+    # local complementation and 2-local complementation
+    # https://arxiv.org/pdf/2511.22271
+    # section 4.4.2
+
+    n = 3
+    N = 2**n
+    
+    c = Clifford(n)
+    H = c.H
+    CZ = c.CZ
+    X,Z,S,T = c.X, c.Z, c.S, c.T
+    RX = lambda i:H(i)*S(i)*H(i)
+
+    plus = [0]*N
+    plus[0] = 1
+    plus = Matrix(K, plus).t
+    for i in range(n):
+        plus = H(i) * plus
+    v = u = plus
+
+    for c in "01 02".split():
+        (i,j) = int(c[0]), int(c[1])
+        u = CZ(i,j) * u
+
+    for c in "01 02 12".split():
+        (i,j) = int(c[0]), int(c[1])
+        v = CZ(i,j) * v
+
+    assert u!=v
+
+    u0 = u
+
+    u = RX(0)*S(1).d*S(2).d*u
+    assert u==v
+
+    #return
+    
+
+    n = 5
+    N = 2**n
+    
+    c = Clifford(n)
+    H = c.H
+    CZ = c.CZ
+    X,Z,S,T = c.X, c.Z, c.S, c.T
+    RX = lambda i:H(i)*S(i)*H(i)
+
+    plus = [0]*N
+    plus[0] = 1
+    plus = Matrix(K, plus).t
+    for i in range(n):
+        plus = H(i) * plus
+    v = u = plus
+
+    for c in "02 03 04 12 13 14 34".split():
+        (i,j) = int(c[0]), int(c[1])
+        u = CZ(i,j) * u
+
+    for c in "02 03 04 12 13 14 23 24".split():
+        (i,j) = int(c[0]), int(c[1])
+        v = CZ(i,j) * v
+
+    assert u!=v
+
+    u0 = u
+
+    u = RX(0)*RX(1)*Z(2)*Z(3)*Z(4)*u
+    assert u==u0
+    
+
+    items = []
+    ops = []
+    for i in [0,1]:
+        op = H(i)*T(i)*H(i)
+        assert op**4 == X(i)
+        iitems = []
+        for i in range(1,8):
+            if i%4 or 1:
+                #iitems.append(op**i)
+                iitems.append(i)
+        items.append(iitems)
+        ops.append(op)
+
+    for i in [2,3,4]:
+        op = T(i)
+        iitems = []
+        for i in range(1,8):
+            if i%4 or 1:
+                #iitems.append(op**i)
+                iitems.append(i)
+        items.append(iitems)
+        ops.append(op)
+    #print([len(ii) for ii in items])
+
+    for idxs in cross(items):
+        u = u0
+        assert len(ops) == len(idxs)
+        for op,i in zip(ops,idxs):
+            for j in range(i):
+                u = op*u
+        if u==u0:
+            print("stabilizer:", idxs)
+        if u==v:
+            print("2-local:", idxs)
+
 
 
     
