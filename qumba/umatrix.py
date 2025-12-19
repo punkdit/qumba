@@ -51,7 +51,7 @@ class Expr(object):
     def __ne__(self, other):
         other = self.promote(other)
         return self.get() != other.get()
-    def __add__(self, other):
+    def __add__(self, other): # Xor
         other = self.promote(other)
         if self.is_zero():
             expr = other
@@ -60,7 +60,7 @@ class Expr(object):
         else:
             expr = Add(self, other)
         return expr
-    def __mul__(self, other):
+    def __mul__(self, other): # And
         other = self.promote(other)
         if self.is_one():
             expr = other
@@ -73,6 +73,12 @@ class Expr(object):
         else:
             expr = Mul(self, other)
         return expr
+
+#    # does this belong here? 
+#    def Implies(self, other, expr=True):
+#        other = self.promote(other)
+#        expr = self.promote(expr)
+#        return If(self.get(), other.get(), expr.get())
 
 
 class Const(Expr):

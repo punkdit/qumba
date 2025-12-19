@@ -555,6 +555,7 @@ def test_fold():
 
     n = 24
 
+    # [[24, 4, 4]]
     # https://qecdb.org/codes/6900a99d0a060a5626b32e6b
     s = ("""
     IIIIXIIXIIIXIIIXXXIIIIII
@@ -615,11 +616,14 @@ def test_fold():
     dump_transverse(Hx, Lx)
 
 
-def send_to_golay(J):
+def send_to_golay(J, H_G=None):
     n = 24
-    code = construct.get_golay()
-    css = code.to_css()
-    H_G = Matrix(css.Hx)
+
+    if H_G is None:
+        code = construct.get_golay()
+        css = code.to_css()
+        H_G = Matrix(css.Hx)
+
     #print()
     #print("golay:")
     #print(H_G)
@@ -654,25 +658,177 @@ def send_to_golay(J):
     print(result)
 
 
+def find_stabilizer(gen, H):
+    print("find_stabilizer")
+    for g in gen:
+        print(g)
+    print(H, H.shape)
+
+    rows = [list(row) for row in list(H.A)]
+    s = str(rows).replace(" ", "")
+    print(s)
+
+
+
+def bruhat_golay():
+    from bruhat.golay import Vec, infty, m24_gen, bricks
+
+    brick = bricks[0]
+
+    gen = m24_gen() # M24 group generators, agrees with gap
+    #for g in gen:
+    #    print(g)
+    #return
+
+    octad = Vec(infty,19,15,5,11,1,22,2)
+    octads = {octad}
+    bdy = list(octads)
+    while bdy:
+        _bdy = []
+        for g in gen:
+            for octad in bdy:
+                o = g * octad
+                if o not in octads:
+                    octads.add(o)
+                    _bdy.append(o)
+        bdy = _bdy
+    assert len(octads) == 759
+    octads = list(octads)
+    octads.sort()
+    #for octad in octads:
+    #    print(octad)
+    found = set(octads)
+    #send = {v:v for v in octads}
+
+    rows = []
+    for v in octads:
+        rows.append(v.v)
+    H = Matrix(rows)
+    #H = H.linear_independent()
+    H = H.row_reduce()
+    print(H, H.shape)
+    H_G = H # Golay
+
+    # https://qecdb.org/codes/67a38c449d65c7b4098268cb 
+    # [[24,8,4]]
+    s = ("""
+    IIIIIIIXXIXIXIIIIXXIIIXX
+    IIIIXXXIIIIIIXXIIXIXIIXI
+    IIIXIIIIXIXIIXXIXIIIXXII
+    IIXIXIXIIIIIIIIXIIXIXXIX
+    IXIXIIIIIIIXIIXIXIIIIXXX
+    IXIXIIIIIIXIXIIXIXXXIIII
+    XIIIIXIIIXIIIXIIIIXXIXXI
+    XIXIIIXIIIIIXXIIXIIXIIXI
+    """).replace("I", ".").replace("X", "1")
+    H = Matrix.parse(s)
+    H = H.normal_form()
+    print(H, H.shape)
+    print(H.get_wenum())
+    m, n = H.shape
+
+    P = send_to_golay(H, H_G)
+    idxs = P.to_perm()
+    print(idxs)
+    H = H*P
+
+    find_stabilizer(gen, H)
+
+    return
+
+    vecs = []
+    for v in H.rowspan():
+        if v.sum() != 8:
+            continue
+        idxs = [i for i in range(n) if v[0,i]]
+        vec = Vec(*idxs)
+        assert vec in found
+        vecs.append(vec)
+
+    vec = vecs[0]
+    orbit = set([vec])
+    bdy = list(orbit)
+    word = {vec:()}
+    while bdy:
+        _bdy = []
+        for v in bdy:
+            for g in gen:
+                v1 = g*v
+                if v1 in orbit:
+                    continue
+                word[v1] = (g,)+word[v]
+                orbit.add(v1)
+                _bdy.append(v1)
+        bdy = _bdy
+        print(len(bdy))
+    print("orbit:", len(orbit), len(word))
+    assert brick in word
+    g = reduce(mul, word[brick])
+    print(g)
+
+    vecs = [g*v for v in vecs]
+    vecs.sort(key = lambda v : (v*brick).sum())
+
+    from huygens.namespace import Canvas
+    cvs = Canvas()
+
+    count = 0
+    x = y = 0
+    for vec in vecs:
+        cvs.insert(x, y, vec.render(2.0,1.2))
+
+        count += 1
+        if count%8==0:
+            y -= 2.0
+            x = 0
+        else:
+            x += 3.0
+
+    cvs.writePDFfile("output_bricks.pdf")
+    print("output_bricks.pdf")
+
+
+
+def test_24_16_4():
+    # this is another [24,16,4] self-orthogonal code from
+    # https://arxiv.org/abs/2008.05051
+    # Short Shor-style syndrome sequences Nicolas Delfosse, Ben W. Reichardt
+    dot = chr(183)
+    s = """
+    1 1 1 1 · · · · · · · · · · · · · · · · · · · ·
+    · · · · 1 1 1 1 · · · · · · · · · · · · · · · ·
+    · · · · · · · · 1 1 1 1 · · · · · · · · · · · ·
+    · · · · · · · · · · · · 1 1 1 1 · · · · · · · ·
+    · · · · · · · · · · · · · · · · 1 1 1 1 · · · ·
+    · · · · · · · · · · · · · · · · · · · · 1 1 1 1
+    · · 1 1 · · 1 1 · · 1 1 · · 1 1 · · 1 1 · · 1 1
+    · 1 · 1 · 1 · 1 · 1 · 1 · 1 · 1 · 1 · 1 · 1 · 1
+    """.replace(" ", "").replace(dot, ".")
+    print(s)
+    H = Matrix.parse(s)
+    print(H)
+    print(H.get_wenum()) 
+    # (1, 0, 0, 0, 6, 0, 0, 0, 15, 0, 0, 0, 212, 0, 0, 0, 15, 0, 0, 0, 6, 0, 0, 0, 1)
+
 
 def test_w8():
     from qumba import autos, transversal
 
-    H = Matrix.parse("""
-    1.......1.1..11....1.11.
-    .1......1.11..1.1.1..1..
-    ..1.....1..1.1.1..11.1..
-    ...1.......111.11111.111
-    ....1...1..11.1.11..1...
-    .....1..1.1.11.1.111111.
-    ......1......1.11..1111.
-    .......1....1..1..1111.1
-    .........1.11...1..11.11 
-    """)
-    print(H.get_wenum())
-
-    code = QCode.build_css(H,H)
-    print(code)
+#    H = Matrix.parse("""
+#    1.......1.1..11....1.11.
+#    .1......1.11..1.1.1..1..
+#    ..1.....1..1.1.1..11.1..
+#    ...1.......111.11111.111
+#    ....1...1..11.1.11..1...
+#    .....1..1.1.11.1.111111.
+#    ......1......1.11..1111.
+#    .......1....1..1..1111.1
+#    .........1.11...1..11.11 
+#    """)
+#    print(H.get_wenum())
+#
+#    code = QCode.build_css(H,H)
+#    print(code)
 
     # https://qecdb.org/codes/67a38c449d65c7b4098268cb 
     # [[24,8,4]]
@@ -805,6 +961,8 @@ def test_logical():
     print(code)
     print(code.longstr())
     css = code.to_css()
+    Hx = Matrix(css.Hx)
+    print("wenum:", Hx.get_wenum())
 
     space = code.space
     n = code.n
