@@ -4,12 +4,12 @@ from functools import cache
 
 import numpy
 
-from bruhat.matroid import Matroid
+from bruhat.matroid import Matroid, SpMatroid
+from bruhat.action import mulclose, get_orbits
 
 from qumba import construct 
 from qumba.symplectic import SymplecticSpace
 from qumba.argv import argv
-from qumba.action import mulclose
 
 
 
@@ -46,7 +46,7 @@ def get_matroid(code):
             skip.append((idxs,mask))
     print("all_sp_masks:", count, "masks:", len(masks), "diff:", count-len(masks))
     #print(masks)
-    M = Matroid(nn, masks)
+    M = SpMatroid(nn, masks)
     #M.check()
     for idxs,mask in skip:
         print("skip:", idxs, M.restrict(mask).rank)
@@ -133,6 +133,33 @@ def test():
     print(accept)
 
 
+#def get_orbits(gen, found, verbose=False):
+#    remain = set(found)
+#    orbits = []
+#    while remain:
+#        c = remain.pop()
+#        orbit = [c]
+#        bdy = list(orbit)
+#        while bdy:
+#            _bdy = []
+#            for g in gen:
+#                for c in bdy:
+#                    d = g*c
+#                    if d in remain:
+#                        orbit.append(d)
+#                        remain.remove(d)
+#                        _bdy.append(d)
+#            bdy = _bdy
+#        orbits.append(orbit)
+#        if verbose:
+#            print("[%d]"%len(orbit), end='', flush=True)
+#    if verbose:
+#        print()
+#    counts = [len(o) for o in orbits]
+#    #print(counts, sum(counts))
+#    assert sum(counts) == len(found)
+#    return orbits
+
 
 def test_orbit():
     n = argv.get("n",4)
@@ -158,30 +185,7 @@ def test_orbit():
     G = mulclose(gen)
     print("|G| =", len(G))
 
-    remain = set(found)
-    orbits = []
-    while remain:
-        c = remain.pop()
-        orbit = [c]
-        bdy = list(orbit)
-        while bdy:
-            _bdy = []
-            for g in gen:
-                for c in bdy:
-                    d = g*c
-                    if d in remain:
-                        orbit.append(d)
-                        remain.remove(d)
-                        _bdy.append(d)
-            bdy = _bdy
-        orbits.append(orbit)
-        print("[%d]"%len(orbit), end='', flush=True)
-
-    print()
-    counts = [len(o) for o in orbits]
-    #print(counts, sum(counts))
-    assert sum(counts) == len(found)
-
+    orbits = get_orbits(gen, found, True)
 
 
 
