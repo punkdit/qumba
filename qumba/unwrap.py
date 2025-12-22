@@ -457,7 +457,7 @@ def get_avoid(code):
             if lh.sum() == code.d:
                 avoid.append(lh)
 
-    print("avoid:", len(avoid))
+    #print("avoid:", len(avoid))
     return avoid
 
 

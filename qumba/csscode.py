@@ -308,6 +308,9 @@ class CSSCode(object):
     def to_css(self):
         return self
 
+    def is_css(self):
+        return True
+
     def is_selfdual(self):
         if self.mx != self.mz:
             return False
