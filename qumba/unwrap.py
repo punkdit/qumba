@@ -23,6 +23,7 @@ from qumba.action import Perm, mulclose_find, mulclose
 from qumba import csscode 
 from qumba.argv import argv
 from qumba.gcolor import dump_transverse
+from qumba.util import choose
 
 
 @cache
@@ -918,6 +919,97 @@ def test_golay():
 
     code = QCode.build_css(H,H)
     print(code)
+
+
+@cache
+def getbits(dim):
+    return list(numpy.ndindex((2,)*dim))
+
+
+def getops(lookup, dim, sub):
+    n = 2**dim
+    ops = []
+    coords = list(range(dim))
+    for idxs in choose(coords, sub):
+        jdxs = tuple(j for j in coords if j not in idxs)
+        #print(idxs, jdxs)
+        for cits in getbits(dim-sub):
+            op = [0]*n
+            src = [0]*dim
+            for (i,bit) in zip(jdxs,cits):
+                src[i] = bit
+            #print(cits, src)
+            for bits in getbits(sub):
+                #dest = [0]*dim
+                dest = list(src)
+                for (i,bit) in zip(idxs,bits):
+                    dest[i] = bit
+                dest = tuple(dest)
+                op[lookup[dest]] = 1
+                #print("\t", dest)
+            #print("\t", op)
+            ops.append(op)
+        #print()
+    ops = Matrix(ops)
+    return ops
+    
+    
+def build_cube(dim, xdim=3, zdim=2):
+    assert 0 <= xdim <= dim
+    assert 0 <= zdim <= dim
+    verts = getbits(dim)
+    n = len(verts)
+    assert n==2**dim
+    lookup = {bits:i for (i,bits) in enumerate(verts)}
+
+    Hx = getops(lookup, dim, xdim)
+    Hx = Hx.linear_independent()
+    Hz = getops(lookup, dim, zdim)
+    Hz = Hz.linear_independent()
+
+    if (Hx*Hz.t).max()>0:
+        return None
+
+    css = CSSCode(Hx=Hx.A, Hz=Hz.A)
+    if css.k>0:
+        css.bz_distance()
+    return css
+
+
+    
+
+
+def test_cube():
+    # Only the (n,n,2) cubes give Clifford hierarchy
+#    dim = 5
+#    for xdim in [5,4,3,2]:
+#      for zdim in range(1,xdim+1):
+
+    for (dim,xdim,zdim) in [
+        (2, 2, 2), # CZ  [[4,2,2]]
+        (2, 2, 1), # k=0
+        (3, 3, 3), # CZ  
+        (3, 3, 2), # CCZ [[8,3,(4,2)]]
+        (3, 3, 1), # k=0
+        (3, 2, 2), # k=0
+        (3, 2, 1), # None
+        (4, 4, 4), # CZ
+        (4, 4, 3), # CZ
+        (4, 4, 2), # CCCZ [[16,4,(8,2)]]
+        (4, 3, 3), # CZ
+        #(4, 3, 2), # k=0
+        #(4, 2, 2), # None
+        (5, 5, 2),
+    ]:
+
+        if xdim!=dim or zdim!=2:
+            continue
+        css = build_cube(dim,xdim,zdim)
+        print((dim,xdim,zdim), css)
+        if css is None or css.k==0:
+            continue
+        dump_transverse(css.Hx, css.Lx, 5)
+
 
 
 
