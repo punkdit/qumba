@@ -22,6 +22,8 @@ from qumba.action import Perm, mulclose_find, mulclose
 #from qumba import autos, transversal
 from qumba import csscode 
 from qumba.argv import argv
+from qumba.gcolor import dump_transverse
+
 
 @cache
 def toziporder(n):
@@ -611,7 +613,6 @@ def test_fold():
 
     return
 
-    from qumba.gcolor import dump_transverse
     dump_transverse(Hx, Lx)
     dump_transverse(Hx, Lx)
 
@@ -926,9 +927,17 @@ def test_logical():
     from qumba.action import Perm, Group, mulclose
 
     _id = argv._id
-    if _id:
+    n = argv.n
+    if n==4:
+        code = construct.get_422()
+    elif n==8:
+        code = construct.get_832()
+    elif n==16:
+        code = construct.get_16_4_2()
+    elif _id:
         print("fetching https://qecdb.org/codes/%s" % _id)
         code = list(db.get(_id=_id))[0]
+
 
     else:
     
@@ -962,7 +971,9 @@ def test_logical():
     print(code.longstr())
     css = code.to_css()
     Hx = Matrix(css.Hx)
-    print("wenum:", Hx.get_wenum())
+    Hz = Matrix(css.Hz)
+    print("Hx.wenum:", Hx.get_wenum())
+    print("Hz.wenum:", Hz.get_wenum())
 
     space = code.space
     n = code.n
@@ -1002,8 +1013,13 @@ def test_logical():
 
     print("tau...", end='', flush=True)
     dode = space.H() * code
-    tau = iter(transversal.find_isomorphisms_css(code, dode)).__next__()
-    print(" found")
+
+    try:
+        tau = iter(transversal.find_isomorphisms_css(code, dode)).__next__()
+        print(" found")
+    except StopIteration:
+        print("no zx-duality")
+        tau = None
 
     logops = set()
 
@@ -1024,7 +1040,20 @@ def test_logical():
         G = G[:argv.limit]
     print("G:", len(G))
 
+    if argv.physical:
+        f = open(argv.physical, 'w')
+        vs = []
+        for i,L in enumerate(G):
+            m = "M%d"%i
+            vs.append(m)
+            print("%s := %s;"%(m, L.gap()), file=f)
+        print("G := Group([%s]);"%(','.join(vs)), file=f)
+        f.close()
+        print("wrote to", argv.physical)
+
     for g in G:
+        if tau is None:
+            break
 
         f = g*tau
         perm = [None]*n
@@ -1098,6 +1127,9 @@ def test_logical():
         print("G := Group([%s]);"%(','.join(vs)), file=f)
         f.close()
         print("wrote to", argv.name)
+
+    css = code.to_css()
+    dump_transverse(css.Hx, css.Lx, 4)
 
     return logops
 

@@ -45,6 +45,31 @@ def get_832():
         "XXIIXXII IZIZIIII IXIXIXIX ZZIIIIII XXXXIIII IZIIIZII"
     )
 
+def get_16_4_2():
+    return QCode.fromstr("""
+    XXXXXXXXXXXXXXXX
+    ZZZZZZZZZZZZZZZZ
+    ........ZZZZZZZZ
+    ....ZZZZ....ZZZZ
+    ..ZZ..ZZ..ZZ..ZZ
+    .Z.Z.Z.Z.Z.Z.Z.Z
+    ............ZZZZ
+    ..........ZZ..ZZ
+    .........Z.Z.Z.Z
+    ......ZZ......ZZ
+    .....Z.Z.....Z.Z
+    ...Z...Z...Z...Z
+    """, None, """
+    X.X.X.X.X.X.X.X.
+    ZZ..............
+    XX..XX..XX..XX..
+    Z.Z.............
+    XXXX....XXXX....
+    Z...Z...........
+    XXXXXXXX........
+    Z.......Z.......
+    """)
+
 
 def get_833():
     "[[8,3,3]] non-css code from https://arxiv.org/abs/quant-ph/9702029"
