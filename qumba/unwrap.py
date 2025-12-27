@@ -26,6 +26,7 @@ from qumba.gcolor import dump_transverse
 from qumba.util import choose
 
 
+
 @cache
 def toziporder(n):
     perm = []
@@ -554,6 +555,74 @@ def test_zx():
     #print("involutory fixed-point free zx-dualities:", len(zxs))
 
 
+def orbit_matrix(gen, space):
+    space = set(space)
+    orbits = []
+    while space:
+        v = space.pop()
+        orbit = [v]
+        bdy = [v]
+        while bdy:
+            _bdy = []
+            for v in bdy:
+              for g in gen:
+                #u = g*v
+                u = Matrix(v.A[:, g.perm])
+                if u not in space:
+                    continue
+                _bdy.append(u)
+                space.remove(u)
+            orbit += _bdy
+            bdy = _bdy
+        orbits.append(orbit)
+    return orbits
+
+
+def parse_hexagons():
+    from bruhat.gset import Group, Perm
+    n = 24
+    def P(*items):
+        items = [i-1 for i in items]
+        idxs = list(range(n))
+        N = len(items)
+        for i in range(N):
+            idxs[items[i]] = items[(i+1)%N]
+        return Perm(idxs)
+        
+    f = open("hexagon.out")
+    count = 0
+    found = 0
+    for line in f:
+        line = line.strip()
+        if not line.startswith("["):
+            continue
+        line = line.replace(" ", "")
+        line = line.replace("(", "P(").replace(")P", ")*P")
+        i = line.index("],[")
+        lhs = line[1:i+1]
+        rhs = line[i+2:-1]
+        lhs = eval(lhs, {"P":P})
+        rhs = eval(rhs, {"P":P})
+        #print(lhs)
+        #print(rhs)
+        succ = True
+        for g,h in zip(lhs,rhs):
+            assert g.order() == h.order()
+            l, r = g.cycles(), h.cycles()
+            items = [len(li) for li in l]
+            items.sort()
+            jtems = [len(ri) for ri in r]
+            jtems.sort()
+            if items != jtems:
+                succ = False
+            print(int(succ), end=' ')
+        found += int(succ)
+        count += 1
+    print()
+    print(count, found)
+
+
+
 def test_fold():
 
     n = 24
@@ -573,18 +642,12 @@ def test_fold():
     IIXIIIXIIXIIXIXIIIIIIXII
     """).replace("I", ".").replace("X", "1")
     H = Matrix.parse(s)
+    print(H.get_wenum())
     print(H.sum(1))
     H = H.normal_form()
     print(H, H.shape)
     m = len(H)
     print()
-
-#    A = H.A
-#    for i in range(m):
-#      for j in range(m):
-#        print((A[i]*A[j]).sum(), end=' ')
-#      print()
-#    return
 
     J = []
     for v in H.rowspan():
@@ -596,6 +659,47 @@ def test_fold():
     print(J, J.shape)
     print(J.sum(1))
     print(J.rank())
+
+    from bruhat.gset import Group, Perm
+    from qumba import transversal
+    code = QCode.build_css(Hx=H, Hz=H)
+    gen = []
+    for f in transversal.find_isomorphisms_css(code, code):
+        perm = f.to_perm()
+        perm = Perm(perm)
+        gen.append(perm)
+        G = Group.generate(gen)
+        if len(G) == 1152:
+            break
+        #print(".", flush=True,end="")
+    print(G)
+    print(G.structure_description())
+    print(G.gapstr())
+    # == 1152 
+    # subgroup of octad group in M24 (index 280)
+    # also subgroup of unordered pair group in M24 (index 770)
+
+    vecs = {i:[] for i in range(n+1)}
+    for v in H.rowspan():
+        vecs[v.sum()].append(v)
+    print([len(vecs[i]) for i in range(n+1)])
+
+    for w in [6,8]:
+        overlap = set()
+        for u in vecs[w]:
+            for v in vecs[w]:
+                overlap.add( int(u.hadamard_product(v).sum() ))
+        print("overlap:", overlap)
+
+    for w in range(n+1):
+        remain = vecs[w]
+        if len(remain) <= 1:
+            continue
+        orbits = orbit_matrix(gen, remain)
+        print(w, len(vecs[w]), "=",
+            [len(o) for o in orbits], "=", len(orbits))
+
+    return
 
     css = CSSCode(Hx=H, Hz=H)
     print(css)
@@ -612,7 +716,6 @@ def test_fold():
         print((Hx[i]*Hx[j]).sum(), end=' ')
       print()
 
-    return
 
     dump_transverse(Hx, Lx)
     dump_transverse(Hx, Lx)

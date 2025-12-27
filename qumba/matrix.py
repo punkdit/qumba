@@ -252,6 +252,10 @@ class Matrix(object):
         else:
             return NotImplemented
 
+    def hadamard_product(self, other):
+        assert self.shape == other.shape
+        return Matrix(self.A*other.A, self.p)
+
     def __pow__(self, n):
         assert n>=0
         A = Matrix.identity(len(self))
