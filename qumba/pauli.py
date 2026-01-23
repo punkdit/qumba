@@ -258,7 +258,8 @@ def get_wenum(code, verbose=False):
     for g in [LX,LY,LZ,LI]:
         S1 = [g*s for s in S]
         p = get_poly(S1)
-        #print(S1, p)
+        #print(S1)
+        #print(' '.join(str(s) for s in S1))
         result.append(p)
 
     return result
@@ -317,10 +318,62 @@ def test():
     #code = QCode.fromstr("ZZZII IIZZZ XIXXI IXXIX")
     #code = QCode.fromstr("XXXX ZZZZ YYII")
 
-    code = construct.get_surface(4,4)
-    print(code)
+    #code = construct.get_surface(4,4)
+    #print(code)
+    #result = get_wenum(code)
+    #print(result[0])
+
+
+def test_wenum():
+
+    from sage import all_cmdline as sage
+    R = sage.PolynomialRing(sage.ZZ, list("xyzw"))
+    x,y,z,w = R.gens()
+
+    from qumba.distill import get_code
+
+#    #code = construct.get_913()
+#    code = construct.get_512()
+#
+#    _code = QCode.fromstr("""
+#    ZZ.ZZ....
+#    .XX.XX...
+#    ...XX.XX.
+#    ....ZZ.ZZ
+#    XX.......
+#    .......XX
+#    ...Z..Z..
+#    ..Z..Z...
+#    """, None, "X..X..X.. ZZZ......")
+
+    code = get_code()
+    assert code is not None
+
+    pstr = lambda wenum : str(wenum).replace("*", "")
+
     result = get_wenum(code)
-    print(result[0])
+    for i,wenum in enumerate(result):
+        print("[%d]:"%i, pstr(wenum))
+        #print("\t", sage.factor(wenum))
+
+    px, py, pz, pw = result
+    print()
+    print( pstr(px) )
+    print( pstr(pz) )
+
+#    wenum = result[0]
+#    top = (wenum(w=1, x=1, y=1, z=z))
+#    bot = (wenum(w=0, x=z, y=0, z=1))
+#    print(top, "/", bot)
+
+    wenum = result[3]
+    top = (wenum(w=z, x=1, y=0, z=0))
+    bot = (wenum(w=1, x=z, y=0, z=0))
+    print(top, "/", bot)
+    top = sage.factor(top)
+    bot = sage.factor(bot)
+    print(top, "/", bot)
+
 
 
 if __name__ == "__main__":
