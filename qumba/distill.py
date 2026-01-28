@@ -1203,7 +1203,7 @@ def get_code(code=None, idx=0, verbose=True):
         ZIXXIZI
         IZIXXIZ
         ZIZIXXI
-        IZIZIXX""")][idx]
+        IZIZIXX""", None, "XXXXXXX ZZZZZZZ")][idx]
 
     if params == (8,1,3):
         code = QCode.fromstr("""

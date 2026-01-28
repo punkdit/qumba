@@ -21,6 +21,7 @@ from qumba.action import mulclose, mulclose_find
 from qumba.matrix import Matrix, DEFAULT_P, pullback
 from qumba.symplectic import symplectic_form
 from qumba.qcode import QCode, strop
+from qumba.util import cross
 from qumba import construct
 
 
@@ -329,6 +330,7 @@ def test_wenum():
     from sage import all_cmdline as sage
     R = sage.PolynomialRing(sage.ZZ, list("xyzw"))
     x,y,z,w = R.gens()
+    I = sage.I
 
     from qumba.distill import get_code
 
@@ -352,14 +354,72 @@ def test_wenum():
     pstr = lambda wenum : str(wenum).replace("*", "")
 
     result = get_wenum(code)
-    for i,wenum in enumerate(result):
-        print("[%d]:"%i, pstr(wenum))
-        #print("\t", sage.factor(wenum))
+#    for i,wenum in enumerate(result):
+#        print("[%d]:"%i, pstr(wenum))
+#        #print("\t", sage.factor(wenum))
 
     px, py, pz, pw = result
+    print( "px", pstr(px) )
+    print( "py", pstr(py) )
+    print( "pz", pstr(pz) )
+    print( "pw", pstr(pw) )
     print()
-    print( pstr(px) )
-    print( pstr(pz) )
+
+    #print( px(x=z, y=1, z=0, w=1) )
+    #print( px(x=1, y=z, z=0, w=z) )
+
+    tgt = 0
+
+    # [[7,1,3]] idx=1
+    #tgt = z**7+7*z**5+7*z**3-7*z # pw(1, I, z, z)
+    #tgt = 7*z**6 - 7*z**4 - 7*z**2 - 1 # px(-1, I, z, z)
+
+    # [[8,1,3]]
+    #tgt = z**8 - 12*z**6 + 38*z**4 - 12*z**2 + 1  # pw(1, I, z, z)
+    tgt = 8*(z**7 + z**5 - z**3 - z) # py(-1, I, z, z)
+
+    #tgt = -z**13 - 65*z**9 + 117*z**5 + 13*z # pw(1, I, z, z)
+    #tgt = 13*z**12 + 117*z**8 - 65*z**4 - 1 # pz(1, I, z, z)
+
+    # [[9,1,3]]
+    #tgt = z**9 + 3*z**3
+    #print( pw(x=1, y=I, z=z, w=z) ) # 64z**9 + 192*z**3
+
+    print("px =", px(x=1, y=I, z=z, w=z) )
+    print("\t=", sage.factor(px(x=1, y=I, z=z, w=z) ))
+    print("py =", py(x=1, y=I, z=z, w=z) )
+    print("\t=", sage.factor(py(x=1, y=I, z=z, w=z) ))
+    print("pz =", pz(x=1, y=I, z=z, w=z) )
+    print("\t=", sage.factor(pz(x=1, y=I, z=z, w=z) ))
+    print("pw =", pw(x=1, y=I, z=z, w=z) )
+    print("\t=", sage.factor(pw(x=1, y=I, z=z, w=z) ))
+
+    return
+
+    if argv.tgt:
+        tgt = eval(argv.tgt, locals())
+    print("tgt =", tgt)
+
+    if not tgt:
+        return
+
+    found = set()
+    for i,poly in enumerate(result):
+        name = "px py pz pw".split()[i]
+        for items in cross([(z,1,-1, I, -I)]*4):
+            p1 = poly(x=items[0], y=items[1], z=items[2], w=items[3])
+            #if p1 in found:
+            #    continue
+            #found.add(p1)
+            #s = str(p1)
+            #if "z" in str(s) and p1.degree() == 7:
+            #    if "14" in s or len(s)<10 or "21" in s:
+            #        continue
+            #    print(s, ":", items)
+            if p1 == tgt or p1==-tgt:
+                print(p1, ":", "%s%s"%(name, items))
+
+    return
 
 #    wenum = result[0]
 #    top = (wenum(w=1, x=1, y=1, z=z))
