@@ -359,10 +359,10 @@ def test_wenum():
 #        #print("\t", sage.factor(wenum))
 
     px, py, pz, pw = result
-    print( "px", pstr(px) )
-    print( "py", pstr(py) )
-    print( "pz", pstr(pz) )
-    print( "pw", pstr(pw) )
+    #print( "px", pstr(px) )
+    #print( "py", pstr(py) )
+    #print( "pz", pstr(pz) )
+    #print( "pw", pstr(pw) )
     print()
 
     #print( px(x=z, y=1, z=0, w=1) )
@@ -385,14 +385,19 @@ def test_wenum():
     #tgt = z**9 + 3*z**3
     #print( pw(x=1, y=I, z=z, w=z) ) # 64z**9 + 192*z**3
 
-    print("px =", px(x=1, y=I, z=z, w=z) )
-    print("\t=", sage.factor(px(x=1, y=I, z=z, w=z) ))
-    print("py =", py(x=1, y=I, z=z, w=z) )
-    print("\t=", sage.factor(py(x=1, y=I, z=z, w=z) ))
-    print("pz =", pz(x=1, y=I, z=z, w=z) )
-    print("\t=", sage.factor(pz(x=1, y=I, z=z, w=z) ))
-    print("pw =", pw(x=1, y=I, z=z, w=z) )
-    print("\t=", sage.factor(pw(x=1, y=I, z=z, w=z) ))
+    def factor(p):
+        if p==0:
+            return p
+        return sage.factor(p)
+
+    print("px =", px(x=1, y=I, z=z, w=z), end=" " )
+    print("\t=", factor(px(x=1, y=I, z=z, w=z) ))
+    print("py =", py(x=1, y=I, z=z, w=z), end=" " )
+    print("\t=", factor(py(x=1, y=I, z=z, w=z) ))
+    print("pz =", pz(x=1, y=I, z=z, w=z), end=" " )
+    print("\t=", factor(pz(x=1, y=I, z=z, w=z) ))
+    print("pw =", pw(x=1, y=I, z=z, w=z), end=" " )
+    print("\t=", factor(pw(x=1, y=I, z=z, w=z) ))
 
     return
 

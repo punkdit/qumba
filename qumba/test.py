@@ -2375,6 +2375,31 @@ def test_state():
     print(count)
 
 
+def test_rm():
+    # the [[16,6,4]] lives inside the Golay code 
+    from bruhat.gset import Perm, Group
+    #code = reed_muller(1, 3) # [[8, 0, 4]] s.d.
+    code = reed_muller(1, 4) # [[16, 6, 4]] s.d.
+    #code = reed_muller(1, 5) # [[32, 20, 4]] s.d.
+    #code = reed_muller(2, 5) # [[32, 0, ?]] s.d.
+    print(code)
+    if code is None:
+        return
+    css = code.to_css()
+    Hx = Matrix(css.Hx)
+    Hz = Matrix(css.Hz)
+    print(Hx.get_wenum())
+    print(Hz.get_wenum())
+    print(Hx)
+    print(Hx==Hz)
+
+    N, perms = code.get_autos()
+    print(N)
+    perms = [Perm(f) for f in perms]
+    G = Group(gens=perms, build=False)
+    print(G.structure_description())
+
+
 def test():
     print("\ntest()")
     get_422()

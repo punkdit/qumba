@@ -1148,7 +1148,8 @@ def get_code(code=None, idx=0, verbose=True):
         code = [
             QCode.fromstr("YYZI IXXZ ZIYY"), # 0
             QCode.fromstr("XXXX ZZZZ YYII"), # 1
-            QCode.fromstr("XYZI IXYZ ZIXY"), # 2
+            #QCode.fromstr("XYZI IXYZ ZIXY"), # 2
+            QCode.fromstr("XYZI IXYZ ZIXY", None, "ZXII ZYXI"), # 2
             QCode.fromstr("ZZZZ XXII IIXX", None, "XIXI ZZII"), # 3
         ][idx]
     if params == (5,1,1):
@@ -1184,15 +1185,20 @@ def get_code(code=None, idx=0, verbose=True):
         #code = construct.get_513()
         #code = QCode.fromstr("XZZX.  .XZZX X.XZZ ZX.XZ", None, "ZXZII YZYII")
         code = QCode.fromstr("XZZX.  .XZZX X.XZZ ZX.XZ", None, "XXXXX ZZZZZ")
-        #code = QCode.fromstr("XZZX.  .XZZX X.XZZ ZX.XZ", None, "YYYYY ZZZZZ")
+        #code = QCode.fromstr("XZZX.  .XZZX X.XZZ ZX.XZ", None, "ZZZZZ YYYYY")
     if params == (6,1,2):
+        if idx==0:
+            logical = "XXIZII ZIXIII"
+        else:
+            logical = "ZIXIII XXIZII"
         code = QCode.fromstr("""
         X.ZZX.
         .X.ZXZ
         ZZX..X
         Z..X.X
         ZZ..Z.
-        """)
+        """, None, logical)
+        code.check()
 
     if params == (7,1,3):
         code = [
@@ -1581,6 +1587,8 @@ ZIZIIIIIIIIIIIIIIIIIIIIIIIZZZIZIIIIIIIIIZZZIZIIZZ
     if verbose:
         print(code)
         print(code.longstr(False))
+
+    code.check()
 
     return code
 

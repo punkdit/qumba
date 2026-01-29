@@ -2269,10 +2269,52 @@ def test_2local():
 
 
 
+def test_412():
+    from qumba.qcode import QCode
+    code = QCode.fromstr("XYZI IXYZ ZIXY")
+
+    P = code.get_projector()
+    #print(P)
+    assert P*P == P
+
+    n = 4
+    u = matrix([[1,-half]]).t
+
+    v = reduce(matmul, [u]*n)
+    v = P*v
+    print(v)
     
 
+def test_832():
+
         
+    from qumba import construct
+    from qumba import test
     
+    code = construct.get_832()
+    print(code.longstr())
+    n = code.n
+
+    plus = matrix([[1,1]]).t
+    T = Clifford(1).T()
+    u = T*plus
+    print(u)
+    v = reduce(matmul, [u]*n)
+
+    E = code.get_clifford_encoder()
+
+    test.test_clifford_encoder(code, E)
+
+    return
+
+    P = code.get_projector()
+    print(P.shape)
+
+    assert P*P == P
+
+    v = P*v
+    print(v.t)
+
     
 
     
