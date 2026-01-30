@@ -2270,19 +2270,92 @@ def test_2local():
 
 
 def test_412():
-    from qumba.qcode import QCode
-    code = QCode.fromstr("XYZI IXYZ ZIXY")
+    from qumba.qcode import QCode, strop
+    from qumba import construct
+    #code = QCode.fromstr("XYZI IXYZ ZIXY")
+    code = QCode.fromstr("XXXX ZZZZ")
+    #code = construct.get_513()
+
+    print(code)
+    n = code.n
+    clifford = Clifford(n)
+
+    E = code.get_encoder()
+    U = code.space.translate_clifford(E) # FAIL FAIL FAIL
 
     P = code.get_projector()
     #print(P)
     assert P*P == P
 
-    n = 4
-    u = matrix([[1,-half]]).t
+    #u = matrix([[1,1]]).t
+    #v = reduce(matmul, [u]*n)
+    #v = P*v
 
-    v = reduce(matmul, [u]*n)
-    v = P*v
-    print(v)
+    for s in strop(code.H).split():
+        h = clifford.get_pauli(s)
+        assert P*h == P
+        assert h*P == P
+
+    for s in strop(code.L).split():
+        l = clifford.get_pauli(s)
+        assert P*l == l*P
+
+    m = len(code.H)
+    Hs = strop(code.H).split()
+    Ts = strop(code.T).split()
+    for (h,t) in zip(Hs, Ts):
+        print("    ", h, t)
+    for l in code.L:
+        print("    ", strop(l))
+
+    Ud = U.d
+
+#    gen = []
+#    for i in range(n):
+#      for g in [clifford.X(i), clifford.Z(i)]:
+#        gen.append(g)
+#    G = mulclose(gen, verbose=True)
+#    print(len(G))
+#    #G = set(G)
+
+    names = {}
+    lookup = {}
+    for key in cross(['IXYZ']*n):
+        key = ''.join(key)
+        g = clifford.get_pauli(key)
+        names[key] = g
+        lookup[g] = key
+        lookup[-g] = "-"+key
+
+    #print(len(names))
+    #print(len(lookup))
+    print()
+
+    for i in range(n):
+      for g in [clifford.X(i), clifford.Z(i)]:
+        h = U*g*Ud
+        print(lookup[h], end=' ')
+      print()
+    return
+
+    #for g in G:
+    #    g = U*g*Ud
+    #    assert g in G
+
+    total = 0
+    for key,g in names.items():
+        h = U*g*Ud
+        #h = g
+        i = int(P*h == P or P*h==-P)
+        #print(i, end='', flush=True)
+        if i:
+            print("\t", key)
+        total += i
+    print()
+
+    print(total)
+
+
     
 
 def test_832():
