@@ -95,8 +95,11 @@ class Pauli:
         vec = self.vec.concatenate(other.vec)
         return Pauli(vec, (self.phase + other.phase)%4)
 
+    def __lt__(self, other):
+        return self.key < other.key
+
     def is_identity(self):
-        return numpy.all(self.vec==0) and self.phase==0
+        return self.vec.is_zero() and self.phase==0
 
     def get_wenum(self):
         vec = self.vec
@@ -155,11 +158,29 @@ class PauliCode:
             n = pauli.n
         for pauli in logicals:
             n = pauli.n
+        k = len(logicals)//2
+        m = len(stabs)
+        assert m+k == n
+        stabs = list(stabs)
+        #stabs.sort()
+        destabs = list(destabs)
+        #destabs.sort()
+        logicals = list(logicals)
+        #logicals.sort()
+        self.stabs = stabs
+        self.destabs = destabs
+        self.logicals = logicals
         self.n = n
-        self.stabs = list(stabs)
-        self.destabs = list(destabs)
-        self.logicals = list(logicals)
+        self.m = m
+        self.k = k
         self.check()
+
+    def __str__(self):
+        stabs = ' '.join(str(op) for op in self.stabs)
+        destabs = ' '.join(str(op) for op in self.destabs)
+        logicals = ' '.join(str(op) for op in self.logicals)
+        return "PauliCode(%s, %s, %s)"%(stabs, destabs, logicals)
+    __repr__ = __str__
 
     def check(self):
         stabs = self.stabs 
@@ -168,143 +189,138 @@ class PauliCode:
         m = len(stabs)
         for g in stabs:
             assert (g*g).is_identity()
+            for h in stabs:
+                assert g*h == h*g
+            for l in logicals:
+                assert g*l == l*g
 
     @classmethod
     def from_qcode(cls, code):
         assert isinstance(code, QCode)
+        code.build()
         stabs = fromsy(code.H)
         destabs = fromsy(code.T)
         logicals = fromsy(code.L)
         return PauliCode(stabs, destabs, logicals)
 
+    def get_full_wenum(self, verbose=False):
+        assert self.k == 1
+        LX, LZ = self.logicals
+        LY = w_phase@LX*LZ
+        LI = LX*LX
+        if verbose:
+            print("LX =", LX)
+            print("LY =", LY)
+            print("LZ =", LZ)
+            print("LI =", LI)
+        assert LX*LZ==-LZ*LX
     
+        from sage import all_cmdline as sage
+        n = self.n
+        gens = []
+        for i in range(n):
+            gens.append("w%d"%i)
+            gens.append("x%d"%i)
+            gens.append("y%d"%i)
+            gens.append("z%d"%i)
+        R = sage.PolynomialRing(sage.ZZ, gens)
+        gens = R.gens()
+    
+        def get_poly(S):
+            p = 0
+            for s in S:
+                r = s.sign()
+                idxs = s.get_full_wenum()
+                for i,idx in enumerate(idxs): 
+                    g = gens[4*i + idx]
+                    r = g*r
+                #print(r, s, ws)
+                p = p+r
+            return p
+    
+        S = mulclose(self.stabs)
+        p = get_poly(S)
+    
+        result = []
+        for g in [LX,LY,LZ,LI]:
+            S1 = [g*s for s in S]
+            p = get_poly(S1)
+            #print(S1, p)
+            result.append(p)
+    
+        return result
+    
+    def get_wenum(self, verbose=False):
+
+        gens = self.stabs
+    
+        for h in gens:
+          for g in gens:
+            assert h*g == g*h
+    
+        assert self.k == 1
+        LX, LZ = self.logicals
+        LY = w_phase@LX*LZ
+        LI = LX*LX
+        if verbose:
+            print("LX =", LX)
+            print("LY =", LY)
+            print("LZ =", LZ)
+            print("LI =", LI)
+        assert LX*LZ==-LZ*LX
+    
+        from sage import all_cmdline as sage
+        R = sage.PolynomialRing(sage.ZZ, list("xyzw"))
+        x,y,z,w = R.gens()
+        p = 0
+    
+        S = mulclose(gens)
+    
+        def get_poly(S):
+            p = 0
+            for s in S:
+                wenum = s.get_wenum()
+                #print(repr(s), s, wenum)
+                r = s.sign()
+                for e,v in zip(wenum, (w,x,y,z)):
+                    #print(r,v,e)
+                    r = r * (v**e)
+                p = p+r
+            return p
+    
+        result = []
+        for g in [LX,LY,LZ,LI]:
+            S1 = [g*s for s in S]
+            p = get_poly(S1)
+            #print(S1)
+            #print(' '.join(str(s) for s in S1))
+            result.append(p)
+    
+        return result
+
+
+    
+def test_pauli():
+
+    for code in construct.all_codes(3,1):
+        code.build()
+        pauli = PauliCode.from_qcode(code)
+        pauli.check()
+        print(pauli)
+        ws = pauli.get_full_wenum()
+        print(ws)
+        ws = pauli.get_wenum()
+        print(ws)
 
 
 def get_full_wenum(code, verbose=False):
-    #print(code.longstr())
-    H = code.H
-    #for h in strop(H):
-    stabs = []
-    for h in H:
-        #print(strop(h))
-        g = fromstr(strop(h, "I"))
-        #print(g)
-        stabs.append(g)
-
-    for h in stabs:
-      for g in stabs:
-        assert h*g == g*h
-
-    L = code.L
-    LX = fromstr(strop(L[0], "I"))
-    LZ = fromstr(strop(L[1], "I"))
-    LY = w_phase@LX*LZ
-    LI = LX*LX
-    if verbose:
-        print("get_wenum", code)
-        print(code.longstr())
-        print("LX =", LX)
-        print("LY =", LY)
-        print("LZ =", LZ)
-        print("LI =", LI)
-    assert LX*LZ==-LZ*LX
-
-    from sage import all_cmdline as sage
-    n = code.n
-    gens = []
-    for i in range(n):
-        gens.append("w%d"%i)
-        gens.append("x%d"%i)
-        gens.append("y%d"%i)
-        gens.append("z%d"%i)
-    R = sage.PolynomialRing(sage.ZZ, gens)
-    gens = R.gens()
-
-    def get_poly(S):
-        p = 0
-        for s in S:
-            r = s.sign()
-            idxs = s.get_full_wenum()
-            for i,idx in enumerate(idxs): 
-                g = gens[4*i + idx]
-                r = g*r
-            #print(r, s, ws)
-            p = p+r
-        return p
-
-    S = mulclose(stabs)
-    p = get_poly(S)
-
-    result = []
-    for g in [LX,LY,LZ,LI]:
-        S1 = [g*s for s in S]
-        p = get_poly(S1)
-        #print(S1, p)
-        result.append(p)
-
-    return result
+    pauli = PauliCode.from_qcode(code)
+    return pauli.get_full_wenum()
 
 
 def get_wenum(code, verbose=False):
-    #print("get_wenum")
-    #print(code.longstr())
-    H = code.H
-    #for h in strop(H):
-    gens = []
-    for h in H:
-        #print(strop(h))
-        g = fromstr(strop(h, "I"))
-        #print(g)
-        gens.append(g)
-
-    for h in gens:
-      for g in gens:
-        assert h*g == g*h
-
-    L = code.L
-    LX = fromstr(strop(L[0], "I"))
-    LZ = fromstr(strop(L[1], "I"))
-    LY = w_phase@LX*LZ
-    LI = LX*LX
-    if verbose:
-        print("get_wenum", code)
-        print(code.longstr())
-        print("LX =", LX)
-        print("LY =", LY)
-        print("LZ =", LZ)
-        print("LI =", LI)
-    assert LX*LZ==-LZ*LX
-
-    from sage import all_cmdline as sage
-    R = sage.PolynomialRing(sage.ZZ, list("xyzw"))
-    x,y,z,w = R.gens()
-    p = 0
-
-    S = mulclose(gens)
-
-    def get_poly(S):
-        p = 0
-        for s in S:
-            wenum = s.get_wenum()
-            #print(repr(s), s, wenum)
-            r = s.sign()
-            for e,v in zip(wenum, (w,x,y,z)):
-                #print(r,v,e)
-                r = r * (v**e)
-            p = p+r
-        return p
-
-    result = []
-    for g in [LX,LY,LZ,LI]:
-        S1 = [g*s for s in S]
-        p = get_poly(S1)
-        #print(S1)
-        #print(' '.join(str(s) for s in S1))
-        result.append(p)
-
-    return result
-
-
+    pauli = PauliCode.from_qcode(code)
+    return pauli.get_wenum()
 
 
 

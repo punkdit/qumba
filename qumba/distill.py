@@ -1616,51 +1616,6 @@ def orbit():
     print("best:", best)
 
 
-def wenum():
-    code = get_code()
-
-    result = pauli.get_wenum(code)
-    for p in result:
-        pass
-
-    ring = p.parent()
-    x,y,z,w = ring.gens()
-    for p in result:
-        print(p)
-        print(p.subs({x:x, y:0, z:0, w:1}))
-        print()
-    #print(sage.factor(p))
-
-    return
-
-    print()
-    print(p.subs({x:1, y:1, z:1, w:1}))
-    print(p.subs({x:z, y:1, z:1, w:1}))
-    print(p.subs({x:1, y:z, z:1, w:1}))
-    print(p.subs({x:1, y:1, z:z, w:1}))
-    print(p.subs({x:1, y:1, z:1, w:z}))
-    print(p.subs({x:z, y:z, z:1, w:1}))
-    print(p.subs({x:z, y:1, z:z, w:1}))
-    print(p.subs({x:z, y:1, z:1, w:z}))
-    print(p.subs({x:1, y:z, z:z, w:1}))
-    print(p.subs({x:1, y:z, z:1, w:z}))
-    print(p.subs({x:1, y:1, z:z, w:z}))
-    print(p.subs({x:z, y:z, z:z, w:1}))
-    print(p.subs({x:z, y:z, z:1, w:z}))
-    print(p.subs({x:z, y:1, z:z, w:z}))
-    print(p.subs({x:1, y:z, z:z, w:z}))
-    print(p.subs({x:z, y:z, z:z, w:z}))
-
-    return
-
-    distill = PauliDistill(code)
-    f = distill.build()
-
-    print(f)
-    print(latex(f))
-    print(sage.factor(f.numerator()), "/", sage.factor(f.denominator()))
-
-
 def test_diff():
 
     code = get_code()
