@@ -1568,6 +1568,22 @@ def test_toric():
 
 
 
+def test_encode():
+
+    code = construct.get_513()
+    print(code.longstr())
+
+    n = code.n
+    space = code.space
+
+    E = code.get_encoder()
+    encode = Lagrangian(E.t)
+
+    print("encode:")
+    print(encode)
+    print()
+    
+
 
 
 def test():

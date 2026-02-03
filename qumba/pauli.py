@@ -95,6 +95,9 @@ class Pauli:
         vec = self.vec.concatenate(other.vec)
         return Pauli(vec, (self.phase + other.phase)%4)
 
+    def is_identity(self):
+        return numpy.all(self.vec==0) and self.phase==0
+
     def get_wenum(self):
         vec = self.vec
         n = self.n
@@ -136,9 +139,45 @@ def fromstr(h):
     op = reduce(matmul, ops)
     return op
 
+def fromsy(H):
+    ops = []
+    for h in H:
+        g = fromstr(strop(h, "I"))
+        ops.append(g)
+    return ops
 
-#def get_poly
 
+class PauliCode:
+    def __init__(self, stabs=[], destabs=[], logicals=[]):
+        assert len(stabs)+len(logicals)
+        #assert len(stabs) == len(destabs)
+        for pauli in stabs:
+            n = pauli.n
+        for pauli in logicals:
+            n = pauli.n
+        self.n = n
+        self.stabs = list(stabs)
+        self.destabs = list(destabs)
+        self.logicals = list(logicals)
+        self.check()
+
+    def check(self):
+        stabs = self.stabs 
+        destabs = self.destabs 
+        logicals = self.logicals 
+        m = len(stabs)
+        for g in stabs:
+            assert (g*g).is_identity()
+
+    @classmethod
+    def from_qcode(cls, code):
+        assert isinstance(code, QCode)
+        stabs = fromsy(code.H)
+        destabs = fromsy(code.T)
+        logicals = fromsy(code.L)
+        return PauliCode(stabs, destabs, logicals)
+
+    
 
 
 def get_full_wenum(code, verbose=False):

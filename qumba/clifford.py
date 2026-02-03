@@ -345,6 +345,17 @@ class Clifford:
         names = mulclose_names(gen, names)
         return names
 
+    def pauli_names(self):
+        names = {}
+        lookup = {}
+        for key in cross(['IXYZ']*self.n):
+            key = ''.join(key)
+            g = self.get_pauli(key)
+            names[key] = g
+            lookup[g] = key
+            lookup[-g] = "-"+key
+        return names, lookup
+
 
 
 dim = 2 # qubits
@@ -2266,6 +2277,72 @@ def test_2local():
             print("stabilizer:", idxs)
         if u==v:
             print("2-local:", idxs)
+
+
+
+
+def test_decoder():
+    from qumba.symplectic import SymplecticSpace
+
+    c2 = Clifford(2)
+    II = c2.I
+    XI = c2.X(0)
+    IX = c2.X(1)
+    ZI = c2.Z(0)
+    IZ = c2.Z(1)
+    wI = c2.wI()
+
+    Pauli = mulclose([wI*wI, XI, IX, ZI, IZ])
+    assert len(Pauli) == 64, len(Pauli)
+
+    assert c2 is Clifford(2)
+
+    SI = c2.S(0)
+    IS = c2.S(1)
+    HI = c2.H(0)
+    IH = c2.H(1)
+    CZ = c2.CZ(0, 1)
+
+    C2 = mulclose([SI, IS, HI, IH, CZ], verbose=True, maxsize=20) # slow
+    #assert len(C2) == 92160
+    print()
+
+    w_ = green(0, 1)
+    lhs = w_ @ I
+
+    ops = {lhs*g for g in C2}
+    print(len(C2), len(ops))
+
+    names, lookup = c2.pauli_names()
+    n = c2.n
+    space = SymplecticSpace(n)
+
+    def get_symplectic(E):
+        rows = []
+        for i in range(n):
+          for xz in "XZ":
+            pauli = ['I']*n
+            pauli[i] = xz
+            src = ''.join(pauli)
+            g = names[src]
+            tgt = E*g*E.d
+            row = lookup[tgt]
+            row = row.replace('-', '')
+            rows.append(row)
+        op = ' '.join(rows)
+        op = space.parse(op)
+        return op
+
+    for E in C2:
+        print(get_symplectic(E))
+        print()
+
+    #print(list(names.keys()))
+    #for g in C2:
+    #    print(g)
+
+    return
+    
 
 
 

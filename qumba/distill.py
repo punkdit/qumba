@@ -34,7 +34,7 @@ from qumba import lin
 EPSILON = 1e-6
 
 def eq(a, b):
-    return abs(a-b) < 1e-6
+    return abs(a-b) < EPSILON
 
 diff = sage.derivative
 
