@@ -314,6 +314,16 @@ class Clifford:
             op = eval(expr, {"self":self})
         return op
 
+    def get_gens(self):
+        n = self.n
+        gens = []
+        for i in range(n):
+            gens.append(self.S(i))
+            gens.append(self.H(i))
+            for j in range(i+1,n):
+                gens.append(self.CZ(i,j))
+        return gens
+
     def get_pauli(self, desc):
         assert len(desc) == self.n
         op = self.I
@@ -345,6 +355,7 @@ class Clifford:
         names = mulclose_names(gen, names)
         return names
 
+    @cache
     def pauli_names(self):
         names = {}
         lookup = {}
@@ -355,6 +366,33 @@ class Clifford:
             lookup[g] = key
             lookup[-g] = "-"+key
         return names, lookup
+
+    def get_symplectic(self, E):
+        from qumba.symplectic import SymplecticSpace
+        n = self.n
+        assert E.shape == (2**n, 2**n) # ?
+        space = SymplecticSpace(n)
+        names, lookup = self.pauli_names()
+        rows = []
+        phases = []
+        for i in range(n):
+          for xz in "XZ":
+            pauli = ['I']*n
+            pauli[i] = xz
+            src = ''.join(pauli)
+            g = names[src]
+            tgt = E*g*E.d
+            row = lookup[tgt]
+            #signs.append([+1, -1][row.startswith('-')])
+            phase = [0,2][row.startswith('-')]
+            phase = (phase + 3*row.count("Y"))%4 # argh, tricky!
+            phases.append(phase)
+            row = row.replace('-', '')
+            rows.append(row)
+        op = ' '.join(rows)
+        op = space.parse(op)
+        op = op.t # why is this transposed?
+        return op, phases
 
 
 
@@ -2281,68 +2319,89 @@ def test_2local():
 
 
 
-def test_decoder():
+def test_distill():
     from qumba.symplectic import SymplecticSpace
+    from qumba.qcode import QCode, strop
+    from qumba.pauli import PauliCode
+    from qumba.distill import PauliDistill
 
-    c2 = Clifford(2)
-    II = c2.I
-    XI = c2.X(0)
-    IX = c2.X(1)
-    ZI = c2.Z(0)
-    IZ = c2.Z(1)
-    wI = c2.wI()
+    n = 3
+    k = 1
+    cliff = Clifford(n)
+    CX = cliff.CX
+    CZ = cliff.CZ
+    H = cliff.H
+    S = cliff.S
 
-    Pauli = mulclose([wI*wI, XI, IX, ZI, IZ])
-    assert len(Pauli) == 64, len(Pauli)
+    gens = cliff.get_gens()
+    
+    items = []
+    for i in range(10):
+        g = choice(gens)
+        for j in range(10*n):
+            g = g*choice(gens)
+        items.append(g)
 
-    assert c2 is Clifford(2)
-
-    SI = c2.S(0)
-    IS = c2.S(1)
-    HI = c2.H(0)
-    IH = c2.H(1)
-    CZ = c2.CZ(0, 1)
-
-    C2 = mulclose([SI, IS, HI, IH, CZ], verbose=True, maxsize=20) # slow
-    #assert len(C2) == 92160
-    print()
+    #items = [S(2)*CX(0,1)*CX(0,2)*CX(1,2)*H(1)] # fail
+    items = [H(0)*CX(0,1)*CX(0,2)*CX(1,2)*H(1)*H(2)]
 
     w_ = green(0, 1)
-    lhs = w_ @ I
+    lhs = reduce(matmul, [w_]*(n-1))@Clifford(1).get_identity()
 
-    ops = {lhs*g for g in C2}
-    print(len(C2), len(ops))
+#    ops = {lhs*g for g in items}
+#    print(len(items), len(ops))
 
-    names, lookup = c2.pauli_names()
-    n = c2.n
+    #R = sage.PolynomialRing(sage.ZZ, 'z')
+    R = sage.PolynomialRing(K, 'z')
+    z = R.gens()[0]
+
+    M = Matrix(R, [z, 1]).t
+    M = reduce(matmul, [M]*n)
+    print(M)
+
+    S = sage.PolynomialRing(sage.ZZ, list("xyzw"))
+    x,y,z,w = S.gens()
+    I = sage.I
+    factor = lambda p : sage.factor(p) if p!=0 else 0
+
     space = SymplecticSpace(n)
-
-    def get_symplectic(E):
-        rows = []
-        for i in range(n):
-          for xz in "XZ":
-            pauli = ['I']*n
-            pauli[i] = xz
-            src = ''.join(pauli)
-            g = names[src]
-            tgt = E*g*E.d
-            row = lookup[tgt]
-            row = row.replace('-', '')
-            rows.append(row)
-        op = ' '.join(rows)
-        op = space.parse(op)
-        return op
-
-    for E in C2:
-        print(get_symplectic(E))
+    for E in items:
         print()
+        print(E.name)
+        EM = lhs*E.d*M
+        print(EM)
+        print(r2*EM)
+        top = EM[0,0]
+        bot = EM[1,0]
 
-    #print(list(names.keys()))
-    #for g in C2:
-    #    print(g)
+        v,phases = cliff.get_symplectic(E)
+        assert space.is_symplectic(v)
+        u = space.get_expr(E.name)
+        assert u==v
 
-    return
+        code = QCode.from_encoder(v, k=k)
+        print(code)
+        print(code.longstr())
+        distill = PauliDistill(code)
+        f = distill.build()
+        #f = sage.simplify(f)
+        print("f =", f, "=?=", top, "/", bot, "==", top/bot, f==top/bot)
+        #print( f == (top//bot))
     
+        pauli = PauliCode.from_encoder(E, k=k)
+        print(pauli)
+        px, py, pz, pw = pauli.get_wenum()
+
+        print("px =", px(x=1, y=I, z=z, w=z), end=" " )
+        print("\t=", factor(px(x=1, y=I, z=z, w=z) ))
+        print("py =", py(x=1, y=I, z=z, w=z), end=" " )
+        print("\t=", factor(py(x=1, y=I, z=z, w=z) ))
+        print("pz =", pz(x=1, y=I, z=z, w=z), end=" " )
+        print("\t=", factor(pz(x=1, y=I, z=z, w=z) ))
+        print("pw =", pw(x=1, y=I, z=z, w=z), end=" " )
+        print("\t=", factor(pw(x=1, y=I, z=z, w=z) ))
+
+
 
 
 

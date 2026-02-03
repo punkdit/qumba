@@ -10,7 +10,7 @@ from random import shuffle, choice
 from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
 from operator import add, mul, matmul
-from math import prod
+from math import prod, log2
 
 import numpy
 
@@ -19,7 +19,7 @@ from qumba.lin import (shortstr, dot2, identity2, eq2, intersect, direct_sum, ze
 from qumba.lin import int_scalar as scalar
 from qumba.action import mulclose, mulclose_find
 from qumba.matrix import Matrix, DEFAULT_P, pullback
-from qumba.symplectic import symplectic_form
+from qumba.symplectic import symplectic_form, SymplecticSpace
 from qumba.qcode import QCode, strop
 from qumba.util import cross
 from qumba import construct
@@ -179,7 +179,7 @@ class PauliCode:
         stabs = ' '.join(str(op) for op in self.stabs)
         destabs = ' '.join(str(op) for op in self.destabs)
         logicals = ' '.join(str(op) for op in self.logicals)
-        return "PauliCode(%s, %s, %s)"%(stabs, destabs, logicals)
+        return "PauliCode([%s], [%s], [%s])"%(stabs, destabs, logicals)
     __repr__ = __str__
 
     def check(self):
@@ -202,6 +202,36 @@ class PauliCode:
         destabs = fromsy(code.T)
         logicals = fromsy(code.L)
         return PauliCode(stabs, destabs, logicals)
+
+    @classmethod
+    def from_encoder(cls, E, m=None, k=None, **kw):
+        from qumba.clifford import Clifford
+        N = len(E)
+        n = int(log2(N))
+        assert N==2**n
+        if m is None and k is None:
+            m = n
+        if m is None:
+            m = n-k
+        if k is None:
+            k = n-m
+        space = Clifford(n)
+        M, phases = space.get_symplectic(E)
+        #print("from_encoder", E.name)
+        M = M.transpose()
+        #print(M, phases)
+        ops = [Pauli(v, phase) for (v,phase) in zip(M, phases)]
+        #print(ops)
+        #print(' '.join([str(op) for op in ops]))
+        HT = ops[:2*m]
+        L = ops[2*m:]
+        H = HT[0::2]
+        T = HT[1::2]
+        #print("H =")
+        #print(H)
+        #code = QCode(H, T, L, **kw)
+        pauli = PauliCode(H, T, L)
+        return pauli
 
     def get_full_wenum(self, verbose=False):
         assert self.k == 1
