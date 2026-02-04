@@ -11,7 +11,7 @@ warnings.filterwarnings('ignore')
 from math import gcd
 from functools import reduce, cache
 from operator import matmul, add
-from random import random, randint
+from random import random, randint, choice
 
 import numpy
 from scipy.optimize import root
@@ -23,7 +23,7 @@ from qumba.smap import SMap
 from qumba.qcode import strop, QCode
 from qumba import construct 
 from qumba.matrix_sage import Matrix
-from qumba.clifford import Clifford, w4, r2, ir2
+from qumba.clifford import Clifford, w4, r2, ir2, green
 from qumba.action import mulclose
 from qumba.dense import bitlog
 from qumba.util import choose
@@ -3484,6 +3484,108 @@ def test_e_513():
 
 
 
+def test_clifford():
+    from qumba.symplectic import SymplecticSpace
+    from qumba.qcode import QCode, strop
+    from qumba.pauli import PauliCode
+    from qumba.distill import PauliDistill
+
+    n = argv.get("n", 3)
+    k = 1
+    cliff = Clifford(n)
+    CX = cliff.CX
+    CZ = cliff.CZ
+    H = cliff.H
+    S = cliff.S
+
+    if argv.ZX:
+        gens = []
+        for i in range(n):
+            gens.append(H(i))
+            for j in range(n):
+                if i!=j:
+                    gens.append(CX(i,j))
+    else:
+        gens = cliff.get_gens()
+    
+    items = []
+    trials = argv.get("trials", 10)
+    for i in range(trials):
+        g = choice(gens)
+        for j in range(10*n):
+            g = g*choice(gens)
+        items.append(g)
+
+    #items = [S(2)*CX(0,1)*CX(0,2)*CX(1,2)*H(1)] # fail
+    #items = [H(0)*CX(0,1)*CX(0,2)*CX(1,2)*H(1)*H(2)]
+
+    w_ = green(0, 1)
+    lhs = reduce(matmul, [w_]*(n-1))@Clifford(1).get_identity()
+
+#    ops = {lhs*g for g in items}
+#    print(len(items), len(ops))
+
+    #R = sage.PolynomialRing(sage.ZZ, 'z')
+    R = sage.PolynomialRing(base, 'z')
+    z = R.gens()[0]
+
+    M = Matrix(R, [z, 1]).t
+    M = reduce(matmul, [M]*n)
+    print(M)
+
+    S = sage.PolynomialRing(sage.ZZ, list("xyzw"))
+    x,y,z,w = S.gens()
+    I = sage.I
+    factor = lambda p : sage.factor(p) if p!=0 else 0
+
+    space = SymplecticSpace(n)
+    for E in items:
+        EM = lhs*E.d*M
+        top = EM[0,0]
+        bot = EM[1,0]
+        if top == 0 or bot == 0:
+            continue
+        print()
+        print(E.name)
+        print(EM)
+        print(r2*EM)
+
+        v,phases = cliff.get_symplectic(E)
+        assert space.is_symplectic(v)
+        u = space.get_expr(E.name)
+        assert u==v
+
+        code = QCode.from_encoder(v, k=k)
+        print(code)
+        print(code.longstr())
+        distill = PauliDistill(code)
+        f = distill.build()
+        #f = sage.simplify(f)
+        print("f =", f, "=?=", top, "/", bot, end=' ')
+        if bot != 0:
+            print("==", top/bot, f==top/bot)
+        f = 1/f
+        print(f, f==top/bot)
+
+        pauli = PauliCode.from_encoder(E, k=k)
+        print(pauli)
+
+        continue
+
+        px, py, pz, pw = pauli.get_wenum()
+
+        print("px =", px(x=1, y=I, z=z, w=z), end=" " )
+        print("\t=", factor(px(x=1, y=I, z=z, w=z) ))
+        print("py =", py(x=1, y=I, z=z, w=z), end=" " )
+        print("\t=", factor(py(x=1, y=I, z=z, w=z) ))
+        print("pz =", pz(x=1, y=I, z=z, w=z), end=" " )
+        print("\t=", factor(pz(x=1, y=I, z=z, w=z) ))
+        print("pw =", pw(x=1, y=I, z=z, w=z), end=" " )
+        print("\t=", factor(pw(x=1, y=I, z=z, w=z) ))
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -3513,6 +3615,5 @@ if __name__ == "__main__":
 
     t = time() - start_time
     print("\nOK! finished in %.3f seconds\n"%t)
-
 
 

@@ -2325,7 +2325,7 @@ def test_distill():
     from qumba.pauli import PauliCode
     from qumba.distill import PauliDistill
 
-    n = 3
+    n = argv.get("n", 3)
     k = 1
     cliff = Clifford(n)
     CX = cliff.CX
@@ -2333,17 +2333,26 @@ def test_distill():
     H = cliff.H
     S = cliff.S
 
-    gens = cliff.get_gens()
+    if argv.ZX:
+        gens = []
+        for i in range(n):
+            gens.append(H(i))
+            for j in range(n):
+                if i!=j:
+                    gens.append(CX(i,j))
+    else:
+        gens = cliff.get_gens()
     
     items = []
-    for i in range(10):
+    trials = argv.get("trials", 10)
+    for i in range(trials):
         g = choice(gens)
         for j in range(10*n):
             g = g*choice(gens)
         items.append(g)
 
     #items = [S(2)*CX(0,1)*CX(0,2)*CX(1,2)*H(1)] # fail
-    items = [H(0)*CX(0,1)*CX(0,2)*CX(1,2)*H(1)*H(2)]
+    #items = [H(0)*CX(0,1)*CX(0,2)*CX(1,2)*H(1)*H(2)]
 
     w_ = green(0, 1)
     lhs = reduce(matmul, [w_]*(n-1))@Clifford(1).get_identity()
@@ -2366,13 +2375,15 @@ def test_distill():
 
     space = SymplecticSpace(n)
     for E in items:
-        print()
-        print(E.name)
         EM = lhs*E.d*M
-        print(EM)
-        print(r2*EM)
         top = EM[0,0]
         bot = EM[1,0]
+        if top == 0 or bot == 0:
+            continue
+        print()
+        print(E.name)
+        print(EM)
+        print(r2*EM)
 
         v,phases = cliff.get_symplectic(E)
         assert space.is_symplectic(v)
@@ -2385,11 +2396,31 @@ def test_distill():
         distill = PauliDistill(code)
         f = distill.build()
         #f = sage.simplify(f)
-        print("f =", f, "=?=", top, "/", bot, "==", top/bot, f==top/bot)
-        #print( f == (top//bot))
+        print("f =", f, "=?=", top, "/", bot, end=' ')
+        if bot != 0:
+            print("==", top/bot, f==top/bot)
+        f = 1/f
+        print(f, f==top/bot)
+
+        z = f.parent().gens()[0]
+        t = 16*z
+        b = ((8*w8**2 + 8)*z**2 + (8*w8**2 - 8))
+        print(t/b)
+        assert f == t/b
+        
+        t = 2*z
+        b = ((w8**2 + 1)*z**2 + (w8**2 - 1))
+        print(t/b)
+        assert f == t/b
+
+        scale = (w4+1)/2
+        print( scale*t / (scale*b) )
     
         pauli = PauliCode.from_encoder(E, k=k)
         print(pauli)
+
+        continue
+
         px, py, pz, pw = pauli.get_wenum()
 
         print("px =", px(x=1, y=I, z=z, w=z), end=" " )
@@ -2548,6 +2579,7 @@ if __name__ == "__main__":
 
     _seed = argv.get("seed")
     if _seed is not None:
+        from random import seed
         print("seed(%s)"%_seed)
         seed(_seed)
 
