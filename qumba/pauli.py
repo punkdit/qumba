@@ -182,6 +182,14 @@ class PauliCode:
         return "PauliCode([%s], [%s], [%s])"%(stabs, destabs, logicals)
     __repr__ = __str__
 
+    @classmethod
+    def promote(cls, item):
+        if isinstance(item, PauliCode):
+            return item
+        assert isinstance(item, QCode)
+        pauli = cls.from_qcode(item)
+        return pauli
+
     def check(self):
         stabs = self.stabs 
         destabs = self.destabs 

@@ -23,11 +23,12 @@ from qumba.smap import SMap
 from qumba.qcode import strop, QCode
 from qumba import construct 
 from qumba.matrix_sage import Matrix
-from qumba.clifford import Clifford, w4, r2, ir2, green
+from qumba.clifford import Clifford, w8, w4, r2, ir2, green
 from qumba.action import mulclose
 from qumba.dense import bitlog
 from qumba.util import choose
 from qumba.triorthogonal import is_morthogonal, strong_morthogonal
+from qumba.pauli import PauliCode
 from qumba import pauli
 from qumba import lin
 
@@ -558,6 +559,8 @@ class Distill:
         assert "zb" not in str(f), str(f)
         self.f = f
 
+        # XXX this uses the "wrong" fourth root of unity XXX
+
         return f
 
     def fast_find(self, top=True, verbose=False):
@@ -765,14 +768,16 @@ class PauliDistill(Distill): # much faster than CodeDistill
     def __init__(self, code):
         assert code.k == 1
         Distill.__init__(self, code.n)
-        self.code = code
+        #self.code = code
+        self.paulicode = PauliCode.promote(code)
 
     @cache
     def get_variety(self, projective=False, verbose=False):
-        code = self.code
+        code = self.paulicode
         n = code.n
 
-        result = pauli.get_wenum(code)
+        #result = pauli.get_wenum(code)
+        result = code.get_wenum()
         #print(result)
 
         if not projective:
@@ -3529,6 +3534,26 @@ def test_clifford():
     R = sage.PolynomialRing(base, 'z')
     z = R.gens()[0]
 
+    #print(dir(base))
+    G = base.galois_group()
+    def galois_orbit(poly):
+        orbit = []
+        for g in G:
+            qoly = R([g(coeff) for coeff in poly])
+            orbit.append(qoly)
+        return orbit
+
+#    def galois_orbit_frac(top, bot):
+#        orbit = set()
+#        for g in G:
+#            top = R([g(coeff) for coeff in poly])
+#            orbit.add(qoly)
+#        return orbit
+
+    pyfunc = lambda u : eval("lambda z: %s"%pystr(u))
+
+    assert set(galois_orbit(z+w8)) == {z + w8, z - w8**3, z + w8**3, z - w8}
+
     M = Matrix(R, [z, 1]).t
     M = reduce(matmul, [M]*n)
     print(M)
@@ -3555,20 +3580,48 @@ def test_clifford():
         u = space.get_expr(E.name)
         assert u==v
 
-        code = QCode.from_encoder(v, k=k)
-        print(code)
-        print(code.longstr())
-        distill = PauliDistill(code)
-        f = distill.build()
-        #f = sage.simplify(f)
-        print("f =", f, "=?=", top, "/", bot, end=' ')
-        if bot != 0:
-            print("==", top/bot, f==top/bot)
-        f = 1/f
-        print(f, f==top/bot)
-
         pauli = PauliCode.from_encoder(E, k=k)
         print(pauli)
+
+        #code = QCode.from_encoder(v, k=k)
+        #print(code)
+        #print(code.longstr())
+        distill = PauliDistill(pauli)
+        f = distill.build()
+        #f = sage.simplify(f)
+        print("f =", f, "\n  =?= (%s)/(%s)" %( top, bot), end=' ')
+        print("\n  ==", top/bot, f==top/bot)
+        #f = 1/f
+        #print(f, f==top/bot)
+
+        frac = top/bot
+
+        if argv.ZX:
+            assert f==frac
+
+#        orbit = {t/b for (t,b) in zip(galois_orbit(top), galois_orbit(bot))}
+#        for f1 in [f, -f, 1/f, -1/f]:
+#            if f1 in orbit:
+#                break
+#        else:
+#            assert 0
+
+        #print(pystr(f))
+        #print(pystr(frac))
+        lfunc = pyfunc(f)
+        rfunc = pyfunc(frac)
+        #z0 = random() + 1j*random()
+        z0 = 1.123+0j
+        lval = lfunc(z0)
+        rval = rfunc(z0)
+
+        #print(lval, rval)
+        for z1 in [lval, -lval, 1/lval, -1/lval]:
+            #if eq(z1, rval) or eq(z1.conjugate(), rval):
+            if eq(z1.conjugate(), rval):
+                break
+        else:
+            assert 0
 
         continue
 
