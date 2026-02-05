@@ -20,6 +20,7 @@ from qumba.lin import int_scalar as scalar
 from qumba.action import mulclose, mulclose_find
 from qumba.matrix import Matrix, DEFAULT_P, pullback
 from qumba.symplectic import symplectic_form, SymplecticSpace
+from qumba.clifford import Clifford, half
 from qumba.qcode import QCode, strop
 from qumba.util import cross
 from qumba import construct
@@ -88,6 +89,11 @@ class Pauli:
         phase = (self.phase + other.phase + beta(self.vec, other.vec)) % 4
         return Pauli(vec, phase)
 
+    def __rmul__(self, r):
+        assert r in [-1, 1]
+        phase = -r + 1
+        return Pauli(self.vec, (self.phase+phase)%4)
+
     def __neg__(self):
         return Pauli(self.vec, (self.phase+2)%4)
 
@@ -123,11 +129,13 @@ class Pauli:
             ws.append(i)
         return tuple(ws)
 
+    def get_clifford(self):
+        clifford = Clifford(self.n)
+        s = strop(self.vec, "I")
+        op = clifford.get_pauli(s)
+        return self.sign()*op
 
 
-#    @classmethod
-#    def fromstr(cls, h):
-        
 
 I = Pauli([0,0])
 wI = Pauli([0,0], 1)
@@ -136,6 +144,7 @@ X = Pauli([1,0])
 Y = Pauli([1,1], 3)
 Z = Pauli([0,1])
 w_phase = Pauli([], 1)
+
 
 def fromstr(h):
     ops = [{"I":I, "X":X, "Y":Y, "Z":Z}[op] for op in h]
@@ -202,6 +211,14 @@ class PauliCode:
             for l in logicals:
                 assert g*l == l*g
 
+    def get_projector(self):
+        clifford = Clifford(self.n)
+        I = clifford.get_identity()
+        op = I
+        for g in self.stabs:
+            op = half*(I + g.get_clifford())*op
+        return op
+
     @classmethod
     def from_qcode(cls, code):
         assert isinstance(code, QCode)
@@ -213,7 +230,6 @@ class PauliCode:
 
     @classmethod
     def from_encoder(cls, E, m=None, k=None, **kw):
-        from qumba.clifford import Clifford
         N = len(E)
         n = int(log2(N))
         assert N==2**n
@@ -340,15 +356,22 @@ class PauliCode:
     
 def test_pauli():
 
-    for code in construct.all_codes(3,1):
+    n = 3
+    k = 1
+    clifford = Clifford(n)
+    I = clifford.get_identity()
+    for code in construct.all_codes(n,k):
         code.build()
         pauli = PauliCode.from_qcode(code)
         pauli.check()
         print(pauli)
         ws = pauli.get_full_wenum()
-        print(ws)
+        #print(ws)
         ws = pauli.get_wenum()
-        print(ws)
+        #print(ws)
+
+        P = pauli.get_projector()
+        assert P*P == P
 
 
 def get_full_wenum(code, verbose=False):
@@ -370,6 +393,13 @@ def test():
     assert X*X == I
     assert Y*Y == I
     assert Z*Z == I
+
+    for s in ["XZ", "ZZZ", "XZY", "YY"]:
+      for sign in [1,-1]:
+        n = len(s)
+        g = sign*fromstr(s)
+        op = sign*Clifford(n).get_pauli(s)
+        assert g.get_clifford() == op
 
     G = mulclose([wI,X,Y,Z])
     assert len(G) == 16

@@ -223,7 +223,7 @@ def get_projector(code):
     I = space.I
     P = None
     for h in H.split():
-        print("\t", h)
+        #print("\t", h)
         s = space.get_pauli(h)
         s = I+s
         P = s if P is None else s*P
@@ -231,9 +231,9 @@ def get_projector(code):
     M = 2**code.m
     P = (one/M)*P
 
-    print("P*P == P ... ", end='', flush=True)
+    #print("P*P == P ... ", end='', flush=True)
     assert P*P == P
-    print("yes")
+    #print("yes")
     assert P.rank() == 2**code.k
 
     if 0:
@@ -841,12 +841,73 @@ class CodeDistill(Distill):
         z = M*(rho*LZ).trace()
         w = M*div
     
-        print(r"\begin{align*}")
-        print("x", right_arrow, mkstr(x))
-        print("y", right_arrow, mkstr(y))
-        print("z", right_arrow, mkstr(z))
-        print("w", right_arrow, mkstr(w)) # div
-        print(r"\end{align*}")
+        #print(r"\begin{align*}")
+        #print("x", right_arrow, mkstr(x))
+        #print("y", right_arrow, mkstr(y))
+        #print("z", right_arrow, mkstr(z))
+        #print("w", right_arrow, mkstr(w)) # div
+        #print(r"\end{align*}")
+    
+        return x, y, z, w
+
+
+
+class PauliCodeDistill(Distill):
+    def __init__(self, code):
+        assert code.k == 1
+        Distill.__init__(self, code.n)
+        #self.code = code
+        self.paulicode = PauliCode.promote(code)
+
+    @cache
+    def get_variety(self, projective=False):
+        #code = self.code
+        #n = code.n
+        n = self.n
+        space = Clifford(n)
+        paulicode = self.paulicode
+        M = 2**paulicode.m
+    
+        #P = get_projector(code)
+        P = self.paulicode.get_projector()
+        Pd = P.d
+    
+        K = sage.PolynomialRing(base, list("xyzw"))
+        Kx, Ky, Kz, Kw = K.gens()
+    
+        if not projective:
+            Kw = 1
+        rho = half*(Kw*I + Kx*X + Ky*Y + Kz*Z)
+        assert rho.trace() == Kw
+    
+        #print("rho^n ... ", end='', flush=True)
+        rho = reduce(matmul, [rho]*n)
+        if not projective:
+            assert rho.trace() == 1
+        #print("P*rho*Pd ... ", end='', flush=True)
+        rho = P*rho*Pd
+        #print("trace ... ", end='', flush=True)
+        div = rho.trace()
+    
+        #L = strop(code.L, "I").split()
+        #LX = space.get_pauli(L[0])
+        #LZ = space.get_pauli(L[1])
+        logicals = paulicode.logicals
+        LX = logicals[0].get_clifford()
+        LZ = logicals[1].get_clifford()
+        LY = w4*LX*LZ
+    
+        x = M*(rho*LX).trace()
+        y = M*(rho*LY).trace()
+        z = M*(rho*LZ).trace()
+        w = M*div
+    
+        #print(r"\begin{align*}")
+        #print("x", right_arrow, mkstr(x))
+        #print("y", right_arrow, mkstr(y))
+        #print("z", right_arrow, mkstr(z))
+        #print("w", right_arrow, mkstr(w)) # div
+        #print(r"\end{align*}")
     
         return x, y, z, w
 
@@ -3571,9 +3632,9 @@ def test_clifford():
         if top == 0 or bot == 0:
             continue
         print()
-        print(E.name)
-        print(EM)
-        print(r2*EM)
+        #print(E.name)
+        #print(EM)
+        #print(r2*EM)
 
         v,phases = cliff.get_symplectic(E)
         assert space.is_symplectic(v)
@@ -3584,15 +3645,25 @@ def test_clifford():
         print(pauli)
 
         #code = QCode.from_encoder(v, k=k)
-        #print(code)
-        #print(code.longstr())
+        ##print(code)
+        ##print(code.longstr())
+        #distill = CodeDistill(code)
+        #f0 = distill.build()
+        #print("f0 =", f0)
+
+        distill = PauliCodeDistill(pauli)
+        f1 = distill.build()
+        print("f1 =", f1)
+
         distill = PauliDistill(pauli)
         f = distill.build()
         #f = sage.simplify(f)
-        print("f =", f, "\n  =?= (%s)/(%s)" %( top, bot), end=' ')
-        print("\n  ==", top/bot, f==top/bot)
+        print("f  =", f) #, "\n  =?= (%s)/(%s)" %( top, bot), end=' ')
+        print("   =", top/bot, f==top/bot)
         #f = 1/f
         #print(f, f==top/bot)
+
+        assert f==f1
 
         frac = top/bot
 
