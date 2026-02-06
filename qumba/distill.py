@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 """
-
 """
+
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -883,18 +883,18 @@ class ProjectorDistill(Distill): # adapted from CodeDistill
         if not projective:
             assert rho.trace() == 1
         #print("P*rho*Pd ... ", end='', flush=True)
-        rho = P*rho*Pd
+        sho = P*rho*Pd
         #print("trace ... ", end='', flush=True)
-        div = rho.trace()
+        div = sho.trace()
     
         logicals = paulicode.logicals
         LX = logicals[0].get_clifford()
         LZ = logicals[1].get_clifford()
         LY = w4*LX*LZ
     
-        x = M*(rho*LX).trace()
-        y = M*(rho*LY).trace()
-        z = M*(rho*LZ).trace()
+        x = M*(sho*LX).trace()
+        y = M*(sho*LY).trace()
+        z = M*(sho*LZ).trace()
         w = M*div
     
         #print(r"\begin{align*}")
@@ -1806,6 +1806,123 @@ def find_clifford():
             print(match, "\tf=%s, r=%s"%(f,r))
 
 
+def test_projector():
+    code = get_code()
+    #distill = CodeDistill(code)
+    distill = PauliDistill(code)
+
+    f = distill.build()
+    print(f)
+    top = f.numerator()
+    bot = f.denominator()
+
+    result = distill.get_variety(verbose=True)
+    px, py, pz, pw = result
+    x, y, z, w = px.parent().gens()
+
+    for p in [px, py, pz, pw]:
+        found = set()
+        for vals in cross([(z,-z,-1,0,1,sage.I,-sage.I)]*4):
+            poly = p(x=vals[0], y=vals[1], z=vals[2], w=vals[3])
+            if poly not in found and 'z' in str(poly) and poly.degree() == 4:
+                print(poly)
+            found.add(poly)
+            #print(poly, end=' ')
+            #if poly == top:
+            #    print(p, vals)
+        #print(found)
+        print()
+
+#    print(px(x=1,y=sage.I,z=z,w=z))
+#    print(py(x=1,y=sage.I,z=z,w=z))
+#    print(pz(x=1,y=sage.I,z=z,w=z))
+#    print(pw(x=1,y=sage.I,z=z,w=z))
+
+
+def all_css_k1(n):
+    from bruhat.algebraic import qchoose_2
+    from qumba.lin import kernel, dot2, array2
+    assert n%2 == 1
+    k = 1
+    m = (n-k)
+    assert m%2 == 0
+    m = m//2
+
+    L = array2([1]*n)
+    L1 = L.copy().reshape((1,n))
+
+    for Hx in qchoose_2(n, m):
+        if dot2(Hx, L).sum() != 0:
+            continue
+        K = kernel(Hx)
+        #print(Hx, Hx.shape)
+        #print(K, K.shape)
+        for Mz in qchoose_2(K.shape[0], m):
+            #print(Mz)
+            Hz = dot2(Mz, K)
+            if dot2(Hz, L).sum() != 0:
+                continue
+            #print(Hz)
+            assert dot2(Hx, Hz.transpose()).sum() == 0
+            code = QCode.build_css(Hx, Hz, None, None, L1, L1)
+            yield code
+        #print()
+        #return
+
+
+def test_css():
+
+    n = argv.get("n", 3)
+    k = 1
+
+    count = 0
+    for code in all_css_k1(n):
+        pc = PauliCode.promote(code)
+        #print(code)
+        print(pc)
+
+        distill = PauliDistill(pc)
+    
+        f = distill.build()
+        print(f)
+
+        z = f.parent().gens()[0]
+        assert f(z=-z) == -f
+        assert f(z=1/z) == 1/f
+    
+        #result = distill.get_variety()
+        result = pc.get_wenum()
+        px, py, pz, pw = result
+        x, y, z, w = px.parent().gens()
+    
+#        a = (px(x=1,y=sage.I,z=z,w=z))
+#        b = (py(x=1,y=sage.I,z=z,w=z))
+#        c = (pz(x=1,y=sage.I,z=z,w=z))
+#        d = (pw(x=1,y=sage.I,z=z,w=z))
+#        if f==a/c or str(f)==str(a/c):
+#            print("found")
+#            break
+
+        a = pw(x=1,y=0,z=0,w=z)
+        b = pw(x=z,y=0,z=0,w=1)
+        #print(a/b)
+        assert str(f)==str(a/b)
+
+        a = pw(x=0,y=0,z=1,w=z)
+        b = pw(x=0,y=0,z=z,w=1)
+        print(a/b)
+        #assert str(f)==str(a/b), str(a/b)
+        print(str(f)==str(a/b))
+        print()
+
+        #print()
+    
+        count += 1
+
+    print(count)
+    # gaussian binomial's [2n n]_q
+    # https://oeis.org/A006098
+
 
 def test():
 
@@ -1856,6 +1973,14 @@ def test():
         code = get_code()
         #distill = CodeDistill(code)
         distill = PauliDistill(code)
+
+        #result = distill.get_variety(verbose=True)
+        #px, py, pz, pw = result
+        #x, y, z, w = px.parent().gens()
+        #print(px(x=1,y=sage.I,z=z,w=z))
+        #print(py(x=1,y=sage.I,z=z,w=z))
+        #print(pz(x=1,y=sage.I,z=z,w=z))
+        #print(pw(x=1,y=sage.I,z=z,w=z))
 
     trials = argv.get("trials", 10000)
     nsols = argv.get("nsols", 10)
@@ -3551,36 +3676,60 @@ def test_clifford():
     from qumba.pauli import PauliCode
     from qumba.distill import PauliDistill
 
-    n = argv.get("n", 3)
+    n = argv.get("n", 5)
     k = 1
     cliff = Clifford(n)
     CX = cliff.CX
     CZ = cliff.CZ
+    SWAP = cliff.SWAP
     H = cliff.H
     S = cliff.S
 
     items = []
     trials = argv.get("trials", 100)
 
-    if argv.ZX:
-        gens = []
-        for i in range(n):
-            gens.append(H(i))
-            for j in range(n):
-                if i!=j:
-                    gens.append(CX(i,j))
-    else:
-        gens = cliff.get_gens()
+    if argv.random:
+        if argv.ZX:
+            gens = []
+            for i in range(n):
+                gens.append(H(i))
+                for j in range(n):
+                    if i!=j:
+                        gens.append(CX(i,j))
+        else:
+            gens = cliff.get_gens()
+        
+        for i in range(trials):
+            g = choice(gens)
+            for j in range(10*n):
+                g = g*choice(gens)
+            items.append(g)
+
+        #items = [S(2)*CX(0,1)*CX(0,2)*CX(1,2)*H(1)] # fail
+        #items = [CX(0,1)*CX(0,2)*CX(1,2)*H(0)]
+
+    elif n==2:
+        items = [CX(0,1), CX(0,1)*H(1)]
+
+    elif n==3:
+        items = [CX(2,0)*CX(2,1)*CX(0,2)*CX(1,2)*H(0)*H(1)]
+        items = [CX(0,2)*SWAP(1,2)*CX(2,0)]
     
-    for i in range(trials):
-        g = choice(gens)
-        for j in range(10*n):
-            g = g*choice(gens)
-        items.append(g)
+        assert SWAP(1,2) == CX(1,2)*CX(2,1)*CX(1,2)
 
-    #items = [S(2)*CX(0,1)*CX(0,2)*CX(1,2)*H(1)] # fail
-    items = [CX(0,1)*CX(0,2)*CX(1,2)*H(0)]
+    elif n==5:
+        E = CZ(0,1)*CZ(1,2)*CZ(2,3)*CZ(3,4)*CZ(4,0)
+        E = H(0)*H(1)*H(2)*H(3)*H(4)*E
+        items = [E]
 
+    else:
+        return
+
+    for E in items:
+        print(E.shape)
+        pauli = PauliCode.from_encoder(E, k=k)
+        print(pauli)
+    return
 
     w_ = green(0, 1)
     lhs = reduce(matmul, [w_]*(n-1))@Clifford(1).get_identity()
@@ -3614,7 +3763,7 @@ def test_clifford():
 
     M = Matrix(R, [z, 1]).t
     M = reduce(matmul, [M]*n)
-    print(M)
+    print(M.t)
 
     S = sage.PolynomialRing(sage.ZZ, list("xyzw"))
     x,y,z,w = S.gens()
@@ -3623,16 +3772,19 @@ def test_clifford():
 
     space = SymplecticSpace(n)
     for E in items:
+        # E is the encoder, but we are computing 
+        # the action of the decoder which is E.d
         EM = lhs*E.d*M
         top = EM[0,0]
         bot = EM[1,0]
         if top == 0 or bot == 0:
             continue
         #print(E.name)
+        #print(E)
         #print(EM)
         #print(r2*EM)
 
-        v,phases = cliff.get_symplectic(E)
+        v, phases = cliff.get_symplectic(E)
         assert space.is_symplectic(v)
         u = space.get_expr(E.name)
         assert u==v
@@ -3655,26 +3807,30 @@ def test_clifford():
         print("f1 =", f1)
 
         distill = PauliDistill(pauli) # uses code wenum & density matrices
-        f = distill.build()
-        print("f  =", f) #, "\n  =?= (%s)/(%s)" %( top, bot), end=' ')
+        f2 = distill.build()
+        print("f2  =", f2) #, "\n  =?= (%s)/(%s)" %( top, bot), end=' ')
         #print("   = (%s)/(%s)" % (top, bot))
-        print("   =", top/bot, f==top/bot)
+        print("   =", top/bot, f2==top/bot)
 
-        assert f==f1
+        assert f2==f1
 
         frac = top/bot
 
         if argv.ZX:
-            assert f==frac
+            assert f2==frac
 
         items = pauli.get_wenum()
         px, py, pz, pw = items
 
         #print(pw)
-        a = pw(x=z, y=0, z=0, w=1)
-        b = pw(x=1, y=0, z=0, w=z)
+        #a = pw(x=z, y=0, z=0, w=1)
+        #b = pw(x=1, y=0, z=0, w=z)
+        a = px(x=1, y=sage.I, z=z, w=z)
+        b = py(x=1, y=sage.I, z=z, w=z)
+        c = pz(x=1, y=sage.I, z=z, w=z)
+        d = pw(x=1, y=sage.I, z=z, w=z)
         #print(poly, "=", factor(poly))
-        print(a, "/", b)
+        print(a, ",", b, ",", c, ",", d)
 
         continue
 
@@ -3684,11 +3840,11 @@ def test_clifford():
         pw = pw(x=1, y=I, z=z, w=z)
 
         if px!=0:
-            f2 = pw / px
-            print("f2 =", f2, f2==f1)
+            f3 = pw / px
+            print("f3 =", f3, f3==f1)
         if py!=0:
-            f2 = pw / py
-            print("f2 =", f2, f2==f1)
+            f3 = pw / py
+            print("f3 =", f3, f3==f1)
 
         continue
 
