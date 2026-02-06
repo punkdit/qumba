@@ -26,7 +26,7 @@ from qumba.matrix_sage import Matrix
 from qumba.clifford import Clifford, w8, w4, r2, ir2, green
 from qumba.action import mulclose
 from qumba.dense import bitlog
-from qumba.util import choose
+from qumba.util import choose, cross
 from qumba.triorthogonal import is_morthogonal, strong_morthogonal
 from qumba.pauli import PauliCode
 from qumba import pauli
@@ -465,13 +465,14 @@ def pprint(f):
 
 
 class Distill:
+    "abstract base class"
 
     f = None
     def __init__(self, n):
         self.n = n
 
     def get_variety(self):
-        pass
+        assert 0, " subclass and define me "
 
     def find(self, trials=1000, nsols=1, top=True, verbose=False):
         sign = +1 if top else -1
@@ -800,6 +801,7 @@ class PauliDistill(Distill): # much faster than CodeDistill
 
 class CodeDistill(Distill):
     def __init__(self, code):
+        assert isinstance(code, QCode)
         assert code.k == 1
         Distill.__init__(self, code.n)
         self.code = code
@@ -852,23 +854,19 @@ class CodeDistill(Distill):
 
 
 
-class PauliCodeDistill(Distill):
+class ProjectorDistill(Distill): # adapted from CodeDistill 
     def __init__(self, code):
         assert code.k == 1
         Distill.__init__(self, code.n)
-        #self.code = code
         self.paulicode = PauliCode.promote(code)
 
     @cache
     def get_variety(self, projective=False):
-        #code = self.code
-        #n = code.n
         n = self.n
         space = Clifford(n)
         paulicode = self.paulicode
         M = 2**paulicode.m
     
-        #P = get_projector(code)
         P = self.paulicode.get_projector()
         Pd = P.d
     
@@ -889,9 +887,6 @@ class PauliCodeDistill(Distill):
         #print("trace ... ", end='', flush=True)
         div = rho.trace()
     
-        #L = strop(code.L, "I").split()
-        #LX = space.get_pauli(L[0])
-        #LZ = space.get_pauli(L[1])
         logicals = paulicode.logicals
         LX = logicals[0].get_clifford()
         LZ = logicals[1].get_clifford()
@@ -3564,6 +3559,9 @@ def test_clifford():
     H = cliff.H
     S = cliff.S
 
+    items = []
+    trials = argv.get("trials", 100)
+
     if argv.ZX:
         gens = []
         for i in range(n):
@@ -3574,8 +3572,6 @@ def test_clifford():
     else:
         gens = cliff.get_gens()
     
-    items = []
-    trials = argv.get("trials", 10)
     for i in range(trials):
         g = choice(gens)
         for j in range(10*n):
@@ -3583,7 +3579,8 @@ def test_clifford():
         items.append(g)
 
     #items = [S(2)*CX(0,1)*CX(0,2)*CX(1,2)*H(1)] # fail
-    #items = [H(0)*CX(0,1)*CX(0,2)*CX(1,2)*H(1)*H(2)]
+    items = [CX(0,1)*CX(0,2)*CX(1,2)*H(0)]
+
 
     w_ = green(0, 1)
     lhs = reduce(matmul, [w_]*(n-1))@Clifford(1).get_identity()
@@ -3631,7 +3628,6 @@ def test_clifford():
         bot = EM[1,0]
         if top == 0 or bot == 0:
             continue
-        print()
         #print(E.name)
         #print(EM)
         #print(r2*EM)
@@ -3642,26 +3638,27 @@ def test_clifford():
         assert u==v
 
         pauli = PauliCode.from_encoder(E, k=k)
+
+        distill = GateDistill(lhs*E.d)
+        f0 = distill.build()
+
+        if "zeta" in str(f0):
+            continue
+
+        print()
         print(pauli)
 
-        #code = QCode.from_encoder(v, k=k)
-        ##print(code)
-        ##print(code.longstr())
-        #distill = CodeDistill(code)
-        #f0 = distill.build()
-        #print("f0 =", f0)
+        print("f0 =", f0)
 
-        distill = PauliCodeDistill(pauli)
+        distill = ProjectorDistill(pauli) # uses code projector & density matrices
         f1 = distill.build()
         print("f1 =", f1)
 
-        distill = PauliDistill(pauli)
+        distill = PauliDistill(pauli) # uses code wenum & density matrices
         f = distill.build()
-        #f = sage.simplify(f)
         print("f  =", f) #, "\n  =?= (%s)/(%s)" %( top, bot), end=' ')
+        #print("   = (%s)/(%s)" % (top, bot))
         print("   =", top/bot, f==top/bot)
-        #f = 1/f
-        #print(f, f==top/bot)
 
         assert f==f1
 
@@ -3670,42 +3667,74 @@ def test_clifford():
         if argv.ZX:
             assert f==frac
 
-#        orbit = {t/b for (t,b) in zip(galois_orbit(top), galois_orbit(bot))}
-#        for f1 in [f, -f, 1/f, -1/f]:
-#            if f1 in orbit:
-#                break
-#        else:
-#            assert 0
+        items = pauli.get_wenum()
+        px, py, pz, pw = items
 
-        #print(pystr(f))
-        #print(pystr(frac))
+        #print(pw)
+        a = pw(x=z, y=0, z=0, w=1)
+        b = pw(x=1, y=0, z=0, w=z)
+        #print(poly, "=", factor(poly))
+        print(a, "/", b)
+
+        continue
+
+        px = px(x=1, y=I, z=z, w=z)
+        py = py(x=1, y=I, z=z, w=z)
+        pz = pz(x=1, y=I, z=z, w=z)
+        pw = pw(x=1, y=I, z=z, w=z)
+
+        if px!=0:
+            f2 = pw / px
+            print("f2 =", f2, f2==f1)
+        if py!=0:
+            f2 = pw / py
+            print("f2 =", f2, f2==f1)
+
+        continue
+
+        """
+        # encoder map uses the other fourth root of unity,
+        # as compared to Distill.build ( PauliCodeDistill & PauliDistill )
         lfunc = pyfunc(f)
         rfunc = pyfunc(frac)
         #z0 = random() + 1j*random()
-        z0 = 1.123+0j
+        z0 = 1.123+0j # must be real
         lval = lfunc(z0)
         rval = rfunc(z0)
 
-        #print(lval, rval)
         for z1 in [lval, -lval, 1/lval, -1/lval]:
-            #if eq(z1, rval) or eq(z1.conjugate(), rval):
             if eq(z1.conjugate(), rval):
                 break
         else:
             assert 0
+        """
 
-        continue
+        items = pauli.get_wenum()
+        px, py, pz, pw = items
 
-        px, py, pz, pw = pauli.get_wenum()
+        #top = f.numerator()
+        #bot = f.denominator()
 
-        print("px =", px(x=1, y=I, z=z, w=z), end=" " )
-        print("\t=", factor(px(x=1, y=I, z=z, w=z) ))
-        print("py =", py(x=1, y=I, z=z, w=z), end=" " )
-        print("\t=", factor(py(x=1, y=I, z=z, w=z) ))
-        print("pz =", pz(x=1, y=I, z=z, w=z), end=" " )
-        print("\t=", factor(pz(x=1, y=I, z=z, w=z) ))
-        print("pw =", pw(x=1, y=I, z=z, w=z), end=" " )
-        print("\t=", factor(pw(x=1, y=I, z=z, w=z) ))
+        #x,y,z,w = pw.parent().gens()
+        for vals in cross([(z,-1,1,sage.I,-sage.I)]*4):
+            poly = pw(x=vals[0], y=vals[1], z=vals[2], w=vals[3])
+            #if poly.degree() <= 2:
+            if poly == top or poly == bot:
+                print(poly, vals)
+
+        #print("px =", px(x=z, y=I, z=I, w=I))
+        #print("py =", py(x=I, y=z, z=I, w=I))
+        #print("pz =", py(x=I, y=I, z=z, w=I))
+        #print("pw =", pw(x=I, y=I, z=I, w=z))
+
+#        print("px =", px(x=1, y=I, z=z, w=z), end=" " )
+#        print("\t=", factor(px(x=1, y=I, z=z, w=z) ))
+#        print("py =", py(x=1, y=I, z=z, w=z), end=" " )
+#        print("\t=", factor(py(x=1, y=I, z=z, w=z) ))
+#        print("pz =", pz(x=1, y=I, z=z, w=z), end=" " )
+#        print("\t=", factor(pz(x=1, y=I, z=z, w=z) ))
+#        print("pw =", pw(x=1, y=I, z=z, w=z), end=" " )
+#        print("\t=", factor(pw(x=1, y=I, z=z, w=z) ))
 
 
 
