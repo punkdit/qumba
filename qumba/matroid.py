@@ -4,12 +4,15 @@ from functools import cache
 
 import numpy
 
-from bruhat.matroid import Matroid, SpMatroid
+from bruhat.matroid import Matroid, SpMatroid, mask_le
 from bruhat.action import mulclose, get_orbits
 
 from qumba import construct 
 from qumba.symplectic import SymplecticSpace
+from qumba.qcode import QCode
+from qumba import db
 from qumba.argv import argv
+from qumba.matrix import Matrix
 
 
 
@@ -187,6 +190,90 @@ def test_orbit():
 
     orbits = get_orbits(gen, found, True)
 
+
+def build_detectable(code):
+    H = code.H
+    m, nn = H.shape
+    n = nn//2
+    #print(H)
+
+    masks = list(numpy.ndindex((2,)*n))
+    lookup = {bits:set() for bits in masks}
+    for bits in numpy.ndindex((2,)*nn):
+        v = Matrix(bits)
+        v2 = v.reshape(n,2)
+        w = v2.sum(1)
+        mask = tuple(min(1,int(wi)) for wi in w)
+        Hv = H*v
+        lookup[mask].add(str(Hv))
+
+    detectable = [(0,)*n]
+    for mask in masks:
+        vals = lookup[mask]
+        if '.'*m in vals:
+            pass
+            #print("   ", end='')
+        else:
+            #print(" + ", end='')
+            detectable.append(mask)
+        #print(mask, ' '.join(lookup[mask]))
+
+    found = set(detectable)
+    for a in masks:
+        if a in found:
+            continue
+        for b in list(found):
+            if mask_le(n, a, b):
+                #print(a, "<=", b)
+                found.remove(b)
+    
+    M = Matroid(n, found)
+    M.check()
+
+    #print()
+    return M
+
+
+def test_detect():
+    #code = construct.get_713()
+
+    n = argv.get("n", 4)
+    k = argv.get("k", 1)
+    d = argv.get("d", 1)
+    found = set()
+    for code in construct.all_codes(n,k,d):
+        M = build_detectable(code)
+        if M not in found:
+            code.build()
+            found.add(M)
+            print(code, end=' ')
+            print("%d:%d"%(M.rank,code.d), end=' ', flush=True)
+    print()
+    print(len(found))
+
+
+def test_distance():
+    code = QCode.fromstr("""
+    XZIZIXIZZI
+    IYIZZYIIZZ
+    IIYZZYIXII
+    IZZYIYZIIZ
+    IZIIXYZYII
+    IZZIZZXXZZ
+    IIZZZZZIXZ
+    IZZZZIIZZX
+    ZZZZZZIIII
+    """) # rank 4
+
+    code = construct.get_713() # rank 3
+    code = construct.get_513() # rank 2
+
+    for code in db.get_codes():
+    
+        print(code)
+        M = build_detectable(code)
+        #print(M)
+        print("rank:", M.rank)
 
 
 if __name__ == "__main__":
