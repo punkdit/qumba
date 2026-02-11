@@ -1123,7 +1123,10 @@ def test_logical():
 
     _id = argv._id
     n = argv.n
-    if n==4:
+    
+    if argv.reed_muller:
+        code = construct.reed_muller(1,4)
+    elif n==4:
         code = construct.get_422()
     elif n==8:
         code = construct.get_832()
@@ -1132,8 +1135,6 @@ def test_logical():
     elif _id:
         print("fetching https://qecdb.org/codes/%s" % _id)
         code = list(db.get(_id=_id))[0]
-
-
     else:
     
         #code = construct.get_10_2_3()
