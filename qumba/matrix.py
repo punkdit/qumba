@@ -57,7 +57,8 @@ def complement(H):
 
 class Matrix(object):
     def __init__(self, A, p=DEFAULT_P, shape=None, name="?"):
-        if type(A) == list or type(A) == tuple:
+        #if type(A) == list or type(A) == tuple:
+        if isinstance(A, (list,tuple)):
             A = numpy.array(A, dtype=scalar)
         elif isinstance(A, Matrix):
             A, p = A.A, A.p

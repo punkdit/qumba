@@ -191,6 +191,209 @@ def test_orbit():
     orbits = get_orbits(gen, found, True)
 
 
+def detect_classical(H):
+    m, n = H.shape
+
+    masks = list(numpy.ndindex((2,)*n))
+    found = set()
+    found.add( (0,)*n )
+    for mask in masks:
+        v = Matrix(mask)
+        Hv = H*v
+        if Hv.sum(): # non-zero syndrome
+            found.add(mask)
+
+    for a in masks:
+        if a in found:
+            continue
+        for b in list(found):
+            if mask_le(n, a, b):
+                #print(a, "<=", b)
+                found.remove(b)
+    
+    #print(found)
+    M = Matroid(n, found)
+    M.check()
+
+    #print()
+    return M
+
+
+def correct_classical(H):
+    #print(H)
+    m, n = H.shape
+
+    masks = list(numpy.ndindex((2,)*n))
+    syns = [Matrix(u) for u in numpy.ndindex((2,)*m)]
+
+    lookup = {u:[] for u in syns}
+    for mask in masks:
+        v = Matrix(mask)
+        Hv = H*v
+        lookup[Hv].append(mask)
+
+    found = []
+    #found.append( (0,)*n )
+    for Hv,items in lookup.items():
+        #assert len(items)
+        if not len(items):
+            continue
+        items.sort(key = sum)
+        #print(Hv, items)
+        w = sum(items[0])
+        items = [v for v in items if sum(v) == w]
+        #print(Hv, items)
+        if len(items)!=1:
+            continue
+        v = items[0]
+        found.append(v)
+    #print(found)
+
+    for a in masks:
+        if a in found:
+            continue
+        for b in list(found):
+            if mask_le(n, a, b):
+                #print(a, "<=", b)
+                found.remove(b)
+    
+    #print(found)
+    M = Matroid(n, found)
+    M.check()
+
+    #print()
+    return M
+
+
+
+def test_classical():
+    from bruhat.algebraic import qchoose_2
+
+    found = set()
+    for H in qchoose_2(4, 2):
+        H = Matrix(H)
+        M = detect_classical(H)
+        if M in found:
+            continue
+        found.add(M)
+    assert len(found) == 35 # missing one non-F2-representable matroid
+
+    found = set()
+    for H in qchoose_2(4, 2):
+        H = Matrix(H)
+        #M = detect_classical(H)
+        M = correct_classical(H)
+        if M in found:
+            continue
+        #print(M)
+        found.add(M)
+    assert len(found) == 21
+
+    m = 4
+    n = 8
+    masks = list(numpy.ndindex((2,)*n))
+    for trial in range(100):
+        H = Matrix.rand(m, n)
+        #print(H)
+        M0 = detect_classical(H)
+        M1 = correct_classical(H)
+        f0 = M0.rankfunc()
+        f1 = M1.rankfunc()
+        f2 = M1.get_dual().rankfunc()
+
+        #for mask in masks:
+        #    nask = tuple(1-i for i in mask)
+        #    print(f0[mask]-f2[nask], end=' ')
+        #print()
+
+        r0, r1 = (M0.rank, M1.rank)
+
+    return
+
+    for n in range(2,8):
+      for m in range(1,n+1):
+        found = set()
+        for H in qchoose_2(n, m):
+            H = Matrix(H)
+            #M = detect_classical(H)
+            M = correct_classical(H)
+            if M in found:
+                continue
+            #print(M)
+            found.add(M)
+        print(len(found), end=' ', flush=True)
+      print()
+
+
+
+
+
+class Mask(tuple):
+    def __new__(cls, *items):
+        ob = tuple.__new__(cls, items)
+        return ob
+
+    def __str__(self):
+        return "Mask%s"%(tuple.__str__(self),)
+
+    def __add__(self, other):
+        assert len(self) == len(other)
+        n = len(self)
+        items = [self[i]+other[i] for i in range(n)]
+        return Mask(*items)
+
+
+def test_find():
+
+    m = Mask(1, 0, 0)
+    m = m +  Mask(0, 1, 0)
+
+    lookup = {(1,1,0):5}
+    assert lookup[m] == 5
+    
+    n = 10
+    accept = lambda m:sum(m)<3
+    items = list(find_masks(n, accept))
+    assert len(items) == 1 + 10 + 5*9, len(items)
+
+
+def find_masks(n, accept = lambda m:True):
+    root = Mask(*[0]*n)
+
+    gen = []
+    for i in range(n):
+        items = [0]*n
+        items[i] = 1
+        gen.append(Mask(*items))
+
+    children = {}
+
+    bdy = []
+    item = accept(root)
+    if item is not None:
+        yield item
+        bdy.append(root)
+    found = set(bdy)
+    weight = 0
+    while bdy:
+        _bdy = []
+        for m in bdy:
+          for i in range(n):
+            if m[i]:
+                continue
+            m1 = m + gen[i]
+            if m1 in found:
+                continue
+            found.add(m1)
+            item = accept(m1)
+            if item is not None:
+                yield item
+                _bdy.append(m1)
+                #children.setdefault(m1, []). # ?!?
+        bdy = _bdy
+        
+
+
 def build_detectable(code):
     H = code.H
     m, nn = H.shape
@@ -234,19 +437,51 @@ def build_detectable(code):
     return M
 
 
+def find_detectable(code):
+    H = code.H
+    m, nn = H.shape
+    n = nn//2
+    #print(H)
+
+    def accept(mask):
+        if sum(mask) == 0:
+            return (0,)*n
+        v = Matrix(mask)
+        v2 = v.reshape(n,2)
+        w = v2.sum(1)
+        mask = tuple(min(1,int(wi)) for wi in w)
+        Hv = H*v
+        if Hv.sum()==0:
+            print("reject:", mask)
+            return 
+        return mask
+
+    masks = []
+    for mask in find_masks(nn, accept):
+        print(mask)
+        masks.append(mask)
+    
+    M = Matroid(n, masks)
+    M.check()
+
+    return M
+
+
 def test_detect():
     #code = construct.get_713()
 
-    n = argv.get("n", 4)
+    n = argv.get("n", 3)
     k = argv.get("k", 1)
     d = argv.get("d", 1)
     found = set()
     for code in construct.all_codes(n,k,d):
         M = build_detectable(code)
+        M1 = find_detectable(code)
+        assert M==M1
         if M not in found:
             code.build()
             found.add(M)
-            print(code, end=' ')
+            #print(code, end=' ')
             print("%d:%d"%(M.rank,code.d), end=' ', flush=True)
     print()
     print(len(found))
