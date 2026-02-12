@@ -13,6 +13,8 @@ from qumba.qcode import QCode
 from qumba import db
 from qumba.argv import argv
 from qumba.matrix import Matrix
+from qumba.lax import lc_orbits, Lower, Upper
+from qumba.util import all_subsets
 
 
 
@@ -56,6 +58,38 @@ def get_matroid(code):
     return M
 
 
+
+def test_signature():
+
+    n = 5
+    k = 1
+    idxs = tuple(range(n))
+    idxss = [tuple(A) for A in all_subsets(idxs)]
+    assert len(idxss) == 2**n
+    count = 0
+    for code in construct.all_codes(n, k):
+        code.build()
+        count += 1
+        H = code.H
+        F = Upper(H)
+        sig = F.signature()
+        print(code, sig)
+        lookup = {A:F(A) for A in idxss}
+        for A in idxss:
+            assert 0<=lookup[A]
+            #assert lookup[A]<=len(A), "%s > len(%s)"%(lookup[A], A)
+            for B in idxss:
+                join = tuple(i for i in idxs if i in A or i in B)
+                meet = tuple(i for i in idxs if i in A and i in B)
+                lhs = lookup[join] + lookup[meet] 
+                rhs = lookup[A] + lookup[B]
+                #print(A, B, join, meet)
+                #print("\t", lhs, "<=", rhs)
+                assert lhs<=rhs
+                if meet == A:
+                    assert lookup[A] <= lookup[B]
+                
+    print("count:", count)
 
 
 def main():
@@ -219,10 +253,54 @@ def detect_classical(H):
     return M
 
 
-def correct_classical(H):
+def s_correct_classical(H):
+    #print("s_correct_classical")
     #print(H)
     m, n = H.shape
 
+    K = H.kernel()
+    #print("K =")
+    #print(K)
+    C = list(K.span())
+    #print("C =", C)
+
+    masks = list(numpy.ndindex((2,)*n))
+    found = []
+    for mask in masks:
+        # this error is correctable if it is
+        # the unique error of minimum weight in its coset.
+        error = Matrix(mask)
+        vC = [error+u for u in C] # <-- the coset
+        vC.sort(key = sum)
+        #print(error, vC)
+        w = vC[0].sum()
+        items = [v for v in vC if v.sum() == w]
+        if len(items) != 1:
+            continue
+        u = items[0]
+        if u==error:
+            #print("\tcorrectable", mask)
+            found.append(mask)
+
+    for a in masks:
+        if a in found:
+            continue
+        for b in list(found):
+            if mask_le(n, a, b):
+                #print(a, "<=", b)
+                found.remove(b)
+    
+    #print(found)
+    M = Matroid(n, found)
+    #M.check() # FAIL !!
+
+    #print()
+    return M
+
+
+
+def correct_classical(H):
+    m, n = H.shape
     masks = list(numpy.ndindex((2,)*n))
     syns = [Matrix(u) for u in numpy.ndindex((2,)*m)]
 
@@ -239,7 +317,7 @@ def correct_classical(H):
         if not len(items):
             continue
         items.sort(key = sum)
-        #print(Hv, items)
+        #print(Hv, "-->", items)
         w = sum(items[0])
         items = [v for v in items if sum(v) == w]
         #print(Hv, items)
@@ -247,7 +325,81 @@ def correct_classical(H):
             continue
         v = items[0]
         found.append(v)
+        #print("\tcorrectable:", v)
     #print(found)
+
+    for a in masks:
+        if a in found:
+            continue
+        for b in list(found):
+            if mask_le(n, a, b):
+                #print(a, "<=", b)
+                found.remove(b)
+    
+    #print(found)
+    M = Matroid(n, found)
+    #M.check() # FAIL
+
+    #print()
+    return M
+
+def tpl_le(lhs, rhs):
+    for (i,j) in zip(lhs, rhs):
+        if i>j:
+            return False
+    return True
+
+def erase_classical(H): # XXX what is this ?!?
+    print("erase_classical")
+    print(H)
+    m, n = H.shape
+
+    masks = list(numpy.ndindex((2,)*n))
+    syns = [Matrix(u) for u in numpy.ndindex((2,)*m)]
+    print(syns)
+
+#    lookup = {(erase,u):[] for u in syns for erase in masks}
+#    for erase in masks:
+#        for mask in masks:
+#            if not tpl_le(mask, erase):
+#                continue
+#            v = Matrix(mask)
+#            Hv = H*v
+#            key = erase,Hv
+#            lookup[key].append(mask)
+
+    lookup = {erase:{u:[] for u in syns} for erase in masks}
+    for erase in masks:
+        for mask in masks:
+            if not tpl_le(mask, erase):
+                continue
+            v = Matrix(mask)
+            Hv = H*v
+            key = erase,Hv
+            lookup[erase][Hv].append(mask)
+
+    #return
+
+    found = []
+    #found.append( (0,)*n )
+    #for key,items in lookup.items():
+    for erase in masks:
+        send = lookup[erase]
+        for Hv,items in send.items():
+            print(erase, Hv, "->", items)
+            #assert len(items)
+            if not len(items):
+                continue
+            items.sort(key = sum)
+            #print(Hv, items)
+            w = sum(items[0])
+            items = [v for v in items if sum(v) == w]
+            #print(Hv, items)
+            if len(items)!=1:
+                break
+        else:
+            print("\terase:", erase)
+            found.append(erase)
 
     for a in masks:
         if a in found:
@@ -265,9 +417,23 @@ def correct_classical(H):
     return M
 
 
-
 def test_classical():
     from bruhat.algebraic import qchoose_2
+
+    H = Matrix([[1,1,1,1]])
+    M = detect_classical(H)
+    assert M == Matroid.uniform(4,1)
+
+    M = correct_classical(H)
+    assert M == Matroid.uniform(4,0)
+
+    M = s_correct_classical(H)
+    assert M == Matroid.uniform(4,0)
+
+    #M = erase_classical(H)
+    #assert M == Matroid.uniform(4,1)
+
+    #return
 
     found = set()
     for H in qchoose_2(4, 2):
@@ -281,22 +447,65 @@ def test_classical():
     found = set()
     for H in qchoose_2(4, 2):
         H = Matrix(H)
-        #M = detect_classical(H)
         M = correct_classical(H)
+        s_M = s_correct_classical(H)
+        assert M==s_M, M
         if M in found:
             continue
         #print(M)
         found.add(M)
     assert len(found) == 21
 
+    n = 6
+    m = 4
+    #for m in range(1, n):
+      #print("qchoose_2(%d, %d)"%(n, m))
+    for H in qchoose_2(n, m):
+        H = Matrix(H)
+        M = correct_classical(H)
+        s_M = s_correct_classical(H)
+        assert M==s_M, M
+        try:
+            M.check()
+        except AssertionError:
+            print(H)
+            print(H.latex())
+            K = H.kernel()
+            print("G =")
+            print(K)
+            print(K.latex())
+            masks = list(M.masks)
+            masks.sort()
+            for mask in masks:
+                print(mask)
+            print(detect_classical(H))
+            raise
+
+#    found = set()
+#    for H in qchoose_2(4, 2):
+#        H = Matrix(H)
+#        M = erase_classical(H)
+#        if M in found:
+#            continue
+#        #print(M)
+#        found.add(M)
+#    assert len(found) == 14, len(found)
+#
+#    return
+
     m = 4
     n = 8
     masks = list(numpy.ndindex((2,)*n))
-    for trial in range(100):
+    for trial in range(10):
         H = Matrix.rand(m, n)
-        #print(H)
+        if H.rank() != m:
+            continue
         M0 = detect_classical(H)
         M1 = correct_classical(H)
+        M2 = s_correct_classical(H)
+        assert M1==M2
+        M1.check()
+        assert M1.less_equal(M0)
         f0 = M0.rankfunc()
         f1 = M1.rankfunc()
         f2 = M1.get_dual().rankfunc()

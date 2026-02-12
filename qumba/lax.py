@@ -159,6 +159,10 @@ class Functor:
         #print("?")
         return U is not None
 
+    def __call__(self, idxs):
+        H = self.get(idxs)
+        return H.m
+
     def signature(self, strict=False):
         counts = []
         lookup = {}
@@ -447,9 +451,7 @@ def main():
 
 
 
-def render_hecke_dot():
-
-    n = 4
+def render_hecke_dot(n=3):
 
     v0 = {code.H.normal_form() for code in construct.all_codes(n,0)}
     v1 = {code.H.normal_form() for code in construct.all_codes(n,1)}

@@ -337,6 +337,13 @@ class Matrix(object):
     def copy(self):
         return Matrix(self.A, self.p)
 
+    def span(self):
+        m, n = self.A.shape
+        for u in numpy.ndindex((self.p,)*m):
+            v = numpy.dot(u, self.A)
+            v = Matrix(v)
+            yield v
+
     def rowspan(self):
         m, n = self.A.shape
         for u in span(self.A):
