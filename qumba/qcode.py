@@ -243,8 +243,10 @@ class QCode(object):
             E = self.get_encoder()
             E = r*E
             code = QCode.from_encoder(E, self.m)
+        elif isinstance(r, (list, tuple)) and len(r)==self.n:
+            code = self.apply_perm(r)
         else:
-            raise TypeError
+            raise TypeError( "what's this:%r"%(type(r),) )
         return code
 
     @classmethod

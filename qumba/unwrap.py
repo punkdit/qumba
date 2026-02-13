@@ -13,7 +13,7 @@ import numpy
 from qumba.lin import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     rank, rand2, pseudo_inverse, kernel, direct_sum, zeros2, solve2, normal_form)
 from qumba.matrix import Matrix
-from qumba.qcode import QCode, SymplecticSpace, strop
+from qumba.qcode import QCode, SymplecticSpace, strop, fromstr
 from qumba.csscode import CSSCode
 from qumba import construct
 from qumba.distance import distance_z3
@@ -1758,6 +1758,262 @@ def test_dehn():
       for b in bases:
         print(int(is_iso(a,b)), end=" ")
       print()
+
+
+def dump_gap(name, logops):
+    f = open(name, 'w')
+    vs = []
+    for i,L in enumerate(logops):
+        vs.append("M%d"%i)
+        print("%s := %s;"%(vs[-1], L.gap()), file=f)
+    print("G := Group([%s]);"%(','.join(vs)), file=f)
+    f.close()
+    print("wrote %d gates to %s"%(i, name))
+
+
+def test_rm():
+    from bruhat.gset import Group, Perm
+    # See: 
+    # https://arxiv.org/abs/2602.09788
+
+    # construct QRM(4): Definition 4.
+    # QRM(4) == [[16,6,4]]
+    # QRM(6) == [[64,20,8]]
+    rank = 4 # aka "m"
+    assert rank%2 == 0
+    r = rank//2 - 1
+    code = construct.reed_muller(r, rank)
+    #print(code)
+    #return
+    L = fromstr("""
+    ...X...X...X...X
+    ............ZZZZ
+    .....X.X.....X.X
+    ..........ZZ..ZZ
+    .........X.X.X.X
+    ......ZZ......ZZ
+    ............XXXX
+    ...Z...Z...Z...Z
+    ..........XX..XX
+    .....Z.Z.....Z.Z
+    ......XX......XX
+    .........Z.Z.Z.Z
+    """)
+    code = QCode(code.H, None, L)
+    code.check()
+    code.distance("z3")
+
+    n = code.n
+    coords = list(numpy.ndindex((2,)*rank))
+    coords = [tuple(reversed(idxs)) for idxs in coords]
+    assert len(coords) == n
+    #print(coords)
+
+    lookup = {idxs:i for (i,idxs) in enumerate(coords)}
+
+    def P(i,j):
+        assert 0<=i<rank
+        assert 0<=j<rank
+        assert i!=j
+        idxs = list(range(rank))
+        idxs[i] = j
+        idxs[j] = i
+        items = [tuple(v[i] for i in idxs) for v in coords]
+        perm = Perm([lookup[v] for v in items])
+        return perm
+
+    def Q(i,j):
+        assert 0<=i<rank
+        assert 0<=j<rank
+        assert i!=j
+        items = []
+        for v in coords:
+            w = list(v)
+            w[i] = (w[i]+w[j])%2
+            w = tuple(w)
+            #print(v, "->", w)
+            items.append(w)
+        perm = Perm([lookup[v] for v in items])
+        return perm
+
+    space = code.space
+
+    def phase_gate_seq(g):
+        if type(g) is list:
+            g = Perm(g)
+        assert (g*g).is_identity()
+        ops = []
+        for idx in g.fixed():
+            ops.append(space.S(idx))
+        for idx in range(n):
+            jdx = g[idx]
+            if jdx<idx:
+                ops.append(space.CZ(idx, jdx))
+        return ops
+
+    def phase_gate(g):
+        ops = phase_gate_seq(g)
+        op = reduce(mul, ops)
+        return op
+
+    pairs = []
+    for i in range(rank):
+      for j in range(rank):
+        if i==j:
+            continue
+        pairs.append((i,j))
+    print("pairs:", pairs)
+
+    get_logical = lambda op: code.get_logical(op*code)
+
+    perms = []
+    logops = []
+    phaseops = []
+
+    op = phase_gate(list(range(n)))
+    L = get_logical(op)
+    #logops.append(L)
+    phaseops.append(L) # choose none
+
+    for (i,j) in pairs: # choose one
+        g = Q(i, j)
+        perms.append(g)
+        dode = list(g)*code
+        assert code.is_equiv(dode)
+        op = phase_gate(g)
+        dode = op*code
+        assert code.is_equiv(dode)
+        L = code.get_logical(dode)
+        logops.append(L)
+        phaseops.append(L)
+
+        ops = phase_gate_seq(g)
+        for opa in ops:
+          for opb in ops:
+            assert opa*opb==opb*opa
+        dode = code
+        for op in reversed(ops):
+            dode = op*dode
+            d = dode.distance("z3")
+            assert d>=code.d
+        print("yes", end=' ', flush=True)
+    print()
+
+    for (p,q) in choose(pairs, 2): # choose two
+        i,j = p
+        if i in q or j in q:
+            continue
+        a,b = q
+        Qij = Q(i,j)
+        Qab = Q(a,b)
+        assert Qij*Qab == Qab*Qij
+        if p>q:
+            continue
+        g = Qij*Qab
+        op = phase_gate(g)
+        assert (op*code).is_equiv(code)
+        L = get_logical(op)
+        logops.append(L)
+        phaseops.append(L)
+
+        ops = phase_gate_seq(g)
+        for opa in ops:
+          for opb in ops:
+            assert opa*opb==opb*opa
+        dode = code
+        for op in reversed(ops):
+            dode = op*dode
+            d = dode.distance("z3")
+            assert d>=code.d
+        print("yes", end=' ', flush=True)
+    print()
+
+    #G = mulclose(phaseops, verbose=True)
+    #print(len(G))
+
+    op = space.H()
+    dode = op*code
+    assert code.is_equiv(dode)
+    L = code.get_logical(dode)
+    logops.append(L)
+
+    for i in range(rank):
+      for j in range(i+1, rank):
+        g = P(i, j)
+        perms.append(g)
+        dode = list(g)*code
+        assert dode.is_equiv(code)
+        L = code.get_logical(dode)
+        logops.append(L)
+        dode = list(g)*dode
+        assert dode == code
+        assert (g*g).is_identity()
+        op = phase_gate(g)
+        dode = op*code
+        assert code.is_equiv(dode)
+        L = code.get_logical(dode)
+        #logops.append(L)
+
+    # GL(4,2)
+    #G = Group.generate(perms, verbose=True)
+    #print(len(G))
+
+    name = "reed_muller.gap"
+    dump_gap(name, logops)
+
+    #G = mulclose(logops, verbose=True)
+    #print(len(G))
+
+    kspace = SymplecticSpace(code.k)
+    CZ = lambda i,j: kspace.CZ(i-1, j-1)
+    S = lambda i: kspace.S(i-1)
+
+    # Example 6.
+    UP_e = phase_gate(list(range(n)))
+    lhs = get_logical(UP_e)
+    rhs = CZ(1,4)*CZ(2,5)*CZ(3,6)
+    assert(lhs==rhs)
+    
+    op = phase_gate(Q(0,1))
+    lhs = get_logical(op)
+    rhs = CZ(1,4)*CZ(2,5)*CZ(3,6)*CZ(2,3)
+    assert(lhs == rhs)
+
+    op = phase_gate(Q(2,3))
+    lhs = get_logical(op)
+    rhs = CZ(1,4)*CZ(2,5)*CZ(3,6)*CZ(2,6)
+    assert(lhs == rhs)
+
+    # Example 7.
+    UP_e = phase_gate(list(range(n)))
+    UP_12 = phase_gate(Q(0,1))
+    UP_34 = phase_gate(Q(2,3))
+    UP_1234 = phase_gate(Q(0,1)*Q(2,3))
+
+    assert UP_12*UP_34 != UP_1234 # not a hom !
+
+    lhs = get_logical(UP_e * UP_12)
+    rhs = CZ(2,3)
+    assert lhs == rhs
+
+    lhs = get_logical(UP_e * UP_34)
+    rhs = CZ(2,6)
+    assert lhs == rhs
+
+    lhs = get_logical(UP_e*UP_12*UP_34*UP_1234)
+    rhs = S(2)
+    assert lhs == rhs
+
+    return
+    
+
+    k = code.k
+    gen = [kspace.CZ(i,j) for i in range(k) for j in range(i+1,k)]
+    #gen += [kspace.S(i) for i in range(k)]
+    #G = mulclose(gen, verbose=True)
+    #print(len(G))
+
+    dump_gap("phase_gates.gap", gen)
 
 
 if __name__ == "__main__":
