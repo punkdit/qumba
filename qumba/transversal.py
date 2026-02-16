@@ -2860,6 +2860,58 @@ def test_lc_class():
     print(G.structure_description(True))
 
 
+def test_adaptor():
+
+    C8 = construct.get_832()
+    C16 = construct.reed_muller()
+
+    C2 = QCode.fromstr("XX", "IZ", "XI ZZ")
+
+    C8 = QCode.fromstr("XXXXXXXX ZZZZZZZZ ZZZZIIII ZZIIZZII ZIZIZIZI")
+    #C8 = [1,0,2,3,4,5,6,7] * C8
+
+    C82 = C2 @ C8
+    C82.distance("z3")
+    print(C82)
+    print(C82.longstr())
+
+    code = C82 + C16
+    space = code.space
+    CX = space.CX
+    op = reduce(mul, [CX(i+16, i) for i in range(16)])
+    dode = op*code
+    print(dode.is_equiv(code))
+
+    from qumba.gcolor import dump_transverse
+    #css = C8.to_css()
+    #dump_transverse(css.Hx, css.Lx)
+
+    #return
+
+    print(C8.longstr())
+    print(C16.longstr())
+
+    code = C8 + C16
+
+    print(code)
+    print(code.longstr())
+
+    space = code.space
+    CX = space.CX
+    op = reduce(mul, [CX(i, i+8) for i in range(8)])
+    dode = op*code
+    print(dode.is_equiv(code))
+
+    print(dode)
+    print(dode.longstr())
+
+    #L = dode.get_logical(code)
+    #print(L)
+
+    #css = dode.to_css()
+    #print(css.Lx)
+    #dump_transverse(css.Hx, css.Lx)
+
 
 if __name__ == "__main__":
     from time import time

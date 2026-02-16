@@ -973,6 +973,7 @@ class QCode(object):
         E = E * P
         code = QCode.from_encoder(E, k=self.k*other.k)
         return code
+    __matmul__ = concat
 
     @classmethod
     def load_codetables(cls):
