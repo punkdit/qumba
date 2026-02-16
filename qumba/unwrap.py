@@ -1150,6 +1150,7 @@ def test_logical():
         # logicals: O(9,2) == Sp(8,2), FT logicals: 432
     
         #code = list(db.get(_id="67a4b0129edf81e4b7e670ad"))[0] # [[30,8,3]]
+        # |G| = 3255764760616815820800
     
         #code = list(db.get(_id="6705236219cca60cf657a938"))[0] # [[21,3,5]]
         # 120960 autos, cyclic, logicals: 4320, FT logicals: 12
@@ -1161,7 +1162,7 @@ def test_logical():
         # logicals: 4320, FT logicals: 36
     
         #code = list(db.get(_id="67a4c83cfab4d3b49d2d29c1"))[0] # [[21,9,3]]
-        # logicals: more than Sp(16,2)
+        # logicals: Sp(16,2) < G < Sp(18,2)
 
     print(code)
     print(code.longstr())
@@ -1207,15 +1208,21 @@ def test_logical():
     if argv.avoid: # use to find the fault tolerant logicals
         avoid = get_avoid(code)
 
-    print("tau...", end='', flush=True)
+    print("tau... ", end='', flush=True)
     dode = space.H() * code
 
-    try:
-        tau = iter(transversal.find_isomorphisms_css(code, dode)).__next__()
-        print(" found")
-    except StopIteration:
-        print("no zx-duality")
-        tau = None
+    if dode.is_equiv(code):
+        print("self-dual")
+        #tau = Perm(list(range(n)), items)
+        tau = Matrix.get_identity(n)
+
+    else:
+        try:
+            tau = iter(transversal.find_isomorphisms_css(code, dode)).__next__()
+            print("found")
+        except StopIteration:
+            print("no zx-duality")
+            tau = None
 
     logops = set()
 
@@ -1247,6 +1254,7 @@ def test_logical():
         f.close()
         print("wrote to", argv.physical)
 
+    G.append( Matrix.get_identity(n) ) # important for self-dual codes!
     for g in G:
         if tau is None:
             break
