@@ -2439,6 +2439,88 @@ def test_832():
 
     
 
+def test_facet():
+    global K
+    print("warning: stomping on global field K")
+
+    degree = 24
+    K = CyclotomicField(degree)
+    w24 = K.gen()
+    w8 = w24**3
+
+    c = Clifford(1)
+
+    pauli1 = mulclose([c.X(), c.Z(), c.Y()])
+    assert len(pauli1) == 16
+    pauli1 = set(pauli1)
+
+    def is_cliff(op):
+        for g in pauli1:
+            if op*g*op.d not in pauli1:
+                return False
+        return True
+
+    gens = [c.H(), c.S()]
+    gens = [Matrix(K, g) for g in gens]
+    cliff1 = mulclose(gens)
+    assert len(cliff1) == 192
+
+    #for g in cliff1:
+    #    assert is_cliff(g) # yes
+
+    T = c.T()
+    assert not is_cliff(T)
+
+    F = c.S()*c.H()
+    assert F.ring == K
+
+    #print(F)
+
+    evecs = F.eigenvectors()
+    #for val,vec,dim in evecs:
+    #    print(val)
+    #    print(vec)
+
+    vec = evecs[0][1]
+    print("vec =")
+    print(vec)
+    print()
+
+    src = vec @ I
+
+
+    c2 = Clifford(2)
+    SI = c2.S(0)
+    IS = c2.S(1)
+    HI = c2.H(0)
+    IH = c2.H(1)
+    CZ = c2.CZ(0, 1)
+
+    cliff2 = mulclose([SI, IS, HI, IH, CZ], maxsize=None, verbose=True) # slow
+    #assert len(cliff2) == 92160
+    print(len(cliff2))
+
+    lhs = green(0,1) @ I
+    for g in cliff2:
+        op = lhs * g * src
+        op = ir2*op
+        u = op*op.d
+        if u != I:
+            continue
+        #if op == T:
+        #    print(op)
+        if is_cliff(op):
+            print('.', end='', flush=True)
+            continue
+        print("\nfound:")
+        print(op)
+        print("g =")
+        print(g, g.name)
+        #print()
+        #break
+
+
+
     
 def test():
     test_clifford()

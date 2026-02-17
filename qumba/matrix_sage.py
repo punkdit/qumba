@@ -123,9 +123,9 @@ class Matrix:
 
     def __matmul__(self, other):
         assert isinstance(other, Matrix)
-        assert self.ring == other.ring
+        ring = unify(self.ring, other.ring)
         M = self.M.tensor_product(other.M)
-        return Matrix(self.ring, M)
+        return Matrix(ring, M)
     tensor_product = __matmul__
 
     def direct_sum(self, other):
