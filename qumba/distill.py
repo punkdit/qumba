@@ -3894,6 +3894,113 @@ def test_clifford():
 
 
 
+def test_facet():
+    from qumba import clifford
+
+    degree = 24
+    K = sage.CyclotomicField(degree)
+    w24 = K.gen()
+    w8 = w24**3
+
+    #print("WARNING: stomping on global field clifford.K")
+    #clifford.K = K
+    #clifford.w8 = w8
+
+    c = Clifford(1, K, w8)
+    assert c.K == K
+    assert c.w == w8
+
+    g = c.X()
+    assert g.ring == K, g.ring
+
+    pauli1 = mulclose([c.X(), c.Z(), c.Y()])
+    assert len(pauli1) == 16
+    pauli1 = set(pauli1)
+    s_pauli1 = set(str(g) for g in pauli1)
+
+    def is_cliff(op):
+        for g in pauli1:
+            h = op*g*op.d 
+            assert (str(h) in s_pauli1) == (h in pauli1)
+            if h not in pauli1:
+                return False
+        return True
+
+    gens = [c.H(), c.S()]
+    #gens = [Matrix(K, g) for g in gens]
+
+    cliff1 = mulclose(gens)
+    assert len(cliff1) == 192
+
+    for g in pauli1:
+        assert g.ring == K, g
+        assert g in cliff1, g
+
+    for g in cliff1:
+        assert g.ring == K
+        assert is_cliff(g) # yes
+
+    T = c.T()
+    assert not is_cliff(T)
+
+    F = c.S()*c.H()
+    assert F.ring == K
+
+    #print(F)
+
+    evecs = F.eigenvectors()
+    #for val,vec,dim in evecs:
+    #    print(val)
+    #    print(vec)
+
+    vec = evecs[0][1] 
+    print("vec =")
+    print(vec)
+    print()
+
+    src = vec
+    #src = T*vec # nope
+    #src = Matrix(K, [[1, w24]]).t # works
+    print("src:")
+    print(src)
+    b = src[1,0]
+    print("minpoly:", b.minpoly())
+
+    src = src @ I
+
+    c2 = Clifford(2)
+    SI = c2.S(0)
+    IS = c2.S(1)
+    HI = c2.H(0)
+    IH = c2.H(1)
+    CZ = c2.CZ(0, 1)
+
+    maxsize = argv.get("maxsize", None)
+    cliff2 = mulclose([SI, IS, HI, IH, CZ], maxsize=maxsize, verbose=True) # slow
+    #assert len(cliff2) == 92160
+    print(len(cliff2))
+
+    lhs = green(0,1) @ I
+    for g in cliff2:
+        op = lhs * g * src
+        op = ir2*op
+        u = op*op.d
+        if u != I:
+            continue
+        #if op == T:
+        #    print(op)
+        if is_cliff(op):
+            print('.', end='', flush=True)
+            continue
+        print("\nfound:")
+        print(op)
+        print("g =")
+        print(g, g.name)
+        #print()
+        break
+
+
+
 
 
 
