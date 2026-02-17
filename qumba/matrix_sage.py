@@ -103,7 +103,8 @@ class Matrix:
 
     def __neg__(self):
         M = -self.M
-        return Matrix(self.ring, M)
+        name = ("-I",)+self.name
+        return Matrix(self.ring, M, name)
 
     def __pow__(self, n):
         if n < 0:
@@ -119,7 +120,8 @@ class Matrix:
         else:
             ring = unify(r.parent(), self.ring)
         M = r*self.M
-        return Matrix(ring, M)
+        name = (str(r),) + self.name
+        return Matrix(ring, M, name)
 
     def __matmul__(self, other):
         assert isinstance(other, Matrix)

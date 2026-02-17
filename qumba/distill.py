@@ -4001,6 +4001,147 @@ def test_facet():
 
 
 
+def test_compose():
+    degree = 24
+    K = sage.CyclotomicField(degree)
+    w24 = K.gen()
+    w8 = w24**3
+    w4 = w8**2
+    assert w4**2 == -1
+    r2 = w8 + w8**7
+    ir2 = r2 / 2
+    assert r2**2 == 2
+
+    c = Clifford(1, K, w8)
+    assert c.K == K
+    assert c.w == w8
+
+    g = c.X()
+    assert g.ring == K, g.ring
+
+    pauli1 = mulclose([c.X(), c.Z(), c.Y()])
+    assert len(pauli1) == 16
+    pauli1 = set(pauli1)
+
+    def is_cliff(op):
+        for g in pauli1:
+            h = op*g*op.d 
+            if h not in pauli1:
+                return False
+        return True
+
+    I, H, S, X, Z, Y = c.I, c.H(), c.S(), c.X(), c.Z(), c.Y()
+    gens = {H, S, X, Z, Y, I, -I}
+    op = c.wI()
+    diag = {I}
+    while op not in gens:
+        gens.add(op)
+        diag.add(op)
+        op = w8*op
+
+    gens = list(gens)
+    cliff1 = mulclose(gens)
+    assert len(cliff1) == 192
+
+    for g in pauli1:
+        assert g.ring == K, g
+        assert g in cliff1, g
+
+    herm = []
+    for g in cliff1:
+        assert g.ring == K
+        assert is_cliff(g) # yes
+        assert (g*g==I) == (g==g.d)
+        if g==g.d and -g not in herm:
+            herm.append(g)
+            assert g*g == I
+
+    print("herm:", len(herm))
+    print("pauli herm:", len([g for g in herm if g in pauli1]))
+
+    T = c.T()
+    assert not is_cliff(T)
+
+    F = c.S()*c.H()
+    assert F.ring == K
+
+
+    def get_z(vec):
+        a = vec[0,0]
+        b = vec[1,0]
+        if b==0:
+            return
+        z = a/b
+        return z
+
+    def get_name(vec):
+        z = get_z(vec)
+        if z is None:
+            return "inf"
+        return z.minpoly()
+
+    #vec = evecs[0][1] 
+    #print("vec =")
+    #print(vec)
+
+#    ops = []
+#    for op in cliff1:
+#        if op*op in ops:
+#            continue
+#        for g in diag:
+#            if g*op in ops or g*op*op in ops:
+#                break
+#        else:
+#            if op not in diag and op**2 not in diag and op**3 in diag:
+#                ops.append(op)
+
+    F = S*H
+    ops = [F, X*F, Z*F, Y*F]
+    ops = [w24*op for op in ops]
+
+    print("ops:", len(ops))
+
+    #for op in herm:
+    for op in ops:
+        #assert -op in herm
+
+        if op in pauli1:
+            continue
+            print("pauli: ", end='')
+
+        name = '*'.join(op.name)
+        name = name.replace("(0)", "")
+        print(name, end=' ')
+
+        if op == (w8**3)*Y*S:
+            print("HERE", end=" ")
+
+        evecs = op.eigenvectors()
+        for val,vec,dim in evecs:
+            #print(val)
+            #print(vec)
+            z = get_z(vec)
+            #if z == ir2*(1-w4):
+            #    print("+FOUND", end=" ")
+            #if z == -ir2*(1-w4):
+            #    print("-FOUND", end=" ")
+            p = get_name(vec)
+            print("(%s)"%val, p, end=", ")
+        print()
+
+
+        #print(op)
+        #print()
+    
+        continue
+        for f in Meromorphic.Clifford:
+            f = f.f
+    
+            g = p(x=f)
+            g = g.numerator()
+            if "I" not in str(g):
+                print(f, "->", g)
+
 
 
 
