@@ -139,6 +139,7 @@ class Clifford:
         self.n = n
         self.K = K
         self.w = w8
+        self.r2 = w8 + w8**7
         self.I = Matrix.identity(K, 2**n)
 
     def wI(self):
@@ -223,7 +224,7 @@ class Clifford:
     def H(self, i=0):
         K = self.K
         w = self.w
-        r2 = w+w.conjugate()
+        r2 = self.r2
         ir2 = r2 / 2
         H = Matrix(K, [[ir2, ir2], [ir2, -ir2]])
         Hi = self.mkop(i, H, "H")
@@ -393,6 +394,49 @@ class Clifford:
         op = space.parse(op)
         op = op.t # why is this transposed?
         return op, phases
+
+    def all_clifford(self, phase=1, pauli=True, check=False):
+        "phase: 0 no phases, 2 is +/-1, 1 is +/-1,+/-i"
+        from qumba.symplectic import SymplecticSpace
+        n = self.n
+        assert n<4, "too big?"
+    
+        s = SymplecticSpace(n)
+        gens =  [s.S(i) for i in range(n)]
+        gens += [s.H(i) for i in range(n)]
+        gens += [s.CX(i,j) for i in range(n) for j in range(i+1,n)]
+        Sp = mulclose(gens)
+        if n==1:
+            assert len(Sp) == 6
+        elif n==2:
+            assert len(Sp) == 720
+        elif n==3:
+            assert len(Sp) == 1451520
+    
+        if pauli:
+            pauli = self.pauli_group(phase)
+        else:
+            pauli = [self.I]
+        #print(len(pauli))
+    
+        G = set()
+        for g in Sp:
+            name = g.name
+            op = self.get_expr(name)
+            #print(op)
+            for h in pauli:
+                oph = op*h
+                if check:
+                    assert oph not in G
+                    G.add(oph) # hazah !
+                yield oph
+    
+        if check:
+            assert len(G) == len(Sp) * len(pauli)
+        #return G
+
+
+
 
 
 

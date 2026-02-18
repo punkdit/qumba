@@ -10,7 +10,7 @@ warnings.filterwarnings('ignore')
 
 from math import gcd
 from functools import reduce, cache
-from operator import matmul, add
+from operator import matmul, add, mul
 from random import random, randint, choice
 
 import numpy
@@ -23,7 +23,7 @@ from qumba.smap import SMap
 from qumba.qcode import strop, QCode
 from qumba import construct 
 from qumba.matrix_sage import Matrix
-from qumba.clifford import Clifford, w8, w4, r2, ir2, green
+from qumba.clifford import Clifford, w8, w4, r2, ir2, green, red
 from qumba.action import mulclose
 from qumba.dense import bitlog
 from qumba.util import choose, cross
@@ -560,7 +560,7 @@ class Distill:
         assert "zb" not in str(f), str(f)
         self.f = f
 
-        # XXX this uses the "wrong" fourth root of unity XXX
+        # XXX this uses the "wrong" _fourth root of unity XXX
 
         return f
 
@@ -3077,6 +3077,58 @@ ZZ.Z...Z.......Z..............Z
     #print("f(z) =", f)
 
 
+def poly_simp(p):
+    items = [x for x in p if x != 0]
+    assert items
+    f = items.pop()
+    while items and f > 1:
+        g = items.pop()
+        f = gcd(f, g)
+    return f, p/f
+
+
+def cyclo_factor(p):
+    f, p = poly_simp(p)
+    #ZZi = sage.GaussianIntegers()
+    K = sage.CyclotomicField(24)
+    base = sage.PolynomialRing(K, "z")
+    z = base.gens()[0]
+    #p = base(p)
+    #print(type(p), p.parent())
+    s = str(p).replace("^", "**")
+    p = eval(s, locals())
+    #print(p)
+    #print(type(p), p.parent())
+    #print(p.parent())
+    #print(type(p))
+    try:
+        p = sage.factor(p)
+        if f != 1:
+            p = f*p
+    except:
+        print("cyclo_factor(%s * (%s)): fail"%(f, p))
+        p = None
+        #raise
+    #print(type(p))
+    #p.append(f)
+    return p
+
+
+def eisenstein_factor(p):
+    f, p = poly_simp(p)
+    ZZw = sage.EisensteinIntegers()
+    base = sage.PolynomialRing(ZZw, "z")
+    p = base(p)
+    try:
+        p = sage.factor(p)
+        if f != 1:
+            p = f*p
+    except:
+        p = None
+        #raise
+    return p
+
+
 def gen_latex():
     code = get_code(verbose=False)
 
@@ -3119,7 +3171,7 @@ def gen_latex():
     top = f.numerator()
     bot = f.denominator()
 
-    r = sage.factor(top - z*bot)
+    r = top - z*bot
 
     df = sage.diff(f, z)
     df_top = df.numerator()
@@ -3127,15 +3179,24 @@ def gen_latex():
 
     print(r"\begin{align*}")
     print("f(z) &= %s \\\\" % latex(f))
-    print("r(z) &= %s \\\\" % latex(r))
+    print("r(z) &= %s \\\\" % latex(sage.factor(r)))
+    #print("r(z) &= %s \\\\" % latex(cyclo_factor(r)))
+    #print("r(z) &= %s \\\\" % latex(eisenstein_factor(r)))
 
     if df_bot == bot**2:
         print(r"f'(z) &= \frac{%s}{%s^2}"%(
             latex(sage.factor(df_top)), (latex( sage.factor(bot) ))))
+        #print(df_top/1771)
+        a = cyclo_factor(df_top)
+        if a is not None:
+            print(" %% top = ", a)
     else:
         print(r"f'(z) &= \frac{%s}{%s} %% df_bot != bot**2"%(
-            latex(sage.factor(df_top)), (latex( sage.factor(df_bot) ))))
+            latex(sage.factor(df_top)), 
+            latex(sage.factor(df_bot))))
     print(r"\end{align*}")
+
+    return
 
     from qumba.clifford import K
     ring = sage.PolynomialRing(K, "z")
@@ -3849,7 +3910,7 @@ def test_clifford():
         continue
 
         """
-        # encoder map uses the other fourth root of unity,
+        # encoder map uses the other _fourth root of unity,
         # as compared to Distill.build ( PauliCodeDistill & PauliDistill )
         lfunc = pyfunc(f)
         rfunc = pyfunc(frac)
@@ -4142,6 +4203,119 @@ def test_compose():
             if "I" not in str(g):
                 print(f, "->", g)
 
+
+def test_2q():
+    degree = 24
+    K = sage.CyclotomicField(degree)
+    w24 = K.gen()
+    w8 = w24**3
+    w4 = w8**2
+    assert w4**2 == -1
+    r2 = w8 + w8**7
+    ir2 = r2 / 2
+    assert r2**2 == 2
+
+    c = Clifford(1, K, w8)
+    assert c.K == K
+    assert c.w == w8
+
+    lhs = green(0, 1) @ I
+    rhs = green(1, 0) @ green(1, 0)
+
+    c = Clifford(2, K, w8)
+    found = set()
+    for op in c.all_clifford(0, check=True):
+        op = lhs*op*rhs
+        if op in found:
+            continue
+        found.add(op)        
+        top = op[0,0]
+        bot = op[1,0]
+        if bot == 0:
+            val = ("inf")
+        else:
+            val = (top/bot)
+        print(val, end=' ', flush=True)
+    print()
+
+
+#def test_ccz_fail():
+#    # trying to inject a CCZ but all i get are diagonal cliffords
+#
+#    K = sage.PolynomialRing(base, list("uvw"))
+#    u,v,w = K.gens()
+#    items = [Matrix(K, [[g,1]]).t for g in [u,v,w]]
+#    #items = [Matrix(K, [[1,1]]).t for g in [u,v,w]]
+#
+#    c = Clifford(6, K, K(w8))
+#    CX = c.CX
+#    CZ = c.CZ
+#    S = c.S
+#    CCZ = I<<I<<I<<Z
+#    _g = green(0,1)
+#    g_ = ir2*green(1,0)
+#    #print(g_)
+#    _r = red(0,1)
+#    r_ = red(1,0)
+#    lhs = reduce(matmul, [_r]*3 + [I]*3)
+#    #rhs = reduce(matmul, [g_]*3 + [I]*3)
+#    rhs = reduce(matmul, items + [I]*3)
+#    rhs = reduce(mul, [CX(i+3,i) for i in range(3)])*rhs
+#    #rhs = reduce(mul, [CZ(i,i+3) for i in range(3)])*rhs
+#    op = lhs*(CCZ@I@I@I)*rhs
+#    op = (ir2/2)*op
+#
+#    c = Clifford(3, K, K(w8))
+#    CZ = c.CZ
+#    S = c.S
+#    gen = [c.wI(), S(0), S(1), S(2), CZ(0,1), CZ(1,2)]
+#    phases = mulclose(gen)
+#    phases = set(phases)
+#    print("phases:", len(phases))
+#
+#    J = c.w**2
+#    assert J**2 == -1
+#    found = set()
+#    values = [1,J,-1,-J]
+#    for a in values:
+#     for b in values:
+#      for c in values:
+#        op1 = op.subs(u=a,v=b,w=c)
+#        #found.add(op1)
+#        if op1 not in phases and op1 not in found and op1.determinant()!=0:
+#            print("found non-clifford")
+#            print(op1)
+#            found.add(op1)
+#    print("found:", len(found))
+    
+
+def test_ccz():
+    # See: https://arxiv.org/abs/1609.07488 Fig 1.a
+    # and https://arxiv.org/abs/1904.01124
+
+    K = sage.PolynomialRing(base, list("uvw"))
+    u,v,w = K.gens()
+    items = [Matrix(K, [[g,1]]).t for g in [u,v,w]]
+    #items = [Matrix(K, [[1,1]]).t for g in [u,v,w]]
+
+    c = Clifford(6, K, K(w8))
+    CX = c.CX
+    CZ = c.CZ
+    S = c.S
+    CCZ = I<<I<<I<<Z
+    _g = green(0,1)
+    g_ = ir2*green(1,0)
+    #print(g_)
+    _r = red(0,1)
+    r_ = red(1,0)
+    rhs = reduce(matmul, [g_]*3 + [I]*3)
+    #rhs = reduce(matmul, items + [I]*3)
+    rhs = reduce(mul, [CX(i,i+3) for i in range(3)])*rhs
+    lhs = reduce(matmul, [I]*3 + [_r]*3 )
+    op = lhs*(CCZ@I@I@I)*rhs
+    #op = (ir2/2)*op
+
+    assert op == CCZ
 
 
 
