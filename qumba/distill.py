@@ -4318,6 +4318,87 @@ def test_ccz():
     assert op == CCZ
 
 
+def test_modular():
+
+    K = sage.CyclotomicField(24)
+    R = sage.PolynomialRing(K, "z")
+    z = R.gens()[0]
+    a = z**2 + 2*z - 1
+    b = z**2 - 2*z - 1
+    c = z**4 + 6*z**2 + 1
+    d = z**4 + 1
+    p_edge = a*b*c*d
+
+    p_face = z**8 + 14*z**4 + 1
+
+    print(p_edge)
+    edge_factors = []
+    edges = []
+    for (ff,dim) in (sage.factor(p_edge)):
+        #print("\t", ff)
+        assert dim==1
+        assert ff.degree() == 1
+        edge_factors.append(ff)
+        value = -ff(0)
+        edges.append(value)
+
+    print(p_face)
+    face_factors = []
+    faces = []
+    for (ff,dim) in (sage.factor(p_face)):
+        #print("\t", ff)
+        assert dim==1
+        assert ff.degree() == 1
+        face_factors.append(ff)
+        value = -ff(0)
+        faces.append(value)
+
+    #f = (z**5 - 5*z) / (5*z**4 - 1) # [[5,1,3]]
+    f = (z**7 + 7*z**3) / (7*z**4 + 1) # [[7,1,3]]
+    print(f)
+
+    df = sage.diff(f)
+    #print(df)
+
+    print("edges:")
+    for value in edges:
+        dfz = df(value)
+        a = dfz*dfz.conjugate()
+        print("\t", value, #"-->", f(value),
+            "is fixed" if f(value)==value else "",
+            "--> edge" if f(value) in edges else "",
+            "is contraction" if abs(complex(a))<1 else "")
+    r = (p_edge(f) - p_edge)
+    top = r.numerator()
+    bot = r.denominator()
+    #top = (top * 244140625)
+    print("p(f)-p=0")
+    for ff,dim in (sage.factor(top)):
+        if ff.degree() == 1:
+            print("\t", ff,
+                "face" if ff in face_factors else "",
+                "edge" if ff in edge_factors else "")
+
+    print("faces:")
+    for value in faces:
+        dfz = df(value)
+        a = dfz*dfz.conjugate()
+        print("\t", value,
+            "is fixed" if f(value)==value else "",
+            "--> face" if f(value)in faces else "",
+            "is contraction" if abs(complex(a))<1 else "")
+    r = (p_face(f) - p_face)
+    top = r.numerator()
+    bot = r.denominator()
+    #top = (top * 244140625)
+    print("p(f)-p=0")
+    for ff,dim in (sage.factor(top)):
+        if ff.degree() == 1:
+            print("\t", ff,
+                "face" if ff in face_factors else "",
+                "edge" if ff in edge_factors else "")
+
+
 
 if __name__ == "__main__":
 
