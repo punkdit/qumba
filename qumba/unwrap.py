@@ -2076,6 +2076,50 @@ def test_rm():
     dump_gap("phase_gates.gap", gen)
 
 
+def test_reed_muller():
+    rank = 4 # aka "m"
+    assert rank%2 == 0
+    r = rank//2 - 1
+    code = construct.reed_muller(r, rank)
+    L = fromstr("""
+    ...X...X...X...X
+    ............ZZZZ
+    .....X.X.....X.X
+    ..........ZZ..ZZ
+    .........X.X.X.X
+    ......ZZ......ZZ
+    ............XXXX
+    ...Z...Z...Z...Z
+    ..........XX..XX
+    .....Z.Z.....Z.Z
+    ......XX......XX
+    .........Z.Z.Z.Z
+    """)
+    code = QCode(code.H, None, L)
+    code.check()
+    code.distance("z3")
+
+    print(code)
+    print(code.longstr())
+
+    dode = construct.get_15_1_3()
+    print(dode)
+    print(dode.longstr())
+
+    eode = code + dode
+    print(eode)
+
+    space = eode.space
+    op = space.get_identity()
+    CX = space.CX
+    n = dode.n
+    for i in range(n):
+        op = CX(i+n, i) * op
+    fode = op*eode
+    print(fode.is_equiv(eode))
+
+
+
 if __name__ == "__main__":
 
     start_time = time()
