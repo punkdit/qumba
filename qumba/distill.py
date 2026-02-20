@@ -560,7 +560,7 @@ class Distill:
         assert "zb" not in str(f), str(f)
         self.f = f
 
-        # XXX this uses the "wrong" _fourth root of unity XXX
+        # XXX this uses the "_wrong" _fourth root of unity XXX
 
         return f
 
@@ -4318,7 +4318,99 @@ def test_ccz():
     assert op == CCZ
 
 
-def test_modular():
+class Belyi:
+    def __init__(self):
+        # See:
+        # https://www.labri.fr/perso/zvonkin/Research/belyi.pdf
+        K = sage.CyclotomicField(24)
+        R = sage.PolynomialRing(K, "z")
+        z = R.gens()[0]
+        I = R(sage.I)
+        # black vertices satisfy f(z)=0 
+        # with multiplicity = vertex degree
+        verts = [z, (z+1), (z-1), (z-I), (z+I)] # inf ??
+        f_vert = reduce(mul, verts)
+        assert f_vert == z * (z**4-1)
+        top = f_vert**4 # vertex degree is 4
+        #print("f_vert:", f_vert)
+        # f(z) = top * p(z) / q(z)
+    
+        # edges (white vertices) go to 1, with degree 2
+        a = z**2 + 2*z - 1
+        b = z**2 - 2*z - 1
+        c = z**4 + 6*z**2 + 1
+        d = z**4 + 1
+        f_edge = a*b*c*d # white
+        # f(z) = f_edge^2*poly(z) + 1
+        
+        # faces go to infinity with degree = 3
+        f_face = z**8 + 14*z**4 + 1 # infinity
+        bot = f_face**3
+        # f(z) = poly(z) / bot(z)
+    
+        f = 108 * top / bot # hazaah !!
+    
+        #print(f)
+        # alternate f:
+        f1 = -(z**8 - 14*z**4 + 1)**3 / (108 * (z**4*(z**4+1)**4))
+        #print(f1)
+    
+        edge_items = [p for p,_ in sage.factor(f_edge)]
+        face_items = [p for p,_ in sage.factor(f_face)]
+        vert_items = [p for p,_ in sage.factor(f_vert)]
+
+        edges = [-p(z=0) for p in edge_items]
+        faces = [-p(z=0) for p in face_items]
+        verts = [-p(z=0) for p in vert_items]
+    
+        #for val in [1,-1,0,I,-I]:
+        for val in verts:
+            assert f(val) == 0, "black vertex -> 0"
+    
+        #for item in edge_items:
+        #    val = -item(z=0)
+        for val in edges:
+            assert f(val) == 1
+    
+        #for item in face_items:
+        #    val = -item(z=0)
+        for val in faces:
+            assert bot(val) == 0
+    
+        self.f = f
+        self.K = K
+        self.z = z
+        self.edge_items = edge_items 
+        self.face_items = face_items 
+        self.vert_items = vert_items
+        self.edges = edges 
+        self.faces = faces 
+        self.verts = verts
+
+    def desc(self, p):
+        s = "edge " if p in self.edge_items else ""
+        s += "vert " if p in self.vert_items else ""
+        s += "face " if p in self.face_items else ""
+        return s
+    
+    def dump(self):
+        f = self.f
+        print(f)
+    
+        df = sage.diff(f)
+        top = df.numerator()
+        bot = df.denominator()
+        print("df =", df)
+        print("top:")
+        for item,m in sage.factor(top):
+            print(item, "degree", m, self.desc(item))
+        print("bot:")
+        for item,m in sage.factor(bot):
+            print(item, "degree", m, self.desc(item))
+
+
+
+def old_test_modular():
 
     K = sage.CyclotomicField(24)
     R = sage.PolynomialRing(K, "z")
@@ -4379,6 +4471,8 @@ def test_modular():
                 "face" if ff in face_factors else "",
                 "edge" if ff in edge_factors else "")
 
+    belyi = get_belyi()
+
     print("faces:")
     for value in faces:
         dfz = df(value)
@@ -4387,7 +4481,7 @@ def test_modular():
             "is fixed" if f(value)==value else "",
             "--> face" if f(value)in faces else "",
             "is contraction" if abs(complex(a))<1 else "")
-    r = (p_face(f) - p_face)
+    r = (belyi(f) - belyi)
     top = r.numerator()
     bot = r.denominator()
     #top = (top * 244140625)
@@ -4397,6 +4491,61 @@ def test_modular():
             print("\t", ff,
                 "face" if ff in face_factors else "",
                 "edge" if ff in edge_factors else "")
+
+
+
+
+def test_belyi():
+    belyi = Belyi()
+    belyi.dump()
+
+
+def test_modular():
+    belyi = Belyi()
+    #belyi.dump()
+    z = belyi.z
+
+    f = (z**5 - 5*z) / (5*z**4 - 1) # [[5,1,3]]
+    #f = (z**7 + 7*z**3) / (7*z**4 + 1) # [[7,1,3]]
+    print(f)
+
+    df = sage.diff(f)
+    #print(df)
+
+    print("edges:")
+    for value in belyi.edges:
+        dfz = df(value)
+        a = dfz*dfz.conjugate()
+        print("\t", value, #"-->", f(value),
+            "is fixed" if f(value)==value else "",
+            "--> edge" if f(value) in belyi.edges else "",
+            "is contraction" if abs(complex(a))<1 else "")
+
+    wrap = belyi.f
+    r = (wrap(f) - wrap)
+    top = r.numerator()
+    bot = r.denominator()
+    #top = (top * 244140625)
+    print("p(f)-p=0")
+    for ff,dim in (sage.factor(top)):
+        if ff.degree() == 1:
+            print("\t", ff, belyi.desc(ff))
+
+    print("faces:")
+    for value in belyi.faces:
+        dfz = df(value)
+        a = dfz*dfz.conjugate()
+        print("\t", value,
+            "is fixed" if f(value)==value else "",
+            "--> face" if f(value)in belyi.faces else "",
+            "is contraction" if abs(complex(a))<1 else "")
+    top = r.numerator()
+    bot = r.denominator()
+    #top = (top * 244140625)
+    print("p(f)-p=0")
+    for ff,dim in (sage.factor(top)):
+        if ff.degree() == 1:
+            print("\t", ff, belyi.desc(ff))
 
 
 
