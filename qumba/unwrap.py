@@ -170,6 +170,58 @@ def test_all_codes():
             found.add(desc)
 
 
+def test_codes():
+    n, k, d = argv.get("params", (5, 1, 2))
+    found = set()
+    for base in construct.all_codes(n, k, d):
+        print(base, end='->', flush=True)
+        cover = Cover.frombase(base)
+        #print(cover.fibers)
+        code = cover.total
+        print(code, end=' ', flush=True)
+        space = code.space
+        CZ = space.CZ
+        op = space.get_identity()
+        dode = code
+        for (i,j) in cover.fibers:
+            g = CZ(i,j)
+            op = op*CZ(i,j)
+            dode = g*dode
+            dode.distance()
+            if dode.d < code.d:
+                print("!%s"%dode, end=' ', flush=True)
+            assert dode.d >= base.d
+        #dode = op*code
+        assert dode.is_equiv(code)
+    print()
+
+def test_code_10():
+    code = QCode.fromstr("""
+    X..X.XXX.X
+    .X..X..X.X
+    ..X.X.X..X
+    .....X..X.
+    ZZZ.ZZ..Z.
+    ..Z.Z.Z..Z
+    .Z..Z..Z.Z
+    Z..Z......
+    """)
+    space = code.space
+    CZ = space.CZ
+    dode = code
+    idxs = [0,1,2,3,4]
+    while 1:
+        shuffle(idxs)
+        for i in idxs:
+            dode = CZ(i, i+5)*dode
+            dode.distance()
+            if dode.d < code.d:
+                break
+        else:
+            break
+    print(dode.is_equiv(code))
+
+
 def test():
     for code in QCode.load_codetables():
         if code.n > 8:
