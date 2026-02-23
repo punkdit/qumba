@@ -2168,7 +2168,7 @@ def search_fix():
             for (x,y,z,m,val) in distill.fast_find():
                 val = complex(val)
                 fval = distill.py_f(complex(val))
-                if not eq(val, fval): # <<-- look for fix points
+                if not eq(val, fval): # <<-- _look for fix points
                     continue
                 if getkey(val) not in skip:
                     print(code)
@@ -2900,7 +2900,8 @@ def get_bits(m):
     rows = numpy.array(list(numpy.ndindex((2,)*m)), dtype=int)
     return rows
 
-def classical_wenum(H):
+
+def classical_wenum_de(H):
     m, n = H.shape
 
     if 0:
@@ -2942,6 +2943,35 @@ def classical_wenum(H):
     return f
 
 
+def classical_wenum_selfdual(H):
+    m, n = H.shape
+
+    A = get_bits(m)
+    AH = numpy.dot(A, H)%2
+    w = AH.sum(axis=1)
+    w = list(w)
+    assert w[0] == 0
+    wenum = [0]*(n+1)
+    for i in w:
+        wenum[i] += 1
+
+    base = sage.PolynomialRing(sage.ZZ, "z")
+    R = sage.FractionField(base)
+    z = R.gens()[0]
+
+    bot = 0
+    top = 0
+    for (i,w) in enumerate(wenum):
+        bot += w*(z**i)
+        top += w*(z**(n-i))
+
+    f = top // bot
+
+    return f
+
+
+
+
 
 
 def build_selfdual(code):
@@ -2954,7 +2984,7 @@ def build_selfdual(code):
     H = numpy.array(H)
     #print(H, H.shape)
 
-    f = classical_wenum(H)
+    f = classical_wenum_de(H)
     return f
 
 
@@ -2994,7 +3024,7 @@ def test_find():
     find(f)
 
 
-def test_selfdual():
+def old_test_selfdual():
     code = get_code(verbose=False)
     f = build_selfdual(code)
     find(f)
@@ -3210,7 +3240,150 @@ def gen_latex():
         print("df(%s)"%val, "=", df.subs({z:val}))
 
 
+def another_test():
+
+    f = Belyi().f
+    print(f)
+
+    df = sage.diff(f)
+    top = df.numerator()
+    print(sage.factor(top))
+
+
 def test_binary():
+
+    base = sage.PolynomialRing(sage.ZZ, "z")
+    R = sage.FractionField(base)
+
+    K = sage.PolynomialRing(sage.CyclotomicField(24), "z")
+
+    # yes some factors do only split here:
+    #K = sage.PolynomialRing(sage.CyclotomicField(24*7), "z")
+
+    # FAIL:
+    #K = sage.PolynomialRing(sage.UniversalCyclotomicField(), "z")
+
+    name = argv.get("name", "24-II.magma")
+    print(name)
+
+    from qumba.selfdual import load
+    items = load.get_items(name)
+    #items = load.get_items("32-II.magma")
+    #items = load.get_items("40-II8.magma") # 16470
+
+    #items = list(items)
+    #print("items:", len(items))
+
+    z = base.gens()[0]
+
+    the_factors = [
+        ("Fp", z**4 + 2*z**3 + 2*z**2 - 2*z + 1),
+        ("Fm", z**4 - 2*z**3 + 2*z**2 + 2*z + 1),
+        ("Z", z),
+        ("Xp", z-1),
+        ("Xn", z+1),
+        ("Y", z**2+1),
+    ]
+    lookup = dict((v,k) for (k,v) in the_factors)
+    def desc(ftop):
+        for factor,m in ftop:
+            finer = sage.factor(K(factor))
+            if factor in lookup:
+                print("%s^%d"%(lookup[factor], m), end="")
+            elif not hasattr(factor, "degree"):
+                continue
+            elif len(finer) > 1:
+                print("O(%d)-->(%s)^%d"%(factor.degree(), finer, m), end="")
+            elif factor.degree() > 4:
+                #print("(%s)^%d"%(factor, m), end="")
+                #factor = K(factor)
+                #print(sage.factor(factor), end=" ")
+                print("O(%d)^%d"%(factor.degree(), m), end="")
+            elif factor.degree() > 0:
+                print("(%s)^%d"%(finer, m), end="")
+            #else:
+            #    print(factor, end=" ")
+            print(".", end='')
+
+            #print(code)
+            #print(f)
+            #print(r"f'(z) = \frac{%s}{(%s)^2}"%(latex(sage.factor(top)), latex(f.denominator())))
+
+        print()
+
+
+
+    if argv.belyi:
+        f = Belyi().f
+        print(f)
+    
+        df = sage.diff(f)
+        top = df.numerator()
+        top = base(top)
+        top = top.change_ring(base)
+        print(top, top.parent())
+        print(sage.factor(top))
+        desc(sage.factor(top))
+        return
+
+    
+    wrap = Belyi().f
+
+    z = R.gens()[0]
+    found = set()
+    for idx,item in enumerate(items):
+        H = numpy.array(item)
+        H = H[1:, 1:] # XXX take all punctures... XXX TODO
+        #print(H, H.shape)
+
+        #print(H.sum(0), H.sum(1))
+        if min(H.sum(0)) == 0:
+            continue
+
+#        m, n = H.shape
+#        L = numpy.array([[1]*n])
+#        code = QCode.build_css(H, H, None, None, L, L)
+#        assert code.is_selfdual()
+#        try:
+#            code.distance("z3")
+#        except:
+#            continue
+#            #code.distance()
+#        print(code)
+#        if code.d==1:
+#            continue
+
+        #f0 = PauliDistill(code).build()
+        #print(f0)
+
+        f = classical_wenum_selfdual(H)
+        if argv.wrap:
+            f = wrap(f)
+
+        if f in found:
+            #print("/", end="", flush=True)
+            continue
+        found.add(f)
+        #print(f)
+        #print(wrap(f))
+        #print(1/f)
+        #assert f == f0, f0
+
+        df = diff(f, z)
+        top = df.numerator()
+        bot = df.denominator()
+
+        #print("\tdegree=%d/%d: "%(top.degree(), bot.degree()), end=" ")
+        ftop = sage.factor(top)
+        desc(ftop)
+
+        #df = diff(1/f, z)
+        #top = df.numerator()
+        #desc(top)
+        #print()
+
+
+def test_galois():
 
     base = sage.PolynomialRing(sage.ZZ, "z")
     R = sage.FractionField(base)
@@ -3223,56 +3396,72 @@ def test_binary():
     #items = load.get_items("32-II.magma")
     #items = load.get_items("40-II8.magma") # 16470
 
-    print("items:", len(items))
+    #items = list(items)
+    #print("items:", len(items))
 
     z = base.gens()[0]
-    F4p = z**4 + 2*z**3 + 2*z**2 - 2*z + 1
-    F4m = z**4 - 2*z**3 + 2*z**2 + 2*z + 1
-    Pz = z
 
-    z = R.gens()[0]
+    found = set()
     for idx,item in enumerate(items):
         H = numpy.array(item)
-        H = H[1:, 1:]
+        H = H[1:, 1:] # XXX take all punctures... XXX TODO
         #print(H, H.shape)
-        #code = QCode.build_css(H, H)
-        #assert code.is_selfdual()
-        #if code.d < 7:
-        #    continue
 
-        #f = build_selfdual(code)
-        f = classical_wenum(H)
+        #print(H.sum(0), H.sum(1))
+        if min(H.sum(0)) == 0:
+            continue
+
+        f = classical_wenum_selfdual(H)
+        if f in found:
+            #print("/", end="", flush=True)
+            continue
+        found.add(f)
+        #print(f)
+        #print(1/f)
+        #assert f == f0, f0
 
         df = diff(f, z)
         top = df.numerator()
         bot = df.denominator()
 
-        #print(top)
-        #if top % F4p == 0:
-        #    print("\t", top//F4p)
+        top = base(top)
 
-        #print(code, end=" ")
-
-        print("%d"%idx, end="", flush=True)
-
+        #print("\tdegree=%d/%d: "%(top.degree(), bot.degree()), end=" ")
         ftop = sage.factor(top)
-        for factor,m in ftop:
-            if factor == Pz:
-                print("(Pz^%d)"%m, end="")
-            if factor == F4p:
-                print("(F4p^%d)"%m, end="")
-            if factor == F4m:
-                print("(F4m^%d)"%m, end="")
 
-            #print(code)
-            #print(f)
-            #print(r"f'(z) = \frac{%s}{(%s)^2}"%(latex(sage.factor(top)), latex(f.denominator())))
+        for (p,m) in ftop:
+            if p.degree() != 16:
+                continue
 
-        #find(f)
-        #break
+            #print(p)
+            #print(list(p))
+            q = 0
+            for (i,j) in enumerate(p):
+                assert i%2==0 or j==0
+                if i%2==0:
+                    q = q + j*z**(i//2)
+            #print(q)
+            assert q(z=z**2) == p
+            q = base(q)
+            print(str(q).replace("^", "**").replace(" ", "")+",")
+            p = q
+            continue
 
-        print(" ", end='', flush=True)
-        #break
+            K1 = sage.NumberField(p, "z")
+            print(K1)
+            G = K1.galois_group() # proof=False)
+            print("G:", G, len(G))
+            #print(dir(G))
+            #for g in G:
+            #    print(g)
+            s = "StructureDescription(Group(%s));"%(list(G),)
+            #print(s)
+            #print(G.structure_description())
+
+        #df = diff(1/f, z)
+        #top = df.numerator()
+        #desc(top)
+        #print()
 
 
 def test_de():
@@ -3299,7 +3488,7 @@ def test_de():
     for idx,item in enumerate(items):
         H = numpy.array(item)
         H = H[1:, 1:]
-        f = classical_wenum(H)
+        f = classical_wenum_de(H)
 
         #print(f.numerator())
 
@@ -4547,6 +4736,112 @@ def test_modular():
         if ff.degree() == 1:
             print("\t", ff, belyi.desc(ff))
 
+
+
+
+def test_curve():
+    curve_methods = \
+    """
+    CartesianProduct	Chow_form	Hom	Jacobian
+    Jacobian_matrix	affine_patch	algebra	ambient_space
+    an_element	arithmetic_genus	base	base_extend
+    base_morphism	base_ring	base_scheme	cartesian_product
+    categories	category	change_ring	codimension
+    coerce	coerce_embedding	coerce_map_from	complement
+    construction	convert_map_from	coordinate_ring	count_points
+    defining_ideal	defining_polynomial	defining_polynomials	degree
+    dimension	dimension_absolute	dimension_relative	divisor
+    divisor_group	divisor_of_function	dual	dump
+    dumps	element_class	embedding_center	embedding_morphism
+    excellent_position	fundamental_group	gens_dict	gens_dict_recursive
+    genus	geometric_genus	get_action	has_coerce_map_from
+    hom	identity_morphism	inject_variables	intersection
+    intersection_multiplicity	intersection_points	intersects_at	irreducible_components
+    is_complete_intersection	is_exact	is_irreducible	is_ordinary_singularity
+    is_parent_of	is_projective	is_singular	is_smooth
+    is_transverse	latex_name	latex_variable_names	local_coordinates
+    multiplicity	neighborhood	ngens	normalize_defining_polynomials
+    nth_iterate	objgen	objgens	orbit
+    ordinary_model	parent	plane_projection	plot
+    point	point_homset	point_set	preimage
+    projection	quadratic_transform	rational_parameterization	rational_points
+    reduce	register_action	register_coercion	register_conversion
+    register_embedding	rename	reset_name	riemann_surface
+    save	singular_points	singular_subscheme	some_elements
+    specialization	structure_morphism	tangent_line	tangents
+    union	variable_name	variable_names	veronese_embedding
+    weil_restriction	zeta_function	zeta_series
+    """
+    K = sage.CyclotomicField(24)
+    K = sage.QQ
+    R = sage.PolynomialRing(K, list("xyz"))
+    x,y,z = R.gens()
+
+    belyi = Belyi()
+    #belyi.dump()
+    f = belyi.f # 2 branch points: [1,0]
+    #f = (z**5 - 5*z) / (5*z**4 - 1) # [[5,1,3]] 8 branch points
+    f = (z**7 + 7*z**3) / (7*z**4 + 1) # [[7,1,3]]  5 branch points (+infinity ?)
+
+    top = f.numerator()
+    bot = f.denominator()
+
+    f = y*bot - top
+    d = f.degree()
+
+    F = x**d * f(y = y/x, z=z/x)
+    F = R(F)
+    print(F, "=", 0)
+
+    F = F(x=z, z=y, y=x)
+
+    Fx = sage.diff(F, x)
+    Fy = sage.diff(F, y)
+    Fz = sage.diff(F, z)
+    #print(Fx)
+    #print(Fy)
+    #print(Fz)
+
+    P = sage.ProjectiveSpace(K, 2, list("xyz"))
+    print(P)
+    print(P.gens())
+
+    curve = sage.Curve([F], P)
+    print(curve)
+
+#    items = [item for item in dir(c) if not item.startswith("_")]
+#    for i,item in enumerate(items):
+#        if i%4 != 0: continue
+#        jtems = items[i:i+4]
+#        print("\t".join(jtems))
+
+    print("is_smooth:", curve.is_smooth())
+
+    for (a,b,c) in curve.singular_points():
+        print("singular:", (a,b,c))
+        assert( F(x=a, y=b, z=c) == 0 )
+        assert( Fx(x=a, y=b, z=c) == 0)
+        assert( Fy(x=a, y=b, z=c) == 0)
+        assert( Fz(x=a, y=b, z=c) == 0)
+
+    surf = curve.riemann_surface() 
+    print( surf )
+
+    #print( dir(surf) )
+
+#    print( surf.downstairs_graph() )
+#    g = surf.plot_paths()
+#    print(g)
+#
+#    g.plot().save("surface.pdf")
+    
+
+    zs = surf.branch_locus
+    print(zs, len(zs))
+
+    #G = surf.monodromy_group() # broken
+
+    #print(surf.places_at_branch_locus())
 
 
 if __name__ == "__main__":

@@ -1782,7 +1782,7 @@ def test_selfdual():
             css.bz_distance()
             w = Matrix(J).get_wenum()
             if w not in found:
-                print(css, w)
+                print(i, css, w)
             found.setdefault(w,[]).append(css)
 
     print("\ncount:", count)
