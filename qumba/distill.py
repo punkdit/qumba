@@ -1910,9 +1910,13 @@ def test_css():
 
         a = pw(x=0,y=0,z=1,w=z)
         b = pw(x=0,y=0,z=z,w=1)
-        print(a/b)
+        print(f)
+        g = (a/b)(z = (z+1)/(z-1))
+        #rhs = (g+1)/(g-1)
+        rhs = g
+        print(g)
         #assert str(f)==str(a/b), str(a/b)
-        print(str(f)==str(a/b))
+        print(str(f)==str(g))
         print()
 
         #print()
@@ -4842,6 +4846,67 @@ def test_curve():
     #G = surf.monodromy_group() # broken
 
     #print(surf.places_at_branch_locus())
+
+
+def test_913():
+
+    K = sage.ZZ
+    R = sage.PolynomialRing(K, list("xyz"))
+    x,y,z = R.gens()
+    
+    top = z**9 + 3*z**3
+    bot = 3*z**6 + 1
+    f = top/bot
+
+    print(f)
+    Hz = (z+1)/(z-1)
+    print(Hz)
+    g = f(z=Hz)
+    print(g)
+    top = g.numerator()
+
+    h = (g+1) / (g-1)
+    top = h.numerator()
+    print(top(z=1))
+
+    code = construct.get_913()
+    print(code.longstr())
+
+    pc = PauliCode.promote(code)
+    #print(code)
+    print(pc)
+
+    distill = PauliDistill(pc)
+
+    f = distill.build()
+    print("code:", f)
+
+    z = f.parent().gens()[0]
+    assert f(z=-z) == -f
+    assert f(z=1/z) == 1/f
+
+    #result = distill.get_variety()
+    result = pc.get_wenum()
+    px, py, pz, pw = result
+    x, y, z, w = px.parent().gens()
+
+    a = pw(x=1,y=0,z=0,w=z)
+    b = pw(x=z,y=0,z=0,w=1)
+    #print(a/b)
+    assert str(f)==str(a/b)
+
+    print()
+
+    a = pw(x=0,y=0,z=1,w=z)
+    b = pw(x=0,y=0,z=z,w=1)
+    g = (a/b)(z = (z+1)/(z-1))
+    #rhs = (g+1)/(g-1)
+    rhs = g
+    print(g)
+    #assert str(f)==str(a/b), str(a/b)
+    print(str(f)==str(g))
+    print()
+
 
 
 if __name__ == "__main__":
