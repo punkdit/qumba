@@ -2812,6 +2812,42 @@ def test_wnode():
     assert op == W
 
 
+def test_412():
+
+    code = construct.get_412()
+    print(code.longstr())
+    P = code.get_projector()
+    #print(8*P)
+
+    E = code.get_clifford_encoder()
+    assert P*E == E
+    #print(P==E*E.d)
+    P = E*E.d
+    assert P*P==P
+
+    evs = P.eigenvectors()
+    for val,vec,d in evs:
+        print("val:", val, d)
+
+    for v in [green(1,0), red(1,0)]: #, green(1,0)+2*red(1,0)]:
+        vn = reduce(matmul, [v]*code.n)
+        u = P*vn
+        #print(u, u.d*u)
+
+    from qumba.clifford import K
+    R = sage.PolynomialRing(K, "z")
+    z = R.gens()[0]
+    v = Matrix(R, [[z,1]]).t
+    #print(v)
+    vn = reduce(matmul, [v]*code.n)
+    #print(vn)
+    #f = 8*P*vn
+
+    lhs = reduce(matmul, [green(0,1)]*code.m + [I])
+    f = lhs*E.d*vn
+    print(f)
+
+
 def test_512():
 
     from qumba.symplectic import SymplecticSpace
