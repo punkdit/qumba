@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 """
+Evaluate phase free ZX-diagrams using a SAT solver .
 """
 
 
@@ -11,7 +12,7 @@ warnings.filterwarnings('ignore')
 from math import gcd
 from functools import reduce, cache
 from operator import matmul, add, mul
-from random import random, randint, choice
+from random import random, randint, choice, shuffle
 
 import z3
 
@@ -23,7 +24,7 @@ from qumba.argv import argv
 from qumba.qcode import strop, QCode
 from qumba import construct 
 from qumba.matrix_sage import Matrix
-from qumba.clifford import Clifford, w8, w4, r2, ir2
+from qumba.clifford import Clifford, w8, w4, r2, ir2, half
 from qumba import clifford 
 from qumba.action import mulclose
 from qumba.lin import shortstr
@@ -141,8 +142,10 @@ class Perm(Atom):
         assert set(idxs) == set(range(m)), idxs
         Atom.__init__(self, space, m, m)
         self.idxs = list(idxs)
-        left = self.left
-        right = [self.right[i] for i in idxs]
+        #left = self.left
+        left = [self.left[i] for i in idxs]
+        #right = [self.right[i] for i in idxs]
+        right = self.right
         self.term = z3.And(*[l==r for (l,r) in zip(left, right)])
 
     def constrain(self):
@@ -170,6 +173,73 @@ class Space:
     def perm(self, *idxs):
         return Perm(self, idxs)
 
+    def get_identity(self, n):
+        return Perm(self, list(range(n)))
+
+    def fuse(self, lop, rop, pairs):
+        #print("fuse", pairs)
+        pairs = list(pairs)
+        pairs.sort()
+        for (i,j) in pairs:
+            assert 0<=i<lop.n, (i, lop)
+            assert 0<=j<rop.m, (j, rop)
+            # etc
+        N = len(pairs)
+        M = lop.n+rop.m-N
+        perm = {i:None for i in range(M)}
+        lookup = dict(pairs)
+        jdx = 0
+        for idx in range(lop.n):
+            if idx in lookup:
+                perm[idx] = lookup[idx]+lop.n-N
+            else:
+                perm[idx] = jdx
+                jdx += 1
+        #print(perm)
+        assert jdx == lop.n - N
+        values = set(lookup.values())
+        jdx = 0
+        for idx in range(rop.m):
+            if idx in values:
+                pass
+            else:
+                assert perm[jdx+lop.n] is None
+                perm[jdx+lop.n] = idx+lop.n-N
+                jdx += 1
+        perm = {j:i for (i,j) in perm.items()} # reversed
+        perm = [perm[i] for i in range(M)]
+        #print("perm:", perm)
+        lhs = lop @ self.get_identity(rop.m-N)
+        #print("\t", rop.m-N, lop.n-N)
+        perm = self.perm(*perm)
+        rhs = self.get_identity(lop.n-N) @ rop
+        return lhs * perm * rhs
+
+    def CX(self, n, ctrl, tgt):
+        assert ctrl != tgt
+        ident = lambda n=1: self.get_identity(n)
+        if tgt < ctrl:
+            tgt, ctrl = ctrl, tgt
+            lop = self.red(1,2)
+            rop = self.green(2,1)
+        else:
+            lop = self.green(1,2)
+            rop = self.red(2,1)
+        lhs = ident(ctrl) @ lop @ ident(n-ctrl-1)
+        rhs = ident(tgt) @ rop @ ident(n-tgt-1)
+        assert lhs.n == rhs.m
+        #print("CX", n, ctrl, tgt)
+        #print(lhs.shape, rhs.shape)
+        assert ctrl < tgt
+        pairs = [(i,i) for i in range(ctrl+1)]
+        pairs.append((ctrl+1, tgt))
+        pairs += [(i+1,i) for i in range(ctrl+1, tgt)]
+        pairs += [(i+1,i+1) for i in range(tgt, n)]
+        #print("pairs:", pairs)
+        assert len(pairs) == lhs.n 
+        op = self.fuse(lhs, rhs, pairs)
+        return op
+
     def solve(self, op):
         solver = z3.Solver()
 
@@ -195,13 +265,14 @@ class Space:
                 values[v] = val
                 term.append(v==val)
             idx = 0
-            for bit,v in enumerate(left):
+            for bit,v in enumerate(reversed(left)):
                 if values[v]:
                     idx += 2**bit
             jdx = 0
-            for bit,v in enumerate(right):
+            for bit,v in enumerate(reversed(right)):
                 if values[v]:
                     jdx += 2**bit
+            assert A[idx, jdx] == 0, "wut"
             A[idx, jdx] = 1
             solver.add(z3.Not(z3.And(*term)))
             #yield values
@@ -210,68 +281,7 @@ class Space:
     
 
 
-
-def test():
-
-    space = Space()
-    g = space.green
-    r = space.red
-   
-    g_gg = g(1, 2)
-    gg_g = g(2, 1)
-    r_rr = r(1, 2)
-    rr_r = r(2, 1)
-    rr_rr = r(2, 2)
-
-    op = gg_g*g_gg
-    op = op * rr_rr
-    print(op)
-
-    A = space.solve(r_rr)
-    print(A)
-
-    assert rr_r*r_rr == rr_rr
-
-
-
-def get_decoder(code):
-    assert code.is_css()
-    n = code.n
-    space = Clifford(n)
-
-    E = code.get_clifford_encoder()
-    print(E.name)
-
-    return
-
-    css = code.to_css()
-    Hx = css.Hx
-    mx = Hx.shape[0]
-    Hz = css.Hz
-    mz = Hz.shape[0]
-
-    print("Hx")
-    print(shortstr(Hx))
-    print("Hz")
-    print(shortstr(Hz))
-
-    K = sage.CyclotomicField(4)
-    _g = Matrix(K, [[1,1]])
-    _r = Matrix(K, [[1,0]])
-    I = Matrix.identity(K, 2)
-    lhs = [_g]*mx + [_r]*mz + [I]
-    print(len(lhs))
-    lhs = reduce(matmul, lhs)
-    print(lhs.shape)
-
-    for i in range(mx):
-        for j in range(n):
-            if Hx[i, j] == 0:
-                continue
-            #op = space.CX(i, tgt)
-
-
-def get_projector(n):
+def XXXget_projector(n):
 
     rr_r = r2*red(2,1)
     op = reduce(matmul, [rr_r]*n)
@@ -286,36 +296,136 @@ def get_projector(n):
     return op
 
 
+def get_projector(code):
+    assert code.is_css()
+    n = code.n
+    assert n < 12
 
-def test_projector():
+    css = code.to_css()
+    Hx = css.Hx
+    mx = Hx.shape[0]
+    Hz = css.Hz
+    mz = Hz.shape[0]
 
-    n = 3
-    #code = construct.get_713()
-    #Ed = get_decoder(code)
+    space = Space()
+    green = space.green
+    red = space.red
+    perm = space.perm
+    ident = space.get_identity
 
-    print(green(1,1))
-    print(green(1,2))
-    print(green(1,3))
-    
+    P = ident(n)
 
-    P = get_projector(n)
-    print(P)
-    print(P*P==2*P)
+    for (H, rmeth, gmeth) in [
+        (Hx, red, green),
+        (Hz, green, red),
+    ]:
+      for h in H:
+        rhs = [rmeth(2,1) if h[i] else ident(1) for i in range(n)]
+        rhs = reduce(matmul, rhs)
+        lhs = gmeth(0, h.sum())
 
-    space = Clifford(n)
-    In = space.get_identity()
-    Q = In + space.get_pauli("X"*n)
-    print(Q)
-    print(P==Q)
+        pairs = []
+        idx = 0
+        for j in range(n):
+            if h[j] == 0:
+                continue
+            pairs.append((idx, j+idx))
+            idx += 1
+        #print("pairs:", pairs)
+        op = space.fuse(lhs, rhs, pairs)
+        assert op.shape == (n, n)
 
-    return
+        P = op*P
 
-    op = 4*red(1,n)
-    print(op, op.shape)
+    P = P.get()
+    P = (half**len(Hx))*P
 
-    for i,bits in enumerate(numpy.ndindex((2,)*n)):
-        if op[0,i]:
-            print(i, bits)
+    return P
+
+
+
+
+
+def test():
+
+    space = Space()
+    get_identity = space.get_identity
+    g = space.green
+    r = space.red
+    fuse = space.fuse
+   
+    # XXX cannot re-use these guys more than once 
+    # in the same operator XXX
+    I = g(1, 1)
+    g_gg = g(1, 2)
+    gg_g = g(2, 1)
+    r_rr = r(1, 2)
+    rr_r = r(2, 1)
+    rr_rr = r(2, 2)
+
+    op = gg_g*g_gg
+    op = op * rr_rr
+
+    assert rr_r*r_rr == rr_rr
+    assert g_gg*gg_g == I
+    assert I == r(1, 1)
+
+    for trial in range(5):
+        n = 4
+        idxs = list(range(n))
+        shuffle(idxs)
+        P = space.perm(*idxs)
+        lhs = P.get()
+        rhs = Clifford(n).get_P(*idxs)
+        assert lhs == rhs
+
+    assert fuse(gg_g, r_rr, []) == gg_g@r_rr
+    assert fuse(gg_g, r_rr, [(0,0)]) == gg_g*r_rr
+
+    lhs = fuse(g_gg, rr_r, [(1,0)])
+    lhs = lhs.get()
+    assert lhs == Clifford(2).CX(0,1)
+
+    op = (g_gg@I).get() * (I@rr_r).get()
+    assert lhs == op
+
+    lhs = g_gg @ get_identity(2)
+    P = space.perm(0,2,1,3)
+    rhs = get_identity(2) @ rr_r
+    op = lhs*P*rhs
+    A = op.get()
+    assert A == Clifford(3).CX(0,2)
+
+    B = space.CX(3, 0, 2)
+    B = B.get()
+    assert A == B
+
+    n = 4
+    for i in range(n):
+      for j in range(i+1,n):
+        lhs = space.CX(n, i, j)
+        lhs = lhs.get()
+        if lhs != Clifford(n).CX(i, j):
+            print(lhs)
+            assert 0
+
+        lhs = space.CX(n, j, i)
+        lhs = lhs.get()
+        if lhs != Clifford(n).CX(j, i):
+            print(lhs)
+            assert 0
+
+    for code in [
+        construct.get_422(),
+        QCode.fromstr("XXII IIXX ZZZZ"),
+        QCode.fromstr("ZZII IIZZ XXXX"),
+        construct.get_713(),
+    ]:
+        P = get_projector(code)
+        Q = code.get_projector()
+        assert P==Q
+
+
 
 
 
