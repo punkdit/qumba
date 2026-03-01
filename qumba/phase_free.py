@@ -421,6 +421,7 @@ def test():
         QCode.fromstr("ZZII IIZZ XXXX"),
         construct.get_713(),
     ]:
+        print(code)
         P = get_projector(code)
         Q = code.get_projector()
         assert P==Q
