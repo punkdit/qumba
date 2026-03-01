@@ -132,10 +132,10 @@ class Matrix:
 
     def direct_sum(self, other):
         assert isinstance(other, Matrix)
-        assert self.ring == other.ring
+        ring = unify(self.ring, other.ring)
         #M = self.M.direct_sum(other.M)
         M = block_diagonal_matrix(self.M, other.M)
-        return Matrix(self.ring, M)
+        return Matrix(ring, M)
     __lshift__ = direct_sum
 
     def stack(self, other):

@@ -4944,6 +4944,42 @@ def test_913():
     print()
 
 
+def test_zero():
+
+    K = sage.CyclotomicField(8)
+    R = sage.PolynomialRing(K, "z0 z1".split())
+    z0, z1 = R.gens()
+
+#    A = ir2*Matrix(R, [[1,1],[1,-1]])
+    A = Matrix(R, [[0,1],[1,0]])
+    CA = (I<<A)
+    print(CA)
+
+    v0 = Matrix(R, [[z0,1]]).t
+    v1 = Matrix(R, [[z1,1]]).t
+    v = v0@v1
+
+    u = CA*v
+    bot = u[3,0]
+    u = (1/bot)*u
+
+    lhs = Matrix(R, [[1,1]]) @ I
+    w = lhs*u
+    bot = w[1,0]
+    w = (1/bot)*w
+    f = w[0,0]
+    print(f)
+
+    top = f.numerator()
+    bot = f.denominator()
+    print(top)
+    print(bot)
+    print("-->")
+    ctrl = 1
+    f = top(z0=ctrl)/bot(z0=ctrl)
+    print(f, f==1+r2)
+
+
 
 if __name__ == "__main__":
 
