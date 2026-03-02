@@ -22,17 +22,21 @@ from sage import all_cmdline as sage
 
 from qumba.argv import argv
 from qumba.qcode import strop, QCode
+from qumba.csscode import CSSCode
 from qumba import construct 
 from qumba.matrix_sage import Matrix
 from qumba.clifford import Clifford, w8, w4, r2, ir2, half
 from qumba import clifford 
 from qumba.action import mulclose
 from qumba.lin import shortstr
+from qumba.distill import PauliDistill
 
 
 class Atom:
     def __init__(self, space, m, n, left=None, right=None):
         self.space = space
+        m = int(m)
+        n = int(n)
         self.m = m
         self.n = n
         self.shape = (m, n)
@@ -343,6 +347,152 @@ def get_projector(code):
     return P
 
 
+def get_decoder_k1(code):
+    assert code.is_css()
+    n = code.n
+    assert n < 12
+
+    css = code.to_css()
+    Hx = css.Hx
+    mx = Hx.shape[0]
+    Hz = css.Hz
+    mz = Hz.shape[0]
+    Lx = css.Lx
+    k = len(Lx)
+
+    space = Space()
+    green = space.green
+    red = space.red
+    perm = space.perm
+    ident = space.get_identity
+
+    P = ident(n)
+
+    for (H, rmeth, gmeth) in [
+        (Hx, red, green),
+        #(Hz, green, red),
+    ]:
+      for h in H:
+        rhs = [rmeth(2,1) if h[i] else ident(1) for i in range(n)]
+        rhs = reduce(matmul, rhs)
+        lhs = gmeth(0, h.sum())
+
+        pairs = []
+        idx = 0
+        for j in range(n):
+            if h[j] == 0:
+                continue
+            pairs.append((idx, j+idx))
+            idx += 1
+        #print("pairs:", pairs)
+        op = space.fuse(lhs, rhs, pairs)
+        assert op.shape == (n, n)
+
+        P = op*P
+
+    #print("Lx:")
+    #print(Lx)
+    for lx in Lx:
+        weight = int(lx.sum())
+        lhs = reduce(matmul, [green(1, weight)] + [red(0,1)]*(n-weight))
+        pairs = []
+        idx = 0
+        jdx = weight
+        for i in range(n):
+            if lx[i]:
+                pairs.append((idx, i))
+                idx += 1
+            else:
+                pairs.append((jdx, i))
+                jdx += 1
+        assert jdx == n
+        assert idx == weight
+        #print(pairs)
+        P = space.fuse(lhs, P, pairs)
+
+    P = P.get()
+#    P = (half**len(Hx))*P
+
+    return P
+
+
+def get_adjacency(space, H):
+    #print(H)
+    green = space.green
+    red = space.red
+
+    m, n = H.shape
+
+    #idxs = numpy.empty(H.shape, dtype=object)
+    idxs = {}
+
+    lhs = []
+    idx = 0
+    for j in range(m):
+        weight = H[j, :].sum()
+        op = green(1, weight)
+        lhs.append(op)
+        for i in range(n):
+            if H[j, i]:
+                idxs[j,i] = idx
+                idx += 1
+    lhs = reduce(matmul, lhs)
+    #print(idxs)
+
+    perm = []
+    rhs = []
+    for i in range(n):
+        weight = H[:, i].sum()
+        op = red(weight, 1)
+        rhs.append(op)
+        for j in range(m):
+            if H[j, i]:
+                perm.append(idxs[j,i])
+    rhs = reduce(matmul, rhs)
+
+    #print(perm)
+    perm = space.perm(*perm)
+
+    P = lhs * perm * rhs
+    assert P.shape == (m, n)
+    return P
+
+
+def get_decoder(code):
+    assert code.is_css()
+    n = code.n
+    assert n < 12
+
+    css = code.to_css()
+    #print("get_decoder")
+    #print(css.longstr())
+    Hx = css.Hx
+    mx = Hx.shape[0]
+    Hz = css.Hz
+    mz = Hz.shape[0]
+    Lx = css.Lx
+    k = len(Lx)
+
+    space = Space()
+    green = space.green
+    red = space.red
+    perm = space.perm
+    ident = space.get_identity
+
+    H = numpy.concatenate((Hx, Lx))
+
+    #print("get_adjacency")
+    #print(H, mx, k)
+
+    P = get_adjacency(space, H)
+    lhs = [green(0,1) for i in range(mx)]+[green(1,1) for i in range(k)]
+    lhs = reduce(matmul, lhs)
+    P = lhs * P
+    P = P.get()
+
+    return P
+
+
 
 
 
@@ -421,11 +571,137 @@ def test():
         QCode.fromstr("ZZII IIZZ XXXX"),
         construct.get_713(),
     ]:
-        print(code)
+        #print(code)
         P = get_projector(code)
         Q = code.get_projector()
         assert P==Q
 
+
+def check_distill(code):
+    n = code.n
+
+    L = get_decoder(code)
+
+    K = clifford.K
+    R = sage.PolynomialRing(K, "z")
+    z = R.gens()[0]
+    v = Matrix(R, [[z,1]]).t
+    v = reduce(matmul, [v]*n)
+
+    w = L*v
+    top = (w[0,0])
+    bot = (w[1,0])
+
+    code = code.to_qcode()
+    distill = PauliDistill(code)
+    f = distill.build()
+
+    #print(code)
+    #print(f)
+
+    assert f == top / bot
+
+
+
+def test_decoder():
+
+    H = numpy.array([
+        [1,1,0],
+        [0,1,1],
+        [1,1,1],
+    ])
+    space = Space()
+    P = get_adjacency(space, H)
+
+    code = QCode.fromstr("XXI IXX")
+    P0 = get_decoder_k1(code)
+    P1 = get_decoder(code)
+    assert P0 == P1
+
+    code = construct.get_713()
+    P0 = get_decoder_k1(code)
+    P1 = get_decoder(code)
+    assert P0 == P1
+
+    code = QCode.fromstr("""
+    ..XX.XX.XX
+    ..X..X.XXX
+    XX...X.XXX
+    X.XXXX.XX.
+    XX....XXX.
+    Z.Z.Z...Z.
+    .ZZZZ..Z..
+    Z.ZZ.ZZ...
+    ZZ...Z...Z
+    """, None, """
+    ....X..XX.
+    .....ZZZ..
+    """)
+    #print(code.longstr(True))
+    P0 = get_decoder(code)
+
+    code = QCode.fromstr("""
+    ..XX.XX.XX
+    XX...X.XXX
+    X.XXXX.XX.
+    XX....XXX.
+    Z.Z.Z...Z.
+    .ZZZZ..Z..
+    Z.ZZ.ZZ...
+    ZZ...Z...Z
+    """, None, """
+    ....X..XX.
+    .....ZZZ..
+    ..X..X.XXX
+    ..ZZ......
+    """)
+    P = get_decoder(code)
+    lhs = clifford.I @ clifford.green(0,1) 
+    assert lhs*P == P0
+
+    code = QCode.fromstr("""
+    ..XX.XX.XX
+    XX...X.XXX
+    X.XXXX.XX.
+    XX....XXX.
+    Z.Z.Z...Z.
+    .ZZZZ..Z..
+    Z.ZZ.ZZ...
+    ZZ...Z...Z
+    """, None, """
+    ..X..X.XXX
+    ..ZZ......
+    ....X..XX.
+    .....ZZZ..
+    """)
+
+    P = get_decoder(code)
+    lhs = clifford.green(0,1) @ clifford.I
+    assert lhs*P == P0
+
+    return
+
+    check_distill(code)
+
+    n = 10
+    mx = 5
+    mz = 4
+
+    for trial in range(5):
+        while 1:
+            css = CSSCode.random(n, mx, mz, distance=3)
+            print(css, css.mx, css.mz)
+            if css.k == 1:
+                break
+
+        print(css.to_qcode().longstr())
+        return
+    
+        P0 = get_decoder_k1(code)
+        P1 = get_decoder(code)
+        assert P0 == P1
+
+        check_distill(css)
 
 
 

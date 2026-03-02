@@ -376,16 +376,29 @@ class QCode(object):
     def to_css(self):
         from qumba.csscode import CSSCode
         H = self.H
+        T = self.T
+        L = self.L
         m, nn = H.shape
+        # ugh, cleanup on isle nine !
         Hx = H[:, 0:nn:2].A
         Hz = H[:, 1:nn:2].A
         idxs = numpy.where(Hx.sum(1))[0]
         jdxs = numpy.where(Hz.sum(1))[0]
-        #assert Hx[jdxs, :].sum() == 0, "not in css form"
-        #assert Hz[idxs, :].sum() == 0, "not in css form"
         Hx = Hx[idxs, :]
         Hz = Hz[jdxs, :]
-        code = CSSCode(Hx=Hx, Hz=Hz)
+        Tx = T[:, 0:nn:2].A
+        Tz = T[:, 1:nn:2].A
+        idxs = numpy.where(Tx.sum(1))[0]
+        jdxs = numpy.where(Tz.sum(1))[0]
+        Tx = Tx[idxs, :]
+        Tz = Tz[jdxs, :]
+        Lx = L[:, 0:nn:2].A
+        Lz = L[:, 1:nn:2].A
+        idxs = numpy.where(Lx.sum(1))[0]
+        jdxs = numpy.where(Lz.sum(1))[0]
+        Lx = Lx[idxs, :]
+        Lz = Lz[jdxs, :]
+        code = CSSCode(Lx, Lz, Hx, Tz, Hz, Tx)
         return code
 
     def to_qcode(self):
