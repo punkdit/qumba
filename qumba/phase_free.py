@@ -2,6 +2,12 @@
 
 """
 Evaluate phase free ZX-diagrams using a SAT solver .
+
+See:
+https://arxiv.org/abs/2204.14038
+"Phase-free ZX diagrams are CSS codes (...or how to graphically
+grok the surface code)" Aleks Kissinger
+
 """
 
 
@@ -182,6 +188,7 @@ class Space:
 
     def fuse(self, lop, rop, pairs):
         #print("fuse", pairs)
+        #print("\t", lop.shape, rop.shape)
         pairs = list(pairs)
         pairs.sort()
         for (i,j) in pairs:
@@ -351,6 +358,7 @@ def get_decoder_k1(code):
     assert code.is_css()
     n = code.n
     assert n < 12
+    assert code.k == 1
 
     css = code.to_css()
     Hx = css.Hx
@@ -679,24 +687,19 @@ def test_decoder():
     lhs = clifford.green(0,1) @ clifford.I
     assert lhs*P == P0
 
-    return
+    for n in [9,10]:
+      mz = 4
+      mx = n-mz-1
 
-    check_distill(code)
-
-    n = 10
-    mx = 5
-    mz = 4
-
-    for trial in range(5):
+      for trial in range(5):
         while 1:
             css = CSSCode.random(n, mx, mz, distance=3)
-            print(css, css.mx, css.mz)
+            #print(css, css.mx, css.mz)
             if css.k == 1:
                 break
 
-        print(css.to_qcode().longstr())
-        return
-    
+        code = css.to_qcode()
+        print(code)
         P0 = get_decoder_k1(code)
         P1 = get_decoder(code)
         assert P0 == P1
