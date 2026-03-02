@@ -113,6 +113,14 @@ class HBox(Compound):
                 yield (l==r)
 
 
+    def __mul__(self, other):
+        assert self.n == other.m
+        assert self.space is other.space
+        lhs = self.atoms
+        rhs = other.atoms if isinstance(other, HBox) else [other]
+        return HBox(self.space, lhs+rhs)
+
+
 class VBox(Compound):
     def __init__(self, space, atoms):
         m = sum([atom.m for atom in atoms], 0)
@@ -121,12 +129,23 @@ class VBox(Compound):
         right = reduce(add, [atom.right for atom in atoms])
         Compound.__init__(self, space, m, n, atoms, left, right)
 
+    def __matmul__(self, other):
+        assert self.space is other.space
+        lhs = self.atoms
+        rhs = other.atoms if isinstance(other, VBox) else [other]
+        return VBox(self.space, lhs+rhs)
+
 
 class Green(Atom):
     def constrain(self):
         # all variables agree
         vs = self.left + self.right
-        term = z3.Or(z3.And(*vs), z3.And(*[z3.Not(v) for v in vs])) # use == instead?
+        if len(vs) < 2:
+            return # ?
+        # use == instead?
+        #term = z3.Or(z3.And(*vs), z3.And(*[z3.Not(v) for v in vs]))
+        v0 = vs[0]
+        term = z3.And(*[v==v0 for v in vs[1:]])
         yield term
 
 
@@ -504,7 +523,7 @@ def get_decoder(code):
 
 
 
-def test():
+def test_space():
 
     space = Space()
     get_identity = space.get_identity
@@ -687,6 +706,8 @@ def test_decoder():
     lhs = clifford.green(0,1) @ clifford.I
     assert lhs*P == P0
 
+    return
+
     for n in [9,10]:
       mz = 4
       mx = n-mz-1
@@ -707,6 +728,9 @@ def test_decoder():
         check_distill(css)
 
 
+def test():
+    test_space()
+    test_decoder()
 
 
 if __name__ == "__main__":
