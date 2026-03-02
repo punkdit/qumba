@@ -310,22 +310,6 @@ class Space:
         return A
     
 
-
-def XXXget_projector(n):
-
-    rr_r = r2*red(2,1)
-    op = reduce(matmul, [rr_r]*n)
-
-    perm = [2*i for i in range(n)]+[2*i+1 for i in range(n)]
-    perm = Clifford(2*n).get_P(*perm)
-    perm = perm.t
-
-    op = perm*op
-    lhs = Clifford(n).get_identity() @ green(0, n)
-    op = lhs*op
-    return op
-
-
 def get_projector(code):
     assert code.is_css()
     n = code.n
@@ -488,7 +472,7 @@ def get_adjacency(space, H):
 def get_decoder(code):
     assert code.is_css()
     n = code.n
-    assert n < 12
+    assert n < 25
 
     css = code.to_css()
     #print("get_decoder")
@@ -518,9 +502,6 @@ def get_decoder(code):
     P = P.get()
 
     return P
-
-
-
 
 
 def test_space():
@@ -604,18 +585,21 @@ def test_space():
         assert P==Q
 
 
-def check_distill(code):
+def get_distill(R, z, code):
     n = code.n
-
     L = get_decoder(code)
+    v = Matrix(R, [[z,1]]).t
+    v = reduce(matmul, [v]*n)
+    w = L*v
+    return w
 
+
+def check_distill(code):
     K = clifford.K
     R = sage.PolynomialRing(K, "z")
     z = R.gens()[0]
-    v = Matrix(R, [[z,1]]).t
-    v = reduce(matmul, [v]*n)
 
-    w = L*v
+    w = get_distill(R, z, code)
     top = (w[0,0])
     bot = (w[1,0])
 
@@ -627,6 +611,60 @@ def check_distill(code):
     #print(f)
 
     assert f == top / bot
+
+
+def get_wenum(H, L=None):
+    K = clifford.K
+    R = sage.PolynomialRing(K, list("xy"))
+    x,y = R.gens()
+
+    from qumba.matrix import Matrix
+    H = Matrix(H)
+    m, n = H.shape
+    wenum = H.get_wenum(L)
+
+    #print(wenum)
+
+    w = 0
+    for (i,j) in enumerate(wenum):
+        if j:
+            w += j * y**i * x**(n-i)
+    return w
+
+
+def test_wenum():
+    from qumba.matrix import Matrix
+
+    K = clifford.K
+    R = sage.PolynomialRing(K, "z")
+    z = R.gens()[0]
+
+    k = 1
+    n = 9
+
+    mx = n//2
+    mz = n-mx-k
+
+    css = CSSCode.random(n, mx, mz, distance=2)
+    code = css.to_qcode()
+    print(code.longstr())
+
+    Hx = Matrix(css.Hx)
+    Lx = Matrix(css.Lx)
+    #print(Hx, Hx.get_wenum())
+
+    print()
+
+    D = get_distill(R, z, code)
+    print(D)
+
+    for i,l in enumerate(Lx.span()):
+        w = get_wenum(Hx, l)
+        w = w(x=z, y=1)
+        print(w)
+        assert D[i,0] == w
+        
+
 
 
 
@@ -706,7 +744,7 @@ def test_decoder():
     lhs = clifford.green(0,1) @ clifford.I
     assert lhs*P == P0
 
-    return
+    #return
 
     for n in [9,10]:
       mz = 4
@@ -731,6 +769,7 @@ def test_decoder():
 def test():
     test_space()
     test_decoder()
+    test_wenum()
 
 
 if __name__ == "__main__":

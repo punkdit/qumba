@@ -452,14 +452,18 @@ class Matrix(object):
         E = E.reshape(2**m, 2**n)
         return E
 
-    def get_wenum(H):
+    def get_wenum(H, L=None):
         m, n = H.shape
         assert m < 32, ("%s is too big ??" % (2**m))
         A = H.A
+        if L is None:
+            L = numpy.zeros((1,n), dtype=scalar)
+        else:
+            L = L.A
         wenum = {i:0 for i in range(n+1)}
         for bits in numpy.ndindex((2,)*m):
             #v = Matrix(bits)*H
-            v = numpy.dot(bits, A)%2
+            v = (L + numpy.dot(bits, A))%2
             wenum[v.sum()] += 1
         return tuple(wenum[i] for i in range(n+1))
 

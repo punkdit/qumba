@@ -606,7 +606,10 @@ class CSSCode(object):
     
             if distance is None:
                 break
-            dx,dz = C.bz_distance()
+            try:
+                dx,dz = C.bz_distance()
+            except AssertionError:
+                continue
             if min(dx,dz) >= distance:
                 break
             count += 1
