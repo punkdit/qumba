@@ -563,6 +563,17 @@ def test_wenum():
     print(top, "/", bot)
 
 
+def test_513():
+
+    code = construct.get_513()
+
+    code = PauliCode.promote(code)
+
+    w = code.get_wenum()
+    for wi in w:
+        print(wi)
+
+
 
 if __name__ == "__main__":
 
