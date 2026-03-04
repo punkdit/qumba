@@ -4575,6 +4575,7 @@ class Belyi:
         # faces go to infinity with degree = 3
         f_face = z**8 + 14*z**4 + 1 # infinity
         bot = f_face**3
+        #print("f_face:", f_face)
         # f(z) = poly(z) / bot(z)
     
         f = 108 * top / bot # hazaah !!
@@ -4979,6 +4980,58 @@ def test_zero():
     f = top(z0=ctrl)/bot(z0=ctrl)
     print(f, f==1+r2)
 
+
+def test_W():
+    base = sage.ZZ
+    w_ww = Matrix(base, [[0,1,1,0],[0,0,0,1]])
+    r_rr = Matrix(base, [[1,0,0,1],[0,1,1,0]])
+    g_gg = Matrix(base, [[1,0,0,0],[0,0,0,1]])
+
+    e = Matrix(base, [[0,1]]).t
+    I = Matrix.get_identity(base, 2)
+    assert (w_ww*(e@I) == I)
+    assert (w_ww*(I@e) == I)
+    lhs, rhs = (w_ww*(I@w_ww), w_ww*(w_ww@I))
+    assert (lhs==rhs)
+
+    #R = PolynomialRing
+    #vals = [-2,-1,0,1,2]
+    vals = [-1,0,1] # big enough
+    lrs = {}
+    for a in vals:
+     for b in vals:
+      if a==b==0:
+        continue
+      for c in vals:
+       for d in vals:
+        if c==d==0:
+            continue
+        l = Matrix(base, [[a,b]]).t
+        r = Matrix(base, [[c,d]]).t
+        if a==-1 or a==0 and b==-1:
+            l = -l
+        if c==-1 or c==0 and d==-1:
+            r = -r
+        lrs[l.t,r.t] = l@r
+
+    print("green == bot:")
+    for key,u in lrs.items():
+        u = g_gg*u
+        if u[0,0]==u[1,0]==0:
+            print(key)
+    
+    print("red == bot:")
+    for key,u in lrs.items():
+        u = r_rr*u
+        if u[0,0]==u[1,0]==0:
+            print(key)
+    
+    print("W == bot:")
+    for key,u in lrs.items():
+        u = w_ww*u
+        if u[0,0]==u[1,0]==0:
+            print(key)
+    
 
 
 if __name__ == "__main__":

@@ -189,6 +189,7 @@ class Matrix:
             row[i] = 1
             rows.append(row)
         return Matrix(ring, rows)
+    get_identity = identity
 
     @classmethod
     def zeros(cls, ring, m, n):
