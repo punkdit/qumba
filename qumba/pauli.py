@@ -6,7 +6,7 @@ Phase accurate, scalable, implementation of Pauli operators
 """
 
 
-from random import shuffle, choice
+from random import shuffle, choice, randint
 from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
 from operator import add, mul, matmul
@@ -565,13 +565,59 @@ def test_wenum():
 
 def test_513():
 
-    code = construct.get_513()
+    code = QCode.fromstr("""
+    XZZX.  .XZZX X.XZZ ZX.XZ
+    """, None, "XXXXX ZZZZZ")
 
-    code = PauliCode.promote(code)
+    n = 5
+    nn = 2*n
+    Lx = Matrix([[1,0]*n])
+    Lz = Matrix([[0,1]*n])
+    L = Lx.concatenate(Lz)
+    Lt = L.t
 
-    w = code.get_wenum()
-    for wi in w:
-        print(wi)
+    count = randint(10,20)
+    for code in construct.all_codes(5,1,2):
+        H = code.H
+        HL = H*Lt
+        if HL.sum():
+            continue
+        #code.build()
+        #T = code.T
+        #TL = T*L
+        #if TL.sum():
+            #continue
+        code = QCode(H=H, L=L)
+        print(code)
+        count -= 1
+        if count == 0:
+            break
+
+    print(code.longstr())
+
+    pcode = PauliCode.promote(code)
+
+    w = pcode.get_full_wenum()
+    f = w[3]
+    print(f)
+    for r,x in f:
+        s = str(x)
+        for j in "*01234":
+            s = s.replace(j, "")
+        s = s.replace("w", ".")
+        print(s.upper())
+
+    from qumba.distill import MultiDistill, PauliDistill
+    distill = MultiDistill(code)
+    distill.build()
+    f = distill.f
+    gens = distill.gens
+    top = -f.numerator()
+    bot = -f.denominator()
+    print(top)
+    print(bot)
+
+
 
 
 

@@ -1371,7 +1371,7 @@ def test_logical():
     print("logops:", len(logops))
     logops = list(logops)
     shuffle(logops)
-    gen = logops[:100]
+    gen = logops[:1000]
 
     if argv.name:
         f = open(argv.name, 'w')
