@@ -4727,7 +4727,35 @@ def old_test_modular():
 
 def test_belyi():
     belyi = Belyi()
-    belyi.dump()
+    #belyi.dump()
+
+    f = belyi.f
+
+    for z in [1,2, 2.1, 1+2**0.5 ,3,4,5,6]:
+        print("%.6f"%z, "->", complex(f(z=z)).real)
+
+    print(complex(f(z= 1+r2/2)))
+
+    df = sage.diff(f)
+    top = df.numerator()
+    bot = df.denominator()
+
+    print("top")
+    for (item,m) in sage.factor(top):
+        print(item, "**", m, item == belyi.z-(1+r2))
+
+    z = belyi.z
+    F = z**8 + 14*z**4 + 1
+    states = []
+    for (item,m) in sage.factor(F):
+        if "z" in str(item):
+            states.append(item)
+
+    print("bot")
+    for (item,m) in sage.factor(bot):
+        print(item, "**", m, item in states)
+
+    
 
 
 def test_modular():
