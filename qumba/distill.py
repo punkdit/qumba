@@ -3761,22 +3761,53 @@ def test_fgl():
 
 
 def test_513():
+    R = sage.PolynomialRing(sage.CyclotomicField(24), "z")
+    R = sage.FractionField(R)
+    z = R.gens()[0]
+
+    #F = z**4 + 2*z**3 + 2*z**2 - 2*z + 1
+    F = z**8 + 14*z**4 + 1
+    print(F)
+    faces = []
+    for (item,m) in sage.factor(F):
+        faces.append(item(0))
+
+    f = (z**5 - 5*z) / (5*z**4 - 1)
+    for z in faces:
+        print(z, "-->", f(z), f(z) in faces)
+
+
     R = sage.PolynomialRing(sage.ZZ, "z")
     R = sage.FractionField(R)
     z = R.gens()[0]
 
-    F = z**4 + 2*z**3 + 2*z**2 - 2*z + 1
-    print(F)
+    #return
 
-    p = (z**5 - 5*z) / (5*z**4 - 1)
-    Q = F.subs({z:p})
-    print(Q)
-    top = Q.numerator()
-    top = sage.factor(top)
-    print(top)
+    H = (z+1)/(z-1)
 
-    #Q = sage.factor(Q)
-    #print(Q)
+    E7 = Belyi().f
+    E7 = R(E7)
+    print(E7)
+
+    E7 = H(E7(z=H))
+
+    r = E7(z=f) - E7
+    top = r.numerator()
+    bot = r.denominator()
+
+    print(sage.factor(top))
+    print(sage.factor(bot))
+
+    for z in faces:
+        assert f(z) in faces
+        print(z, "\t----->", f(z))
+        print(E7(z)==E7(f(z)))
+        print(r(z))
+    
+    for z in [0,-1,2]:
+        print(z, "\t----->", f(z))
+        print(E7(z)==E7(f(z)))
+        print(r(z))
 
 
 
