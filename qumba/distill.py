@@ -3772,6 +3772,7 @@ def test_513():
     for (item,m) in sage.factor(F):
         faces.append(item(0))
 
+
     f = (z**5 - 5*z) / (5*z**4 - 1)
     for z in faces:
         print(z, "-->", f(z), f(z) in faces)
@@ -3804,7 +3805,7 @@ def test_513():
         print(E7(z)==E7(f(z)))
         print(r(z))
     
-    for z in [0,-1,2]:
+    for z in [0,-1,1]:
         print(z, "\t----->", f(z))
         print(E7(z)==E7(f(z)))
         print(r(z))
@@ -4639,7 +4640,7 @@ class Belyi:
             assert bot(val) == 0
     
         self.f = f
-        self.K = K
+        self.K = f.parent()
         self.z = z
         self.edge_items = edge_items 
         self.face_items = face_items 
@@ -4649,10 +4650,10 @@ class Belyi:
         self.verts = verts
 
     def desc(self, p):
-        s = "edge " if p in self.edge_items else ""
-        s += "vert " if p in self.vert_items else ""
-        s += "face " if p in self.face_items else ""
-        return s
+        s = "edge " if p in self.edge_items+self.edges else ""
+        s += "vert " if p in self.vert_items+self.verts else ""
+        s += "face " if p in self.face_items+self.faces else ""
+        return s or "?"
     
     def dump(self):
         f = self.f
@@ -4668,91 +4669,6 @@ class Belyi:
         print("bot:")
         for item,m in sage.factor(bot):
             print(item, "degree", m, self.desc(item))
-
-
-
-def old_test_modular():
-
-    K = sage.CyclotomicField(24)
-    R = sage.PolynomialRing(K, "z")
-    z = R.gens()[0]
-    a = z**2 + 2*z - 1
-    b = z**2 - 2*z - 1
-    c = z**4 + 6*z**2 + 1
-    d = z**4 + 1
-    p_edge = a*b*c*d
-
-    p_face = z**8 + 14*z**4 + 1
-
-    print(p_edge)
-    edge_factors = []
-    edges = []
-    for (ff,dim) in (sage.factor(p_edge)):
-        #print("\t", ff)
-        assert dim==1
-        assert ff.degree() == 1
-        edge_factors.append(ff)
-        value = -ff(0)
-        edges.append(value)
-
-    print(p_face)
-    face_factors = []
-    faces = []
-    for (ff,dim) in (sage.factor(p_face)):
-        #print("\t", ff)
-        assert dim==1
-        assert ff.degree() == 1
-        face_factors.append(ff)
-        value = -ff(0)
-        faces.append(value)
-
-    #f = (z**5 - 5*z) / (5*z**4 - 1) # [[5,1,3]]
-    f = (z**7 + 7*z**3) / (7*z**4 + 1) # [[7,1,3]]
-    print(f)
-
-    df = sage.diff(f)
-    #print(df)
-
-    print("edges:")
-    for value in edges:
-        dfz = df(value)
-        a = dfz*dfz.conjugate()
-        print("\t", value, #"-->", f(value),
-            "is fixed" if f(value)==value else "",
-            "--> edge" if f(value) in edges else "",
-            "is contraction" if abs(complex(a))<1 else "")
-    r = (p_edge(f) - p_edge)
-    top = r.numerator()
-    bot = r.denominator()
-    #top = (top * 244140625)
-    print("p(f)-p=0")
-    for ff,dim in (sage.factor(top)):
-        if ff.degree() == 1:
-            print("\t", ff,
-                "face" if ff in face_factors else "",
-                "edge" if ff in edge_factors else "")
-
-    belyi = get_belyi()
-
-    print("faces:")
-    for value in faces:
-        dfz = df(value)
-        a = dfz*dfz.conjugate()
-        print("\t", value,
-            "is fixed" if f(value)==value else "",
-            "--> face" if f(value)in faces else "",
-            "is contraction" if abs(complex(a))<1 else "")
-    r = (belyi(f) - belyi)
-    top = r.numerator()
-    bot = r.denominator()
-    #top = (top * 244140625)
-    print("p(f)-p=0")
-    for ff,dim in (sage.factor(top)):
-        if ff.degree() == 1:
-            print("\t", ff,
-                "face" if ff in face_factors else "",
-                "edge" if ff in edge_factors else "")
-
 
 
 
@@ -4791,50 +4707,94 @@ def test_belyi():
 
 def test_modular():
     belyi = Belyi()
-    #belyi.dump()
+    z = belyi.z
+    #f = (z**5 - 5*z) / (5*z**4 - 1) # [[5,1,3]]
+    #f = (z**9 + 3*z**3) / (3*z**6 + 1) # Shor [[9,1,3]]
+    f = (z**7 + 7*z**3) / (7*z**4 + 1) # [[7,1,3]]
+
+
+    report_modular(belyi, f)
+    
+def test_15_1_3():
+    belyi = Belyi()
     z = belyi.z
 
-    f = (z**5 - 5*z) / (5*z**4 - 1) # [[5,1,3]]
-    #f = (z**7 + 7*z**3) / (7*z**4 + 1) # [[7,1,3]]
-    print(f)
+    for (ff,m) in (sage.factor( z**4 + 1 )):
+        print(-ff(0))
+
+    f = (z**15 + 15*z**7) / (15*z**8 + 1) # [[15,1,3]]
+    df = sage.diff(f)
+    top = df.numerator()
+    bot = df.denominator()
+    print(sage.latex(top))
+    print(sage.latex(bot))
+
+
+def report_modular(belyi, f):
+    print("report_modular:", f)
+
+    f = belyi.K(f)
 
     df = sage.diff(f)
-    #print(df)
+    print("df =", df)
 
-    print("edges:")
-    for value in belyi.edges:
+    print("verts:")
+    for value in belyi.verts:
+        fz = f(value)
         dfz = df(value)
         a = dfz*dfz.conjugate()
         print("\t", value, #"-->", f(value),
-            "is fixed" if f(value)==value else "",
-            "--> edge" if f(value) in belyi.edges else "",
-            "is contraction" if abs(complex(a))<1 else "")
+            #"--> vert" if f(z) in belyi.verts else "",
+            "--> " + belyi.desc(fz),
+            "fixed" if fz==value else "",
+            "stationary " if dfz==0 else ("is contraction" if abs(complex(a))<1 else ""))
 
-    wrap = belyi.f
-    r = (wrap(f) - wrap)
-    top = r.numerator()
-    bot = r.denominator()
-    #top = (top * 244140625)
-    print("p(f)-p=0")
-    for ff,dim in (sage.factor(top)):
-        if ff.degree() == 1:
-            print("\t", ff, belyi.desc(ff))
+    print("edges:")
+    for value in belyi.edges:
+        fz = f(value)
+        dfz = df(value)
+        a = dfz*dfz.conjugate()
+        print("\t", value, #"-->", f(z),
+            #"--> edge" if f(z) in belyi.edges else "",
+            "--> " + belyi.desc(fz),
+            "fixed" if fz==value else "",
+            "stationary " if dfz==0 else ("is contraction" if abs(complex(a))<1 else ""))
 
     print("faces:")
     for value in belyi.faces:
+        fz = f(value)
         dfz = df(value)
         a = dfz*dfz.conjugate()
         print("\t", value,
-            "is fixed" if f(value)==value else "",
-            "--> face" if f(value)in belyi.faces else "",
-            "is contraction" if abs(complex(a))<1 else "")
-    top = r.numerator()
-    bot = r.denominator()
-    #top = (top * 244140625)
-    print("p(f)-p=0")
-    for ff,dim in (sage.factor(top)):
-        if ff.degree() == 1:
-            print("\t", ff, belyi.desc(ff))
+            #"--> face" if f(z)in belyi.faces else "",
+            "--> " + belyi.desc(fz),
+            "fixed" if fz==value else "",
+            "stationary " if dfz==0 else ("is contraction" if abs(complex(a))<1 else ""))
+
+    E7 = belyi.f
+    z = belyi.z
+    H = (z+1)/(z-1)
+    E71 = H(E7(z=H))
+    r7 = (E7(f) - E7)
+    r71 = (E71(f) - E71)
+    print("fixed points up to Clifford:")
+    values = []
+    for ff,dim in sage.factor(r7.numerator()):
+        if ff.degree() != 1:
+            continue
+        value = -ff(z=0)
+        values.append(value)
+    for ff,dim in sage.factor(r71.numerator()):
+        if ff.degree() != 1:
+            continue
+        value = -ff(z=0)
+        values.append(value)
+    values = list(set(values))
+
+    items = [(belyi.desc(value), value) for value in values]
+    items.sort()
+    for k,v in items:
+        print("\t", k, v)
 
 
 
