@@ -4723,6 +4723,9 @@ def test_15_1_3():
         print(-ff(0))
 
     f = (z**15 + 15*z**7) / (15*z**8 + 1) # [[15,1,3]]
+
+    report_modular(belyi, f)
+
     df = sage.diff(f)
     top = df.numerator()
     bot = df.denominator()
@@ -4780,12 +4783,18 @@ def report_modular(belyi, f):
     print("fixed points up to Clifford:")
     values = []
     for ff,dim in sage.factor(r7.numerator()):
-        if ff.degree() != 1:
+        if ff.degree() == 2:
+            print("\t(%s)^%d"%(ff, dim))
+            continue
+        elif ff.degree() > 1:
             continue
         value = -ff(z=0)
         values.append(value)
     for ff,dim in sage.factor(r71.numerator()):
-        if ff.degree() != 1:
+        if ff.degree() == 2:
+            print("\t(%s)^%d"%(ff, dim))
+            continue
+        elif ff.degree() > 1:
             continue
         value = -ff(z=0)
         values.append(value)
