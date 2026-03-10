@@ -4580,20 +4580,20 @@ def test_ccz():
 
 
 class Belyi:
-    def __init__(self):
+    def __init__(self, root=24):
         # See:
         # https://www.labri.fr/perso/zvonkin/Research/belyi.pdf
-        K = sage.CyclotomicField(24)
+        K = sage.CyclotomicField(root)
         R = sage.PolynomialRing(K, "z")
         z = R.gens()[0]
         I = R(sage.I)
         # black vertices satisfy f(z)=0 
         # with multiplicity = vertex degree
         verts = [z, (z+1), (z-1), (z-I), (z+I)] # inf ??
-        f_vert = reduce(mul, verts)
-        assert f_vert == z * (z**4-1)
-        top = f_vert**4 # vertex degree is 4
-        #print("f_vert:", f_vert)
+        p_vert = reduce(mul, verts)
+        assert p_vert == z * (z**4-1)
+        top = p_vert**4 # vertex degree is 4
+        #print("p_vert:", p_vert)
         # f(z) = top * p(z) / q(z)
     
         # edges (white vertices) go to 1, with degree 2
@@ -4601,13 +4601,13 @@ class Belyi:
         b = z**2 - 2*z - 1
         c = z**4 + 6*z**2 + 1
         d = z**4 + 1
-        f_edge = a*b*c*d # white
-        # f(z) = f_edge^2*poly(z) + 1
+        p_edge = a*b*c*d # white
+        # f(z) = p_edge^2*poly(z) + 1
         
         # faces go to infinity with degree = 3
-        f_face = z**8 + 14*z**4 + 1 # infinity
-        bot = f_face**3
-        #print("f_face:", f_face)
+        p_face = z**8 + 14*z**4 + 1 # infinity
+        bot = p_face**3
+        #print("p_face:", p_face)
         # f(z) = poly(z) / bot(z)
     
         f = 108 * top / bot # hazaah !!
@@ -4617,9 +4617,9 @@ class Belyi:
         f1 = -(z**8 - 14*z**4 + 1)**3 / (108 * (z**4*(z**4+1)**4))
         #print(f1)
     
-        edge_items = [p for p,_ in sage.factor(f_edge)]
-        face_items = [p for p,_ in sage.factor(f_face)]
-        vert_items = [p for p,_ in sage.factor(f_vert)]
+        edge_items = [p for p,_ in sage.factor(p_edge)]
+        face_items = [p for p,_ in sage.factor(p_face)]
+        vert_items = [p for p,_ in sage.factor(p_vert)]
 
         edges = [-p(z=0) for p in edge_items]
         faces = [-p(z=0) for p in face_items]
@@ -4641,6 +4641,7 @@ class Belyi:
     
         self.f = f
         self.K = f.parent()
+        self.base = K
         self.z = z
         self.edge_items = edge_items 
         self.face_items = face_items 
@@ -4648,6 +4649,9 @@ class Belyi:
         self.edges = edges 
         self.faces = faces 
         self.verts = verts
+        self.p_vert = p_vert
+        self.p_edge = p_edge
+        self.p_face = p_face
 
     def desc(self, p):
         s = "edge " if p in self.edge_items+self.edges else ""
@@ -4670,6 +4674,63 @@ class Belyi:
         for item,m in sage.factor(bot):
             print(item, "degree", m, self.desc(item))
 
+
+
+def test_connection():
+
+    # Galois connection
+
+    belyi = Belyi(24)
+
+    K = sage.PolynomialRing(sage.ZZ, "z")
+
+    p_vert = K(belyi.p_vert)
+    p_edge = K(belyi.p_edge)
+    p_face = K(belyi.p_face)
+    print("p_vert =", p_vert)
+    print("p_edge =", p_edge)
+    print("p_face =", p_face)
+
+    items = []
+    for src in [p_vert, p_edge, p_face]:
+      for (p,m) in sage.factor(src):
+        if p.degree() > 1:
+            items.append(p)
+    print(items)
+
+    K = belyi.base
+    G = K.galois_group()
+    print(G)
+
+    def splits(K1, p):
+        R = sage.PolynomialRing(K1, "z")
+        p = R(p)
+        for item,m in sage.factor(p):
+            if item.degree() > 1:
+                return False
+        return True
+
+    #polys = [
+        
+
+    Hs = G.subgroups()
+    for H in Hs:
+        #print("|H|=", len(H))
+        K1, hom = (H.fixed_field())
+        print(K1)
+        print("\t", end='')
+
+        for p in items:
+            if splits(K1, p):
+                print(("%s"%p).replace(" ", ""), end=", ")
+
+        if splits(K1, p_vert):
+            print("p_vert", end=" ")
+        if splits(K1, p_edge):
+            print("p_edge", end=" ")
+        if splits(K1, p_face):
+            print("p_face", end=" ")
+        print()
 
 
 def test_belyi():
@@ -4716,7 +4777,7 @@ def test_modular():
     report_modular(belyi, f)
     
 def test_15_1_3():
-    belyi = Belyi()
+    belyi = Belyi(48)
     z = belyi.z
 
     for (ff,m) in (sage.factor( z**4 + 1 )):
@@ -4782,15 +4843,19 @@ def report_modular(belyi, f):
     r71 = (E71(f) - E71)
     print("fixed points up to Clifford:")
     values = []
+    found = set()
     for ff,dim in sage.factor(r7.numerator()):
+        found.add(ff)
         if ff.degree() == 2:
-            print("\t(%s)^%d"%(ff, dim))
+            print("\t(%s)^%d"%(ff, dim), complex(ff(z=0)))
             continue
         elif ff.degree() > 1:
             continue
         value = -ff(z=0)
         values.append(value)
     for ff,dim in sage.factor(r71.numerator()):
+        if ff in found:
+            continue
         if ff.degree() == 2:
             print("\t(%s)^%d"%(ff, dim))
             continue
