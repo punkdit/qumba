@@ -22,7 +22,7 @@ from qumba.action import Perm, mulclose_find, mulclose
 #from qumba import autos, transversal
 from qumba import csscode 
 from qumba.argv import argv
-from qumba.gcolor import dump_transverse
+from qumba.gcolor import dump_transverse, get_transverse
 from qumba.util import choose
 
 
@@ -1132,6 +1132,51 @@ def build_cube(dim, xdim=3, zdim=2):
 
 
     
+def test_colour():
+    code = QCode.fromstr("XXXX ZZII IIZZ") # [[4,1,2]] Z logical
+    code = QCode.fromstr("XXXX ZZZZ") # [[4,2,2]] CZ logical
+    code = construct.get_832() # CCZ logical, addressable CZ, Z
+    code = QCode.fromstr("""
+    XXXXXXXX
+    ZZZZZZZZ
+    """) # [[8,6,2]] one CZ logical CZ[0,1][2,3][4,5]
+
+#    d = code.distance()
+#    print(code)
+#    print(code.longstr())
+#    css = code.to_css()
+#    dump_transverse(css.Hx, css.Lx, 3)
+
+    from bruhat.algebraic import qchoose_2
+    n = 8
+    for m in range(1, 8):
+      # find even weight classical codes
+      count = 0
+      for H in qchoose_2(n, m):
+        rw = H.sum(1) % 2
+        if rw.sum():
+            continue
+        if min(H.sum(0))==0:
+            continue
+        s = shortstr(H).replace("1", "Z")
+        s = "X"*8 + "\n" + s
+        count += 1
+        code = QCode.fromstr(s)
+        code.distance()
+        css = code.to_css()
+        items = get_transverse(css.Hx, css.Lx, 3)
+        if "CCZ" in str(items):
+            print()
+            print(s)
+            print(code) #, end=' ', flush=True)
+            print(items)
+        else:
+            print(".", end='', flush=True)
+
+        #if count>100:
+        #    break
+      print()
+      print(n, m, count)
 
 
 def test_cube():
