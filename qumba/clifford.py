@@ -2481,6 +2481,53 @@ def test_832():
     v = P*v
     print(v.t)
 
+
+def test_orbit():
+
+    T = Matrix(K, [[1,0],[0,w8]])
+    CS = I<<S
+    CCX = reduce(matmul, [I]*6 + [X])
+    CCZ = reduce(matmul, [I]*6 + [Z])
+
+    n = argv.get("n", 2)
+
+    c = Clifford(n)
+    gens = c.get_gens()
+
+    src = [T] + [I]*(n-1)
+    src = reduce(matmul, src)
+    bdy = [src]
+
+    if argv.pauli:
+        bdy = []
+        for ops in cross( [(I, X, Y, Z, S, S.d, T, T**3, T**5, T**7)]*(n-1) ):
+            op = reduce(matmul, (T,) + ops)
+            bdy.append(op)
+        print(len(bdy))
+
+    pairs = [(g,g.d) for g in gens]
+    orbit = set(bdy)
+    while bdy:
+        _bdy = []
+        for src in bdy:
+            for g,gd in pairs:
+                op = g*src*gd
+                if op in orbit:
+                    continue
+                orbit.add(op)
+                _bdy.append(op)
+        bdy = _bdy
+        print("%d:%d"%(len(bdy),len(orbit)), end=" ", flush=True)
+    print()
+
+    print(len(orbit))
+    print(CS in orbit)
+    print(CCX in orbit)
+    print(CCZ in orbit)
+
+    print("is_diagonal:", len([g for g in orbit if g.is_diagonal()]))
+
+
     
 def test():
     test_clifford()

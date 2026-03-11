@@ -1132,21 +1132,36 @@ def build_cube(dim, xdim=3, zdim=2):
 
 
     
-def test_colour():
+def test_12_3_2():
     code = QCode.fromstr("XXXX ZZII IIZZ") # [[4,1,2]] Z logical
     code = QCode.fromstr("XXXX ZZZZ") # [[4,2,2]] CZ logical
     code = construct.get_832() # CCZ logical, addressable CZ, Z
+#    code = QCode.fromstr("""
+#    XXXXXXXX
+#    ZZZZZZZZ
+#    """) # [[8,6,2]] one CZ logical CZ[0,1][2,3][4,5]
+
+
     code = QCode.fromstr("""
-    XXXXXXXX
-    ZZZZZZZZ
-    """) # [[8,6,2]] one CZ logical CZ[0,1][2,3][4,5]
+    XXXXXXXX....
+    ....XXXXXXXX
+    ZZZZ........
+    ZZ..ZZ......
+    Z.Z.Z.Z.....
+    ZZZZZZZZ....
+    ....ZZZZZZZZ
+    ....ZZ..ZZ..
+    ....Z.Z.Z.Z.
+    """)
 
-#    d = code.distance()
-#    print(code)
-#    print(code.longstr())
-#    css = code.to_css()
-#    dump_transverse(css.Hx, css.Lx, 3)
+    d = code.distance()
+    print(code)
+    print(code.longstr())
+    css = code.to_css()
+    dump_transverse(css.Hx, css.Lx, 3)
 
+
+def test_colour_search():
     from bruhat.algebraic import qchoose_2
     n = 8
     for m in range(1, 8):
