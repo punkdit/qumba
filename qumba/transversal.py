@@ -5,7 +5,7 @@ _looking for transversal logical clifford operations
 
 from functools import reduce
 from operator import add, matmul, mul
-from random import shuffle
+from random import shuffle, randint
 
 import numpy
 
@@ -2912,6 +2912,205 @@ def test_adaptor():
     #print(css.Lx)
     #dump_transverse(css.Hx, css.Lx)
 
+
+def old_search_logical(code, L, row_weight=None, css=False):
+    solver = Solver()
+    Add = solver.add
+
+    n = code.n
+    nn = 2*n
+    space = code.space
+    F = space.F
+
+    U = UMatrix.unknown(nn, nn)
+
+    Add(U.t*F*U == F) # U symplectic
+
+    if css:
+        for i in range(nn):
+          for j in range(nn):
+            if (i+j)%2:
+                Add( U[i,j] == 0 )
+
+
+    HU = code.H * U.t
+    LU = code.L * U.t
+    R = HU * F * code.L.t
+    Add(R==0) # linear constraint
+    R = HU * F * code.H.t
+    Add(R==0) # linear constraint
+
+    Fn = code.space.F
+    Fk = SymplecticSpace(code.k).F
+    Add(Fk*code.L * Fn * LU.t == L)
+
+    if row_weight is not None:
+        for i in range(nn):
+            Add(Sum([If(U[i,j].get(),1,0) for j in range(nn)])<=row_weight)
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            print(result)
+            break
+    
+        model = solver.model()
+        M = U.get_interp(model)
+        assert M.t*F*M == F
+    
+        dode = code.apply(M)
+        assert dode.is_equiv(code)
+        yield M
+
+        Add(U != M)
+
+
+def search_logical(code, L, row_weight=None, css=False):
+    solver = Solver()
+    Add = solver.add
+
+    n = code.n
+    m = code.m
+    nn = 2*n
+    mm = 2*m
+    space = code.space
+    Fn = space.F
+    Fm = SymplecticSpace(code.m).F
+    Fk = SymplecticSpace(code.k).F
+
+    #U = UMatrix.unknown(nn, nn)
+    M = UMatrix.unknown(mm, mm)
+    E = code.get_encoder()
+    
+    #Add(U.t*Fn*U == Fn) # U symplectic
+    Add(M.t*Fm*M == Fn) # M symplectic
+
+    U = M<<L
+    U = E * U * ~E
+
+    if css:
+        for i in range(nn):
+          for j in range(nn):
+            if (i+j)%2:
+                Add( U[i,j] == 0 )
+
+
+    HU = code.H * U.t
+    LU = code.L * U.t
+    R = HU * Fn * code.L.t
+    Add(R==0) # linear constraint
+    R = HU * Fn * code.H.t
+    Add(R==0) # linear constraint
+
+    Add(Fk*code.L * Fn * LU.t == L)
+
+    if row_weight is not None:
+        for i in range(nn):
+            Add(Sum([If(U[i,j].get(),1,0) for j in range(nn)])<=row_weight)
+
+    while 1:
+        result = solver.check()
+        if result != z3.sat:
+            print(result)
+            break
+    
+        model = solver.model()
+        M = U.get_interp(model)
+        assert M.t*Fn*M == Fn
+    
+        dode = code.apply(M)
+        assert dode.is_equiv(code)
+        yield M
+
+        Add(U != M)
+
+
+def test_832():
+
+    code = construct.get_422()
+    sk = SymplecticSpace(code.k)
+    L = sk.SWAP(0,1)
+    for M in search_logical(code, L, 1, False):
+        print(M)
+        assert code.space.is_symplectic(M)
+        dode = M*code
+        L1 = dode.get_logical(code)
+        #print(L1)
+        assert L1==L
+        break
+    else:
+        assert 0
+
+    code = construct.get_832()
+    sk = SymplecticSpace(code.k)
+    #L = sk.SWAP(0,1)
+    L = sk.H(0)
+    for M in search_logical(code, L, 5, False):
+        print(M)
+        assert code.space.is_symplectic(M)
+        print(code.space.get_name(M))
+        dode = M*code
+        L1 = dode.get_logical(code)
+        #print(L1)
+        assert L1==L
+        break
+    else:
+        assert 0
+
+    code = construct.get_832()
+    print(code)
+    n = code.n
+
+    c2 = code + code
+    print(c2)
+
+    sk = SymplecticSpace(c2.k)
+    L = sk.SWAP(0, 3)
+
+#    for M in search_logical(c2, L, 1):
+#        assert 0
+#
+#    for M in search_logical(c2, L, 2, css=True):
+#        assert 0
+
+    for w in range(3, n):
+        print("w =", w)
+        for M in search_logical(c2, L, w, css=True):
+            print(M)
+            print(c2.space.get_name(M))
+            break
+        else:
+            continue
+        break
+
+
+
+def test_css():
+    n = 4
+    nn = 2*n
+    space = SymplecticSpace(n)
+    op = space.get_identity()
+    for _ in range(16):
+        i = randint(0, n-1)
+        j = randint(0, n-1)
+        if i==j:
+            continue
+        op = space.CX(i,j) * op
+    print(op)
+    print()
+    for i in range(nn):
+      for j in range(nn):
+        if (i+j)%2:
+            assert op[i,j] == 0, (i,j)
+    #op = space.get_identity()
+    op = SMap()
+    for i in range(nn):
+      for j in range(nn):
+        if (i+j)%2:
+            op[i,j] = '.'
+        else:
+            op[i,j] = '1'
+    print(op)
 
 if __name__ == "__main__":
     from time import time

@@ -15,7 +15,6 @@ from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, ForAll, PbEq, 
 
 from qumba.qcode import QCode, SymplecticSpace, fromstr, shortstr, strop
 from qumba.matrix import Matrix, scalar
-from qumba import csscode
 from qumba.action import mulclose, Group, Perm, mulclose_find
 from qumba.util import allperms, cache
 from qumba import equ
