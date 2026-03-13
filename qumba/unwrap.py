@@ -1244,6 +1244,10 @@ def test_logical():
         code = construct.get_832()
     elif n==16:
         code = construct.get_16_4_2()
+    elif n==36:
+        from qumba.equivariant import main_stacked
+        css = main_stacked()
+        code = css.to_qcode()
     elif _id:
         print("fetching https://qecdb.org/codes/%s" % _id)
         code = list(db.get(_id=_id))[0]

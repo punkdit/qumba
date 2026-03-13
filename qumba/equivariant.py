@@ -1196,7 +1196,305 @@ def test_bicayley():
                 best[code.k] = code.d
     
 
+def get_cyclic(l, idxs):
+    A = zeros2(l, l)
+    for i in range(l):
+        for j in idxs:
+            A[i, (i+j)%l] = 1
+    return Matrix(A)
 
+
+def main_stacked():
+    "https://arxiv.org/pdf/2602.15372"
+
+    code = get_stacked(9, [0,4], [3,6])
+    #code = get_stacked(21, [2,5], [5,14])
+    #code = get_stacked(27, [22,24], [12,22])
+
+    return code
+
+
+def get_stacked(l, idxs, jdxs):
+
+    A = get_cyclic(l, idxs)
+    B = get_cyclic(l, jdxs)
+
+    Hx = A.concatenate(B.t, axis=1)
+    Hz = B.concatenate(A.t, axis=1)
+    code = CSSCode(Hx=Hx.A, Hz=Hz.A)
+    code.bz_distance()
+    print(code.longstr())
+    print(code)
+    print("-->")
+
+    top = A.concatenate(B.t, A.t, B, axis=1)
+    bot = B.t.concatenate(A, B, A.t, axis=1)
+    H = top.concatenate(bot)
+
+    code = CSSCode(Hx=H.A, Hz=H.A)
+    code.bz_distance()
+    print(code)
+    return code
+
+
+
+def test_algebra():
+    # this is the group algebra over F_2
+
+    G = get_group()
+    print(G)
+    ident = G.identity
+
+    perms = list(G)
+    del G # unordered!
+    perms.sort(key = str)
+    lookup = {p:i for (i,p) in enumerate(perms)}
+    n = len(perms)
+
+    I = Matrix.get_identity(n)
+    n2 = n**2
+    cap = I.reshape((1, n2))
+    cup = I.reshape((n2, 1))
+
+    swap = zeros2(n2, n2)
+    for i in range(n):
+      for j in range(n):
+        idx = i + n*j
+        jdx = j + n*i
+        swap[idx,jdx] = 1
+    swap = Matrix(swap)
+
+    assert swap*swap == I@I
+    assert swap != I@I
+    assert I == (cap @ I) * (I @ swap) * (cup @ I)
+
+    unit = zeros2(n, 1)
+    unit[lookup[ident]] = 1
+    unit = Matrix(unit)
+
+    mul = zeros2(n, n2)
+    for i,g in enumerate(perms):
+      for j,h in enumerate(perms):
+        k = lookup[g*h]
+        mul[k, i+n*j] = 1
+    mul = Matrix(mul)
+    #print(mul)
+    assert mul*(mul@I) == mul*(I@mul)
+    assert mul*(unit@I) == I
+    assert mul*(I@unit) == I
+
+    inv = zeros2(n, n)
+    for i,g in enumerate(perms):
+        assert i==lookup[g]
+        gi = ~g
+        j = lookup[gi]
+        inv[j, i] = 1
+    inv = Matrix(inv)
+
+    lhs = mul * (inv@inv)
+    rhs = inv * mul * swap
+    assert lhs == rhs
+
+    lhs = (cap @ I) * (mul @ swap) * (I @ cup @ I)
+    rhs = mul * (inv @ I)
+    assert lhs == rhs
+
+    # um, wat ?!?
+#    def left(g):
+#        L = zeros2(n,n)
+#        for i in range(n):
+#            h = g*perms[i]
+#            j = lookup[h]
+#            L[i,j] = 1
+#        return Matrix(L)
+#
+#    def right(g):
+#        R = zeros2(n,n)
+#        for i in range(n):
+#            h = perms[i]*g
+#            j = lookup[h]
+#            R[i,j] = 1
+#        return Matrix(R)
+
+    def vec(i):
+        v = zeros2(n, 1)
+        v[i] = 1
+        v = Matrix(v)
+        return v
+
+    # arghh... what... fix me
+    left = lambda g : mul * (vec(lookup[g])@I)
+    right = lambda g : mul * (I@vec(lookup[g]))
+
+    for g in perms:
+        i = lookup[g]
+        assert i == lookup[g]
+        v = zeros2(n, 1)
+        v[i] = 1
+        v = Matrix(v)
+        lhs = mul * (v@I)
+        rhs = left(g)
+#        print(lhs)
+#        print("=")
+#        print(rhs)
+        assert (lhs==left(g))
+        #print(lhs==left(g), lhs==right(g))
+
+    for g in perms:
+      for h in perms:
+        L = left(g)
+        R = right(h)
+        assert L*R == R*L
+
+    for trial in range(10):
+        A = left(choice(perms))
+        B = right(choice(perms))
+
+        assert A*B == B*A
+        assert swap * (A@B) == (B@A)*swap
+
+        At = (cap @ I) * (A @ swap) * (cup @ I)
+        assert At == A.t
+    
+        a = choice(perms)
+        ai = ~a
+        b = choice(perms)
+        La = left(a)
+        Ra = right(a)
+
+        assert La.t == left(ai)
+
+
+def test_hopf():
+    # this is the group algebra over F_2
+
+    G = get_group()
+    print(G)
+    ident = G.identity
+
+    perms = list(G)
+    del G # unordered!
+    perms.sort(key = str)
+    lookup = {p:i for (i,p) in enumerate(perms)}
+    n = len(perms)
+
+    I = Matrix.get_identity(n)
+    n2 = n**2
+    cap = I.reshape((1, n2))
+    cup = I.reshape((n2, 1))
+
+    swap = zeros2(n2, n2)
+    for i in range(n):
+      for j in range(n):
+        idx = i + n*j
+        jdx = j + n*i
+        swap[idx,jdx] = 1
+    swap = Matrix(swap)
+
+    assert swap*swap == I@I
+    assert swap != I@I
+    assert I == (cap @ I) * (I @ swap) * (cup @ I)
+
+    unit = zeros2(n, 1)
+    unit[lookup[ident]] = 1
+    unit = Matrix(unit)
+
+    mul = zeros2(n, n2)
+    for i,g in enumerate(perms):
+      for j,h in enumerate(perms):
+        k = lookup[g*h]
+        mul[k, i+n*j] = 1
+    mul = Matrix(mul)
+    #print(mul)
+    assert mul*(mul@I) == mul*(I@mul)
+    assert mul*(unit@I) == I
+    assert mul*(I@unit) == I
+
+    inv = zeros2(n, n)
+    for i,g in enumerate(perms):
+        assert i==lookup[g]
+        gi = ~g
+        j = lookup[gi]
+        inv[j, i] = 1
+    inv = Matrix(inv)
+
+    lhs = mul * (inv@inv)
+    rhs = inv * mul * swap
+    assert lhs == rhs
+
+    lhs = (cap @ I) * (mul @ swap) * (I @ cup @ I)
+    rhs = mul * (inv @ I)
+    assert lhs == rhs
+
+    # um, wat ?!?
+#    def left(g):
+#        L = zeros2(n,n)
+#        for i in range(n):
+#            h = g*perms[i]
+#            j = lookup[h]
+#            L[i,j] = 1
+#        return Matrix(L)
+#
+#    def right(g):
+#        R = zeros2(n,n)
+#        for i in range(n):
+#            h = perms[i]*g
+#            j = lookup[h]
+#            R[i,j] = 1
+#        return Matrix(R)
+
+    def vec(i):
+        v = zeros2(n, 1)
+        v[i] = 1
+        v = Matrix(v)
+        return v
+
+    # arghh... what... fix me
+    left = lambda g : mul * (vec(lookup[g])@I)
+    right = lambda g : mul * (I@vec(lookup[g]))
+
+    for g in perms:
+        i = lookup[g]
+        assert i == lookup[g]
+        v = zeros2(n, 1)
+        v[i] = 1
+        v = Matrix(v)
+        lhs = mul * (v@I)
+        rhs = left(g)
+#        print(lhs)
+#        print("=")
+#        print(rhs)
+        assert (lhs==left(g))
+        #print(lhs==left(g), lhs==right(g))
+
+    for g in perms:
+      for h in perms:
+        L = left(g)
+        R = right(h)
+        assert L*R == R*L
+
+    for trial in range(10):
+        A = left(choice(perms))
+        B = right(choice(perms))
+
+        assert A*B == B*A
+        assert swap * (A@B) == (B@A)*swap
+
+        At = (cap @ I) * (A @ swap) * (cup @ I)
+        assert At == A.t
+    
+        a = choice(perms)
+        ai = ~a
+        b = choice(perms)
+        La = left(a)
+        Ra = right(a)
+
+        assert La.t == left(ai)
+
+        rhs = inv * mul * swap * (vec(lookup[a])@inv)
+        assert La.t == rhs
+
+    
 
 if __name__ == "__main__":
     from time import time
