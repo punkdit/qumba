@@ -6,6 +6,7 @@ import numpy
 
 from bruhat.matroid import Matroid, SpMatroid, mask_le
 from bruhat.action import mulclose, get_orbits
+from bruhat.algebraic import qchoose_2
 
 from qumba import construct 
 from qumba.symplectic import SymplecticSpace
@@ -417,7 +418,6 @@ def erase_classical(H): # XXX what is this ?!?
 
 
 def test_classical():
-    from bruhat.algebraic import qchoose_2
 
     H = Matrix([[1,1,1,1]])
     M = detect_classical(H)
@@ -537,7 +537,7 @@ def test_classical():
       print()
 
 
-def test_6():
+def test_ex():
 
     H = Matrix.parse("""
     1..1
@@ -545,8 +545,27 @@ def test_6():
     .11.
     ..11
     """)
-    M = detect_classical(H)
-    print(M)
+
+    n, m = 4, 2
+    for H in qchoose_2(n, m):
+        #print(H)
+        H = Matrix(H)
+        K = H.kernel()
+    
+        M = detect_classical(H)
+        MK = detect_classical(K)
+        assert M.get_dual() == MK
+
+        f = M.rankfunc()
+        tops = M.closed()
+        print(tops)
+        for v in K.span():
+            if v.sum() == 0:
+                continue
+            mask = tuple(v)
+            print(mask, mask in tops)
+            
+
     return
 
     H = Matrix.parse("""
