@@ -1386,6 +1386,34 @@ def test():
     #print(C.longstr())
 
 
+def test_hexacode():
+    code = QCode.fromstr("""
+    XIIXXZ
+    IXIXZX
+    IIXZXX
+    ZIIZZY
+    IZIZYZ
+    IIZYZZ
+    """)
+    code = QCode.fromstr(""" XIIXXZ IXIXZX IIXZXX YIIYYX IYIYXY IIYXYY """)
+
+    code = QCode.fromstr("""
+    XZXZXZ XZZXZX ZXXZZX
+    """) # [[6,3,2]] 24 autos
+
+    code = QCode.fromstr("""
+    XZXZXZ XZZXZX ZXXZZX
+    YXYXYX YXXYXY XYYXXY
+    """) # [[6,0,4]] 24 autos
+
+    code.check()
+    print(code)
+
+    N, perms = code.get_autos()
+    print(N)
+    print(perms)
+
+
 
 if __name__ == "__main__":
 
