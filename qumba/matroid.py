@@ -10,7 +10,6 @@ from bruhat.action import mulclose, get_orbits
 from qumba import construct 
 from qumba.symplectic import SymplecticSpace
 from qumba.qcode import QCode
-from qumba import db
 from qumba.argv import argv
 from qumba.matrix import Matrix
 from qumba.lax import lc_orbits, Lower, Upper
@@ -299,7 +298,7 @@ def s_correct_classical(H):
 
 
 
-def correct_classical(H):
+def correct_classical(H, uniq=1):
     m, n = H.shape
     masks = list(numpy.ndindex((2,)*n))
     syns = [Matrix(u) for u in numpy.ndindex((2,)*m)]
@@ -321,7 +320,7 @@ def correct_classical(H):
         w = sum(items[0])
         items = [v for v in items if sum(v) == w]
         #print(Hv, items)
-        if len(items)!=1:
+        if not items or len(items)>uniq: # ????
             continue
         v = items[0]
         found.append(v)
@@ -442,6 +441,7 @@ def test_classical():
         if M in found:
             continue
         found.add(M)
+        #assert M.is_polymatroid()
     assert len(found) == 35 # missing one non-F2-representable matroid
 
     found = set()
@@ -454,6 +454,7 @@ def test_classical():
             continue
         #print(M)
         found.add(M)
+        #assert M.is_polymatroid()
     assert len(found) == 21
 
     n = 6
@@ -477,9 +478,11 @@ def test_classical():
             masks = list(M.masks)
             masks.sort()
             for mask in masks:
-                print(mask)
+                print(mask, sum(mask))
             print(detect_classical(H))
+            print("is_polymatroid:", M.is_polymatroid())
             raise
+        assert M.is_polymatroid()
 
 #    found = set()
 #    for H in qchoose_2(4, 2):
@@ -533,6 +536,46 @@ def test_classical():
         print(len(found), end=' ', flush=True)
       print()
 
+
+def test_6():
+
+    H = Matrix.parse("""
+    1..1
+    11..
+    .11.
+    ..11
+    """)
+    M = detect_classical(H)
+    print(M)
+    return
+
+    H = Matrix.parse("""
+    1..1..
+    .1.1.1
+    ..11.1
+    ....11
+    """)
+
+
+#    **    =
+#      **   
+#    012345
+#    1..1..
+#    .1.1.1
+#    ..11.1
+#    ....11
+
+    m, n = H.shape
+    for i in range(n):
+      for j in range(i+1, n):
+        v = [0]*n
+        v[i] = 1
+        v[j] = 1
+        v = Matrix(v)
+        print(i, j, H*v)
+
+    M = correct_classical(H, 2)
+    print(M)
 
 
 
@@ -712,6 +755,7 @@ def test_distance():
     code = construct.get_713() # rank 3
     code = construct.get_513() # rank 2
 
+    from qumba import db
     for code in db.get_codes():
     
         print(code)

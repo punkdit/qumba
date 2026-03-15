@@ -1233,6 +1233,7 @@ def get_stacked(l, idxs, jdxs):
 
     code = CSSCode(Hx=H.A, Hz=H.A)
     code.bz_distance()
+    print(code.longstr())
     print(code)
     return code
 
