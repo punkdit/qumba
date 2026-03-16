@@ -1395,16 +1395,20 @@ def test_hexacode():
     IZIZYZ
     IIZYZZ
     """)
+    assert code.is_gf4()
     code = QCode.fromstr(""" XIIXXZ IXIXZX IIXZXX YIIYYX IYIYXY IIYXYY """)
+    assert code.is_gf4()
 
     code = QCode.fromstr("""
     XZXZXZ XZZXZX ZXXZZX
     """) # [[6,3,2]] 24 autos
+    #assert code.is_gf4()
 
     code = QCode.fromstr("""
     XZXZXZ XZZXZX ZXXZZX
     YXYXYX YXXYXY XYYXXY
     """) # [[6,0,4]] 24 autos
+    assert code.is_gf4()
 
     code.check()
     print(code)
@@ -1412,6 +1416,19 @@ def test_hexacode():
     N, perms = code.get_autos()
     print(N)
     print(perms)
+
+    ws = []
+    for v in code.H.span():
+        if v[:2].sum() == 0:
+            ws.append(v)
+    W = Matrix(ws)
+    W = W[:, 2:]
+    W = W.linear_independent()
+    print(W)
+    code = QCode(W)
+    print(code)
+    print(code.longstr())
+    print(code.get_autos())
 
 
 
