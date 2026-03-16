@@ -1132,11 +1132,36 @@ class QCode(object):
 #        return P
 
 
-    def get_components(self):
-        print("get_components")
-        H = self.H
-        print(H.normal_form())
+#    def get_components(self):
+#        print("get_components")
+#        H = self.H
+#        print(H.normal_form())
         
+    def puncture(self, i): # just guessing how this works... ?!
+        assert 0<=i<self.n
+        H = self.H
+        H = H[:, :2*i].concatenate(H[:, 2*i+2:], axis=1)
+        n = self.n-1
+        space = SymplecticSpace(n)
+        F = space.F
+        R = H * F * H.t
+        rows = []
+        for i in range(n):
+            if R[i, i:].sum()==0:
+                rows.append(H[i])
+        H = Matrix(rows)
+        code = QCode(H)
+        return code
+
+    def shorten(self, i):
+        assert 0<=i<self.n
+        H = self.H
+        H1 = H[:, :2*i].concatenate(H[:, 2*i+2:], axis=1)
+        J = H[:, 2*i:2*i+2]
+        K = J.t.kernel()
+        #print(K, K.shape)
+        code = QCode(K*H1)
+        return code
 
 
 

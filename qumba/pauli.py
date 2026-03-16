@@ -22,7 +22,7 @@ from qumba.matrix import Matrix, DEFAULT_P, pullback
 from qumba.symplectic import symplectic_form, SymplecticSpace
 from qumba.clifford import Clifford, half
 from qumba.qcode import QCode, strop
-from qumba.util import cross
+from qumba.util import cross, allperms
 from qumba import construct
 
 
@@ -62,6 +62,10 @@ class Pauli:
         phase = (self.phase + s.count("Y")) % 4
         phase = ["", "i", "-", "-i"][phase]
         return phase + s
+
+    @classmethod
+    def get_identity(cls, n):
+        return Pauli([0,0]*n)
 
     def sign(self):
         v = self.vec
@@ -195,7 +199,7 @@ class PauliCode:
     def promote(cls, item):
         if isinstance(item, PauliCode):
             return item
-        assert isinstance(item, QCode)
+        assert isinstance(item, QCode), type(item)
         pauli = cls.from_qcode(item)
         return pauli
 
@@ -352,6 +356,19 @@ class PauliCode:
     
         return result
 
+    def weight_enum(self):
+        stabs = self.stabs
+        m = self.m
+        n = self.n
+        wenum = {}
+        for bits in numpy.ndindex((2,)*m):
+            op = Pauli.get_identity(n)
+            for (i,bit) in enumerate(bits):
+                if bit:
+                    op = op  * stabs[i]
+            key = op.get_wenum()
+            wenum[key] = wenum.setdefault(key, 0) + op.sign()
+        return wenum
 
     
 def test_pauli():
@@ -620,6 +637,206 @@ def test_513():
 
 
 
+def get_autos(code):
+    n = code.n
+    space = code.space
+    items = list(range(n))
+    perms = []
+    for idxs in allperms(items):
+        dode = space.get_perm(idxs) * code
+        if dode.is_equiv(code):
+            perms.append(idxs)
+    return perms
+
+def test_hexacode():
+    code = QCode.fromstr("""
+    XIIXXZ
+    IXIXZX
+    IIXZXX
+    ZIIZZY
+    IZIZYZ
+    IIZYZZ
+    """)
+    assert code.is_gf4()
+    code = QCode.fromstr(""" XIIXXZ IXIXZX IIXZXX YIIYYX IYIYXY IIYXYY """)
+    assert code.is_gf4()
+    #print(code.get_autos()) # 6
+    #assert len(get_autos(code)) == 6
+
+    code = QCode.fromstr("""
+    YZIXIX
+    YZXIXI
+    IXYZIX
+    XIYZXI
+    IXIXYZ
+    """) # https://arxiv.org/pdf/cs/0503058
+    #assert code.is_gf4() # nope
+    #print(code.get_autos()) # 24
+    perms = get_autos(code)
+    print(perms)
+    perms.sort()
+    for p in perms:
+        print(p)
+
+    n = code.n
+    #for i in range(n):
+        #for perm in perms:
+            #if perm[0] == i:
+
+    
+    return
+
+
+    code = QCode.fromstr("""
+    XZXZXZ XZZXZX ZXXZZX
+    """) # [[6,3,2]] 24 autos
+    #assert code.is_gf4()
+    #assert len(get_autos(code)) == 24
+
+    code = QCode.fromstr("""
+    XZXZXZ XZZXZX ZXXZZX
+    YXYXYX YXXYXY XYYXXY
+    """) # [[6,0,4]] 24 autos
+    assert code.is_gf4()
+    #assert len(get_autos(code)) == 24
+    from bruhat.gset import Group, Perm
+    perms = get_autos(code)
+    print(perms)
+    gens = [Perm(perm) for perm in perms]
+    G = Group(gens)
+    print(G)
+    print(G.structure_description())
+    H = [g for g in G if g[0]==0]
+    print(Group(H).structure_description())
+
+    HH = Matrix(list(code.H.span()))
+    rows = strop(HH).split()
+    rows.sort()
+    #print('\n'.join(rows))
+
+    from qumba.qcode import fromstr
+    H = fromstr("""
+    XZXZXZ
+    XZZXZX
+    ZXXZZX
+    ZXZXXZ
+    YXYXYX
+    XYXYYX
+    XYYXXY
+    YXXYXY
+    ZYZYZY
+    ZYYZYZ
+    YZYZZY
+    YZZYYZ
+    """)
+    H = Matrix(H)
+    assert H.rank() == 6
+    dode = QCode(H.linear_independent())
+    assert dode.is_equiv(code)
+
+    dode = code.shorten(0)
+    print(dode, dode.get_autos())
+
+    if 0:
+        from qumba.unwrap import unwrap
+        code = unwrap(code)
+        print(code)
+    
+        #print(code.get_autos())
+        print(code.longstr())
+    
+        #dode = code.puncture(0)
+        #print(dode) # [[11,5,2]]
+    
+        dode = code.shorten(0) # [[11,1,3]]
+        print(dode)
+    
+    #    css = dode.to_css()
+    #    Hx = Matrix(css.Hx)
+    #    print(Hx.get_wenum())
+    #    rows = []
+    #    for row in Hx.span():
+    #        if row.sum() == 4:
+    #            rows.append(row)
+    #    H1 = Matrix(rows)
+    #    print(H1.rank())
+    
+
+    from sage import all_cmdline as sage
+    from qumba.distill import PauliDistill
+
+    if 0:
+        pauli = PauliCode.from_qcode(dode)
+        distill = PauliDistill(dode)
+        f = distill.build()
+        z = f.parent().gens()[0]
+        df = sage.diff(f, z)
+        top = df.numerator()
+        print(top)
+        print(sage.factor(top))
+    
+        return
+
+    pauli = PauliCode.from_qcode(code)
+    print(pauli)
+    wenum = pauli.weight_enum()
+    print(wenum)
+
+    R = sage.PolynomialRing(sage.ZZ, list("wxyz"))
+    gens = R.gens()
+    print(gens)
+    p = 0
+    for (key,r) in wenum.items():
+        term = r
+        for (i,e) in enumerate(key):
+            term = term * (gens[i]**e)
+        p += term
+    print(p)
+    print(p(w=1))
+
+    from qumba.transversal import find_local_cliffords, find_autos_lc, get_local_clifford
+    #for op in find_local_cliffords(code): # gf4 only
+    #for op in find_autos_lc(code): # huge!
+
+    space = code.space
+
+    gens = []
+    for perm in [(1,0,2,3,4,5), (1,2,3,4,5,0)]:
+        P = space.get_perm(perm)
+        dode = P * code
+        assert not dode.is_equiv(code)
+        M = get_local_clifford(code, dode)
+        op = M*P
+        assert (op*code).is_equiv(code)
+        gens.append(op)
+    G = mulclose(gens)
+    print(len(G)) # 3*6! = 2160
+
+    return
+
+    code.check()
+    print(code)
+
+    N, perms = code.get_autos()
+    print(N)
+    print(perms)
+
+    ws = []
+    for v in code.H.span():
+        if v[:2].sum() == 0:
+            ws.append(v)
+    W = Matrix(ws)
+    W = W[:, 2:]
+    W = W.linear_independent()
+    print(W)
+    code = QCode(W)
+    print(code)
+    print(code.longstr())
+    print(code.get_autos())
+
+
+
+
 
 if __name__ == "__main__":
 
@@ -656,5 +873,4 @@ if __name__ == "__main__":
 
     t = time() - start_time
     print("OK! finished in %.3f seconds\n"%t)
-
 

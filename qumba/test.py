@@ -14,6 +14,7 @@ from qumba.autos import get_autos, get_autos_css
 from qumba import csscode, construct
 from qumba.construct import (get_422, get_513, get_golay, get_10_2_3, reed_muller,
     slab)
+from qumba.transversal import find_isomorphisms_css
 from qumba.action import mulclose, mulclose_hom, mulclose_find
 from qumba.util import cross, allperms
 from qumba.symplectic import Building
@@ -413,7 +414,6 @@ def test_toric():
 
 
 def test_biplanar():
-    from qumba.transversal import find_isomorphisms_css
     from qumba import csscode, db
 #    for (w,h) in [
 #        (24, 12),
@@ -2398,6 +2398,72 @@ def test_rm():
     perms = [Perm(f) for f in perms]
     G = Group(gens=perms, build=False)
     print(G.structure_description())
+
+
+def isomorphic(code, dode):
+    for M in find_isomorphisms_css(code, dode):
+        return True
+    return False
+
+def test_shorten():
+    """
+    shorten golay to get reed_muller(1,4)
+    """
+
+    def uniq_css(codes):
+        codes = list(codes)
+        i = 0
+        while i < len(codes):
+            j = i+1
+            while j < len(codes):
+                if isomorphic(codes[i], codes[j]):
+                    codes.pop(j)
+                else:
+                    j += 1
+            i += 1
+        return codes
+
+    code = get_golay()
+    for i in range(4):
+        code = code.shorten(0)
+        print(code)
+
+    codes = [code]
+    n = code.n
+    while n>16:
+        codes = [code.shorten(i) for i in range(n) for code in codes]
+        print("codes:", len(codes))
+        codes = uniq_css(codes)
+        for code in codes:
+            print("\t", code)
+        n -= 1
+
+    for code in codes:
+        if code.d == 4:
+            break
+    else:
+        assert 0
+
+    rm = reed_muller(1, 4) # [[16, 6, 4]] s.d.
+    assert isomorphic(rm, code)
+
+
+def test_golay_rm():
+    code = get_golay()
+    H = code.H
+
+    n = code.n
+    rows = strop(H).split()
+    idxs = [i for i in range(n) if rows[0][i]=='X']
+    print(idxs)
+    for i in reversed(idxs):
+        code = code.shorten(i)
+    print(code)
+
+    rm = reed_muller(1, 4) # [[16, 6, 4]] s.d.
+    assert isomorphic(rm, code)
+    
+
 
 
 def test():

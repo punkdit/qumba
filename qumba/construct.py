@@ -9,8 +9,8 @@ import numpy
 
 from qumba.lin import (parse, shortstr, linear_independent, eq2, dot2, identity2,
     array2, zeros2, rank, rand2, pseudo_inverse, kernel, direct_sum, span)
-from qumba.util import choose
-from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr
+from qumba.util import choose, allperms
+from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr, strop
 from qumba.csscode import CSSCode, find_zx_duality
 from qumba.sp_pascal import i_grassmannian
 from qumba.argv import argv
@@ -1386,6 +1386,17 @@ def test():
     #print(C.longstr())
 
 
+def get_autos(code):
+    n = code.n
+    space = code.space
+    items = list(range(n))
+    perms = []
+    for idxs in allperms(items):
+        dode = space.get_perm(idxs) * code
+        if dode.is_equiv(code):
+            perms.append(idxs)
+    return perms
+
 def test_hexacode():
     code = QCode.fromstr("""
     XIIXXZ
@@ -1398,17 +1409,52 @@ def test_hexacode():
     assert code.is_gf4()
     code = QCode.fromstr(""" XIIXXZ IXIXZX IIXZXX YIIYYX IYIYXY IIYXYY """)
     assert code.is_gf4()
+    #print(code.get_autos()) # 6
+    #assert len(get_autos(code)) == 6
+
+    code = QCode.fromstr("""
+    YZIXIX
+    YZXIXI
+    IXYZIX
+    XIYZXI
+    IXIXYZ
+    """) # https://arxiv.org/pdf/cs/0503058
+    #assert code.is_gf4() # nope
+    #print(code.get_autos()) # 24
+    #assert len(get_autos(code)) == 24
+
 
     code = QCode.fromstr("""
     XZXZXZ XZZXZX ZXXZZX
     """) # [[6,3,2]] 24 autos
     #assert code.is_gf4()
+    #assert len(get_autos(code)) == 24
 
     code = QCode.fromstr("""
     XZXZXZ XZZXZX ZXXZZX
     YXYXYX YXXYXY XYYXXY
     """) # [[6,0,4]] 24 autos
     assert code.is_gf4()
+    assert len(get_autos(code)) == 24
+    from bruhat.gset import Group, Perm
+    perms = get_autos(code)
+    print(perms)
+    gens = [Perm(perm) for perm in perms]
+    G = Group(gens)
+    print(G)
+    print(G.structure_description())
+    H = [g for g in G if g[0]==0]
+    print(Group(H).structure_description())
+
+    HH = Matrix(list(code.H.span()))
+    #print(strop(HH))
+
+    from qumba.pauli import PauliCode
+    pauli = PauliCode.from_qcode(code)
+    print(pauli)
+    print(pauli.weight_enum())
+
+    return
 
     code.check()
     print(code)
