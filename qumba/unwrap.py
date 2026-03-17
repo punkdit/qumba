@@ -1262,7 +1262,7 @@ def test_logical():
         #code = list(db.get(_id="67a4b0119edf81e4b7e670ac"))[0] # [[15,5,3]] 5,5 surface
         # logicals: O(9,2) x S3 == Sp(8,2)xS3
     
-        code = list(db.get(_id="6900a99d0a060a5626b32e6b"))[0] # [[24,4,4]]
+        #code = list(db.get(_id="6900a99d0a060a5626b32e6b"))[0] # [[24,4,4]]
         # logicals: O(9,2) == Sp(8,2), FT logicals: 432
     
         #code = list(db.get(_id="67a4b0129edf81e4b7e670ad"))[0] # [[30,8,3]]
@@ -1279,6 +1279,8 @@ def test_logical():
     
         #code = list(db.get(_id="67a4c83cfab4d3b49d2d29c1"))[0] # [[21,9,3]]
         # logicals: Sp(16,2) < G < Sp(18,2)
+
+        code = list(db.get(_id="67a38d7c9d65c7b4098268e1"))[0] # [[24,10,4]]
 
     print(code)
     print(code.longstr())

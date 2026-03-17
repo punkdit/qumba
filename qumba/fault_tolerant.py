@@ -453,6 +453,7 @@ def test_state_prep():
     #code = construct.get_surface(3,3)
     code = construct.get_512() # sat
     code = QCode.fromstr("XXXXII IIXXXX ZZZZII IIZZZZ") # sat
+    #code = construct.get_832() # unsat
     #code = construct.get_713() # unsat
     #code = construct.get_toric(2,2) # [[8,2,2]] sat
     #code = construct.get_10_2_3() # unsat
@@ -770,7 +771,7 @@ def test_ancilla():
     
         model = solver.model()
         U1 = U.get_interp(model)
-        V1 = V.get_interp(model)
+        #V1 = V.get_interp(model)
         W1 = W.get_interp(model)
         print()
         print("U1:")
@@ -961,29 +962,6 @@ def test_prep():
         #break
 
     #print(count)
-
-
-def test_goto():
-    # See: https://www.nature.com/articles/srep19578
-
-    n = 8
-    syntax = Syntax()
-    CX, H = syntax.CX, syntax.H
-
-    prog = (CX(6,7)*CX(5,7)*CX(0,7)
-        *CX(6,4)*CX(1,5)*CX(3,6)*CX(2,0)
-        *CX(1,4)*CX(2,6)*CX(3,5)*CX(1,0)
-        *H(1)*H(2)*H(3))
-
-    print(prog)
-
-    space = SymplecticSpace(n)
-    E = prog*space
-
-    #print(E)
-    print(strop(E.t))
-
-    "IIIZZZZ ZIIIIZZ IZIIZIZ IIZIZZI"
 
 
 def get_logops(css):

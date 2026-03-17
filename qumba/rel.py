@@ -246,6 +246,11 @@ class Lagrangian(Relation):
         return str(smap)
 
     @classmethod
+    def get_identity(cls, n, p=2):
+        I = Matrix.identity(2*n, p)
+        return cls(I, I)
+
+    @classmethod
     def get_swap(cls):
         z = zeros(2,2)
         i = Matrix.identity(2)
@@ -270,6 +275,19 @@ class Lagrangian(Relation):
         if A.sum() != m:
             return False
         return True
+
+    def get_code(self, k=0):
+        rank, tgt, src = self.shape
+        module = Module(src//2)
+        H = Matrix([]).reshape(0, tgt)
+        for i in range(src//2-k):
+            r = module.X(i)
+            op = self.get_left(r)
+            if len(op):
+                H = H.concatenate(op)
+        H = H.linear_independent()
+        return QCode(H)
+
 
 
 class Module:
@@ -345,29 +363,31 @@ class Module:
             op = pauli + op
         return op
 
-    def PX(self, *idxs):
+    def PX(self, *idxs): # or RX / reset ?
         "prepare X state: |+..+>"
         n = self.n
         if not idxs:
             idxs = list(range(n))
         ops = [I]*n
         for i in idxs:
-            ops[i] = b_ # ?!?! is this right ??
+            #ops[i] = b_ # ?!?! is this right ??
+            ops[i] = w_
         op = reduce(matmul, ops)
         return op
 
-    def PZ(self, *idxs):
+    def PZ(self, *idxs): # or RZ / reset ?
         "prepare Z state: |0..0>"
         n = self.n
         if not idxs:
             idxs = list(range(n))
         ops = [I]*n
         for i in idxs:
-            ops[i] = w_ # ?!?! is this right ??
+            #ops[i] = w_ # ?!?! is this right ??
+            ops[i] = b_
         op = reduce(matmul, ops)
         return op
 
-    def PY(self, *idxs):
+    def PY(self, *idxs): # or RY / reset ?
         "prepare Y state"
         n = self.n
         if not idxs:
@@ -385,7 +405,8 @@ class Module:
             idxs = list(range(n))
         ops = [I]*n
         for i in idxs:
-            ops[i] = _b # ?!?! is this right ??
+            #ops[i] = _b # ?!?! is this right ??
+            ops[i] = _w
         op = reduce(matmul, ops)
         return op
 
@@ -396,7 +417,8 @@ class Module:
             idxs = list(range(n))
         ops = [I]*n
         for i in idxs:
-            ops[i] = _w # ?!?! is this right ??
+            #ops[i] = _w # ?!?! is this right ??
+            ops[i] = _b
         op = reduce(matmul, ops)
         return op
 
@@ -443,6 +465,11 @@ if 1:
         [1,0],
         [0,1],
     ])
+
+    assert str(b_).strip() == "Z|" # the Z-state aka |0>
+    assert str(w_).strip() == "X|" # the X-state aka |+>
+    assert str(_b).strip() == "|Z" # the Z-measure aka <0|
+    assert str(_w).strip() == "|X" # the X-measure aka <+|
 
     assert swap*bb_b == bb_b
 
@@ -1127,8 +1154,8 @@ def test_module():
 
     module = Module(2)
 
-    lhs = module.CX(0,1) * module.H(1) * module.PZ(0,1)
-    rhs = module.CX(1,0) * module.H(0) * module.PZ(0,1)
+    lhs = module.CX(0,1) * module.H(1) * module.PX(0,1)
+    rhs = module.CX(1,0) * module.H(0) * module.PX(0,1)
     assert lhs == rhs
 
     #print(module.PZ(0,1))
@@ -1159,6 +1186,7 @@ def test_module():
 
 
 def test_goto():
+    # test fault tolerant circuits from Goto paper
     # See: https://www.nature.com/articles/srep19578
 
     n = 8
@@ -1195,17 +1223,19 @@ def test_goto():
     #    rel = rel*op
 
     idxs = list(range(n))
-    init = module.PX(*idxs) # ??? PX/PZ ???
+    init = module.PZ(*idxs)
     for i in [1,2,3]:
         init = module.H(i)*init
-    rel = rel*init
+    state = rel*init
     print()
-    print(rel)
+    print(state)
 
     print()
-    print(module.MZ(7) * rel)
+    print("MZ(7)")
+    print(module.MZ(7) * state)
     print()
-    print(module.MX(7) * rel)
+    print("MX(7)")
+    print(module.MX(7) * state)
 
     """
     Z....ZZ 
@@ -1214,21 +1244,23 @@ def test_goto():
     ...ZZZZ 
     """
 
-    print(module.MZ(7) * rel == module.MX(7) * rel)
-    print(module.MZ(7) == module.MX(7))
+    assert module.MZ(7) * state == module.MX(7) * state # weird but true..
+    assert module.MZ(7) != module.MX(7)
 
-def get_code(U, k=0):
-    assert isinstance(U, Lagrangian)
-    rank, tgt, src = U.shape
-    module = Module(src//2)
-    H = Matrix([]).reshape(0, tgt)
-    for i in range(src//2-k):
-        r = module.X(i)
-        op = U.get_left(r)
-        if len(op):
-            H = H.concatenate(op)
-    H = H.linear_independent()
-    return QCode(H)
+    prep = module.MZ(7) * rel
+    print(prep)
+
+    # um um, how does this work
+    mod = Module(n)
+    nn = prep.src
+    for i in range(n):
+        #v = [0]*nn
+        #v[i] = 1
+        #v = Matrix([v])
+        v = mod.X(i)
+        print(v, prep * v)
+        v = mod.Z(i)
+        print(v, prep * v)
 
 
 def test_left_right():
@@ -1277,7 +1309,7 @@ def test_left_right():
     print()
     print(e)
 
-    dode = get_code(e)
+    dode = e.get_code()
     print()
     print(dode)
     print(dode.longstr())
@@ -1299,7 +1331,7 @@ def get_subcode(code, dode):
     m = module.MZ(*idxs)
 
     e = m*encode
-    eode = get_code(e, 1)
+    eode = e.get_code(1)
     return eode
 
 
@@ -1578,10 +1610,69 @@ def test_encode():
 
     E = code.get_encoder()
     encode = Lagrangian(E.t)
-
     print("encode:")
     print(encode)
     print()
+    
+
+def measure_x(rel, idxs):
+    nn = rel.src
+    n = nn//2
+    mod = Module(n+1)
+    rel = rel @ Lagrangian.get_identity(1) # ancilla
+    rel = rel * mod.PX(n)
+    for i in idxs:
+        rel = mod.CX(n, i)*rel
+    rel = mod.MX(n) * rel
+    return rel
+
+def measure_z(rel, idxs):
+    nn = rel.src
+    n = nn//2
+    mod = Module(n+1)
+    rel = rel @ Lagrangian.get_identity(1) # ancilla
+    rel = rel * mod.PZ(n)
+    for i in idxs:
+        rel = mod.CX(i, n)*rel
+    rel = mod.MZ(n) * rel
+    return rel
+
+
+def test_422():
+
+    code = construct.get_422()
+    n = code.n
+    nn = 2*n
+    
+    if 0:
+        E = code.get_encoder()
+        encode = Lagrangian(E.t)
+        print("encode:")
+        print(encode)
+        print()
+
+
+    rel = Module(4).get_identity()
+    rel = measure_x(rel, [0,1,2,3])
+    lhs = rel
+
+    mod = Module(5)
+    rel = mod.get_identity()
+    a = 4
+    for i in range(4):
+        rel = mod.CX(a, i) * rel
+    rel = mod.MX(a) * rel * mod.PX(a)
+    assert rel == lhs
+
+    rel = measure_z(rel, [0,1,2,3])
+    rel = measure_x(rel, [0,1])
+    rel = measure_x(rel, [0,2])
+
+    print(rel)
+    print()
+
+    v = Matrix([[0]*nn])
+    print(rel*v)
     
 
 
