@@ -2528,7 +2528,6 @@ def test_orbit():
     print("is_diagonal:", len([g for g in orbit if g.is_diagonal()]))
 
 
-    
 def test():
     test_clifford()
     test_clifford3()

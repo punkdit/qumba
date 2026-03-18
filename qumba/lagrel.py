@@ -28,6 +28,15 @@ from qumba.rel import Relation, zeros
 
 
 class Lagrangian(Relation):
+
+    @property
+    def source(self):
+        return Module(self.src//2)
+
+    @property
+    def target(self):
+        return Module(self.tgt//2)
+
     @classmethod
     def all_rels(cls, tgt, src):
         n = tgt+src
@@ -105,9 +114,20 @@ class Lagrangian(Relation):
 
 
 class Module:
+
+    # singleton
+    @cache
+    def __new__(cls, n):
+        ob = object.__new__(cls)
+        return ob
+
     def __init__(self, n):
         self.space = SymplecticSpace(n)
         self.n = n
+
+    def __str__(self):
+        return "Module(%d)"%(self.n,)
+    __repr__ = __str__
 
     def get_identity(self):
         I = self.space.get_identity()
@@ -182,10 +202,12 @@ class Module:
         n = self.n
         if not idxs:
             idxs = list(range(n))
+        else:
+            idxs = list(idxs)
+        idxs.sort(reverse=True)
         ops = [I]*n
         for i in idxs:
-            #ops[i] = b_ # ?!?! is this right ??
-            ops[i] = w_
+            ops.insert(i, w_)
         op = reduce(matmul, ops)
         return op
 
@@ -194,10 +216,12 @@ class Module:
         n = self.n
         if not idxs:
             idxs = list(range(n))
+        else:
+            idxs = list(idxs)
+        idxs.sort(reverse=True)
         ops = [I]*n
         for i in idxs:
-            #ops[i] = w_ # ?!?! is this right ??
-            ops[i] = b_
+            ops.insert(i, b_)
         op = reduce(matmul, ops)
         return op
 
@@ -206,9 +230,12 @@ class Module:
         n = self.n
         if not idxs:
             idxs = list(range(n))
+        else:
+            idxs = list(idxs)
+        idxs.sort(reverse=True)
         ops = [I]*n
         for i in idxs:
-            ops[i] = w1_ # ?!?! is this right ??
+            ops.insert(i, w1_)
         op = reduce(matmul, ops)
         return op
 
@@ -219,7 +246,6 @@ class Module:
             idxs = list(range(n))
         ops = [I]*n
         for i in idxs:
-            #ops[i] = _b # ?!?! is this right ??
             ops[i] = _w
         op = reduce(matmul, ops)
         return op
@@ -231,7 +257,6 @@ class Module:
             idxs = list(range(n))
         ops = [I]*n
         for i in idxs:
-            #ops[i] = _w # ?!?! is this right ??
             ops[i] = _b
         op = reduce(matmul, ops)
         return op
@@ -297,6 +322,9 @@ if 1:
 
 
 def test_symplectic():
+
+    assert Module(3) is Module(3)
+
     one = Lagrangian(zeros(0,0), zeros(0,0))
     #print(one)
     #print(one*one)
@@ -765,6 +793,29 @@ def test_module():
     assert op.rank == 4
 
 
+def test_syntax():
+
+    s = Syntax()
+    X, Z, Y = s.X, s.Z, s.Y
+    S, H, CX, MX, PX, PZ = s.S, s.H, s.CX, s.MX, s.PX, s.PZ
+
+    mod = Module(5)
+    op = MX(0) * mod
+    assert op.source == Module(5)
+    assert op.target == Module(4)
+
+    #print(mod.PX(3))
+    op = PX(3) * mod
+    #print(op)
+
+    module = Module(0)
+    lhs = PX(2)*PX(1)*PZ(0)*module
+    rhs = module.PZ(0) @ module.PX(0) @ module.PX(0)
+    assert lhs == rhs
+    lhs = PZ(0)*PX(1)*PX(2)*module # tricky... hmmm
+    assert lhs == rhs
+
+
     
 
 
@@ -776,62 +827,39 @@ def test_goto():
     syntax = Syntax()
     CX, H = syntax.CX, syntax.H
     PX, PZ = syntax.PX, syntax.PZ
+    MX, MZ = syntax.MX, syntax.MZ
 
-    prog = (CX(6,7)*CX(5,7)*CX(0,7)
-        *CX(6,4)*CX(1,5)*CX(3,6)*CX(2,0)
-        *CX(1,4)*CX(2,6)*CX(3,5)*CX(1,0)
-        *H(1)*H(2)*H(3))
+    prog = (CX(6,7)*CX(5,7)*CX(0,7)*CX(6,4)*CX(1,5)*CX(3,6)*CX(2,0)
+        *CX(1,4)*CX(2,6)*CX(3,5)*CX(1,0)*H(1)*H(2)*H(3))
 
-    prog = (CX(6,7)*CX(5,7)*CX(0,7)
-        *CX(6,4)*CX(1,5)*CX(3,6)*CX(2,0)
+    prog = (CX(6,7)*CX(5,7)*CX(0,7)*CX(6,4)*CX(1,5)*CX(3,6)*CX(2,0)
         *CX(1,4)*CX(2,6)*CX(3,5)*CX(1,0))
 
-    # XXX Module can't eat PX/PZ 
-    #for i in reversed(range(n)):
-    #    s = PX(i) if i in [1,2,3] else PZ(i)
-    #    prog = prog*s
-    #for i in [1,2,3]:
-    #    prog = prog*PX(i)
+    for i in reversed(range(n)):
+        s = PX(i) if i in [1,2,3] else PZ(i)
+        prog = prog*s
 
     print(prog)
 
-    space = SymplecticSpace(n)
-    module = Module(n)
-    rel = prog*module
+    module = Module(0)
+    state = prog*module
 
-    print(rel)
+    assert state.source == module
+    assert state.target == Module(8)
 
-    #for i in reversed(range(n)):
-    #    op = PX(i) if i in [1,2,3] else PZ(i)
-    #    rel = rel*op
-
-    idxs = list(range(n))
-    init = module.PZ(*idxs)
-    for i in [1,2,3]:
-        init = module.H(i)*init
-    state = rel*init
-    print()
-    print(state)
-
-    print()
-    print("MZ(7)")
-    print(module.MZ(7) * state)
-    print()
-    print("MX(7)")
-    print(module.MX(7) * state)
-
-    """
-    Z....ZZ 
-    .Z..Z.Z 
-    ..Z.ZZ.
-    ...ZZZZ 
-    """
+    module = state.target
 
     assert module.MZ(7) * state == module.MX(7) * state # weird but true..
     assert module.MZ(7) != module.MX(7)
 
-    prep = module.MZ(7) * rel
-    print(prep)
+    prep = module.MZ(7) * state
+    print(prep, prep.shape)
+
+    other = MZ(7) * state
+    print(other, other.shape)
+    assert prep == other
+
+    return
 
     # um um, how does this work
     mod = Module(n)
@@ -844,6 +872,30 @@ def test_goto():
         print(v, prep * v)
         v = mod.Z(i)
         print(v, prep * v)
+
+
+def test_render():
+    from huygens.zx import Circuit
+
+    syntax = Syntax()
+    CX, H = syntax.CX, syntax.H
+    PX, PZ = syntax.PX, syntax.PZ
+    MX, MZ = syntax.MX, syntax.MZ
+    
+    n = 4
+    c = Circuit(n)
+    prog = MX(n)*CX(n,3)*CX(n,2)*CX(n,1)*CX(n,0)*PX(n)
+    prog = (
+         MX(n)*MZ(n+1)
+        *CX(n,n+1)
+        *CX(n+1,3)*CX(n,2)*CX(n+1,1)*CX(n,0)
+        *CX(n,n+1)
+        *PZ(n+1)*PX(n))
+
+    op = prog * c
+    cvs = op.render() #width=3, height=3)
+    cvs.writePDFfile("syndrome.pdf")
+
 
 
 def test_left_right():

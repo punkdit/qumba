@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from qumba.symplectic import SymplecticSpace
 
 
 class Term(object):
@@ -19,20 +18,41 @@ class Term(object):
         atoms = self.atoms
         return tuple("%s%s"%((name,)+(arg,)) for (name,arg) in atoms)
 
-    def __mul__(self, other):
+    def __mul__(self, item):
         from qumba.qcode import QCode
         atoms = self.atoms
-        if isinstance(other, Term):
-            atoms = atoms + other.atoms
+        if isinstance(item, Term):
+            atoms = atoms + item.atoms
             return Term(atoms)
 
-        if isinstance(other, QCode):
-            return (self * other.space) * other
+        if isinstance(item, QCode):
+            return (self * item.space) * item
 
-        op = other.get_identity()
+        if hasattr(item, "target") and item.target is not None:
+            # this is so we can hit operators... good idea?
+            op = item # we already are an op
+            target = op.target # and this is it's target
+        else:
+            # start here
+            target = item
+            op = target.get_identity()
+
+        #print("Term.__mul__")
+        #print("\top =", str(op).replace("\n", " "), type(op))
         for (name, arg) in reversed(atoms):
-            meth = getattr(other, name)
-            op = meth(*arg) * op
+            #print("\ttarget =", target)
+            #print("\t%s(%s)"%(name, arg))
+            meth = getattr(target, name, None)
+            if meth is None:
+                meth = getattr(target, "get_"+name)
+            opa = meth(*arg)
+            op = opa * op
+            if hasattr(op, "target") and op.target is not None:
+                # just hack this XXX
+                target = op.target
+                #print("\tnew target =", op.target)
+        #print("\ttarget =", target)
+        #print("\tfini")
         return op
 
 
@@ -54,10 +74,13 @@ class Syntax(object):
 
 
 def test():
+    from qumba.symplectic import SymplecticSpace
     from qumba.clifford import Clifford
+    from qumba.lagrel import Module
+
     s = Syntax()
     X, Z, Y = s.X, s.Z, s.Y
-    S, H, CX = s.S, s.H, s.CX
+    S, H, CX, MX, PX = s.S, s.H, s.CX, s.MX, s.PX
     prog = X(0)*Z(2)
     assert str(prog) == "X(0)*Z(2)", str(prog)
 
@@ -66,8 +89,24 @@ def test():
     M = prog*space
 
     prog = CX(0, 1)
-    print(prog*space)
-    print(prog*SymplecticSpace(n))
+    (prog*space)
+    (prog*SymplecticSpace(n))
+    (prog*Module(n))
+
+    prog = (CX(6,7)*CX(5,7)*CX(0,7)*CX(6,4)
+        *CX(1,5)*CX(3,6)*CX(2,0)
+        *CX(1,4)*CX(2,6)*CX(3,5)*CX(1,0))
+
+    op = prog * Module(8)
+
+    mod = Module(5)
+    op = MX(0) * mod
+    assert op.source == Module(5)
+    assert op.target == Module(4)
+
+    op = PX(7) * mod
+    assert op.target == Module(6)
+    
 
 
 
