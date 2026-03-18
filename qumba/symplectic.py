@@ -30,7 +30,11 @@ def symplectic_form(n, p=DEFAULT_P):
     return F
 
 
-class SymplecticSpace(object):
+class SymplecticSpace:
+    """
+    Our operators are "transposed" from the usual
+    left acting Matrix's. See rel.py .
+    """
     def __init__(self, n, p=DEFAULT_P):
         assert 0<=n
         self.n = n
@@ -399,7 +403,7 @@ def uturn_to_zip(n):
 
 
 
-class Building(object):
+class Building:
     """
         Provide an interface to qumba.building _which uses a
         different symplectic form (the uturn form).

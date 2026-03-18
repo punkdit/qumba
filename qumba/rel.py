@@ -37,7 +37,7 @@ def normalize(left, right, truncate=True):
     return left, right
 
 
-class Relation(object):
+class Relation:
     """ A linear relation
     """
 
@@ -299,7 +299,7 @@ class Module:
         I = self.space.get_identity()
         return Lagrangian(I)
 
-    # Argggh, why is this transposed
+    # Argggh, SymplecticSpace gives transposed ops ...?!?
     def CX(self, i, j):
         CX = self.space.CX(i, j)
         CX = Lagrangian(CX.t)
