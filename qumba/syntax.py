@@ -8,7 +8,7 @@ class Term(object):
 
     def __str__(self):
         atoms = self.atoms
-        s = "*".join("%s%s"%((name,)+(arg,)) for (name,arg) in atoms)
+        s = "*".join("%s%s%s"%((name,)+(arg,)+(kw,)) for (name,arg,kw) in atoms)
         s = s.replace(',)', ')')
         s = s.replace(' ', '')
         return s
@@ -16,7 +16,7 @@ class Term(object):
     @property
     def name(self):
         atoms = self.atoms
-        return tuple("%s%s"%((name,)+(arg,)) for (name,arg) in atoms)
+        return tuple("%s%s%s"%((name,)+(arg,)+(kw,)) for (name,arg,kw) in atoms)
 
     def __mul__(self, item):
         from qumba.qcode import QCode
@@ -37,22 +37,22 @@ class Term(object):
             target = item
             op = target.get_identity()
 
-        #print("Term.__mul__")
-        #print("\top =", str(op).replace("\n", " "), type(op))
-        for (name, arg) in reversed(atoms):
-            #print("\ttarget =", target)
-            #print("\t%s(%s)"%(name, arg))
+#        print("Term.__mul__")
+#        print("\top =", str(op).replace("\n", " "), type(op))
+        for (name, arg, kw) in reversed(atoms):
+#            print("\ttarget =", target)
+#            print("\t%s(%s)"%(name, arg))
             meth = getattr(target, name, None)
             if meth is None:
                 meth = getattr(target, "get_"+name)
-            opa = meth(*arg)
+            opa = meth(*arg, **kw)
             op = opa * op
             if hasattr(op, "target") and op.target is not None:
                 # just hack this XXX
                 target = op.target
-                #print("\tnew target =", op.target)
-        #print("\ttarget =", target)
-        #print("\tfini")
+#                print("\tnew target =", op.target)
+#        print("\ttarget =", target)
+#        print("\tfini")
         return op
 
 
@@ -61,8 +61,8 @@ class Atom(object):
         assert type(name) is str
         self.name = name
 
-    def __call__(self, *arg):
-        return Term([(self.name, arg)])
+    def __call__(self, *arg, **kw):
+        return Term([(self.name, arg, kw)])
 
 
 class Syntax(object):

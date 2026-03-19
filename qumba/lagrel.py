@@ -875,7 +875,7 @@ def test_goto():
 
 
 def test_render():
-    from huygens.zx import Circuit
+    from huygens.zx import Circuit, grey, st_Thick
 
     syntax = Syntax()
     CX, H = syntax.CX, syntax.H
@@ -887,12 +887,15 @@ def test_render():
     prog = MX(n)*CX(n,3)*CX(n,2)*CX(n,1)*CX(n,0)*PX(n)
     prog = (
          MX(n)*MZ(n+1)
-        *CX(n,n+1)
+        *CX(n,n+1, st_gate=[grey]+st_Thick)
         *CX(n+1,3)*CX(n,2)*CX(n+1,1)*CX(n,0)
         *CX(n,n+1)
-        *PZ(n+1)*PX(n))
+        *PZ(n+1)*PX(n, st_stroke=[grey]))
 
     op = prog * c
+
+    print(op)
+
     cvs = op.render() #width=3, height=3)
     cvs.writePDFfile("syndrome.pdf")
 
