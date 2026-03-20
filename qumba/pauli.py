@@ -660,7 +660,7 @@ def test_hexacode():
     assert code.is_gf4()
     code = QCode.fromstr(""" XIIXXZ IXIXZX IIXZXX YIIYYX IYIYXY IIYXYY """)
     assert code.is_gf4()
-    #print(code.get_autos()) # 6
+    print(code.get_autos()) # 6
     #assert len(get_autos(code)) == 6
 
     code = QCode.fromstr("""
@@ -670,6 +670,16 @@ def test_hexacode():
     XIYZXI
     IXIXYZ
     """) # https://arxiv.org/pdf/cs/0503058
+
+    code = QCode.fromstr("""
+    XYXIIY
+    IXYXIY
+    IIXYXY
+    YZYIIZ
+    IYZYIZ
+    IIYZYZ
+    """) # Macwilliams-Sloane p598
+
     #assert code.is_gf4() # nope
     #print(code.get_autos()) # 24
     perms = get_autos(code)
@@ -677,6 +687,8 @@ def test_hexacode():
     perms.sort()
     for p in perms:
         print(p)
+
+    print(len(perms))
 
     n = code.n
     #for i in range(n):

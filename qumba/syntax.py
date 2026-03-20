@@ -2,16 +2,23 @@
 
 
 
-class Term(object):
+class Term:
     def __init__(self, atoms):
         self.atoms = list(atoms)
 
     def __str__(self):
         atoms = self.atoms
-        s = "*".join("%s%s%s"%((name,)+(arg,)+(kw,)) for (name,arg,kw) in atoms)
+        s = "*".join("%s%s"%(name,arg) + (str(kw) if kw else "")
+            for (name,arg,kw) in atoms)
         s = s.replace(',)', ')')
         s = s.replace(' ', '')
         return s
+
+    def __len__(self):
+        return len(self.atoms)
+
+    def __getitem__(self, idx):
+        return self.atoms[idx]
 
     @property
     def name(self):
@@ -56,7 +63,7 @@ class Term(object):
         return op
 
 
-class Atom(object):
+class Atom:
     def __init__(self, name):
         assert type(name) is str
         self.name = name
@@ -65,7 +72,7 @@ class Atom(object):
         return Term([(self.name, arg, kw)])
 
 
-class Syntax(object):
+class Syntax:
     def __getattr__(self, name):
         return Atom(name)
 

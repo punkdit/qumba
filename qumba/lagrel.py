@@ -874,34 +874,6 @@ def test_goto():
         print(v, prep * v)
 
 
-def test_render():
-    from huygens.zx import Box, Circuit, grey, st_Thick
-    Box.st_stroke = []
-
-    syntax = Syntax()
-    CX, H = syntax.CX, syntax.H
-    PX, PZ = syntax.PX, syntax.PZ
-    MX, MZ = syntax.MX, syntax.MZ
-    
-    n = 4
-    c = Circuit(n)
-    prog = MX(n)*CX(n,3)*CX(n,2)*CX(n,1)*CX(n,0)*PX(n)
-    prog = (
-         MX(n)*MZ(n+1)
-        *CX(n,n+1)
-        *CX(n+1,3)*CX(n,2)*CX(n+1,1)*CX(n,0)
-        *CX(n,n+1)
-        *PZ(n+1)*PX(n))
-
-    op = prog * c
-
-    print(op)
-
-    cvs = op.render() #width=3, height=3)
-    cvs.writePDFfile("syndrome.pdf")
-
-
-
 def test_left_right():
 #    code = construct.get_422()
     code = construct.get_713()
