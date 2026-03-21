@@ -16,11 +16,12 @@ import numpy
 
 from huygens.zx import (Canvas, Box, Diagram, 
     st_THick, st_THIck, st_THICk, st_thin, MultiDeco,
-    grey, black, green, red, yellow, purple, white, path, Scale)
+    grey, black, green, red, yellow, purple, white, path, Scale, LineWidth)
 
 a = 0.4
 st_black = [black]+st_thin
-st = st_THICk
+#st = st_THIck
+st = [LineWidth(lw=0.2)]
 st_red = [MultiDeco([red.alpha(a)]+st, st_black)]
 st_green = [MultiDeco([green.alpha(a)]+st, st_black)]
 st_purple = [MultiDeco([purple.alpha(a)]+st, st_black)]
@@ -156,18 +157,21 @@ def build_flow(n, term):
         #fg.text(0, 0, str(v0.A))
         bb = fg.get_bound_box()
         fg.stroke(path.rect(bb.llx, bb.lly, bb.width, bb.height), 
-            [grey]+st_THick)
+            [black.alpha(0.7)]+st_THick)
         cvs.insert(x, y, fg)
         count += 1
         if count % 4==0:
-            y -= 1.1*bb.height
+            y -= 1.4*bb.height
             x = 0
         else:
-            x += 1.1*bb.width
+            x += 1.4*bb.width
 
         #if count>1:
         #    break
             
+
+    bb = cvs.get_bound_box()
+    cvs.stroke(path.rect(bb.llx-1, bb.lly-1, bb.width+2, bb.height+2), [white])
 
     cvs.writePDFfile("test_flow.pdf")
         
