@@ -150,7 +150,7 @@ def build_flow(n, term):
         print()
 
         fg = box.render(width=2, height=2)
-        r = 1.9
+        r = 1.55
         fg = Canvas([Scale(r), fg])
         fg = Canvas([fg])
         bb = fg.get_bound_box()
@@ -160,7 +160,7 @@ def build_flow(n, term):
             [black.alpha(0.7)]+st_THick)
         cvs.insert(x, y, fg)
         count += 1
-        if count % 4==0:
+        if count % 8==0:
             y -= 1.4*bb.height
             x = 0
         else:
@@ -173,7 +173,10 @@ def build_flow(n, term):
     bb = cvs.get_bound_box()
     cvs.stroke(path.rect(bb.llx-1, bb.lly-1, bb.width+2, bb.height+2), [white])
 
-    cvs.writePDFfile("test_flow.pdf")
+    cvs = Canvas().insert(1.7, 21., cvs)
+    cvs.stroke(path.rect(0, 0, 42.0, 29.7), [white])
+
+    cvs.writePDFfile("test_flow_land.pdf")
         
 
 
