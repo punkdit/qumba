@@ -649,6 +649,8 @@ def get_autos(code):
     return perms
 
 def test_hexacode():
+    from bruhat.gset import Group, Perm
+
     code = QCode.fromstr("""
     XIIXXZ
     IXIXZX
@@ -685,16 +687,25 @@ def test_hexacode():
     perms = get_autos(code)
     print(perms)
     perms.sort()
-    for p in perms:
-        print(p)
+    #for p in perms:
+    #    print(p)
 
     print(len(perms))
+    gens = [Perm(perm) for perm in perms]
+    G = Group(gens)
+    print(G)
+    print(G.structure_description())
 
     n = code.n
     #for i in range(n):
         #for perm in perms:
             #if perm[0] == i:
 
+    dode = code.shorten(0)
+    print(dode)
+    perms = get_autos(dode)
+    print(len(perms))
+    print(dode.longstr())
     
     return
 
@@ -711,7 +722,6 @@ def test_hexacode():
     """) # [[6,0,4]] 24 autos
     assert code.is_gf4()
     #assert len(get_autos(code)) == 24
-    from bruhat.gset import Group, Perm
     perms = get_autos(code)
     print(perms)
     gens = [Perm(perm) for perm in perms]
