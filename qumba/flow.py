@@ -58,8 +58,9 @@ class Builder:
         #flow = Flow(n-1, n, 
 
 
-def build_flow(n, term):
-    print("build_flow", n, term)
+def build_flow(n, term, stem):
+    # XXX fix & do this properly XXX
+    print("\nbuild_flow", n, term)
 
     nn = 2*n
     mod = Module(n)
@@ -74,11 +75,13 @@ def build_flow(n, term):
         mod = op.target
         ops.append((atom, op))
 
+    print("A =")
     print(A)
 
     box = term * Diagram(n)
-    cvs = box.render()
-    cvs.writePDFfile("test_flow.pdf")
+    #cvs = box.render()
+    #cvs.writePDFfile(stem+".pdf")
+    #return
 
     #return
 
@@ -108,11 +111,9 @@ def build_flow(n, term):
     cvs = Canvas()
     x = y = 0
     count = 0
-#    for bits in numpy.ndindex((2,)*nn):
-#
-#        v = numpy.array(bits).reshape(1, nn)
-    for v0 in A.right.span():
-        #print(v0, v0.shape)
+    for v0 in A.right.span(): # XXX not enough to iterate over this ?!?
+        print("v0 =")
+        print(v0, v0.shape)
         v = v0.reshape(1,nn)
         v = Lagrangian(v)
         #if str(v).strip() != "ZZ.|":
@@ -124,6 +125,7 @@ def build_flow(n, term):
         diagram = Diagram(n, st_wires)
         box = diagram.get_identity()
 
+        print("v =")
         print(v, v.shape)
         for atom, op in ops:
             right = v.left
@@ -170,13 +172,16 @@ def build_flow(n, term):
         #    break
             
 
-    bb = cvs.get_bound_box()
-    cvs.stroke(path.rect(bb.llx-1, bb.lly-1, bb.width+2, bb.height+2), [white])
+    if argv.A3:
 
-    cvs = Canvas().insert(1.7, 21., cvs)
-    cvs.stroke(path.rect(0, 0, 42.0, 29.7), [white])
+        bb = cvs.get_bound_box()
+        cvs.stroke(path.rect(bb.llx-1, bb.lly-1, bb.width+2, bb.height+2), [white])
+    
+        cvs = Canvas().insert(1.7, 21., cvs)
+        cvs.stroke(path.rect(0, 0, 42.0, 29.7), [white])
 
-    cvs.writePDFfile("test_flow_land.pdf")
+    cvs.writePDFfile(stem+".pdf")
+    #cvs.writePDFfile("test_flow_land.pdf")
         
 
 
@@ -189,9 +194,26 @@ def test_render():
     PX, PZ = syntax.PX, syntax.PZ
     MX, MZ = syntax.MX, syntax.MZ
 
+    build_flow(2, CX(0,1), "test_flow_2")
+    return
+
+    n = 2
+    term = MZ(1) * CX(0,1) * CX(1,2) * PX(1)
+
+    n = 1
+    term = MZ(1) * CX(0,1) * PX(1)
+    term = MZ(0) * CX(0,1) * PX(0)
+
+    #n = 3
+    #term = MZ(1) * CX(0,1) * CX(1,2)  # works
+    build_flow(n, term, "test_flow_2")
+
+    return
+
     n = 3
     term = MX(0) * CX(0,1) * CX(0,2)
-    build_flow(n, term)
+    build_flow(n, term, "test_flow_3")
+
     return
     
     

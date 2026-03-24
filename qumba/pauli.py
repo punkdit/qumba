@@ -662,7 +662,7 @@ def test_hexacode():
     assert code.is_gf4()
     code = QCode.fromstr(""" XIIXXZ IXIXZX IIXZXX YIIYYX IYIYXY IIYXYY """)
     assert code.is_gf4()
-    print(code.get_autos()) # 6
+    #print(code.get_autos()) # 6
     #assert len(get_autos(code)) == 6
 
     code = QCode.fromstr("""
@@ -682,106 +682,148 @@ def test_hexacode():
     IIYZYZ
     """) # Macwilliams-Sloane p598
 
+    pauli = PauliCode.from_qcode(code)
+    w = pauli.weight_enum()
+    for (k,v) in w.items():
+        print(v, "*", k)
+
+    if 0:
+        clifford = Clifford(pauli.n)
+        P = pauli.get_projector()
+        assert P*P == P
+
+    #return
+    
+
     #assert code.is_gf4() # nope
     #print(code.get_autos()) # 24
     perms = get_autos(code)
-    print(perms)
+    #print(perms)
     perms.sort()
     #for p in perms:
     #    print(p)
 
     print(len(perms))
-    gens = [Perm(perm) for perm in perms]
-    G = Group(gens)
-    print(G)
+    G = Group([Perm(perm) for perm in perms])
     print(G.structure_description())
 
+    items = [strop(v) for v in code.H.span()]
+    remain = list(items)
+    orbits = []
+    while remain:
+        item = remain.pop()
+        orbit = {item}
+        for g in G:
+            jtem = ''.join(item[i] for i in g)
+            if jtem in remain:
+                orbit.add(jtem)
+                remain.remove(jtem) 
+        orbits.append(orbit)
+    print([len(o) for o in orbits])
+
+    return
+
     n = code.n
-    #for i in range(n):
-        #for perm in perms:
-            #if perm[0] == i:
 
     dode = code.shorten(0)
     print(dode)
     perms = get_autos(dode)
     print(len(perms))
+    G = Group([Perm(perm) for perm in perms])
+    print(G.structure_description())
     print(dode.longstr())
-    
+
+    other = construct.get_513()
+    iso = dode.get_isomorphism(other)
+    assert iso is not None
+    print(iso)
+
     return
 
+#    for v in dode.H.span():
+#        print(strop(v))
+#
+#    for g in G:
+#        print(g)
 
-    code = QCode.fromstr("""
-    XZXZXZ XZZXZX ZXXZZX
-    """) # [[6,3,2]] 24 autos
-    #assert code.is_gf4()
-    #assert len(get_autos(code)) == 24
-
-    code = QCode.fromstr("""
-    XZXZXZ XZZXZX ZXXZZX
-    YXYXYX YXXYXY XYYXXY
-    """) # [[6,0,4]] 24 autos
-    assert code.is_gf4()
-    #assert len(get_autos(code)) == 24
-    perms = get_autos(code)
-    print(perms)
-    gens = [Perm(perm) for perm in perms]
-    G = Group(gens)
-    print(G)
-    print(G.structure_description())
-    H = [g for g in G if g[0]==0]
-    print(Group(H).structure_description())
-
-    HH = Matrix(list(code.H.span()))
-    rows = strop(HH).split()
-    rows.sort()
-    #print('\n'.join(rows))
-
-    from qumba.qcode import fromstr
-    H = fromstr("""
-    XZXZXZ
-    XZZXZX
-    ZXXZZX
-    ZXZXXZ
-    YXYXYX
-    XYXYYX
-    XYYXXY
-    YXXYXY
-    ZYZYZY
-    ZYYZYZ
-    YZYZZY
-    YZZYYZ
-    """)
-    H = Matrix(H)
-    assert H.rank() == 6
-    dode = QCode(H.linear_independent())
-    assert dode.is_equiv(code)
-
-    dode = code.shorten(0)
-    print(dode, dode.get_autos())
-
-    if 0:
-        from qumba.unwrap import unwrap
-        code = unwrap(code)
-        print(code)
     
-        #print(code.get_autos())
-        print(code.longstr())
-    
-        #dode = code.puncture(0)
-        #print(dode) # [[11,5,2]]
-    
-        dode = code.shorten(0) # [[11,1,3]]
-        print(dode)
-    
-    #    css = dode.to_css()
-    #    Hx = Matrix(css.Hx)
-    #    print(Hx.get_wenum())
-    #    rows = []
-    #    for row in Hx.span():
-    #        if row.sum() == 4:
-    #            rows.append(row)
-    #    H1 = Matrix(rows)
-    #    print(H1.rank())
+#    return
+#
+
+#    code = QCode.fromstr("""
+#    XZXZXZ XZZXZX ZXXZZX
+#    """) # [[6,3,2]] 24 autos
+#    #assert code.is_gf4()
+#    #assert len(get_autos(code)) == 24
+#
+#    code = QCode.fromstr("""
+#    XZXZXZ XZZXZX ZXXZZX
+#    YXYXYX YXXYXY XYYXXY
+#    """) # [[6,0,4]] 24 autos
+#    assert code.is_gf4()
+#    #assert len(get_autos(code)) == 24
+#    perms = get_autos(code)
+#    print(perms)
+#    gens = [Perm(perm) for perm in perms]
+#    G = Group(gens)
+#    print(G)
+#    print(G.structure_description())
+#    H = [g for g in G if g[0]==0]
+#    print(Group(H).structure_description())
+#
+#    HH = Matrix(list(code.H.span()))
+#    rows = strop(HH).split()
+#    rows.sort()
+#    #print('\n'.join(rows))
+#
+#    from qumba.qcode import fromstr
+#    H = fromstr("""
+#    XZXZXZ
+#    XZZXZX
+#    ZXXZZX
+#    ZXZXXZ
+#    YXYXYX
+#    XYXYYX
+#    XYYXXY
+#    YXXYXY
+#    ZYZYZY
+#    ZYYZYZ
+#    YZYZZY
+#    YZZYYZ
+#    """)
+#    H = Matrix(H)
+#    assert H.rank() == 6
+#    dode = QCode(H.linear_independent())
+#    assert dode.is_equiv(code)
+#
+#    dode = code.shorten(0)
+#    print(dode, dode.get_autos())
+
+    from qumba.unwrap import unwrap
+    code = unwrap(code)
+    print(code) # [[12,0,4]]
+
+    #print(code.get_autos())
+    print(code.longstr())
+
+    #dode = code.puncture(0)
+    #print(dode) # [[11,5,2]]
+
+    dode = code.shorten(0) # [[11,1,3]]
+    print(dode)
+    print(dode.longstr())
+
+    N, perms = dode.get_autos()
+
+    css = dode.to_css()
+    Hx = Matrix(css.Hx)
+    print(Hx.get_wenum())
+#    rows = []
+#    for row in Hx.span():
+#        if row.sum() == 4:
+#            rows.append(row)
+#    H1 = Matrix(rows)
+#    print(H1.rank())
     
 
     from sage import all_cmdline as sage
@@ -798,6 +840,8 @@ def test_hexacode():
         print(sage.factor(top))
     
         return
+
+    return
 
     pauli = PauliCode.from_qcode(code)
     print(pauli)
