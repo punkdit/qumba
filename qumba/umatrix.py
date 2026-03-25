@@ -438,6 +438,32 @@ def old_test_selfdual():
     # https://oeis.org/A003053
 
 
+def test_involute():
+    # https://oeis.org/A053722
+    # 1, 4, 22, 316, 6976, ...
+
+    n = argv.get("n", 2)
+
+    solver = Solver()
+    add = solver.add
+
+    I = Matrix.identity(n)
+    H = UMatrix.unknown(n,n)
+    add(H*H == I)
+
+    count = 0
+    while 1:
+        result = solver.check()
+        if str(result) != "sat":
+            break
+
+        model = solver.model()
+        h = H.get_interp(model)
+        add(H != h)
+        count += 1
+    print(count)
+
+
 def test():
     solver = Solver()
     add = solver.add
