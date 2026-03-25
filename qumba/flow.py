@@ -30,32 +30,7 @@ st_yellow = [MultiDeco([yellow.alpha(a)]+st, st_black)]
 from qumba.qcode import strop, QCode, SymplecticSpace
 from qumba.syntax import Syntax
 from qumba.argv import argv
-from qumba.lagrel import Module, Lagrangian, w_ww
-
-
-class Flow:
-    def __init__(self, nleft, nright, term):
-        self.nleft = nleft
-        self.nright = nright
-        self.term = term
-
-    def __mul__(self, other):
-        nleft = self.nleft
-        nright = other.nright
-        term = self.term * other.term
-        return Flow(nleft, nright, term)
-
-
-class Builder:
-    def __init__(self, n=0):
-        self.n = n
-
-    def get_identity(self):
-        pass
-
-    def MX(self, idx):
-        n = self.n
-        #flow = Flow(n-1, n, 
+from qumba.lagrel import Module, Lagrangian, w_ww, ww_w, b_bb, bb_b, b1, w1, pullback
 
 
 def build_flow(n, term):
@@ -218,6 +193,64 @@ def test_render():
     cvs.writePDFfile("test_render.pdf")
 
 
+class Flow:
+    def __init__(self, nleft, nright, term):
+        self.nleft = nleft
+        self.nright = nright
+        self.term = term
+
+    def __mul__(self, other):
+        nleft = self.nleft
+        nright = other.nright
+        term = self.term * other.term
+        return Flow(nleft, nright, term)
+
+
+class Builder:
+    def __init__(self, n=0):
+        self.n = n
+
+    def get_identity(self):
+        pass
+
+    def MX(self, idx):
+        n = self.n
+        #flow = Flow(n-1, n, 
+
+
+def get_flow(n, term):
+    print("get_flow")
+
+    mod = Module(n)
+    for a in term:
+        print(a)
+        op = a*mod
+        print(op)
+        print(op.A)
+        print()
+    
+
+
+def test():
+
+    n = argv.get("n", 4)
+
+    syn = Syntax()
+
+    gates = []
+    for i in range(n):
+        for j in range(n):
+            if i!=j:
+                gates.append(syn.CX(i,j))
+    #print(gates)
+
+#    term = syn.get_identity()
+#    for i in range(4):
+#        term = term*choice(gates)
+#    print(term)
+
+#    terms = [choice(gates) for i in range(4)]
+#    get_flow(n, terms)
 
 
 

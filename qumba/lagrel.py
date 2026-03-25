@@ -18,7 +18,7 @@ import numpy
 
 from qumba.matrix import Matrix, pullback
 from qumba.symplectic import symplectic_form
-from qumba.qcode import strop, QCode, SymplecticSpace
+from qumba.qcode import fromstr, strop, QCode, SymplecticSpace
 from qumba.smap import SMap
 from qumba.action import mulclose, mulclose_names
 from qumba.syntax import Syntax
@@ -46,6 +46,12 @@ class Lagrangian(Relation):
             rel = Lagrangian(l, r)
             assert rel.is_lagrangian()
             yield rel
+
+    @classmethod
+    def fromstr(cls, s):
+        assert "|" not in s, "not implemented"
+        H = fromstr(s)
+        return Lagrangian(H)
 
     def is_lagrangian(self):
         A = self.A
@@ -110,6 +116,28 @@ class Lagrangian(Relation):
                 H = H.concatenate(op)
         H = H.linear_independent()
         return QCode(H)
+
+
+def detect(lhs, rhs):
+    "return (detect'ors, lhs*rhs)"
+    rhs = lhs.promote(rhs)
+    assert lhs.src == rhs.tgt, (lhs.src, rhs.tgt)
+    l, r = pullback(lhs.right.t, rhs.left.t)
+
+    left = lhs.left.t * l
+    right = rhs.right.t * r
+    f = left.concatenate(right)
+    k = f.kernel().t # find the detect'ing regions
+
+    ll = lhs.right.t * l
+    rr = rhs.left.t * r
+    assert ll==rr
+    d = (ll*k).t
+    d = Lagrangian(d)
+    op = Lagrangian(left.t, right.t)
+
+    return d, op
+
 
 
 
@@ -382,35 +410,31 @@ def test_symplectic():
     r = w1.get_op()
 
     code = w1.to_qcode()
-    print(code.longstr())
+    #print(code.longstr())
     T = code.T
     assert r == Lagrangian(T[:, :2], T[:, 2:])
     assert r in names
     #print(names[r])
     assert r == b_*_w
 
-    dode = QCode(T)
-    print()
-    print(dode.longstr())
+    #dode = QCode(T)
+    #print()
+    #print(dode.longstr())
 
-    return
+    #print("w1 =")
+    #print(w1)
+    #print("r =")
+    #print(r)
+    #q = r.get_op()
+    #print("q =")
+    #print(q)
+    #assert r.get_op() == w1
 
-    print("w1 =")
-    print(w1)
-    print("r =")
-    print(r)
-    q = r.get_op()
-    print("q =")
-    print(q)
-    assert r.get_op() == w1
-
-    M = list(names.keys())
-    for r in M:
-        q = r.get_op()
-        assert q != r, r
-        print(r == q.get_op())
-
-    return
+#    M = list(names.keys())
+#    for r in M:
+#        q = r.get_op()
+#        assert q != r, r
+#        #print(r == q.get_op())
 
     # ---------- 2 qubits ----------------
 
@@ -528,7 +552,25 @@ def test_symplectic():
     #print()
     assert str(w_) == "X| "
 
-    return
+
+    I = Lagrangian.get_identity(1)
+
+    op = (w_ww * ww_w)
+    assert op == I
+
+    assert w_ww.shape == (3,2,4) # rank, left, right
+
+    d, ww = detect(w_ww, ww_w)
+    assert ww == I
+    assert d == Lagrangian.fromstr("ZZ")
+
+    mzz = ww_w*w_ww
+
+    d, op = detect(mzz, mzz)
+    assert d == Lagrangian.fromstr("ZZ")
+
+
+def other_test():
 
     G = mulclose(gen, verbose=True)
     assert len(G) == 720 # Sp(4,2)
@@ -551,6 +593,7 @@ def test_symplectic():
 
     for m in M:
         assert m.is_lagrangian()
+
 
 
 def test_code():

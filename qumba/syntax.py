@@ -13,6 +13,7 @@ class Term:
         s = s.replace(',)', ')')
         s = s.replace(' ', '')
         return s
+    __repr__ = __str__
 
     def __len__(self):
         return len(self.atoms)
