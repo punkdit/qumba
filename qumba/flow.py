@@ -30,7 +30,7 @@ st_yellow = [MultiDeco([yellow.alpha(a)]+st, st_black)]
 from qumba.qcode import strop, QCode, SymplecticSpace
 from qumba.syntax import Syntax
 from qumba.argv import argv
-from qumba.lagrel import Module, Lagrangian, w_ww, ww_w, b_bb, bb_b, b1, w1, pullback
+from qumba.lagrel import Module, Lagrangian, w_ww, ww_w, b_bb, bb_b, b1, w1, detect
 
 
 def build_flow(n, term, stem):
@@ -273,6 +273,21 @@ def test():
 
 #    terms = [choice(gates) for i in range(4)]
 #    get_flow(n, terms)
+
+    syntax = Syntax()
+    CX, H = syntax.CX, syntax.H
+    PX, PZ = syntax.PX, syntax.PZ
+    MX, MZ = syntax.MX, syntax.MZ
+    
+    lhs = MX(n)*MZ(n+1)*CX(n,n+1) *CX(n+1,3)*CX(n,2)
+    lhs = lhs*Module(6)
+    rhs = CX(n+1,1)*CX(n,0) *CX(n,n+1) *PZ(n+1)*PX(n)
+    rhs = rhs*Module(4)
+
+    D, op = detect(lhs, rhs)
+    assert D == Lagrangian.fromstr("....ZZ")
+
+    print(op.nf)
 
 
 
