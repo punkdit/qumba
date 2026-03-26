@@ -22,7 +22,7 @@ from sage.all_cmdline import (FiniteField, CyclotomicField, latex, block_diagona
 from sage import all_cmdline as sage
 
 from qumba.lin import zeros2, identity2
-from qumba.action import mulclose, mulclose_names, mulclose_find
+from qumba.action import mulclose, mulclose_names, mulclose_find, mulclose_hom
 from qumba.util import cross, allperms
 from qumba.argv import argv
 
@@ -2526,6 +2526,298 @@ def test_orbit():
     print(CCZ in orbit)
 
     print("is_diagonal:", len([g for g in orbit if g.is_diagonal()]))
+
+
+def test_lagrel_iso():
+    # check Lagrangian relations agree with Clifford composition
+
+    n = 2
+    c = Clifford(n)
+    gen  = [c.H(i) for i in range(n)]
+    gen += [c.S(i) for i in range(n)]
+    gen += [c.CZ(i,j) for i in range(n) for j in range(i+1,n)]
+
+#    if n==1:
+#        gen.append(ket(0))
+#        #gen.append(ket(1))
+#        #gen.append(H*ket(0))
+#        #gen.append(H*ket(1))
+#        gen.append(bra(0))
+#    else:
+#        assert 0
+
+    for g in gen:
+        print(g)
+
+    gen.append(c.get_identity())
+
+    def sample(m=20):
+        #g = c.get_identity()
+        g = choice(gen)
+        for i in range(m):
+            while 1:
+                h = choice(gen)
+                if g.shape[1] != h.shape[0]:
+                    continue
+                g = g*h
+                break 
+        return g
+
+    for trial in range(10):
+        g = sample()
+
+    from qumba.pauli import Pauli
+    from qumba.pauli import Matrix as FMatrix
+    from qumba.lagrel import Lagrangian
+
+    nn = 2*n
+    src = []
+    tgt = []
+    for i in range(n):
+        src.append(c.X(i))
+        op = [0]*nn
+        op[2*i] = 1
+        op = Pauli(op)
+        tgt.append(op)
+        src.append(c.Z(i))
+        op = [0]*nn
+        op[2*i+1] = 1
+        op = Pauli(op)
+        tgt.append(op)
+
+    hom = mulclose_hom(src, tgt)
+    print(len(hom))
+    wI = c.wI()
+    phases = [wI**j for j in range(8)]
+    assert len(set(phases)) == 8
+    #for (k,v) in hom.items():
+    #    print(k, v)
+
+    def get_lagrel(U):
+        #print("get_lagrel")
+        #print(U)
+        Ud = U.d
+        rows = []
+        for i,g in enumerate(src):
+            h = U*g*Ud
+            u = tgt[i]
+            for w in phases:
+                v = hom.get(w*h)
+                if v is not None:
+                    break
+            else:
+                assert 0, "\n%s"%h
+            #print(u.vec, "-->", v.vec)
+            rows.append(v.vec)
+        A = FMatrix(rows)
+        #print(A)
+        return Lagrangian(A)
+
+
+    for op in gen:
+        get_lagrel(op)
+
+    for trial in range(10):
+        g = sample()
+        h = sample()
+        lag = get_lagrel(g)
+        lah = get_lagrel(h)
+        lagh = get_lagrel(g*h)
+        assert lag*lah == lagh
+
+
+def test_lagrel():
+    # check Lagrangian relations agree with Clifford composition
+
+    n = 1
+    c = Clifford(n)
+    gen  = [c.H(i) for i in range(n)]
+    gen += [c.S(i) for i in range(n)]
+    gen += [c.CZ(i,j) for i in range(n) for j in range(i+1,n)]
+
+    if n==1:
+        gen.append(ket(0))
+        #gen.append(ket(1))
+        #gen.append(H*ket(0))
+        #gen.append(H*ket(1))
+        gen.append(bra(0))
+    else:
+        assert 0
+
+    for g in gen:
+        print(g)
+
+    gen.append(c.get_identity())
+
+    def sample(m=20):
+        #g = c.get_identity()
+        g = choice(gen)
+        for i in range(m):
+            if randint(0,1):
+              while 1:
+                h = choice(gen)
+                if g.shape[1] != h.shape[0]:
+                    continue
+                g = g*h
+                break 
+            else:
+              while 1:
+                h = choice(gen)
+                if h.shape[1] != g.shape[0]:
+                    continue
+                g = h*g
+                break 
+        return g
+
+    def to_state(op):
+        l, r = op.shape
+        #print("to_state", l, r)
+        op = op.reshape(1, l*r)
+        return op
+
+    from qumba.dense import bitlog
+    paulis = {}
+    for i in [1,2]:
+        paulis[i] = Clifford(i).pauli_group(2)
+
+#    for trial in range(10):
+#        g = sample()
+#        print(g)
+
+    from qumba.lagrel import Lagrangian
+    from qumba import lagrel 
+    #print(lagrel.w1)
+
+    g = Clifford(1).S()
+    g = to_state(g)
+    for op in [Z@Z, -X@Y]:
+        assert op in paulis[2]
+        assert g*op==g
+
+#    i = bitlog(g.shape[1])
+#    for op in paulis[i]:
+#        if g*op == g:
+#            print(op, op.name)
+
+    #print(lagrel.b_ * lagrel._b)
+    g = ket(0) * bra(0)
+
+    g = to_state(g)
+    for op in [Z@I, I@Z]:
+        assert op in paulis[2]
+        assert g*op==g
+
+#    i = bitlog(g.shape[1])
+#    for op in paulis[i]:
+#        if g*op == g:
+#            print(op, op.name)
+
+    from qumba.pauli import Matrix as FMatrix
+
+    one = lagrel._b*lagrel.b_
+    def get_lagrel(g):
+        print("get_lagrel", g.shape)
+        if g.is_zero():
+            # fail
+            return None
+        if g.shape == (1,1): # a non-zero phase
+            return one
+        L, R = g.shape
+        l = bitlog(L)
+        r = bitlog(R)
+        g = to_state(g)
+        N = g.shape[1]
+        n = bitlog(N)
+        nn = 2*n
+        rows = []
+        for op in paulis[n]:
+            if g*op != g:
+                continue
+            name = op.name
+            print(name)
+            v = [0]*nn
+            for opi in op.name:
+                if opi.startswith("zeta"):
+                    continue
+                idx = 2*eval(opi[1:])
+                assert opi[0] in 'ZX'
+                if opi[0] == "Z":
+                    idx += 1
+                assert v[idx] == 0
+                v[idx] = 1
+            rows.append(v)
+        M = FMatrix(rows)
+        return M
+
+    rel = get_lagrel(bra(0)*ket(0))
+    assert rel == lagrel._b*lagrel.b_
+    assert get_lagrel(bra(0)*X*ket(0)) is None
+    assert get_lagrel(bra(0)*X*ket(0)*bra(0)) is None
+
+    g = S
+    rel = get_lagrel(S)
+    print(rel)
+
+    return
+
+
+    from qumba.pauli import Pauli
+
+    nn = 2*n
+    src = []
+    tgt = []
+    for i in range(n):
+        src.append(c.X(i))
+        op = [0]*nn
+        op[2*i] = 1
+        op = Pauli(op)
+        tgt.append(op)
+        src.append(c.Z(i))
+        op = [0]*nn
+        op[2*i+1] = 1
+        op = Pauli(op)
+        tgt.append(op)
+
+    hom = mulclose_hom(src, tgt)
+    print(len(hom))
+    wI = c.wI()
+    phases = [wI**j for j in range(8)]
+    assert len(set(phases)) == 8
+    #for (k,v) in hom.items():
+    #    print(k, v)
+
+    def get_lagrel(U):
+        #print("get_lagrel")
+        #print(U)
+        Ud = U.d
+        rows = []
+        for i,g in enumerate(src):
+            h = U*g*Ud
+            u = tgt[i]
+            for w in phases:
+                v = hom.get(w*h)
+                if v is not None:
+                    break
+            else:
+                assert 0, "\n%s"%h
+            #print(u.vec, "-->", v.vec)
+            rows.append(v.vec)
+        A = FMatrix(rows)
+        #print(A)
+        return Lagrangian(A)
+
+
+    for op in gen:
+        get_lagrel(op)
+
+    for trial in range(10):
+        g = sample()
+        h = sample()
+        lag = get_lagrel(g)
+        lah = get_lagrel(h)
+        lagh = get_lagrel(g*h)
+        assert lag*lah == lagh
+
 
 
 def test():

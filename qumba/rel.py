@@ -53,8 +53,8 @@ class Relation:
         assert left.shape[0] == right.shape[0], "%s %s"%(left.shape, right.shape)
         self._left = left
         self._right = right
-        if left.shape[1] or right.shape[1]: # ?!?!
-            left, right = normalize(left, right)
+        #if left.shape[1] or right.shape[1]: # ?!?!
+        left, right = normalize(left, right)
         rank = left.shape[0]
         self.left = left
         self.right = right

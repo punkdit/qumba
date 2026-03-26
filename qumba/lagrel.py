@@ -552,6 +552,10 @@ def test_symplectic():
     #print()
     assert str(w_) == "X| "
 
+    a = (_w*b_)
+    b = (_b*b_)
+    assert a==b
+    assert _b*w_ == a
 
     I = Lagrangian.get_identity(1)
 
@@ -593,20 +597,6 @@ def other_test():
 
     for m in M:
         assert m.is_lagrangian()
-
-
-def test_phases():
-
-    a = (_w*b_)
-    b = (_b*b_)
-    assert a!=b
-    assert _b*w_ == a
-    print("<+|0> =")
-    print(a, a.rank)
-    print("<0|0> =")
-    print(b, b.rank)
-    bb = b@b
-    print(bb, bb.rank)
 
 
 def test_code():

@@ -271,6 +271,21 @@ class Matrix:
         #print(type(self.M))
         return vecs
 
+    def reshape(self, rows, cols):
+        r, c = self.shape
+        M = self.M
+        rows = []
+        row = []
+        for i in range(r):
+          for j in range(c):
+            u = M[i,j]
+            row.append(u)
+            n = j + c*i
+            if len(row) == cols:
+                rows.append(row)
+                row = []
+        assert len(row) == 0, row
+        return Matrix(self.ring, rows)
 
     def cokernel(self):
         K = all_cmdline.kernel(self.M)
