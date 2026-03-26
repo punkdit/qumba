@@ -595,6 +595,19 @@ def other_test():
         assert m.is_lagrangian()
 
 
+def test_phases():
+
+    a = (_w*b_)
+    b = (_b*b_)
+    assert a!=b
+    assert _b*w_ == a
+    print("<+|0> =")
+    print(a, a.rank)
+    print("<0|0> =")
+    print(b, b.rank)
+    bb = b@b
+    print(bb, bb.rank)
+
 
 def test_code():
 
