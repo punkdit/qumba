@@ -153,6 +153,8 @@ class Relation:
         #return "%s %s"%(smap, self.shape)
 
     def __eq__(self, other):
+        if other is None:
+            return False
         assert isinstance(other, self.__class__)
         assert self.tgt == other.tgt
         assert self.src == other.src

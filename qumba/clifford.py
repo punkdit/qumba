@@ -2637,10 +2637,12 @@ def test_lagrel():
 
     if n==1:
         gen.append(ket(0))
-        #gen.append(ket(1))
-        #gen.append(H*ket(0))
-        #gen.append(H*ket(1))
         gen.append(bra(0))
+    elif n==2:
+        gen.append(I@ket(0))
+        gen.append(I@bra(0))
+        gen.append(ket(0)@I)
+        gen.append(bra(0)@I)
     else:
         assert 0
 
@@ -2677,14 +2679,16 @@ def test_lagrel():
 
     from qumba.dense import bitlog
     paulis = {}
-    for i in [1,2]:
-        paulis[i] = Clifford(i).pauli_group(2)
+    for i in [1,2,3,4]:
+        P = Clifford(i).pauli_group(2)
+        print("Pauli(%d) = %d"%(i,len(P)))
+        paulis[i] = P
 
 #    for trial in range(10):
 #        g = sample()
 #        print(g)
 
-    from qumba.lagrel import Lagrangian
+    from qumba.lagrel import Lagrangian, Module
     from qumba import lagrel 
     #print(lagrel.w1)
 
@@ -2716,7 +2720,7 @@ def test_lagrel():
 
     one = lagrel._b*lagrel.b_
     def get_lagrel(g):
-        print("get_lagrel", g.shape)
+        #print("get_lagrel", g.shape)
         if g.is_zero():
             # fail
             return None
@@ -2728,13 +2732,15 @@ def test_lagrel():
         g = to_state(g)
         N = g.shape[1]
         n = bitlog(N)
+        if n not in paulis:
+            return None # give up
         nn = 2*n
         rows = []
         for op in paulis[n]:
             if g*op != g:
                 continue
             name = op.name
-            print(name)
+            #print(name)
             v = [0]*nn
             for opi in op.name:
                 if opi.startswith("zeta"):
@@ -2747,75 +2753,59 @@ def test_lagrel():
                 v[idx] = 1
             rows.append(v)
         M = FMatrix(rows)
-        return M
+        assert l+r == n
+        l, r = M[:,:2*l], M[:,2*l:]
+        rel = Lagrangian(l,r)
+        rel = rel.nf
+        return rel
 
     rel = get_lagrel(bra(0)*ket(0))
     assert rel == lagrel._b*lagrel.b_
     assert get_lagrel(bra(0)*X*ket(0)) is None
     assert get_lagrel(bra(0)*X*ket(0)*bra(0)) is None
 
-    g = S
+    rel = get_lagrel(ket(0)@ket(0))
+    assert rel == lagrel.b_@lagrel.b_
+
+    rel = get_lagrel(ket(0)@H)
+    assert rel == lagrel.b_@lagrel.h
+
     rel = get_lagrel(S)
-    print(rel)
-
-    return
-
-
-    from qumba.pauli import Pauli
-
-    nn = 2*n
-    src = []
-    tgt = []
-    for i in range(n):
-        src.append(c.X(i))
-        op = [0]*nn
-        op[2*i] = 1
-        op = Pauli(op)
-        tgt.append(op)
-        src.append(c.Z(i))
-        op = [0]*nn
-        op[2*i+1] = 1
-        op = Pauli(op)
-        tgt.append(op)
-
-    hom = mulclose_hom(src, tgt)
-    print(len(hom))
-    wI = c.wI()
-    phases = [wI**j for j in range(8)]
-    assert len(set(phases)) == 8
-    #for (k,v) in hom.items():
-    #    print(k, v)
-
-    def get_lagrel(U):
-        #print("get_lagrel")
-        #print(U)
-        Ud = U.d
-        rows = []
-        for i,g in enumerate(src):
-            h = U*g*Ud
-            u = tgt[i]
-            for w in phases:
-                v = hom.get(w*h)
-                if v is not None:
-                    break
-            else:
-                assert 0, "\n%s"%h
-            #print(u.vec, "-->", v.vec)
-            rows.append(v.vec)
-        A = FMatrix(rows)
-        #print(A)
-        return Lagrangian(A)
-
+    assert rel == lagrel.w1
+    rel = get_lagrel(H)
+    assert rel == lagrel.h
+    rel = get_lagrel(-S*H*S*X)
+    assert rel == lagrel.b1
 
     for op in gen:
         get_lagrel(op)
 
-    for trial in range(10):
+    count = 0
+    while count < 100:
         g = sample()
         h = sample()
+        if g.shape[1] != h.shape[0]:
+            continue
         lag = get_lagrel(g)
         lah = get_lagrel(h)
         lagh = get_lagrel(g*h)
+        #if None in [lag,lah,lagh]:
+        #    continue
+        if lagh is None:
+            continue
+        assert lag is not None
+        assert lah is not None
+        count += 1
+        if lag*lah != lagh or 1:
+            print(lag)
+            print("---")
+            print(lah)
+            print("---")
+            print(lagh)
+            print("---")
+            print(lag*lah)
+            print("---")
+            print()
         assert lag*lah == lagh
 
 
