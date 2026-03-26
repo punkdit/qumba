@@ -450,15 +450,31 @@ def test_clifford_pairs():
 def test_state_prep():
     "fault tolerant state prep for CSS codes"
 
-    #code = construct.get_surface(3,3)
     code = construct.get_512() # sat
     code = QCode.fromstr("XXXXII IIXXXX ZZZZII IIZZZZ") # sat
+    code = construct.get_surface(3,3) # unsat
     #code = construct.get_832() # unsat
     #code = construct.get_713() # unsat
     #code = construct.get_toric(2,2) # [[8,2,2]] sat
     #code = construct.get_10_2_3() # unsat
     #code = construct.get_913() # unsat
     #code = construct.get_toric(3,3) # [[18,2,3]] ??
+
+    #for code in construct.all_css(11,1,3):
+    #    break
+
+    code = QCode.fromstr("""
+    XIIIIXXIIIX
+    IXIIIIXIIXX
+    IIXIIIXXIIX
+    IIIXIIXIXIX
+    IIIIXXXXXXI
+    ZIIIIZZIIIZ
+    IZIIIIZIIZZ
+    IIZIIIZZIIZ
+    IIIZIIZIZIZ
+    IIIIZZZZZZI
+    """) # [[11,1,3]] selfdual: sat
 
     space = code.space
     n = code.n
