@@ -726,6 +726,16 @@ def search_two_block(lb, rb, lw, rw, trials=None):
         yield L,R
         
 
+def exhaust_two_block(lb, rb, lw, rw, trials=None):
+    assert len(lb) == len(rb)
+    idxs = list(range(len(lb)))
+    for Ls in choose(lb, lw):
+      L = reduce(add, Ls)
+      for Rs in choose(rb, rw):
+        R = reduce(add, Rs)
+        yield L,R
+        
+
 
 def two_block(G, wa=2, wb=2, rand=True):
     """
@@ -739,7 +749,7 @@ def two_block(G, wa=2, wb=2, rand=True):
 
     n = len(G)
 
-    def left(g):
+    def left(g, n=n):
         L = zeros2(n,n)
         for i in range(n):
             h = g*perms[i]
@@ -747,7 +757,7 @@ def two_block(G, wa=2, wb=2, rand=True):
             L[i,j] = 1
         return Matrix(L)
 
-    def right(g):
+    def right(g, n=n):
         R = zeros2(n,n)
         for i in range(n):
             h = perms[i]*g
@@ -761,10 +771,14 @@ def two_block(G, wa=2, wb=2, rand=True):
         R = right(h)
         assert L*R == R*L
 
-#    for g in G:
-#        print(left(g),'\n')
+    #for g in G:
+    #    print(left(g),'\n')
+
     lb = [left(g) for g in G]
     rb = [right(g) for g in G]
+    #print(G)
+    #for g in G:
+    #    print(g)
 
     trials = argv.get("trials", 100)
     found = set()
@@ -772,6 +786,56 @@ def two_block(G, wa=2, wb=2, rand=True):
     fn = sample_two_block
     if argv.search:
         fn = search_two_block
+    #print(fn)
+
+    target = argv.target
+    if target:
+        from qumba.db import get
+        target = list(get(_id=argv.target))[0]
+        print("target:", target)
+        assert target.is_css()
+        target = target.to_css()
+        fn = exhaust_two_block
+        print(shortstr(target.Hx))
+        Hx = target.Hx
+        mx, n = Hx.shape
+        Lx = Hx[:, :n//2]
+        Rx = Hx[:, n//2:]
+        #print(Lx)
+        #print(Rx)
+        ops = []
+        for i,l in enumerate(lb):
+            A = l.A
+            if Matrix(A[0] * Lx[0]) != Matrix(A[0]):
+                continue
+            ops.append(l)
+            #print("order:", l.order())
+            g = G[i]
+            assert l == left(g)
+            print(g.cycles())
+        L = reduce(add, ops)
+        #L = L.linear_independent()
+        #print(L == Matrix(Lx))
+        #print(L)
+        ops = []
+        for i,r in enumerate(rb):
+            A = r.A
+            if Matrix(A[0] * Rx[0]) != Matrix(A[0]):
+                continue
+            ops.append(r)
+            #print("order:", r.order())
+            g = G[i]
+            assert r == right(g)
+            print(g.cycles())
+        R = reduce(add, ops)
+        #R = R.linear_independent()
+        #print(R == Matrix(Rx))
+        #print(R)
+        H = L.concatenate(R, axis=1)
+        H = H.linear_independent()
+        print(H == Matrix(Hx))
+        return
+
     #print(fn)
 
     for (L,R) in fn(lb, rb, wa, wb, trials):
@@ -787,6 +851,16 @@ def two_block(G, wa=2, wb=2, rand=True):
             continue
         if argv.k and argv.k != code.k:
             continue
+
+        if target is not None:
+            if target.k != code.k:
+                continue
+            if code.is_equiv(target):
+                print("found!")
+                return
+            #print(code)
+            #print(code.longstr())
+            
 
         code.bz_distance()
         if code.dx <= 2 or code.dz <= 2:
