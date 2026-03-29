@@ -783,6 +783,60 @@ def test_distance():
         print("rank:", M.rank)
 
 
+def test_bimonoid():
+    from bruhat.matroid import find_lin
+
+    n, m = 5, 3
+    found = set()
+    for H in qchoose_2(n, m):
+        H = Matrix(H)
+        M = detect_classical(H)
+        if M in found:
+            continue
+        found.add(M)
+    
+        M0 = M.delete(n-1)
+        M1 = M.contract(n-1)
+        if M0 is None or M1 is None:
+            continue
+
+        print(M)
+        print(H)
+
+        A = H[:, n-1:]
+        print(A, A.shape)
+        K = A.t.kernel()
+        print(K, K.shape)
+        KH = K*H
+        print(KH, KH.shape)
+        KH = KH[:, :n-1].normal_form()
+        print(KH, KH.shape)
+
+        print(M0)
+        H0 = iter(find_lin(M0)).__next__().A
+        #for H0 in find_lin(M0):
+        #    print(H0)
+        H0 = Matrix(H0)
+        print(H0)
+        H00 = H[:, :n-1].row_reduce()
+        assert(H0==H00)
+        #print(H00)
+        print(M1)
+
+        H1 = iter(find_lin(M1)).__next__().A
+        H1 = Matrix(H1)
+        #for H1 in find_lin(M1):
+        #    print(H1)
+        print(H1, H1==KH)
+        assert H1==KH
+
+        print()
+
+        #if len(found) > 40:
+        #    break
+    
+
+
 if __name__ == "__main__":
     from time import time
     start_time = time()
