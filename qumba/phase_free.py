@@ -766,6 +766,28 @@ def test_decoder():
         check_distill(css)
 
 
+def test_rm():
+    code = construct.get_422()
+    #P = get_decoder(code)
+    #print(P)
+
+    code = construct.reed_muller()
+    print(code)
+
+    #P = get_decoder(code)
+    #print(P.shape)
+
+    K = clifford.K
+    R = sage.PolynomialRing(K, "z")
+    z = R.gens()[0]
+
+    w = get_distill(R, z, code)
+    print(w)
+
+    #top = (w[0,0])
+    #bot = (w[1,0])
+
+
 def test():
     test_space()
     test_decoder()
