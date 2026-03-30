@@ -15,6 +15,7 @@ from qumba.argv import argv
 from qumba.matrix import Matrix
 from qumba.lax import lc_orbits, Lower, Upper
 from qumba.util import all_subsets
+from qumba.smap import SMap
 
 
 
@@ -783,7 +784,69 @@ def test_distance():
         print("rank:", M.rank)
 
 
+
+def restrict(H, idxs):
+    # restrict = delete = puncture
+    m, n = H.shape
+    for i in idxs:
+        assert 0<=i<n
+    J = H[:, idxs]
+    J = J.normal_form()
+    return J
+
+
+def contract(H, idxs):
+    m, n = H.shape
+    for i in idxs:
+        assert 0<=i<n
+    jdxs = [i for i in range(n) if i not in idxs]
+    A = H[:, jdxs]
+    #print("contract", jdxs)
+    #print(A, A.shape)
+    K = A.t.kernel()
+    #print(K, K.shape)
+    KH = K*H
+    KH = KH[:, idxs]
+    KH = KH.normal_form()
+    return KH
+
+
 def test_bimonoid():
+
+    m, n = 3, 6
+    idxs = [0,1]
+    jdxs = [2,3]
+    kdxs = [4,5]
+
+    for trial in range(20):
+
+        H = Matrix.rand(m, n)
+        H = H.normal_form()
+
+        smap = SMap()
+        smap[0,0] = str(H)
+    
+        AB = restrict(H, idxs+jdxs)
+        A0 = restrict(AB, idxs)
+        B0 = contract(AB, jdxs)
+        C0 = contract(H, kdxs)
+
+        A1 = restrict(H, idxs)
+        _n = A1.shape[1]
+        BC = contract(H, jdxs+kdxs)
+        _jdxs = [j-_n for j in jdxs]
+        _kdxs = [k-_n for k in kdxs]
+        B1 = restrict(BC, _jdxs)
+        C1 = contract(BC, _kdxs)
+
+        assert A0==A1
+        assert B0==B1
+        assert C0==C1
+
+
+
+
+def test_delete_contract():
     from bruhat.matroid import find_lin
 
     n, m = 5, 3
