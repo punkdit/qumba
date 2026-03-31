@@ -5,7 +5,8 @@ Matrix's with columns _indexed by integer sets
 
 """
 
-from functools import cache
+from functools import cache, reduce
+from operator import add
 
 import numpy
 
@@ -21,6 +22,7 @@ from qumba.matrix import Matrix
 from qumba.lax import lc_orbits, Lower, Upper
 from qumba.util import all_subsets
 from qumba.smap import SMap
+from qumba.matroid import detect_classical
 
 
 class IMatrix:
@@ -75,6 +77,10 @@ class IMatrix:
         K = self.H.kernel()
         K = IMatrix(K, self.idxs)
         return K
+
+    def get_wenum(self):
+        wenum = self.H.get_wenum()
+        return wenum
 
     def __getitem__(self, key):
         row, col = key
@@ -183,6 +189,58 @@ class IMatrix:
         p = self._tutte(x, y)
         return p
 
+    def get_matroid(self):
+        return detect_classical(self.H)
+
+
+
+
+def build_pascal(m, n):
+    from sage import all_cmdline as sage
+    R = sage.PolynomialRing(sage.ZZ, list("xy"))
+    x, y = R.gens()
+
+    print("\nbuild_pascal", m, n)
+    k = n-m
+    found = {}
+    for H in qchoose_2(n, m):
+        H = IMatrix.promote(H)
+        p = H._tutte(x, y)
+        found.setdefault(p, []).append(H)
+        M = H.get_matroid()
+        q = M.get_tutte()
+        if type(q) is int:
+            continue
+        q = eval(q.python_str())
+        assert (p==q), (p,q)
+        #print(M)
+        assert p(x=1, y=1) == len(M.get_basis())
+        assert p(x=2, y=1) == len(M.masks)
+
+    #return
+
+    #print("found:", len(found))
+    items = []
+    for p,Hs in found.items():
+        s = str(sage.latex(p))
+        items.append(s)
+        print(len(Hs), ":", str(p).rjust(40), "\t", end="")
+        smap = SMap()
+        col = 0
+        for H in Hs:
+            smap[0, col] = str(H.H)
+            col += n+1
+        #print(smap)
+        for H in Hs:
+            wenum = H.get_wenum()
+        print(wenum, end=" ")
+        if type(p) is int:
+            continue
+        #w = (x-y)**k * y**(n-k) * p(x=x/y, y=(x+y)/(x-y)) # wenum of G = H.dual()
+        w = (x-y)**(n-k) * y**k * p(x=y,y=x)(x=x/y, y=(x+y)/(x-y))
+        print(w)
+        #print([i for (i,e) in p(x=1+x, y=y-1)])
+    return items
 
 
 def test_pascal():
@@ -196,37 +254,31 @@ def test_pascal():
 
     #return
 
-    for n in range(6):
+    N = 6
+    table = {}
+    for n in range(N):
       for m in range(n+1):
-        build_pascal(m, n)
+        result = build_pascal(m, n)
+        table[n,m] = result
 
-def build_pascal(m, n):
-    from sage import all_cmdline as sage
-    R = sage.PolynomialRing(sage.ZZ, list("xy"))
-    x, y = R.gens()
+    #return
 
-    print("\nbuild_pascal", m, n)
-    found = {}
-    for H in qchoose_2(n, m):
-        H = IMatrix.promote(H)
-        p = H._tutte(x, y)
-        found.setdefault(p, []).append(H)
-    #print("found:", len(found))
-    for p,Hs in found.items():
-        print(len(Hs), ":", str(p).rjust(30), "\t", end="")
-        smap = SMap()
-        col = 0
-        for H in Hs:
-            smap[0, col] = str(H.H)
-            col += n+1
-        #print(smap)
-        for H in Hs:
-            wenum = H.H.get_wenum()
-        print(wenum, end=" ")
-        if type(p)!=int:
-            print([i for (i,e) in p(x=1+x, y=x*(x-1))])
-        else:
-            print()
+    for n in range(N):
+        #row = [table[n,m] for m in range(n+1)]
+        k = max(len(table[n,m]) for m in range(n+1))
+        for m in range(n+1):
+            cell = table[n,m]
+            table[n,m] = cell + [""]*(k-len(cell))
+            assert len(table[n,m]) == k, (k, table[n,m])
+        print(r"\hline")
+        for row in zip(*[table[n,m] for m in range(n+1)]):
+            row = reduce(add, [('',item) for item in row])
+            row = ('',)*(4-n) + row
+            #print(row, len(row))
+            print(" & ".join(row), r"\\", "%", len(row))
+        
+
+    
 
 
 def main():
@@ -245,7 +297,7 @@ def main():
         print(p)
         print(p(x=1))
         print(p(y=1))
-        print(H.H.get_wenum())
+        print(H.get_wenum())
         #print(q)
         R = p.parent()
         x, y = R.gens()
