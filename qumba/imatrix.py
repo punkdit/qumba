@@ -24,10 +24,12 @@ from qumba.smap import SMap
 
 
 class IMatrix:
-    def __init__(self, H, idxs):
+    def __init__(self, H, idxs=None):
         assert isinstance(H, Matrix), H.__class__
         H = H.normal_form()
         m, n = H.shape
+        if idxs is None:
+            idxs = list(range(n))
         assert len(idxs) == n
         assert len(set(idxs)) == len(idxs) # uniq
         self.H = H
@@ -57,6 +59,8 @@ class IMatrix:
     def promote(cls, item):
         if isinstance(item, IMatrix):
             return item
+        if isinstance(item, numpy.ndarray):
+            item = Matrix(item)
         m, n = item.shape
         idxs = list(range(n))
         return IMatrix(item, idxs)
@@ -178,6 +182,51 @@ class IMatrix:
         x, y, = R.gens()
         p = self._tutte(x, y)
         return p
+
+
+
+def test_pascal():
+
+    from sage import all_cmdline as sage
+    R = sage.PolynomialRing(sage.ZZ, list("xy"))
+    x, y = R.gens()
+
+    #p = x**4 + x**3 * y
+    #print(sage.factor(x**5+2*x**4-2*x**2-x))
+
+    #return
+
+    for n in range(6):
+      for m in range(n+1):
+        build_pascal(m, n)
+
+def build_pascal(m, n):
+    from sage import all_cmdline as sage
+    R = sage.PolynomialRing(sage.ZZ, list("xy"))
+    x, y = R.gens()
+
+    print("\nbuild_pascal", m, n)
+    found = {}
+    for H in qchoose_2(n, m):
+        H = IMatrix.promote(H)
+        p = H._tutte(x, y)
+        found.setdefault(p, []).append(H)
+    #print("found:", len(found))
+    for p,Hs in found.items():
+        print(len(Hs), ":", str(p).rjust(30), "\t", end="")
+        smap = SMap()
+        col = 0
+        for H in Hs:
+            smap[0, col] = str(H.H)
+            col += n+1
+        #print(smap)
+        for H in Hs:
+            wenum = H.H.get_wenum()
+        print(wenum, end=" ")
+        if type(p)!=int:
+            print([i for (i,e) in p(x=1+x, y=x*(x-1))])
+        else:
+            print()
 
 
 def main():
