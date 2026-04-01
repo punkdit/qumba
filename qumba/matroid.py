@@ -900,6 +900,22 @@ def test_delete_contract():
     
 
 
+def test_wenum():
+
+    for n in range(1, 9):
+      print("n=%d"%n, end=' ', flush=True)
+      for m in range(n+1):
+        found = set()
+        for H in qchoose_2(n, m):
+            H = Matrix(H)
+            p = H.get_wenum()
+            found.add(p)
+        print(len(found), end=' ', flush=True)
+      print()
+
+
+
+
 if __name__ == "__main__":
     from time import time
     start_time = time()
