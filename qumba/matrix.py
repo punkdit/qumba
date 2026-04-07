@@ -203,7 +203,7 @@ class Matrix(object):
         return len(self.A)
 
     def __eq__(self, other):
-        assert self.p == other.p
+        assert self.p == other.p, (self.p, other.p)
         #assert self.shape == other.shape # too strict
         return self.key == other.key
 
@@ -384,6 +384,55 @@ class Matrix(object):
         A0 = A[:, :i]
         A1 = A[:, i+1:]
         return A0.concatenate(A1, axis=1)
+    delete = puncture
+
+    def contract(A, i):
+        B = A.kernel()
+        Bi = B.puncture(i)
+        C = Bi.kernel()
+        return C
+
+    def is_loop(self, i):
+        return self.A[:, i].sum() == 0
+
+    def is_isthmus(self, i):
+        K = self.kernel()
+        return K.is_loop(i)
+
+    def _tutte(self, x, y, depth=0):
+        m, n = self.shape
+        if n == 0:
+            return 1
+        i = 0
+        #print(" "*depth+ "_tutte", i)
+        #smap = SMap()
+        #smap[0,depth] = str(self)
+        #print(smap)
+        if self.is_loop(i):
+            assert not self.is_isthmus(i)
+            #print(" "*depth+ "is_loop")
+            lhs = self.delete(i)
+            p = y*lhs._tutte(x, y, depth+1)
+        elif self.is_isthmus(i):
+            assert not self.is_loop(i)
+            #print(" "*depth+ "is_coloop")
+            rhs = self.contract(i)
+            p = x*rhs._tutte(x, y, depth+1)
+        else:
+            #print(" "*depth+ "else")
+            lhs = self.delete(i)
+            rhs = self.contract(i)
+            lhs = lhs._tutte(x, y, depth+1)
+            rhs = rhs._tutte(x, y, depth+1)
+            p = lhs+rhs
+        return p
+
+    def get_tutte(self):
+        from sage import all_cmdline as sage
+        R = sage.PolynomialRing(sage.ZZ, list("xy"))
+        x, y, = R.gens()
+        p = self._tutte(x, y)
+        return p
 
     def to_spider(self, scalar=int, verbose=True):
         from qumba.decode import network

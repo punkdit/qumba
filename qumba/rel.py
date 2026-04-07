@@ -1,18 +1,16 @@
 #!/usr/bin/env python
 
 """
-Lagrangian relations 
-also known as
-Pauli flows
+Linear relations, or jointly-monic spans
 
-https://arxiv.org/abs/2105.06244v2
+see also: lagrel.py
 
 """
 
 from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
 from operator import add, mul, matmul, lshift
-from random import choice, shuffle
+from random import choice, shuffle, randint
 
 import numpy
 
@@ -156,8 +154,8 @@ class Relation:
         if other is None:
             return False
         assert isinstance(other, self.__class__)
-        assert self.tgt == other.tgt
-        assert self.src == other.src
+        #assert self.tgt == other.tgt # too strict
+        #assert self.src == other.src # too strict
         if self.shape==other.shape and self.left==other.left and self.right==other.right:
             return True
         # just return False because we use normal_form
@@ -378,6 +376,132 @@ def test_linear():
     op = (I @ w_ww @ I @ I) * (I @ I @ swap @ I) * (black(3,0) @ black(2,0))
     assert op == Relation([[1,1,1,0],[0,1,0,1]], zeros(2,0))
 
+
+def test_tutte():
+
+    I = Relation([[1]], [[1]])
+    b_ = Relation([[1]], zeros(1,0))
+    bb_ = Relation([[1,1]], zeros(1,0))
+    bb_b = Relation([[1,1]], [[1]])
+    _b = b_.op
+    _bb = bb_.op
+    b_bb = bb_b.op
+
+    w_ = Relation([[0]], zeros(1,0))
+    ww_ = Relation([[1,1]], zeros(1,0))
+    ww_w = Relation([[1,1],[0,1]], [[0],[1]])
+
+    _w = w_.op
+    _ww = ww_.op
+    w_ww = ww_w.op
+
+#    rel = (b_)
+#    print(rel)
+#    print(rel.left, rel.left.shape)
+#    print(rel.right, rel.right.shape)
+
+    M = Matrix([[1,0],[1,0]])
+    assert M.is_isthmus(0)
+    assert not M.is_loop(0)
+    assert M.is_loop(1)
+    assert not M.is_isthmus(1)
+
+    M = Matrix([[1,0,1],[0,1,1]])
+    assert M.delete(0) == Matrix([[0,1],[1,1]])
+    assert M.contract(0) == Matrix([[1,1]])
+    assert Matrix([[1,1]]).contract(0) == Matrix.zeros((0,1))
+
+    #print(M)
+    #print(M.get_tutte())
+
+    lhs = bb_b * w_ww
+    rhs = ww_w * b_bb
+    assert (lhs.op == rhs)
+
+    m, n = 3, 4
+    for trial in range(5):
+        M = Matrix.rand(m, n)
+        K = M.kernel()
+        lhs = Relation(M.t)
+        op = reduce(matmul, [_w]*m)
+        lhs = op*lhs
+        print(lhs, lhs.shape)
+        print(K, K.shape)
+        #rhs = Relation(K.t)
+        #print(rhs, rhs.shape)
+        #print(lhs == rhs)
+        print()
+    return
+
+    def delete(M, i):
+        M = Relation.promote(M)
+        m, n = M.tgt, M.src
+        assert 0<=i<n
+        ops = [I]*n
+        ops[i] = w_
+        op = reduce(matmul, ops)
+        return M*op
+
+    def fail_contract(M, i):
+        M = Relation.promote(M)
+        m, n = M.tgt, M.src
+        assert 0<=i<n
+        ops = [I]*n
+        ops[i] = b_
+        op = reduce(matmul, ops)
+        return M*op
+
+    def contract(M, i):
+        M = Relation.promote(M)
+        M1 = M.op
+        M2 = delete(M1, i)
+        M3 = M2.op
+        return M3
+
+    m, n = 3, 4
+    for trial in range(50):
+
+        j = randint(0, n-1)
+        M = Matrix.rand(m, n)
+        Mj = M.delete(j)
+
+        R = Relation(M.t)
+        #print("R =")
+        #print(R, R.shape)
+        #print("j =", j)
+        Rj = Relation(Mj.t)
+        #print("Rj =")
+        #print(Rj, Rj.shape)
+
+        Sj = delete(R, j)
+        #print("Sj =")
+        #print(Sj, Sj.shape)
+        #print( Rj==Sj )
+        assert( Rj==Sj )
+        #print()
+
+    m, n = 3, 4
+    for trial in range(50):
+
+        #j = randint(0, n-1)
+        j = 0
+        M = Matrix.rand(m, n)
+        Mj = M.contract(j)
+
+        R = Relation(M.t)
+        print("R =")
+        print(R, R.shape)
+        print("j =", j)
+        Rj = Relation(Mj.t)
+        print("Rj =")
+        print(Rj, Rj.shape)
+
+        Sj = contract(R, j)
+        print("Sj =")
+        print(Sj, Sj.shape)
+        print( Rj==Sj )
+        assert( Rj==Sj )
+        print()
 
 
 def test_pascal():
