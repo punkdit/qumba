@@ -117,6 +117,176 @@ class Lagrangian(Relation):
         H = H.linear_independent()
         return QCode(H)
 
+#    def restrict(self, i):
+#        A = self.A
+#        r, tgt, src = self.shape
+#        m, n = A.shape
+#        assert tgt + src == n
+#        assert 0<=2*i<n
+#        idxs = list(n)
+#        idxs.remove(i)
+#        A = A[:, idxs]
+#        if i < tgt:
+#            tgt -= 1
+#        else:
+#            src -= 1
+#        L = Lagrangian(A[:, :tgt], A[:, src:])
+#        return L
+
+    def _hitme(self, i, l, r):
+        A = self.A
+        m, nn = A.shape
+        r, tgt, src = self.shape
+        assert tgt + src == nn
+        assert 0<=2*i<nn
+        assert nn%2 == 0
+        n = nn//2
+        op = [I]*n
+        if i < tgt:
+            # measure i
+            op[i] = l
+            op = reduce(matmul, op)
+            L = op * self
+        else:
+            # prepare i
+            op[i] = r
+            op = reduce(matmul, op)
+            L = self * op
+        return L
+
+    def x_restrict(self, i):
+        return self._hitme(i, _b, b_)
+
+    def y_restrict(self, i):
+        return self._hitme(i, _w1, w1_) # == b1_,_b1
+
+    def z_restrict(self, i):
+        return self._hitme(i, _w, w_)
+
+    def _tutte(self, x, y, z, depth=0):
+        if self.rank == 0:
+            return 1
+        i = 0
+        xl = self.x_restrict(i)
+        yl = self.y_restrict(i)
+        zl = self.z_restrict(i)
+        px = py = pz = None
+        if xl.rank:
+            px = xl._tutte(x, y, z, depth+1)
+        if yl.rank:
+            py = yl._tutte(x, y, z, depth+1)
+        if zl.rank:
+            pz = zl._tutte(x, y, z, depth+1)
+        if xl.rank == 0 and yl.rank == 0 and zl.rank == 0:
+            #assert 0
+            p = 1
+        elif xl.rank == 0 and yl.rank == 0:
+            p = x*y*pz
+        elif xl.rank == 0 and zl.rank == 0:
+            p = x*py*z
+        elif yl.rank == 0 and zl.rank == 0:
+            p = px*y*z
+        elif xl.rank == 0:
+            p = x*(py + pz)
+        elif yl.rank == 0:
+            p = y*(px + pz)
+        elif zl.rank == 0:
+            p = z*(px + py)
+        else:
+            p = px + py + pz
+        print(" "*depth, p, xl.rank, yl.rank, zl.rank)
+        return p
+
+    def get_tutte(self):
+        from sage import all_cmdline as sage
+        R = sage.PolynomialRing(sage.ZZ, list("xyz"))
+        x, y, z = R.gens()
+        p = self._tutte(x, y, z)
+        return p
+
+
+if 1:
+    # make some globals
+
+    I = Lagrangian.identity(2)
+    h = Lagrangian([[0,1],[1,0]])
+    b_ = Lagrangian([[0,1]], zeros(1,0))
+    b1 = Lagrangian([[1,0],[1,1]]) # S gate
+    w1 = h*b1*h
+    b1_ = b1*b_
+    w1_ = h*b1_
+    w_ = w1 * w1_
+    _b1 = b1_.op
+    _b = b_.op
+    _w1 = w1_.op
+    _w = w_.op
+
+    assert _b1 == _w1
+
+    swap = Lagrangian.get_swap()
+    
+    bb_b = Lagrangian([
+        [1,0,0,0],
+        [0,0,1,0],
+        [0,1,0,1],
+    ], [
+        [1,0],
+        [1,0],
+        [0,1],
+    ])
+
+    assert str(b_).strip() == "Z|" # the Z-state aka |0>
+    assert str(w_).strip() == "X|" # the X-state aka |+>
+    assert str(_b).strip() == "|Z" # the Z-measure aka <0|
+    assert str(_w).strip() == "|X" # the X-measure aka <+|
+
+    assert swap*bb_b == bb_b
+
+    b_bb = bb_b.op
+    ww_w = (h@h) * bb_b * h
+    w_ww = ww_w.op
+
+    cnot = (I @ b_bb) * (ww_w @ I) 
+    assert cnot * cnot.op == I@I # invertible
+    assert cnot == (w_ww@I)*(I@bb_b)
+
+
+
+
+def test_tutte():
+
+#    L = Lagrangian([[0,1]], zeros(1,2))
+#
+#    for op in [ L, _b, b_, _w, w_, _w1]:
+#        print(op.nf, op.shape)
+#        assert op.is_lagrangian()
+
+    prop = set(Lagrangian.all_rels(1, 1))
+    for a in prop:
+        #print(a, a.shape)
+        for b in prop:
+            assert a*b in prop
+
+    x = (b_*_b) @ I
+    z = (w_*_w) @ I
+
+    for L in Lagrangian.all_rels(2, 0):
+        print(L, L.shape)
+        op = x*L
+        print(op.nf, op.shape)
+        print()
+        
+
+    return
+
+    n = 3
+    for L in Lagrangian.all_rels(n, 0):
+        print(L, L.shape)
+        p = L.get_tutte()
+        print(p)
+
+
+
 
 def detect(lhs, rhs):
     "return (detect'ors, lhs*rhs)"
@@ -299,53 +469,6 @@ class Module:
             ops[i] = _w1 # ?!?! is this right ??
         op = reduce(matmul, ops)
         return op
-
-
-if 1:
-    # make some globals
-
-    I = Lagrangian.identity(2)
-    h = Lagrangian([[0,1],[1,0]])
-    b_ = Lagrangian([[0,1]], zeros(1,0))
-    b1 = Lagrangian([[1,0],[1,1]]) # S gate
-    w1 = h*b1*h
-    b1_ = b1*b_
-    w1_ = h*b1_
-    w_ = w1 * w1_
-    _b1 = b1_.op
-    _b = b_.op
-    _w1 = w1_.op
-    _w = w_.op
-
-    assert _b1 == _w1
-
-    swap = Lagrangian.get_swap()
-    
-    bb_b = Lagrangian([
-        [1,0,0,0],
-        [0,0,1,0],
-        [0,1,0,1],
-    ], [
-        [1,0],
-        [1,0],
-        [0,1],
-    ])
-
-    assert str(b_).strip() == "Z|" # the Z-state aka |0>
-    assert str(w_).strip() == "X|" # the X-state aka |+>
-    assert str(_b).strip() == "|Z" # the Z-measure aka <0|
-    assert str(_w).strip() == "|X" # the X-measure aka <+|
-
-    assert swap*bb_b == bb_b
-
-    b_bb = bb_b.op
-    ww_w = (h@h) * bb_b * h
-    w_ww = ww_w.op
-
-    cnot = (I @ b_bb) * (ww_w @ I) 
-    assert cnot * cnot.op == I@I # invertible
-    assert cnot == (w_ww@I)*(I@bb_b)
-
 
 
 

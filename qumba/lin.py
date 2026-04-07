@@ -601,6 +601,9 @@ def linear_independent(A, check=False, verbose=False):
     if A.shape[0] == 0:
         return A
 
+    if A.shape[1] == 0:
+        return A[:, :]
+
     P, L, U = plu_reduce(A)
 
     if verbose:

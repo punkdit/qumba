@@ -57,6 +57,10 @@ class IMatrix:
         key = self.H, self.idxs
         return hash(key)
 
+    def __getattr__(self, name):
+        attr = getattr(self.H, name)
+        return attr
+
     @classmethod
     def promote(cls, item):
         if isinstance(item, IMatrix):
@@ -66,6 +70,11 @@ class IMatrix:
         m, n = item.shape
         idxs = list(range(n))
         return IMatrix(item, idxs)
+
+    @classmethod
+    def parse(cls, s):
+        H = Matrix.parse(s)
+        return cls.promote(H)
 
     @classmethod
     def rand(cls, m, n):
@@ -145,14 +154,13 @@ class IMatrix:
         return self.dual().is_loop(idx)
 
     def _tutte(self, x, y, depth=0):
-        assert depth < 10
         m, n = self.shape
         if n == 0:
             return 1
         i = self.idxs[0]
         #print(" "*depth+ "_tutte", i)
-        smap = SMap()
-        smap[0,depth] = str(self)
+        #smap = SMap()
+        #smap[0,depth] = str(self)
         #print(smap)
         idxs = list(self.idxs)
         idxs.remove(i)
@@ -341,6 +349,25 @@ def test_coassoc():
         assert C0==C1
 
 
+def test_contract():
+
+    #m, n = 2, 5
+    #H = IMatrix.rand(m, n)
+    H = IMatrix.parse("""
+    1011
+    0111
+    """)
+    print(H)
+    print()
+
+    H = H.normal_form()
+    print(H)
+    print()
+
+    J = H.contract([2,3])
+    print(J, J.shape)
+    print()
+
 
 
 def test_delete_contract():
@@ -398,8 +425,13 @@ def test_delete_contract():
 
 def test_wenum():
 
-    for n in [8,9]:
-      print("n=%d"%n, end=' ', flush=True)
+    ns = argv.get("n")
+    if ns is not None:
+        ns = [ns]
+    else:
+        ns = range(8)
+    for n in ns:
+      print("n=%d: "%n, end=' ', flush=True)
       for m in range(n+1):
         found = set()
         for H in qchoose_2(n, m):
@@ -412,22 +444,95 @@ def test_wenum():
       print()
 
 
+def test_random_wenum():
+    oeis = [
+        [1,                                                       ],
+        [1,   1,                                                  ],
+        [1,   2,   1,                                             ],
+        [1,   3,   3,   1,                                        ],
+        [1,   4,   6,   4,    1,                                  ],
+        [1,   5,  10,  10,    5,    1,                            ],
+        [1,   6,  16,  22,   16,    6,    1,                      ],
+        [1,   7,  23,  43,   43,   23,    7,    1,                ],
+        [1,   8,  32,  77,  106,   77,   32,    8,    1,          ],
+        [1,   9,  43, 131,  240,  240,  131,   43,    9,   1,     ],
+        [1,  10,  56, 213,  516,  705,  516,  213,   56,  10,   1,],
+        [1,  11,  71, 333, 1060, 1988, 1988, 1060,  333,  71,  11,   1],
+    ]
+
+    for n in range(12):
+      print("n=%d: "%n, end='', flush=True)
+      for m in range(n//2 + 1):
+      #for m in range(n+1):
+        count = oeis[n][m]
+        found = set()
+        while len(found) < count:
+            while 1:
+                H = IMatrix.rand(m, n)
+                if H.rank() == m:
+                    break
+            H = H.normal_form()
+            #print(H)
+            p = H.get_tutte()
+            found.add(p)
+        print(len(found), end=' ', flush=True)
+
+      print()
+
+
+def test_tutte():
+    A = IMatrix.parse("""
+    1000101
+    0100110
+    0010011
+    0001011
+    """)
+    print(A)
+    print(A.get_tutte())
+    B = IMatrix.parse("""
+    1000100
+    0100111
+    0010011
+    000101a
+    """.replace("a", "1"))
+    print(B)
+    print(B.get_tutte())
+
+
 
 if __name__ == "__main__":
+
+    from random import seed
     from time import time
     start_time = time()
-    fn = argv.next() or "main"
 
-    print("%s()"%fn)
+    profile = argv.profile
+    name = argv.next() or "test"
 
-    if argv.profile:
+    _seed = argv.get("seed")
+    if _seed is not None:
+        print("seed(%s)"%(_seed))
+        seed(_seed)
+
+    if profile:
         import cProfile as profile
-        profile.run("%s()"%fn)
+        profile.run("%s()"%name)
+
+    elif argv.pyinstrument:
+        fn = eval(name)
+        from pyinstrument import Profiler
+        with Profiler(interval=0.01) as profiler:
+            fn()
+        profiler.print()
+
     else:
-        fn = eval(fn)
+        fn = eval(name)
         fn()
 
-    print("finished in %.3f seconds.\n"%(time() - start_time))
+
+    t = time() - start_time
+    print("\nOK! finished in %.3f seconds\n"%t)
+
 
 
 

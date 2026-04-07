@@ -2464,6 +2464,50 @@ def test_golay_rm():
     assert isomorphic(rm, code)
     
 
+def test_tutte():
+
+    found = set()
+    items = list(construct.all_codes(3, 0, 0))
+    print("items:", len(items))
+#    for C in items[10:13]:
+#        print(C.longstr())
+#        D = C.puncture(2)
+#        print(D.longstr())
+#        print()
+
+    C = items[10]
+    print(C.longstr())
+    p = C.tutte_poly()
+    print(p)
+
+    #return
+
+    lookup = {}
+    for C in items:
+        p = C.tutte_poly()
+        lookup[C] = p
+        if p in found:
+            continue
+        print(p)
+        print(C.longstr())
+        found.add(p)
+
+    #return
+
+    shuffle(items)
+    items = items[:5]
+
+    for C in items:
+      for D in items:
+        lhs = lookup[C] * lookup[D]
+        rhs = (C+D).tutte_poly()
+        print(lhs==rhs)
+#        print("(%s)*(%s)" %(lookup[C], lookup[D]), 
+#            "=", p, 
+#            "=?\t",
+#            q, p==q)
+#      print()
+
 
 
 def test():

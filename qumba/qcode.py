@@ -1137,31 +1137,224 @@ class QCode(object):
 #        H = self.H
 #        print(H.normal_form())
         
-    def puncture(self, i): # just guessing how this works... ?!
+    def _puncture(self, i):  # == delete == restrict
+        # just guessing how this works... ?!
         assert 0<=i<self.n
         H = self.H
+        if self.n == 1:
+            return None
+        #print("puncture(%d)"%i)
+        #print(H)
         H = H[:, :2*i].concatenate(H[:, 2*i+2:], axis=1)
-        n = self.n-1
+        #print("H =")
+        #print(H, H.shape)
+        H = H.linear_independent()
+        #print("H =")
+        #print(H, H.shape)
+        if not len(H):
+            return None
+        #m, nn = H.shape
+        #n = nn//2
+        n = self.n - 1
         space = SymplecticSpace(n)
         F = space.F
         R = H * F * H.t
+        #print("R =")
+        #print(R, R.shape, n)
+        m = len(R)
         rows = []
-        for i in range(n):
+        for i in range(m):
             if R[i, i:].sum()==0:
                 rows.append(H[i])
         H = Matrix(rows)
+#        print("H =")
+#        print(H)
+        H = H.reshape(len(H), 2*n)
         code = QCode(H)
         return code
 
-    def shorten(self, i):
+    def fail_puncture(self, i):
         assert 0<=i<self.n
+        #print("puncture(%d)"%(i,))
+        self.build()
         H = self.H
+        L = self.L
+        HL = H.concatenate(L)
+        H1 = H[:, :2*i].concatenate(H[:, 2*i+2:], axis=1)
+        J = HL[:, 2*i:2*i+2]
+        K = J.t.kernel()
+        #print(K, K.shape)
+        KH1 = K*H1
+        #print("KH1:")
+        #print(strop(KH1))
+        code = QCode(KH1)
+        return code
+
+    def failfailpuncture(self, i):
+        self.build()
+        TF = self.T * self.space.F
+        HF = self.H * self.space.F
+        #code = QCode(H=TF, T=HF)
+        code = QCode(H=self.T)
+        code.build()
+        code = code.shorten(i)
+        if code is None:
+            return None
+        code.build()
+        code = QCode(H=code.T, T=code.H)
+        return code
+        
+    def puncture(self, i):
+        H = self.H.kernel()
+        #print("H =")
+        #print(strop(H))
+
         H1 = H[:, :2*i].concatenate(H[:, 2*i+2:], axis=1)
         J = H[:, 2*i:2*i+2]
         K = J.t.kernel()
-        #print(K, K.shape)
-        code = QCode(K*H1)
+        H = K*H1
+        if not len(H):
+            return None
+        H = H.kernel()
+        #print("H =")
+        #print(strop(H))
+        n = H.shape[1]//2
+        space = SymplecticSpace(n)
+        F = space.F
+        R = H * F * H.t
+        m = len(R)
+        idxs = [i for i in range(m) if R[i, :].sum() == 0]
+        #print("R =")
+        #print(R, idxs)
+#        print([R[i,:].sum() for i in range(m)])
+        H = H[idxs, :]
+#        print(strop(H), H.shape)
+        code = QCode(H=H)
         return code
+
+
+    def shorten(self, i):  # == contract
+        assert 0<=i<self.n
+        #print("="*10)
+        #print("shorten(%d)"%i)
+        H = self.H
+        #print(strop(H) or "[]", H.shape)
+        H1 = H[:, :2*i].concatenate(H[:, 2*i+2:], axis=1)
+        J = H[:, 2*i:2*i+2]
+        K = J.t.kernel()
+        #print("K =")
+        #print(K, K.shape)
+        #print("="*10)
+        KH1 = K*H1
+        if not len(KH1):
+            return None
+        code = QCode(KH1)
+        return code
+
+    def is_loop(self, i):
+        return self.H[:, 2*i:2*i+2].sum() == 0
+
+    def is_coloop(self, i):
+        K = self.H.kernel()
+        return K[:, 2*i:2*i+2].sum() == 0
+
+#    def _tutte(self, x, y, depth=0):
+#        #print(" "*depth + "_tutte", self.n)
+#        #smap = SMap()
+#        #smap[0, depth] = "%s, %s"%(strop(self.H), self.H.shape)
+#        #print(smap)
+#        #print("_tutte", depth)
+#        #print(strop(self.H), self.H.shape, self.n)
+#        if self.n == 0:
+#            return 1
+#
+#        if self.m == 0:
+#            return y**self.n
+#
+#        H = self.H
+#
+#        i = 0
+#        left = self.puncture(i)
+#        right = self.shorten(i)
+#
+#        pl = left._tutte(x, y, depth+1) if left is not None else None
+#        pr = right._tutte(x, y, depth+1) if right is not None else None
+#
+#        if left is None and right is None:
+#            #print("<1>", end='', flush=True)
+#            p = 1
+#
+#        #elif left is None or left.n == 0:
+#        elif self.is_loop(i):
+#            assert right is not None
+#            assert pr is not None
+#            p = x*pr
+#            #print("<x>", end='', flush=True)
+#
+#        #elif right is None or right.n == 0:
+#        #elif self.is_coloop(i):
+#        elif right is None:
+#            p = pl * y
+#            #print("<y>", end='', flush=True)
+#
+#        else:
+#            assert pl is not None
+#            assert pr is not None
+#            p = pl + pr
+#
+#        return p
+
+    def lc_tutte_poly(self):
+        "local clifford Tutte polynomial (?)"
+        from sage import all_cmdline as sage
+        R = sage.PolynomialRing(sage.ZZ, list("xy"))
+        x, y, = R.gens()
+        n = self.n
+        H = self.H
+        rank = len(H)
+        p = 0
+        for bits in numpy.ndindex((2,)*n):
+            idxs = reduce(add, [[2*idx, 2*idx+1]
+                for idx,bit in enumerate(bits) if bit], [])
+            #print(bits, idxs)
+            H1 = H[:, idxs]
+            #print(H1)
+            r = H1.rank()
+            p += x**(rank - r) * y**(len(idxs)-r)
+        return p
+
+    def tutte_poly(self):
+        "Coxeter Tutte polynomial (?)"
+        from sage import all_cmdline as sage
+        R = sage.PolynomialRing(sage.ZZ, list("xy"))
+        x, y, = R.gens()
+        H = self.H
+        n = self.n
+        m, nn = H.shape
+        p = 0
+        for bits in numpy.ndindex((2,)*nn):
+            for i in range(n):
+                if bits[2*i] and bits[2*i+1]:
+                    break
+            else:
+                idxs = [i for i in range(nn) if bits[i]]
+                #print(bits, idxs)
+                H1 = H[:, idxs]
+                #print(H1)
+                r = H1.rank()
+                p += x**(m - r) * y**(len(idxs)-r)
+        return p
+
+    def get_tutte(self):
+        from sage import all_cmdline as sage
+        R = sage.PolynomialRing(sage.ZZ, list("xy"))
+        x, y, = R.gens()
+        p = self._tutte(x, y)
+        return p
+
+
+            
+        
 
 
 
