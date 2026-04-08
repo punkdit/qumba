@@ -418,20 +418,30 @@ def test_tutte():
     rhs = ww_w * b_bb
     assert (lhs.op == rhs)
 
-    m, n = 3, 4
-    for trial in range(5):
-        M = Matrix.rand(m, n)
-        K = M.kernel()
-        lhs = Relation(M.t)
-        op = reduce(matmul, [_w]*m)
-        lhs = op*lhs
-        print(lhs, lhs.shape)
-        print(K, K.shape)
-        #rhs = Relation(K.t)
-        #print(rhs, rhs.shape)
-        #print(lhs == rhs)
-        print()
-    return
+    if 0:
+        m, n = 3, 5
+        k = n-m
+        for trial in range(1):
+            H = Matrix.rand(m, n)
+            if H.rank() < m:
+                continue
+            print("H =")
+            print(H, H.shape)
+            lhs = Relation(Matrix.identity(n), H.t)
+            print("H =")
+            print(lhs, lhs.shape)
+            K = H.kernel()
+            #op = reduce(matmul, [_w]*m)
+            op = Relation(Matrix.zeros((k, m)), Matrix.identity(k))
+            print(op, op.shape)
+            lhs = lhs*op
+            print(lhs, lhs.shape)
+            print(K, K.shape)
+            #rhs = Relation(K.t)
+            #print(rhs, rhs.shape)
+            #print(lhs == rhs)
+            print()
+        return
 
     def delete(M, i):
         M = Relation.promote(M)
@@ -441,22 +451,6 @@ def test_tutte():
         ops[i] = w_
         op = reduce(matmul, ops)
         return M*op
-
-    def fail_contract(M, i):
-        M = Relation.promote(M)
-        m, n = M.tgt, M.src
-        assert 0<=i<n
-        ops = [I]*n
-        ops[i] = b_
-        op = reduce(matmul, ops)
-        return M*op
-
-    def contract(M, i):
-        M = Relation.promote(M)
-        M1 = M.op
-        M2 = delete(M1, i)
-        M3 = M2.op
-        return M3
 
     m, n = 3, 4
     for trial in range(50):
@@ -480,28 +474,118 @@ def test_tutte():
         assert( Rj==Sj )
         #print()
 
-    m, n = 3, 4
-    for trial in range(50):
+#    def fail_contract(M, i):
+#        M = Relation.promote(M)
+#        m, n = M.tgt, M.src
+#        assert 0<=i<n
+#        ops = [I]*n
+#        ops[i] = b_
+#        op = reduce(matmul, ops)
+#        return M*op
+
+    def contract(M, i):
+        #print("contract(%d)"%i)
+        #print(M, M.shape)
+        #M = Relation.promote(M)
+        m, n = M.shape
+        right = Matrix.zeros((m,0))
+        idxs = list(range(n))
+        idxs.remove(i)
+        idxs += [i]
+        M1 = M[:, idxs]
+        left = M1[:, :-1]
+        right = M1[:, -1:]
+        R = Relation(left, right)
+        #print("R =")
+        #print(R)
+        R = R*w_
+        #print("Rb_ =")
+        #print(R)
+        return R.left
+
+    def rel_contract(R, i):
+        assert i == 0
+        cup = Relation.white(0, 2)
+        m = R.tgt
+        n = R.src
+        lhs = cup * (Relation.white(1,0) @ Relation.identity(1))
+        lhs = lhs @ Relation.identity(m-1)
+        R1 = lhs * R
+        return R1
+
+    def rel_delete(R, i):
+        assert i == 0
+        cup = Relation.white(0, 2)
+        m = R.tgt
+        n = R.src
+        lhs = cup * (Relation.black(1,0) @ Relation.identity(1))
+        lhs = lhs @ Relation.identity(m-1)
+        R1 = lhs * R
+        return R1
+
+    def promote(M):
+        left = M
+        right = M[:, M.shape[1]:]
+        return Relation(left, right)
+
+    print("delete:")
+    m, n = 3, 5
+    for trial in range(5):
+
+        #j = randint(0, n-1)
+        j = 0
+        M = Matrix.rand(m, n)
+        Mj = M.delete(j)
+
+        R = promote(M)
+        print(R)
+
+        Rj = promote(Mj)
+        print(Rj)
+
+        Sj = rel_delete(R, j)
+        print(Sj)
+#        assert Sj.left == Rj.left
+        assert Sj == Rj
+
+        print()
+
+    #return
+
+    print("contract:")
+    m, n = 3, 5
+    for trial in range(5):
 
         #j = randint(0, n-1)
         j = 0
         M = Matrix.rand(m, n)
         Mj = M.contract(j)
+        #print("M =")
+        #print(M)
+        #print("M.contract(%d)"%j)
+        #print(Mj)
 
-        R = Relation(M.t)
-        print("R =")
-        print(R, R.shape)
-        print("j =", j)
-        Rj = Relation(Mj.t)
-        print("Rj =")
-        print(Rj, Rj.shape)
+        Sj = contract(M, j)
 
-        Sj = contract(R, j)
-        print("Sj =")
-        print(Sj, Sj.shape)
-        print( Rj==Sj )
-        assert( Rj==Sj )
+        #print("Sj =")
+        #print(Sj, Sj.shape)
+        equiv = Mj.t.solve(Sj.t) is not None
+        assert equiv
+        #print()
+
+        R = promote(M)
+        print(R)
+
+        Rj = promote(Mj)
+        print(Rj)
+
+        Sj = rel_contract(R, j)
+        print(Sj)
+        assert Sj.left == Rj.left
+        assert Sj == Rj
+
         print()
+
 
 
 def test_pascal():
