@@ -133,6 +133,12 @@ class Relation:
             return item
         return cls(item)
 
+    @classmethod
+    def subspace(cls, M):
+        left = M
+        right = M[:, M.shape[1]:]
+        return cls(left, right)
+
     def __str__(self):
         left, right = self._left, self._right
         w = left.shape[1]
@@ -418,31 +424,6 @@ def test_tutte():
     rhs = ww_w * b_bb
     assert (lhs.op == rhs)
 
-    if 0:
-        m, n = 3, 5
-        k = n-m
-        for trial in range(1):
-            H = Matrix.rand(m, n)
-            if H.rank() < m:
-                continue
-            print("H =")
-            print(H, H.shape)
-            lhs = Relation(Matrix.identity(n), H.t)
-            print("H =")
-            print(lhs, lhs.shape)
-            K = H.kernel()
-            #op = reduce(matmul, [_w]*m)
-            op = Relation(Matrix.zeros((k, m)), Matrix.identity(k))
-            print(op, op.shape)
-            lhs = lhs*op
-            print(lhs, lhs.shape)
-            print(K, K.shape)
-            #rhs = Relation(K.t)
-            #print(rhs, rhs.shape)
-            #print(lhs == rhs)
-            print()
-        return
-
     def delete(M, i):
         M = Relation.promote(M)
         m, n = M.tgt, M.src
@@ -474,15 +455,6 @@ def test_tutte():
         assert( Rj==Sj )
         #print()
 
-#    def fail_contract(M, i):
-#        M = Relation.promote(M)
-#        m, n = M.tgt, M.src
-#        assert 0<=i<n
-#        ops = [I]*n
-#        ops[i] = b_
-#        op = reduce(matmul, ops)
-#        return M*op
-
     def contract(M, i):
         #print("contract(%d)"%i)
         #print(M, M.shape)
@@ -504,87 +476,61 @@ def test_tutte():
         return R.left
 
     def rel_contract(R, i):
-        assert i == 0
-        cup = Relation.white(0, 2)
-        m = R.tgt
-        n = R.src
-        lhs = cup * (Relation.white(1,0) @ Relation.identity(1))
-        lhs = lhs @ Relation.identity(m-1)
+        lhs = [I for i in range(R.tgt)]
+        lhs[i] = Relation.white(0, 1)
+        lhs = reduce(matmul, lhs)
         R1 = lhs * R
         return R1
 
     def rel_delete(R, i):
-        assert i == 0
-        cup = Relation.white(0, 2)
-        m = R.tgt
-        n = R.src
-        lhs = cup * (Relation.black(1,0) @ Relation.identity(1))
-        lhs = lhs @ Relation.identity(m-1)
+        lhs = [I for i in range(R.tgt)]
+        lhs[i] = Relation.black(0, 1)
+        lhs = reduce(matmul, lhs)
         R1 = lhs * R
         return R1
 
-    def promote(M):
-        left = M
-        right = M[:, M.shape[1]:]
-        return Relation(left, right)
-
-    print("delete:")
     m, n = 3, 5
     for trial in range(5):
-
-        #j = randint(0, n-1)
-        j = 0
+        j = randint(0, n-1)
         M = Matrix.rand(m, n)
         Mj = M.delete(j)
 
-        R = promote(M)
-        print(R)
-
-        Rj = promote(Mj)
-        print(Rj)
-
+        R = Relation.subspace(M)
+        Rj = Relation.subspace(Mj)
         Sj = rel_delete(R, j)
-        print(Sj)
-#        assert Sj.left == Rj.left
         assert Sj == Rj
 
-        print()
-
-    #return
-
-    print("contract:")
     m, n = 3, 5
     for trial in range(5):
-
-        #j = randint(0, n-1)
-        j = 0
+        j = randint(0, n-1)
         M = Matrix.rand(m, n)
         Mj = M.contract(j)
-        #print("M =")
-        #print(M)
-        #print("M.contract(%d)"%j)
-        #print(Mj)
-
         Sj = contract(M, j)
-
-        #print("Sj =")
-        #print(Sj, Sj.shape)
         equiv = Mj.t.solve(Sj.t) is not None
         assert equiv
-        #print()
-
-        R = promote(M)
-        print(R)
-
-        Rj = promote(Mj)
-        print(Rj)
-
+        R = Relation.subspace(M)
+        Rj = Relation.subspace(Mj)
         Sj = rel_contract(R, j)
-        print(Sj)
         assert Sj.left == Rj.left
         assert Sj == Rj
 
-        print()
+    m, n = 3, 5
+    for trial in range(5):
+        j = randint(0, n-1)
+        M = Matrix.rand(m, n)
+        R = Relation.subspace(M)
+        R = R @ Relation.black(1,0)
+        #print(R)
+        #print()
+
+    null = Relation(Matrix.zeros((0,0)))
+    for l in [Relation.black(0,1), Relation.white(0,1)]:
+      for r in [Relation.black(1,0), Relation.white(1,0)]:
+        lr = (l*r).nf
+        assert lr==null
+    
+    for l in [Relation.black(0,1), Relation.white(0,1)]:
+        print(l, l.shape)
 
 
 
