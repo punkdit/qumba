@@ -20,6 +20,7 @@ from qumba.lin import (shortstr, dot2, identity2, eq2, intersect, direct_sum, ze
 from qumba.lin import int_scalar as scalar
 from qumba import lin
 from qumba.action import mulclose
+from qumba.smap import SMap
 from qumba.decode.network import TensorNetwork
 
 
@@ -156,11 +157,11 @@ class Matrix(object):
         #lines[-1] = lines[-1] + "]"
         #return '\n'.join(lines)
 
-    def latex(self):
+    def latex(self, tp="bmatrix"):
         A = self.A
         rows = ['&'.join('.123456'[i] for i in row) for row in A]
         rows = r'\\'.join(rows)
-        rows = r"\begin{bmatrix}%s\end{bmatrix}"%rows
+        rows = r"\begin{%s}%s\end{%s}"%(tp,rows,tp)
         return rows
 
     def gap(self):
@@ -608,6 +609,48 @@ def test():
     I = Matrix.identity(5)
     assert I*I == I
 
+
+def mstr(M):
+    m, n = M.shape
+    smap = SMap()
+    smap[0,0] = "["
+    for i in range(m):
+        smap[i,1] = "["
+        smap[i,n+2] = "]"
+    smap[0,2] = str(M)
+    smap[m-1, n+3] = "]"
+    return str(smap)
+
+
+def test_pushout():
+
+    m, n = 3, 7
+    n0 = 4
+    n1 = n-n0
+
+    for trial in range(10):
+        A0 = Matrix.rand(m, n0)
+        A1 = Matrix.rand(m, n1)
+        A = Matrix.concatenate(A0, A1, axis=1)
+    
+        #print(mstr(A0))
+        #print(mstr(A1))
+        #print(mstr(A))
+    
+        B0, B1 = pushout(A0.t, A1.t)
+    
+        #print(mstr(B0))
+        #print(mstr(B1))
+    
+        B = Matrix.concatenate(B0, B1, axis=1)
+        #print(mstr(B))
+    
+        BAt = B*A.t
+        #print(mstr(B*A.t))
+        assert BAt.sum() == 0
+    
+
+    
 
 
 

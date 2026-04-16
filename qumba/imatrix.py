@@ -437,26 +437,113 @@ def test_wenum():
         for H in qchoose_2(n, m):
             H = Matrix(H)
             H1 = IMatrix(H)
-            #p = H.get_wenum()
-            p = H1.get_tutte()
+            p = H.get_wenum()
+            #p = H1.get_tutte()
             found.add(p)
         print(len(found), end=' ', flush=True)
       print()
 
 
+def test_diverge():
+
+    n = argv.get("n", 6)
+    m = argv.get("m", 3)
+    found = {}
+    for H in qchoose_2(n, m):
+        H = Matrix(H)
+        p = H.get_wenum()
+        if p in found:
+            J = found[p]
+            tH = IMatrix(H).get_tutte()
+            tJ = IMatrix(J).get_tutte()
+            if tH != tJ:
+                break
+        found[p] = H
+    else:
+        return
+
+    print("p =", p)
+    print(H, tH)
+    print(J, tJ)
+    print()
+    print(H.latex())
+    print(J.latex())
+
+
+def test_63():
+    H = Matrix.parse("""
+    111..1
+    ...1.1
+    ....11
+    """)
+
+    print(H)
+    print("->")
+
+    Hl = H.puncture(0)
+    print(Hl.latex("pmatrix"))
+    Hr = H.contract(0)
+    print(Hr.latex("pmatrix"))
+
+    Hll = Hl.puncture(0)
+    print(Hll.latex("pmatrix"))
+    Hlr = Hl.contract(0)
+    print(Hlr.latex("pmatrix"))
+
+    Hrl = Hr.puncture(0)
+    print(Hrl.latex("pmatrix"))
+    Hrr = Hr.contract(0)
+    print(Hrr.latex("pmatrix"))
+
+
+def test_some():
+    from sage import all_cmdline as sage
+    H = Matrix.parse("""
+    111...
+    .1.11.
+    ..11.1
+    """)
+
+    t = IMatrix(H).get_tutte()
+    print("surface code:")
+    print("t(x,y) =", t)
+    R = t.parent()
+    x, y = R.gens()
+    p = t(x=1-x, y=0)
+    print(p)
+    print(sage.factor(p))
+
+    print("colour code:")
+    H = Matrix.parse("""
+    1111....
+    1.1.1.1.
+    ..1111..
+    ....1111
+    """)
+    t = IMatrix(H).get_tutte()
+    print("t(x,y) =", t)
+    R = t.parent()
+    x, y = R.gens()
+    p = t(x=1-x, y=0)
+    print(p)
+    print(sage.factor(p))
+
+    
+
+
 def test_random_wenum():
     oeis = [
-        [1,                                                       ],
-        [1,   1,                                                  ],
-        [1,   2,   1,                                             ],
-        [1,   3,   3,   1,                                        ],
-        [1,   4,   6,   4,    1,                                  ],
-        [1,   5,  10,  10,    5,    1,                            ],
-        [1,   6,  16,  22,   16,    6,    1,                      ],
-        [1,   7,  23,  43,   43,   23,    7,    1,                ],
-        [1,   8,  32,  77,  106,   77,   32,    8,    1,          ],
-        [1,   9,  43, 131,  240,  240,  131,   43,    9,   1,     ],
-        [1,  10,  56, 213,  516,  705,  516,  213,   56,  10,   1,],
+        [1,                                                           ],
+        [1,   1,                                                      ],
+        [1,   2,   1,                                                 ],
+        [1,   3,   3,   1,                                            ],
+        [1,   4,   6,   4,    1,                                      ],
+        [1,   5,  10,  10,    5,    1,                                ],
+        [1,   6,  16,  22,   16,    6,    1,                          ],
+        [1,   7,  23,  43,   43,   23,    7,    1,                    ],
+        [1,   8,  32,  77,  106,   77,   32,    8,    1,              ],
+        [1,   9,  43, 131,  240,  240,  131,   43,    9,   1,         ],
+        [1,  10,  56, 213,  516,  705,  516,  213,   56,  10,   1,    ],
         [1,  11,  71, 333, 1060, 1988, 1988, 1060,  333,  71,  11,   1],
     ]
 
