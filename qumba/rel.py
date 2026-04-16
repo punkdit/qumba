@@ -401,10 +401,13 @@ def test_tutte():
     _ww = ww_.op
     w_ww = ww_w.op
 
-#    rel = (b_)
-#    print(rel)
-#    print(rel.left, rel.left.shape)
-#    print(rel.right, rel.right.shape)
+    #print(w_, w_.shape)
+    #ww_ = w_@w_
+    #print(ww_, ww_.shape)
+
+    M = Matrix.zeros((0,1))
+    print(M.is_loop(0))
+    print(M.is_isthmus(0))
 
     M = Matrix([[1,0],[1,0]])
     assert M.is_isthmus(0)
@@ -416,6 +419,8 @@ def test_tutte():
     assert M.delete(0) == Matrix([[0,1],[1,1]])
     assert M.contract(0) == Matrix([[1,1]])
     assert Matrix([[1,1]]).contract(0) == Matrix.zeros((0,1))
+
+    return
 
     #print(M)
     #print(M.get_tutte())
@@ -529,8 +534,11 @@ def test_tutte():
         lr = (l*r).nf
         assert lr==null
     
-    for l in [Relation.black(0,1), Relation.white(0,1)]:
+    for l in [Relation.black(2,2), Relation.white(2,2)]:
         print(l, l.shape)
+        print(l.nf, l.shape)
+
+    
 
 
 
