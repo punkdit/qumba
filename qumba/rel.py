@@ -406,8 +406,8 @@ def test_tutte():
     #print(ww_, ww_.shape)
 
     M = Matrix.zeros((0,1))
-    print(M.is_loop(0))
-    print(M.is_isthmus(0))
+    assert (M.is_loop(0))
+    assert not (M.is_isthmus(0))
 
     M = Matrix([[1,0],[1,0]])
     assert M.is_isthmus(0)
@@ -419,6 +419,10 @@ def test_tutte():
     assert M.delete(0) == Matrix([[0,1],[1,1]])
     assert M.contract(0) == Matrix([[1,1]])
     assert Matrix([[1,1]]).contract(0) == Matrix.zeros((0,1))
+
+    assert bb_ == ww_
+    M = (bb_b @ ww_w) * bb_
+    print(M)
 
     return
 

@@ -26,6 +26,8 @@ from qumba.matroid import detect_classical
 
 
 class IMatrix:
+    """ Matrix with arbitrary column indexes 
+    """
     def __init__(self, H, idxs=None):
         assert isinstance(H, Matrix), H.__class__
         H = H.normal_form()
@@ -547,7 +549,12 @@ def test_random_wenum():
         [1,  11,  71, 333, 1060, 1988, 1988, 1060,  333,  71,  11,   1],
     ]
 
-    for n in range(12):
+    n = argv.get("n")
+    if n is not None:
+        ns = [n]
+    else:
+        ns = list(range(12))
+    for n in ns:
       print("n=%d: "%n, end='', flush=True)
       for m in range(n//2 + 1):
       #for m in range(n+1):
