@@ -384,6 +384,8 @@ def test_linear():
 
 
 def test_tutte():
+    black = Relation.black
+    white = Relation.white
 
     I = Relation([[1]], [[1]])
     b_ = Relation([[1]], zeros(1,0))
@@ -392,10 +394,12 @@ def test_tutte():
     _b = b_.op
     _bb = bb_.op
     b_bb = bb_b.op
+    assert b_bb == black(1, 2)
 
     w_ = Relation([[0]], zeros(1,0))
     ww_ = Relation([[1,1]], zeros(1,0))
     ww_w = Relation([[1,1],[0,1]], [[0],[1]])
+    assert ww_w == white(2, 1)
 
     _w = w_.op
     _ww = ww_.op
@@ -422,7 +426,11 @@ def test_tutte():
 
     assert bb_ == ww_
     M = (bb_b @ ww_w) * bb_
-    print(M)
+
+    I = black(1,1)
+
+    op = (I @ I @ white(1,2) @ I) * (black(3,0) @ black(2,0))
+    assert M==op
 
     return
 
