@@ -14,7 +14,7 @@ from math import prod
 import numpy
 
 from qumba.default_p import DEFAULT_P
-from qumba.lin import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2,
+from qumba.lin import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2, array2,
     kernel, span, pseudo_inverse, rank, row_reduce, linear_independent, rand2, parse,
     normal_form,)
 from qumba.lin import int_scalar as scalar
@@ -535,6 +535,43 @@ class Matrix(object):
     def get_components(H):
         return get_components(H)
 
+    def get_graph(self):
+        "encode into a pynauty Graph"
+        from pynauty import Graph
+        H = self
+        rows = [v.A for v in H.span() if v.sum()]
+        V = array2(rows)
+        #print(V.sum(0)) # not much help..
+        #print("V =")
+        #print(V)
+        m, n = V.shape
+        g = Graph(n+m, True) # bits + checks
+        for bit in range(n):
+            checks = [n+check for check in range(m) if V[check, bit]]
+            g.connect_vertex(bit, checks)
+        g.set_vertex_coloring([
+            set(i for i in range(n)),
+            set(range(n, m+n))
+        ])
+        return g
+
+    def get_isomorphism(self, other):
+        "find a column permutation self-->other"
+        import pynauty
+        lhs = self.get_graph()
+        rhs = other.get_graph()
+        if not pynauty.isomorphic(lhs, rhs):
+            return None
+        # See https://github.com/pdobsan/pynauty/issues/31
+        f = pynauty.canon_label(lhs) # lhs--f-->C
+        g = pynauty.canon_label(rhs) # rhs--g-->C
+        iso = [None]*len(f)
+        for i in range(len(f)):
+            iso[f[i]] = g[i]
+        return iso
+
+
+
 
 def get_components(H): # dumb & slow XXX
     #print("get_components")
@@ -649,6 +686,48 @@ def test_pushout():
         #print(mstr(B*A.t))
         assert BAt.sum() == 0
     
+
+def test_wenum():
+
+    n = argv.get("n", 6)
+    m = argv.get("m", 3)
+
+    found = {}
+    while 1:
+
+        M = Matrix.rand(m, n)
+
+        M = M.normal_form()
+        if len(M) < m:
+            continue
+
+        w = M.get_wenum()
+        if w not in found:
+            found[w] = M
+            continue
+
+        M1 = found[w]
+        iso = M.get_isomorphism(M1)
+        if iso is not None:
+            continue
+
+        print('.', flush=True, end='')
+        p = M.get_tutte()
+        q = M1.get_tutte()
+        if p==q:
+            break
+
+    print()
+    print(M, M.get_tutte())
+    print()
+    print(M1, M1.get_tutte())
+
+    print()
+    print(M.latex("pmatrix"))
+    print(M1.latex("pmatrix"))
+    print(M.get_tutte())
+
+
 
     
 
