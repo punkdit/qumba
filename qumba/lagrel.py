@@ -12,7 +12,7 @@ https://arxiv.org/abs/2105.06244v2
 from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
 from operator import add, mul, matmul, lshift
-from random import choice, shuffle
+from random import choice, shuffle, randint
 
 import numpy
 
@@ -251,39 +251,139 @@ if 1:
     assert cnot == (w_ww@I)*(I@bb_b)
 
 
+def is_xop(op, i):
+    A = op.A
+    m, nn = A.shape
+    v = [0]*nn
+    v[2*i] = 1
+    v = Matrix([v])
+    u = A.t.solve(v.t)
+    return u is not None
+
+def is_yop(op, i):
+    A = op.A
+    m, nn = A.shape
+    v = [0]*nn
+    v[2*i:2*i+2] = [1,1]
+    v = Matrix([v])
+    u = A.t.solve(v.t)
+    return u is not None
+
+def is_zop(op, i):
+    A = op.A
+    m, nn = A.shape
+    v = [0]*nn
+    v[2*i+1] = 1
+    v = Matrix([v])
+    u = A.t.solve(v.t)
+    return u is not None
+
+
+def delete(op, i):
+    A = op.A
+    A = A.puncture(2*i)
+    A = A.puncture(2*i)
+    A = A.linear_independent()
+    op = Lagrangian.subspace(A)
+    assert op.is_lagrangian()
+    return op
+
+
+def get_tutte(op, R=None, depth=0):
+    assert 0, "FAIL"
+    if R is None:
+        from sage import all_cmdline as sage
+        R = sage.PolynomialRing(sage.ZZ, list("xyz"))
+
+    #print("get_tutte", depth)
+    #print(op, op.shape)
+
+    x, y, z = R.gens()
+    n = op.shape[0]
+
+    if n:
+        i = randint(0, n-1)
+
+    if n==0:
+        p = 1
+
+    elif is_xop(op, i):
+        op = delete(op, i)
+        p = x * get_tutte(op, R, depth+1)
+
+    elif is_yop(op, i):
+        op = delete(op, i)
+        #p = y * get_tutte(op, R, depth+1) # ???
+        p = (x*z)*get_tutte(op, R, depth+1) # ???
+
+    elif is_zop(op, i):
+        op = delete(op, i)
+        p = z * get_tutte(op, R, depth+1)
+
+    else:
+        xop = [I] * n
+        xop[i] = _b
+        xop = reduce(matmul, xop)
+
+        yop = [I] * n
+        yop[i] = _b1
+        yop = reduce(matmul, yop)
+
+        zop = [I] * n
+        zop[i] = _w
+        zop = reduce(matmul, zop)
+
+        xop = xop*op
+        assert xop.shape[0] == n-1
+        xp = get_tutte(xop, R, depth+1)
+
+        yop = yop*op
+        assert yop.shape[0] == n-1
+        yp = get_tutte(yop, R, depth+1)
+
+        zop = zop*op
+        assert zop.shape[0] == n-1
+        zp = get_tutte(zop, R, depth+1)
+
+        p = xp+yp+zp # ???
+        #p = xp+zp # ???
+
+
+    return p
 
 
 def test_tutte():
 
-#    L = Lagrangian([[0,1]], zeros(1,2))
-#
-#    for op in [ L, _b, b_, _w, w_, _w1]:
-#        print(op.nf, op.shape)
-#        assert op.is_lagrangian()
+    rel = b_ @ w_
+    assert not is_xop(rel, 0)
+    assert is_xop(rel, 1)
+    assert not is_yop(rel, 0)
+    assert not is_yop(rel, 1)
+    assert is_zop(rel, 0)
+    assert not is_zop(rel, 1)
 
-    prop = set(Lagrangian.all_rels(1, 1))
-    for a in prop:
-        #print(a, a.shape)
-        for b in prop:
-            assert a*b in prop
+    rel = bb_b * b_
+    for i in range(2):
+        assert not is_xop(rel, i)
+        assert not is_yop(rel, i)
+        assert not is_zop(rel, i)
 
-    x = (b_*_b) @ I
-    z = (w_*_w) @ I
-
-    for L in Lagrangian.all_rels(2, 0):
-        print(L, L.shape)
-        op = x*L
-        print(op.nf, op.shape)
+    for n in [1,2,3]:
+        found = set()
+        for op in Lagrangian.all_rels(n,0):
+            #print(op)
+            #print([is_xop(op, 0), is_xop(op, 1)])
+    
+            p = get_tutte(op)
+            q = get_tutte(op)
+            assert p==q, "%s != %s"%(p, q)
+            if p in found:
+                continue
+            found.add(p)
+            print(p)
+    
+        print(len(found))
         print()
-        
-
-    return
-
-    n = 3
-    for L in Lagrangian.all_rels(n, 0):
-        print(L, L.shape)
-        p = L.get_tutte()
-        print(p)
 
 
 
