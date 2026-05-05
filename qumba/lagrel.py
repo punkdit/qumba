@@ -386,6 +386,71 @@ def test_tutte():
         print()
 
 
+def FAIL_generating_poly(A):
+    m, nn = A.shape
+    n = nn//2
+    from sage import all_cmdline as sage
+    R = sage.PolynomialRing(sage.ZZ, list("xy"))
+    x, y = R.gens()
+    p = 0
+    for bits in numpy.ndindex((2,)*n):
+        idxs = []
+        for i,bit in enumerate(bits):
+            if bit:
+                idxs.append(2*i)
+                idxs.append(2*i+1)
+        B = A[:, idxs]
+        B = B.row_reduce()
+        left = len(A) - len(B)
+        right = sum(bits) - len(B)
+        if right< 0:
+            print(A)
+            print(bits)
+            print(idxs)
+            print(B)
+        assert right>=0
+        p += (x-1)**left * (y-1)**right
+    return p
+
+
+def generating_poly(A):
+    # not great: pauli Y != Z == X
+    # but it is monoidal
+    m, nn = A.shape
+    n = nn//2
+    from sage import all_cmdline as sage
+    R = sage.PolynomialRing(sage.ZZ, list("xy"))
+    x, y = R.gens()
+    p = 0
+    for bits in numpy.ndindex((2,)*nn):
+        for i in range(n):
+            if bits[2*i] and bits[2*i+1]:
+                break
+        else:
+            idxs = [i for i,bit in enumerate(bits) if bit]
+            B = A[:, idxs]
+            B = B.row_reduce()
+            left = len(A) - len(B)
+            right = sum(bits) - len(B)
+            #p += (x-1)**left * (y-1)**right # has -ve coefficients
+            p += x**left * y**right
+    return p
+
+
+def test_char():
+
+    for n in [1,2,3,4]:
+        found = set()
+        for op in Lagrangian.all_rels(n, 0):
+            A = op.A
+            p = generating_poly(A)
+            #print(A, p)
+            if p not in found:
+                print(op)
+                print(p)
+            found.add(p)
+        print(len(found))
+
 
 
 def detect(lhs, rhs):
