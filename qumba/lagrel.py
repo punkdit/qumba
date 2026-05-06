@@ -438,6 +438,8 @@ def generating_poly(A):
 
 
 def test_char():
+    # maybe we want to use polymatroids:
+    # https://arxiv.org/abs/2207.04421 etc.
 
     for n in [1,2,3,4]:
         found = set()
