@@ -203,7 +203,7 @@ def parse(s):
 
 
 def shortstr(A, deco=False, zero='.'):
-    A = array2(A)
+    A = numpy.array(A)
     A = A.view()
     assert len(A.shape)<=2
     #if 1 in A.shape:
@@ -1351,7 +1351,7 @@ def fromkernel(J, check=False):
     return f
 
 
-def pushout(J, K, J1=None, K1=None, check=False):
+def pushout(J, K, J1=None, K1=None, p=2, check=False):
     """
     Return JJ,KK given J and K in the following diagram:
 
@@ -1367,6 +1367,7 @@ def pushout(J, K, J1=None, K1=None, check=False):
     return unique arrow F : B+C/~ --> T (st. F*JJ=J1 and F*KK=K1).
     """
     assert J.shape[1] == K.shape[1]
+    assert p==2, "not implemented"
 
     b, c = J.shape[0], K.shape[0]
     JJ = zeros2(b+c, b)

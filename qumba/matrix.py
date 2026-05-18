@@ -15,8 +15,9 @@ import numpy
 
 from qumba.default_p import DEFAULT_P
 from qumba.lin import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2, array2,
-    kernel, span, pseudo_inverse, rank, linear_independent, rand2, parse)
-from qumba.linp import row_reduce, normal_form, rand
+    span, pseudo_inverse, rank, linear_independent, rand2, parse)
+from qumba.linp import row_reduce, normal_form, rand, kernel
+from qumba import linp
 from qumba.lin import int_scalar as scalar
 from qumba import lin
 from qumba.action import mulclose
@@ -121,7 +122,6 @@ class Matrix(object):
     @classmethod
     def rand(cls, m, n, p=DEFAULT_P):
         A = rand(m, n, p)
-        print(A)
         return Matrix(A, p)
 
     def to_perm(self):
@@ -145,7 +145,6 @@ class Matrix(object):
         return Matrix(A, p, name="0")
 
     def __str__(self):
-        assert self.p == 3
         if len(self.shape) <= 2:
             return shortstr(self.A)
         else:
@@ -237,7 +236,7 @@ class Matrix(object):
 
     def __mul__(self, other):
         if isinstance(other, Matrix):
-            assert self.p == other.p
+            assert self.p == other.p, (self.p, other.p)
             A = numpy.dot(self.A, other.A)
             if A.shape == ():
                 return A%self.p
@@ -311,7 +310,7 @@ class Matrix(object):
         return B
 
     def kernel(self):
-        K = kernel(self.A)
+        K = kernel(self.A, self.p)
         K = Matrix(K, self.p)
         return K
 
@@ -611,26 +610,33 @@ def get_components(H): # dumb & slow XXX
 
 def pushout(j, k, j1=None, k1=None):
     assert j.shape[1] == k.shape[1]
+    assert j.p == k.p
+    if j.p == 2:
+        pushout = lin.pushout
+    else:
+        pushout = linp.pushout
+
     J = j.A
     K = k.A
     if j1 is not None:
         J1 = j1.A
         K1 = k1.A
-        JJ, KK, F = lin.pushout(J, K, J1, K1)
-        jj = Matrix(JJ)
-        kk = Matrix(KK)
-        f = Matrix(F)
+        JJ, KK, F = pushout(J, K, J1, K1, p=j.p)
+        jj = Matrix(JJ, p=j.p)
+        kk = Matrix(KK, p=j.p)
+        f = Matrix(F, p=j.p)
         return jj, kk, f
 
     else:
-        JJ, KK = lin.pushout(J, K)
-        jj = Matrix(JJ)
-        kk = Matrix(KK)
+        JJ, KK = pushout(J, K, p=j.p)
+        jj = Matrix(JJ, p=j.p)
+        kk = Matrix(KK, p=j.p)
         return jj, kk
 
 
 def pullback(j, k, j1=None, k1=None):
     assert j.shape[0] == k.shape[0]
+
     if j1 is not None:
         jj, kk, f = pushout(j.t, k.t, j1.t, k1.t)
         return jj.t, kk.t, f.t
@@ -693,16 +699,16 @@ def test_tutte():
     n = argv.get("n", 4)
     m = argv.get("m", 2)
 
-    found = {}
-    for i in range(10):
+    found = set()
+    for i in range(100):
 
         M = Matrix.rand(m, n, q)
-        print(M, M.p)
         M = M.normal_form()
-
         p = M.get_tutte()
-
-        print(M.A, p)
+        if p in found:
+            continue
+        found.add(p)
+        print(M, p)
         print()
 
 

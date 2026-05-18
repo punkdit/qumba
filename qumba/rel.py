@@ -42,13 +42,16 @@ class Relation:
     """ A linear relation
     """
 
-    def __init__(self, left, right=None, p=2):
-        left = Matrix.promote(left)
+    def __init__(self, left, right=None, p=None):
+        left = Matrix.promote(left, p)
         if right is None:
-            right = Matrix.identity(left.shape[0])
+            right = Matrix.identity(left.shape[0], p)
         else:
-            right = Matrix.promote(right)
+            right = Matrix.promote(right, p)
         assert left.shape[0] == right.shape[0], "%s %s"%(left.shape, right.shape)
+        if p is None:
+            p = left.p
+        assert left.p == right.p == p
         self._left = left
         self._right = right
         #if left.shape[1] or right.shape[1]: # ?!?!
@@ -75,7 +78,7 @@ class Relation:
         if len(r.shape)==1:
             n = len(r)
             r = r.reshape(1, n)
-        null = Matrix.zeros(0,0).reshape(r.shape[0],0)
+        null = Matrix.zeros(0,self.p).reshape(r.shape[0],0)
         r = Relation(r, null)
         self = Relation(self.left, self.right)
         op = self*r
@@ -87,7 +90,7 @@ class Relation:
         if len(l.shape)==1:
             n = len(l)
             l = l.reshape(1, n)
-        null = Matrix.zeros(0,0).reshape(l.shape[0],0)
+        null = Matrix.zeros(0,self.p).reshape(l.shape[0],0)
         l = Relation(null, l)
         self = Relation(self.left, self.right)
         op = l*self
@@ -100,12 +103,12 @@ class Relation:
         for i in range(n):
             v = [0]*n
             v[i] = 1
-            v = Matrix(v).reshape(1,n)
+            v = Matrix(v, self.p).reshape(1,n)
             u = self.get_left(v)
             assert len(u)==1, "not invertible ...?"
             u = u.reshape(n)
             rows.append(u)
-        U = Matrix(rows)
+        U = Matrix(rows, self.p)
         return U
 
     @classmethod
@@ -123,7 +126,7 @@ class Relation:
         a = numpy.zeros((n-1, n), dtype=int)
         for i in range(n-1):
             a[i, i] = 1
-            a[i, i+1] = -1
+            a[i, i+1] = p-1
         A = Matrix(a, p)
         return Relation(A[:, :tgt], A[:, tgt:], p)
 
@@ -182,27 +185,26 @@ class Relation:
         return hash((self.left, self.right))
 
     def __mul__(lhs, rhs):
-        #assert isinstance(rhs, lhs.__class__)
         rhs = lhs.promote(rhs)
-        #print()
-        #print(lhs, "*")
-        #print(rhs)
         assert lhs.src == rhs.tgt, (lhs.src, rhs.tgt)
+        assert lhs.p == rhs.p
         l, r = pullback(lhs.right.t, rhs.left.t)
         left = lhs.left.t * l
         right = rhs.right.t * r
         return lhs.__class__(left.t, right.t)
 
     def __rmul__(self, other):
-        other = self.__class__(other)
+        other = self.__class__(other, p=self.p)
         return other.__mul__(self)
 
     def __matmul__(lhs, rhs):
+        assert lhs.p == rhs.p
         left = lhs.left.direct_sum(rhs.left)
         right = lhs.right.direct_sum(rhs.right)
         return lhs.__class__(left, right)
 
     def __lshift__(lhs, rhs):
+        assert lhs.p == rhs.p
         left = lhs.left << rhs.left
         right = lhs.right << rhs.right
         return lhs.__class__(left, right)
@@ -213,13 +215,17 @@ class Relation:
         return self.__class__(self.right, self.left)
 
     @classmethod
-    def get_swap(cls):
+    def get_swap(cls, p=2):
         z = zeros(2,2)
-        i = Matrix.identity(2)
+        i = Matrix.identity(2, p)
         l = z.concatenate(i)
         r = i.concatenate(z)
         swap = Relation(i, [[0,1],[1,0]])
         return swap
+
+black = Relation.black
+white = Relation.white
+
 
 def all_linear(tgt, src):
     for idxs in numpy.ndindex((2,)*(tgt*src)):
@@ -550,6 +556,24 @@ def test_tutte():
         print(l, l.shape)
         print(l.nf, l.shape)
 
+    
+def test_linp():
+
+    q = 3
+    lhs = Relation([[1]], [[2,1]], q)
+    assert lhs.p == q
+
+    rhs = Relation([[1,1]], [[1]], q)
+    assert rhs.p == q
+    rel = (lhs*rhs)
+    other = (Relation.white(0,1,p=q) @ Relation.white(1,0,p=q))
+    assert rel == other
+
+    q = 2
+
+    op = (white(2,1) @ black(2,1)) * black(2,0)
+    print(op.left)
+    print(op.left.get_tutte())
     
 
 
