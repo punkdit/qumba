@@ -15,8 +15,8 @@ import numpy
 
 from qumba.default_p import DEFAULT_P
 from qumba.lin import (shortstr, dot2, identity2, eq2, intersect, direct_sum, zeros2, array2,
-    kernel, span, pseudo_inverse, rank, row_reduce, linear_independent, rand2, parse,
-    normal_form,)
+    kernel, span, pseudo_inverse, rank, linear_independent, rand2, parse)
+from qumba.linp import row_reduce, normal_form, rand
 from qumba.lin import int_scalar as scalar
 from qumba import lin
 from qumba.action import mulclose
@@ -100,7 +100,7 @@ class Matrix(object):
     def reshape(self, *shape):
         A = self.A
         A = A.reshape(*shape)
-        return Matrix(A)
+        return Matrix(A, self.p)
 
     @classmethod
     def einsum(cls, desc, *args):
@@ -119,9 +119,10 @@ class Matrix(object):
     get_perm = perm
 
     @classmethod
-    def rand(cls, m, n):
-        A = rand2(m, n)
-        return Matrix(A)
+    def rand(cls, m, n, p=DEFAULT_P):
+        A = rand(m, n, p)
+        print(A)
+        return Matrix(A, p)
 
     def to_perm(self):
         A = self.A
@@ -144,6 +145,7 @@ class Matrix(object):
         return Matrix(A, p, name="0")
 
     def __str__(self):
+        assert self.p == 3
         if len(self.shape) <= 2:
             return shortstr(self.A)
         else:
@@ -315,12 +317,12 @@ class Matrix(object):
 
     def pseudo_inverse(self):
         A = pseudo_inverse(self.A)
-        return Matrix(A)
+        return Matrix(A, self.p)
     __invert__ = pseudo_inverse
 
     def solve(self, other):
         A = lin.solve(self.A, other.A)
-        return Matrix(A) if A is not None else None
+        return Matrix(A, self.p) if A is not None else None
 
     def where(self):
         return list(zip(*numpy.where(self.A))) # list ?
@@ -342,39 +344,37 @@ class Matrix(object):
         m, n = self.A.shape
         for u in numpy.ndindex((self.p,)*m):
             v = numpy.dot(u, self.A)
-            v = Matrix(v)
+            v = Matrix(v, self.p)
             yield v
 
     def rowspan(self):
         m, n = self.A.shape
         for u in span(self.A):
             u.shape = 1, n
-            u = Matrix(u)
+            u = Matrix(u, self.p)
             yield u
 
     def rank(self):
         assert self.p == 2, "not implemented"
         return rank(self.A)
 
-    def row_reduce(self):
-        assert self.p == 2, "not implemented"
-        A = row_reduce(self.A)
-        return Matrix(A)
+    def row_reduce(self, truncate=True):
+        A = row_reduce(self.A, self.p, truncate)
+        return Matrix(A, self.p)
 
     def normal_form(self, truncate=True):
-        assert self.p == 2, "not implemented"
-        A = normal_form(self.A, truncate)
-        return Matrix(A)
+        A = normal_form(self.A, self.p, truncate)
+        return Matrix(A, self.p)
 
     def linear_independent(self):
         assert self.p == 2, "not implemented"
         A = linear_independent(self.A)
-        return Matrix(A)
+        return Matrix(A, self.p)
 
     def intersect(self, other):
         assert self.p == 2, "not implemented"
         A = intersect(self.A, other.A)
-        return Matrix(A)
+        return Matrix(A, self.p)
 
     def get_projector(A):
         "project onto the colspace"
@@ -685,6 +685,28 @@ def test_pushout():
         BAt = B*A.t
         #print(mstr(B*A.t))
         assert BAt.sum() == 0
+
+
+def test_tutte():
+
+    q = argv.get("q", 3)
+    n = argv.get("n", 4)
+    m = argv.get("m", 2)
+
+    found = {}
+    for i in range(10):
+
+        M = Matrix.rand(m, n, q)
+        print(M, M.p)
+        M = M.normal_form()
+
+        p = M.get_tutte()
+
+        print(M.A, p)
+        print()
+
+
+
     
 
 def test_wenum():
