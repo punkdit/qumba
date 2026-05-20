@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """
 linear algebra over Z/2
+
+for Z/p see linp.py
 """
 
 

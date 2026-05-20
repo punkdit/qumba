@@ -469,7 +469,7 @@ def projector(A, p, check=False):
 
 
 
-def pushout(J, K, p, check=False):
+def pushout(J, K, p, J1=None, K1=None, check=False):
     """
     Return JJ,KK given J and K in the following diagram:
 
@@ -485,6 +485,8 @@ def pushout(J, K, p, check=False):
     return unique arrow F : B+C/~ --> T (st. F*JJ=J1 and F*KK=K1).
     """
     assert J.shape[1] == K.shape[1]
+    assert type(p) is int
+    assert 1<p
 
     b, c = J.shape[0], K.shape[0]
     JJ = zeros(b+c, b)
@@ -502,6 +504,30 @@ def pushout(J, K, p, check=False):
 
     JJ = compose(JJ, R, p=p)
     KK = compose(KK, R, p=p)
+
+    if J1 is not None:
+        assert K1 is not None
+        assert J1.shape[0] == K1.shape[0]
+        assert eq(compose(J, J1, p=p), compose(K, K1, p=p), p=p)
+        m = J1.shape[0]
+        n = R.shape[0]
+        F = zeros(m, n)
+
+        Rinv = pseudo_inverse(R, p=p, check=check)
+
+        for i in range(n):
+            r = Rinv[:, i]
+            u, v = r[:b], r[b:]
+            u = xdot(J1, u, p=p)
+            v = xdot(K1, v, p=p)
+            #assert eq(u, v)
+            uv = (u+v)%p
+            F[:, i] = uv
+
+        assert eq(compose(JJ, F, p=p), J1, p=p)
+        assert eq(compose(KK, F, p=p), K1, p=p)
+
+        return JJ, KK, F # <--------------- return
 
     return JJ, KK
 
@@ -537,9 +563,6 @@ def test_pseudoinverse():
         assert eq(PLU, A, p)
         #print()
 
-    return
-
-    # FAIL:
     for (m,n) in [(2,3)]:
       for bits in numpy.ndindex((p,)*m*n):
         A = array(bits)
@@ -551,10 +574,32 @@ def test_pseudoinverse():
         BAB = xdot(B, A, B, p=p)
         assert eq(A, ABA, p=p)
         assert eq(B, BAB, p=p)
-        #i = int( eq(AB.transpose(), AB) )
-        #j = int( eq(BA.transpose(), BA) )
-        #print(i,j,end=" ")
-    print()
+
+    print("OK")
+
+
+def test_pushout():
+
+    p = 3
+    J = zeros(2, 1)
+    J[0, 0] = 1
+    K = zeros(2, 1)
+    K[1, 0] = 1
+
+    JJ, KK = pushout(J, K, p)
+
+    #print shortstrx(JJ, KK)
+
+    assert eq(compose(J, JJ, p=p), compose(K, KK, p=p), p=p)
+
+    J1, K1 = JJ, KK
+
+    JJ, KK, F = pushout(J, K, p, J1, K1)
+
+    #print
+    #print shortstr(F)
+    assert eq(F, identity(3), p=p)
+
 
 
 
@@ -635,7 +680,7 @@ if __name__ == "__main__":
 
     profile = argv.profile
     name = argv.next() or "test"
-    _seed = argv.get("seed", 0)
+    _seed = argv.get("seed")
     if _seed is not None:
         print("seed(%s)"%(_seed))
         seed(_seed)
