@@ -2509,6 +2509,11 @@ def test_tutte():
 #      print()
 
 
+def test_wenum():
+    code = get_422()
+    css = code.to_css()
+    print(css.longstr())
+
 
 def test():
     print("\ntest()")
