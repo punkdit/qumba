@@ -2509,11 +2509,12 @@ def test_tutte():
 #      print()
 
 
-def test_wenum():
-    code = get_422()
-    css = code.to_css()
+def test_603():
+    #code = get_422()
+    #css = code.to_css()
     #print(css.longstr())
 
+    # 422 encoder = 603
     E = Matrix.parse("""
     1.1..1
     .11.1.
@@ -2533,6 +2534,68 @@ def test_wenum():
             print(g)
     H = Group(stab)
     print(H.structure_description())
+
+
+def test_804():
+    E = Matrix.parse("""
+    1.1.1.1.
+    11..11..
+    1111....
+    11111111
+    """)
+
+    E = E.normal_form()
+    print(E)
+
+    E = Matrix.parse("""
+    1..1.11.
+    .11.1..1
+    ..11..11
+    ....1111
+    """)
+
+    items = []
+    for v in E.rowspan():
+        print(v)
+        if v.sum():
+            #print(v)
+            items.append(v)
+    print(len(items))
+    print()
+
+    from qumba.util import choose
+    count = 0
+    for quad in choose(items, 4):
+        count += 1
+        H = Matrix.concatenate(*quad)
+        if H.rank() < 4:
+            continue
+        cs = list(int(i) for i in  H.sum(0))
+        if cs[:2] != [3,3]:
+            continue
+        cs = [i for i in cs if i>2]
+        if cs != [3,3]:
+            continue
+        print(cs)
+        print(H)
+        print()
+
+    return
+    
+    N, perms = E.get_autos()
+    from bruhat.gset import Group, Perm
+    print(perms)
+    gens = [Perm(perm) for perm in perms]
+    G = Group.generate(gens)
+    print(G)
+    print(G.structure_description()) # (C2 x C2 x C2) : PSL(3,2)
+    stab = []
+    for g in G:
+        if g[0] == 0:
+            stab.append(g)
+    H = Group(stab)
+    print(H.structure_description()) # PSL(3,2)
+    print(len(H))
 
 
 
