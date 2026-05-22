@@ -569,6 +569,18 @@ class Matrix(object):
             iso[f[i]] = g[i]
         return iso
 
+    def get_autos(self):
+        m, n = self.shape
+        assert m <= 20, ("um... %s is too big ??"%(m))
+        from pynauty import Graph, autgrp
+        g = self.get_graph()
+        aut = autgrp(g)
+        gen = aut[0]
+        N = int(aut[1])
+        return N, gen
+
+
+
 
 
 

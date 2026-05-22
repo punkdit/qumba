@@ -2512,7 +2512,28 @@ def test_tutte():
 def test_wenum():
     code = get_422()
     css = code.to_css()
-    print(css.longstr())
+    #print(css.longstr())
+
+    E = Matrix.parse("""
+    1.1..1
+    .11.1.
+    ...111""")
+
+    N, perms = E.get_autos()
+    from bruhat.gset import Group, Perm
+    print(perms)
+    gens = [Perm(perm) for perm in perms]
+    G = Group.generate(gens)
+    print(G)
+    print(G.structure_description())
+    stab = []
+    for g in G:
+        if g[0] == 0:
+            stab.append(g)
+            print(g)
+    H = Group(stab)
+    print(H.structure_description())
+
 
 
 def test():
