@@ -2563,24 +2563,25 @@ def test_804():
     print(len(items))
     print()
 
-    from qumba.util import choose
-    count = 0
-    for quad in choose(items, 4):
-        count += 1
-        H = Matrix.concatenate(*quad)
-        if H.rank() < 4:
-            continue
-        cs = list(int(i) for i in  H.sum(0))
-        if cs[:2] != [3,3]:
-            continue
-        cs = [i for i in cs if i>2]
-        if cs != [3,3]:
-            continue
-        print(cs)
-        print(H)
-        print()
-
-    return
+    if 0:
+        from qumba.util import choose
+        count = 0
+        for quad in choose(items, 4):
+            count += 1
+            H = Matrix.concatenate(*quad)
+            if H.rank() < 4:
+                continue
+            cs = list(int(i) for i in  H.sum(0))
+            if cs[:2] != [3,3]:
+                continue
+            cs = [i for i in cs if i>2]
+            if cs != [3,3]:
+                continue
+            print(cs)
+            print(H)
+            print()
+    
+        return
     
     N, perms = E.get_autos()
     from bruhat.gset import Group, Perm
