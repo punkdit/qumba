@@ -2545,7 +2545,6 @@ def test_804():
     """)
 
     E = E.normal_form()
-    print(E)
 
     E = Matrix.parse("""
     1..1.11.
@@ -2556,7 +2555,8 @@ def test_804():
 
     items = []
     for v in E.rowspan():
-        print(v)
+        if v.sum() == 4:
+            print(v)
         if v.sum():
             #print(v)
             items.append(v)
@@ -2566,20 +2566,16 @@ def test_804():
     if 0:
         from qumba.util import choose
         count = 0
-        for quad in choose(items, 4):
+        for m in range(4, 10):
+          for quad in choose(items, m):
             count += 1
             H = Matrix.concatenate(*quad)
             if H.rank() < 4:
                 continue
             cs = list(int(i) for i in  H.sum(0))
-            if cs[:2] != [3,3]:
-                continue
-            cs = [i for i in cs if i>2]
-            if cs != [3,3]:
-                continue
-            print(cs)
-            print(H)
-            print()
+            if cs == [3]*8:
+                print(H, H.shape, cs)
+                print()
     
         return
     
