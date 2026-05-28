@@ -577,7 +577,8 @@ class Matrix(object):
         aut = autgrp(g)
         gen = aut[0]
         N = int(aut[1])
-        return N, gen
+        perms = [perm[:n] for perm in gen]
+        return N, perms
 
 
 

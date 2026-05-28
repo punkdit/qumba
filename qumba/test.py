@@ -2510,19 +2510,29 @@ def test_tutte():
 
 
 def test_603():
-    #code = get_422()
-    #css = code.to_css()
-    #print(css.longstr())
-
     # 422 encoder = 603
     E = Matrix.parse("""
-    1.1..1
+    1..1.1
+    .1.11.
+    ..1.11""")
+    F = Matrix.parse("""
+    11.1..
     .11.1.
-    ...111""")
+    1.1..1""")
 
-    N, perms = E.get_autos()
+    N, perms = F.get_autos()
+    assert N == 24
+
+    for perm in perms:
+        print(perm)
+        E0 = E[:, perm]
+        print(E0)
+        f = E.t.solve(E0.t)
+        assert f is not None
+
+    #return
+
     from bruhat.gset import Group, Perm
-    print(perms)
     gens = [Perm(perm) for perm in perms]
     G = Group.generate(gens)
     print(G)
@@ -2533,7 +2543,7 @@ def test_603():
             stab.append(g)
             print(g)
     H = Group(stab)
-    print(H.structure_description())
+    print("point stabilizer:", H.structure_description())
 
 
 def test_804():
