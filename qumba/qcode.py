@@ -214,7 +214,7 @@ class QCode(object):
     def __getattr__(self, name):
         if name in self.attrs:
             return self.attrs[name]
-        raise AttributeError
+        raise AttributeError( repr(name) )
 
     def __eq__(self, other):
         assert isinstance(other, QCode)

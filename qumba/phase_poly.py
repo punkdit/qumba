@@ -85,7 +85,7 @@ class Op:
                     m *= v[idx]
                 a += r*m
             a %= N
-            print(v, a)
+            yield v, a
     
 
 
@@ -255,6 +255,40 @@ def test():
     g.act(HLx)
 
 
+
+def test_unwrap():
+
+    from qumba.unwrap import Cover
+
+    code = construct.get_513()
+    #code = construct.get_412()
+    cover = Cover.frombase(code)
+
+    print(cover.fibers)
+    print(cover.total)
+
+    css = cover.total.to_css()
+
+    space = Diag(css.n)
+    Z = space.Z
+    CZ = space.CZ
+    I = space.get_identity()
+
+    op = I
+    for (i,j) in cover.fibers:
+        op = op*CZ(i,j)
+
+    print(cover.total.longstr())
+
+    Hx = Matrix(css.Hx)
+    Lx = Matrix(css.Lx)
+    HLx = Hx.concatenate(Lx)
+    for (a,v) in op.act(Hx):
+        print(a,v)
+
+
+
+
 def main_tensor():
     H = Matrix([[1,1]])
     Ht = H.t
@@ -334,6 +368,86 @@ def parse(n, stabs):
     return css
         
     
+
+
+
+def main_vasmer():
+    # https://arxiv.org/abs/1801.04255
+    # Appendix A
+    n = 12
+    stabs = """
+    X5X6X7X8X9X10X11X12,
+    X1X3X5, X2X4X7,
+    Z6Z9, Z6Z10,
+    Z8Z11, Z8Z12,
+    Z1Z5Z6, Z2Z6Z7,
+    Z4Z7Z8, Z3Z5Z8"""
+
+    C0 = parse(n, stabs)
+    print(C0)
+    #print(C0.longstr())
+
+    stabs = """
+    X1X5X6X9, X2X6X7X10,
+    X3X5X8X11, X4X7X8X12,
+    Z1Z3Z5, Z1Z2Z6,
+    Z2Z4Z7, Z3Z4Z8,
+    Z5Z9Z11, Z6Z9Z10,
+    Z7Z10Z12"""
+
+    C1 = parse(n, stabs)
+    print(C1)
+    #print(C1.longstr())
+
+    stabs = """
+    X1X2X3X4X5X6X7X8,
+    X6X9X10, X8X11X12,
+    Z1Z5, Z3Z5,
+    Z2Z7, Z4Z7,
+    Z5Z8Z11, Z5Z6Z9,
+    Z6Z7Z10, Z7Z8Z12"""
+
+    C2 = parse(n, stabs)
+    print(C2)
+    #print(C2.longstr())
+
+    code = C0+C1+C2
+    code.bz_distance()
+
+    print(code)
+
+
+    n = code.n
+    space = Diag(n)
+
+    Z = space.Z
+    CZ = space.CZ
+    CCZ = space.CCZ
+    I = space.get_identity()
+
+    op = I
+    for i in range(12):
+        op = op*CCZ(i, 12+i, 24+i)
+
+    Hx = Matrix(code.Hx)
+    Hz = Matrix(code.Hz)
+    print(Hx, Hx.shape)
+    print(op)
+
+    Hzt = Hz.t
+    print("act:")
+    for v,a in op.act(Hx):
+        #if v.sum() and Hzt.solve(v) is not None:
+        #    print(v, "found")
+        #    break
+        if a==0:
+            continue
+        print(v) #, Hzt.solve(v) is not None)
+    print("done")
+
+
+
+
 
 
 def test_vasmer():
