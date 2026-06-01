@@ -72,6 +72,22 @@ class Op:
             op = op*self
         return op
 
+    def act(self, Hx):
+        level = self.level
+        N = 2**level
+        items = self.items
+        m, n = Hx.shape
+        for v in Hx.span():
+            a = 0
+            for (idxs,r) in items.items():
+                m = 1
+                for idx in idxs:
+                    m *= v[idx]
+                a += r*m
+            a %= N
+            print(v, a)
+    
+
 
 class Diag:
     def __init__(self, n, level=1):
@@ -144,11 +160,24 @@ class Diag:
 
 def test():
 
-    #code = construct.get_832()
+    n = 3
+    space = Diag(n, 2)
+    Z = space.Z
+    CZ = space.CZ
+    CCZ = space.CCZ
+    I = space.get_identity()
+
+    Hx = Matrix([[1,0,0],[0,1,0],[0,0,1]])
+    print(Hx)
+    g = Z(2)*CZ(0,2)*CZ(1,2)*CCZ(0,1,2)
+    g.act(Hx)
+
+    #return
+
     code = construct.get_713()
+    code = construct.get_10_2_3()
 
     n = code.n
-
     space = Diag(n, 2)
     Z = space.Z
     S = space.S
@@ -173,17 +202,57 @@ def test():
     assert g**3 != I
     assert g**4 == I
 
-
-    print(code)
-    print(code.longstr())
-
     css = code.to_css()
     Hx = Matrix(css.Hx)
+    g = reduce(mul, [S(i) for i in range(n)])
+    g.act(Hx)
 
-    for v in Hx.span():
-        print(v)
+    # ---------------------------
 
+    code = construct.get_832()
+    """
+    L =
+    XX..XX..
+    .Z.Z....
+    .X.X.X.X
+    ZZ......
+    XXXX....
+    .Z...Z..
 
+    Lx =
+    XX..XX..
+    .X.X.X.X
+    XXXX....
+    =
+    .XX.X..X
+    """
+
+    n = code.n
+    space = Diag(n, 3)
+    Z = space.Z
+    S = space.S
+    T = space.T
+    CS = space.CS
+    CZ = space.CZ
+    I = space.get_identity()
+
+    print(code.longstr())
+    css = code.to_css()
+    Hx = Matrix(css.Hx)
+    Lx = Matrix(css.Lx)
+    HLx = Hx.concatenate(Lx)
+    ops = [None]*n
+    idxs = [1,2,4,7]
+    for i in range(n):
+        if i in idxs:
+            ops[i] = T(i)**7
+        else:
+            ops[i] = T(i)
+    for g in ops:
+        print(g)
+    g = reduce(mul, ops)
+    print(g)
+    g.act(HLx)
 
 
 if __name__ == "__main__":
