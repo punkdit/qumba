@@ -77,7 +77,10 @@ class Op:
         N = 2**level
         items = self.items
         m, n = Hx.shape
-        for v in Hx.span():
+        #for v in Hx.span():
+        for u in numpy.ndindex((2,)*m):
+            u = Matrix(u)
+            v = u*Hx
             a = 0
             for (idxs,r) in items.items():
                 m = 1
@@ -85,7 +88,7 @@ class Op:
                     m *= v[idx]
                 a += r*m
             a %= N
-            yield v, a
+            yield u, a
     
 
 
@@ -261,13 +264,11 @@ def test_unwrap():
     from qumba.unwrap import Cover
 
     code = construct.get_513()
-    #code = construct.get_412()
+    code = construct.get_412()
     cover = Cover.frombase(code)
 
-    print(cover.fibers)
-    print(cover.total)
-
-    css = cover.total.to_css()
+    code = cover.total
+    css = code.to_css()
 
     space = Diag(css.n)
     Z = space.Z
@@ -278,14 +279,49 @@ def test_unwrap():
     for (i,j) in cover.fibers:
         op = op*CZ(i,j)
 
-    print(cover.total.longstr())
+    print(code)
+    print(code.longstr())
 
     Hx = Matrix(css.Hx)
     Lx = Matrix(css.Lx)
-    HLx = Hx.concatenate(Lx)
-    for (a,v) in op.act(Hx):
-        print(a,v)
+    A = Lx.concatenate(Hx)
+    A = Hx
+    for (v,a) in op.act(A):
+        print(v, v*A,a)
 
+    # -------------------
+
+    from qumba.symplectic import SymplecticSpace
+    space = SymplecticSpace(css.n)
+    CZ = space.CZ
+
+    op = space.get_identity()
+    for (i,j) in cover.fibers:
+        op = op*CZ(i,j)
+
+    dode = op*code
+    print(dode)
+    print(dode.longstr())
+    print(dode.is_equiv(code))
+
+    return
+
+    # -------------------
+
+    from qumba.clifford import Clifford
+
+    P = code.get_projector()
+    print(P.shape)
+    assert P*P == P
+
+    space = Clifford(css.n)
+    CZ = space.CZ
+
+    op = space.get_identity()
+    for (i,j) in cover.fibers:
+        op = op*CZ(i,j)
+
+    print(op*P == P*op)
 
 
 
