@@ -1622,6 +1622,19 @@ def test_422():
     print(rel*v)
     
 
+def test_measure():
+
+    m = Module(2)
+    MZ, PZ = m.MZ, m.PZ
+
+    #op = PZ(0)*MZ(0)
+    #print(op)
+
+    op = (b_*_b) @ (b_*_b)
+    #print(op.nf)
+
+    print(m.get_identity())
+
 
 
 def test():

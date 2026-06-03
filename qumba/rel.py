@@ -14,6 +14,7 @@ from random import choice, shuffle, randint
 
 import numpy
 
+from qumba.default_p import DEFAULT_P
 from qumba.matrix import Matrix, pullback
 from qumba.symplectic import symplectic_form
 from qumba.qcode import strop, QCode, SymplecticSpace
@@ -42,7 +43,7 @@ class Relation:
     """ A linear relation
     """
 
-    def __init__(self, left, right=None, p=None):
+    def __init__(self, left, right=None, p=DEFAULT_P):
         left = Matrix.promote(left, p)
         if right is None:
             right = Matrix.identity(left.shape[0], p)

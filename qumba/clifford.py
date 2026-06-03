@@ -617,8 +617,26 @@ def test_clifford():
     IH = c2.H(1)
     CZ = c2.CZ(0, 1)
 
-    #C2 = mulclose([SI, IS, HI, IH, CZ], verbose=True) # slow
-    #assert len(C2) == 92160
+    if argv.slow:
+        C2 = mulclose([SI, IS, HI, IH, CZ], maxsize=None, verbose=True) # slow
+        #assert len(C2) == 92160, len(C2)
+        print()
+    
+        # The action of the clifford group by conjugation
+        # on the Pauli group.
+        # Find the Clifford stabilizer of a (Pauli) stabilizer state.
+        state = [ZI, IZ, ZI*IZ] # |00>
+        found = []
+        for g in C2:
+            for p in state[:2]:
+                if (~g)*p*g not in state:
+                    break
+            else:
+                found.append(g)
+        print("stab:", len(found)) # 1536
+
+        return
+    
 
     CNOT = c2.CNOT(0, 1)
     SWAP = c2.SWAP(0, 1)
