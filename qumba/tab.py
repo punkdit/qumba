@@ -202,9 +202,9 @@ def unify(lops, rops, ljdx, rjdx):
     rnn = 2*rops[0].n
     lops, lpivots = normal_form(lops, 2*ljdx, 2*ln)
     rops, rpivots = normal_form(rops, 0, 2*rjdx)
-    print("unify")
-    print(lops, lpivots)
-    print(rops, rpivots)
+    #print("unify")
+    #print(lops, lpivots)
+    #print(rops, rpivots)
 
 #    ops = []
 #    lj = 2*ljdx
@@ -222,7 +222,7 @@ def unify(lops, rops, ljdx, rjdx):
     while lpivots and rpivots:
         li, lj = lpivots[0]
         ri, rj = rpivots[0]
-        print(li, lj, ri, rj)
+        #print(li, lj, ri, rj)
         if lj-2*ljdx < rj:
             lpivots.pop(0) # argh, use index 
             continue
@@ -231,12 +231,12 @@ def unify(lops, rops, ljdx, rjdx):
             continue
         assert lj-2*ljdx==rj
         l, r = lops[li], rops[ri]
-        print("\trows:", l, r)
+        #print("\trows:", l, r)
         if l.vec[2*ljdx:] == r.vec[:2*rjdx]:
             vec = l.vec[:2*ljdx].concatenate(r.vec[2*rjdx:])
             phase = (l.phase + r.phase) % 4 # ?!?!?
             op = Pauli(vec, phase)
-            print("\tappend:", op)
+            #print("\tappend:", op)
             ops.append(op)
 
         lpivots.pop(0)        
@@ -313,6 +313,42 @@ class Tab:
         tab = Tab(ops, self.nleft)
         return tab
 
+    def __matmul__(self, other):
+        ops = []
+        #for op in self.ops:
+        #    ops.append(op @ Pauli.get_identity(other.n))
+        #for op in other.ops:
+        #    ops.append(Pauli.get_identity(self.n) @ op)
+        nn0 = 2*self.n
+        nn1 = 2*other.n
+        l0 = 2*self.nleft
+        r0 = nn0-l0
+        l1 = 2*other.nleft
+        r1 = nn1-l1
+        pad = lambda n:Matrix.zeros((n,))
+        for op in self.ops:
+            #print(op)
+            vec = op.vec
+            #print(vec)
+            vec = Matrix.concatenate(vec[:l0], pad(l1), vec[l0:], pad(r1))
+            #print(vec)
+            op = Pauli(vec, op.phase)
+            #print(op)
+            ops.append(op)
+            
+        for op in other.ops:
+            #print(op)
+            vec = op.vec
+            #print(vec)
+            vec = Matrix.concatenate(pad(l0), vec[:l1], pad(r0), vec[l1:])
+            #print(vec)
+            op = Pauli(vec, op.phase)
+            #print(op)
+            ops.append(op)
+            
+        return Tab(ops, (l0+l1)//2)
+
+
 
 def test():
 
@@ -324,28 +360,45 @@ def test():
     #print( normal_form([Y@Y, Y@I])[0] )
     assert normal_form([Y@Y, Y@I])[0] == [Y@I, I@Y]
 
-    I = Tab.get_identity(1)
-    assert I == Tab([X@X, Z@Z], 1)
+    i = Tab.get_identity(1)
+    assert i == Tab([X@X, Z@Z], 1)
 
-    H = Tab([X@Z, Z@X], 1)
-    assert H != I
+    h = Tab([X@Z, Z@X], 1)
+    assert h != i
 
     x = Tab([X@X, -Z@Z], 1)
     z = Tab([-X@X, Z@Z], 1)
-    assert x!=I
+    assert x!=i
     assert x!=z
-    assert x*x == I
+    assert x*x == i
+    assert x*z == z*x
     xz = (x*z)
-    print(xz*xz)
+    assert xz*xz == i
 
-    return
+    h = Tab([X@Z, Z@X], 1)
+    assert h*h == i
 
-    H = Tab([[0,1],[1,0]])
-    S = Tab([[1,0],[1,1]], None, [0,3]) 
+    s = Tab([-Y@X, Z@Z], 1)
+    assert s*s == z
 
-    XZ = X*Z
-    #print(X*Z, Z*X)
-    print(XZ*XZ)
+    G = mulclose([s, h])
+    assert len(G) == 24
+
+    #from bruhat.gset import cayley
+    #G = cayley(G)
+    #print(G.structure_description(True)) # S4
+
+    # ------------
+    # n=2
+
+    ii = Tab.get_identity(2)
+    cx = Tab([X@X@X@I, I@X@I@X, Z@I@Z@I, Z@Z@I@Z], 2)
+    assert cx*cx == ii
+
+    assert i@i == ii
+
+    G = mulclose([h@i, i@h, s@i, i@s, cx])
+    assert len(G) == 11520
 
 
 
