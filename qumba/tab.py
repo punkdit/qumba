@@ -171,7 +171,7 @@ def row_reduce(ops, jj0=None, jj1=None):
 def normal_form(ops, jj0=None, jj1=None):
     ops = row_reduce(ops, jj0, jj1)
     if not ops:
-        return ops
+        return ops, []
     m = len(ops)
     nn = 2*ops[0].n
     if jj0 is None:
@@ -203,9 +203,9 @@ def unify(lops, rops, ljdx, rjdx):
     rnn = 2*rops[0].n
     lops, lpivots = normal_form(lops, 2*ljdx, 2*ln)
     rops, rpivots = normal_form(rops, 0, 2*rjdx)
-    #print("unify")
-    #print(lops, lpivots)
-    #print(rops, rpivots)
+    print("unify")
+    print(lops, lpivots)
+    print(rops, rpivots)
 
 #    ops = []
 #    lj = 2*ljdx
@@ -246,6 +246,27 @@ def unify(lops, rops, ljdx, rjdx):
     return ops
 
 
+class Null:
+
+    # singleton
+    @cache
+    def __new__(cls):
+        ob = object.__new__(cls)
+        return ob
+
+    def __str__(self):
+        return "Null()"
+    __repr__ = __str__
+
+    def __mul__(self, other):
+        return self
+    __matmul__ = __mul__
+
+    # etc.
+
+
+null = Null()
+
 
 
 class Tab:
@@ -255,7 +276,9 @@ class Tab:
             assert isinstance(op, Pauli)
             assert n is None or n == op.n
             n = op.n
-        assert len(ops) == n
+        if not ops:
+            n = 0
+        assert len(ops) == n, str(ops)
         ops, pivots = normal_form(ops)
         self.ops = tuple(ops)
         self.n = n
@@ -307,14 +330,18 @@ class Tab:
         return tab
 
     def __mul__(self, other):
+        if other is null:
+            return null
         assert self.nright == other.nleft
         ops = unify(self.ops, other.ops, self.nleft, other.nleft)
         if ops is None:
-            return None
+            return null
         tab = Tab(ops, self.nleft)
         return tab
 
     def __matmul__(self, other):
+        if other is null:
+            return null
         ops = []
         #for op in self.ops:
         #    ops.append(op @ Pauli.get_identity(other.n))
@@ -411,14 +438,24 @@ def test():
     #G = cayley(G)
     #print(G.structure_description(True)) # S4
 
+    u = Tab([], 0)
+    px = Tab([X], 1)
+    mx = Tab([X], 0)
+    print(mx*px)
+    print(mx)
+    print(mx * h)
+
     # ------------
     # n=2
 
     ii = Tab.get_identity(2)
     cx = Tab([X@X@X@I, I@X@I@X, Z@I@Z@I, Z@Z@I@Z], 2)
     assert cx*cx == ii
-
     assert i@i == ii
+
+    
+
+    return
 
     gen = [h@i, i@h, s@i, i@s, cx]
     G = mulclose([h@i, i@h, s@i, i@s, cx])
