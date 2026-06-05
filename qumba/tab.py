@@ -24,6 +24,7 @@ from qumba.pauli import Pauli
 from qumba import pauli 
 
 zeros = lambda a,b : Matrix.zeros((a,b))
+pad = lambda n:Matrix.zeros((n,))
 
 
 #def normalize(left, right, phase):
@@ -123,26 +124,26 @@ zeros = lambda a,b : Matrix.zeros((a,b))
 #        return AFA.sum() == 0
 
 
-def row_reduce(ops, j0=None, j1=None):
+def row_reduce(ops, jj0=None, jj1=None):
     ops = list(ops)
     if not ops:
         return ops
     m = len(ops)
     nn = 2*ops[0].n
-    if j0 is None:
-        j0 = 0
-    if j1 is None:
-        j1 = nn
+    if jj0 is None:
+        jj0 = 0
+    if jj1 is None:
+        jj1 = nn
     #print("="*79)
-    #print("normal_form", m, j0, j1)
+    #print("normal_form", m, jj0, jj1)
     #for op in ops:
     #    print(op)
     #print("="*79)
 
     i = 0
-    j = j0
-    while i < m and j < j1:
-        assert i <= j-j0
+    j = jj0
+    while i < m and j < jj1:
+        assert i <= j-jj0
 
         # find nonzero in col j
         for i1 in range(i, m):
@@ -167,22 +168,22 @@ def row_reduce(ops, j0=None, j1=None):
     return ops
 
 
-def normal_form(ops, j0=None, j1=None):
-    ops = row_reduce(ops, j0, j1)
+def normal_form(ops, jj0=None, jj1=None):
+    ops = row_reduce(ops, jj0, jj1)
     if not ops:
         return ops
     m = len(ops)
     nn = 2*ops[0].n
-    if j0 is None:
-        j0 = 0
-    if j1 is None:
-        j1 = nn
+    if jj0 is None:
+        jj0 = 0
+    if jj1 is None:
+        jj1 = nn
     pivots = []
-    j = j0
+    j = jj0
     for i in range(m):
-        while j < j1 and ops[i].vec[j] == 0:
+        while j < jj1 and ops[i].vec[j] == 0:
             j += 1
-        if j==j1:
+        if j==jj1:
             break
         pivots.append((i,j))
         i0 = i-1
@@ -325,7 +326,6 @@ class Tab:
         r0 = nn0-l0
         l1 = 2*other.nleft
         r1 = nn1-l1
-        pad = lambda n:Matrix.zeros((n,))
         for op in self.ops:
             #print(op)
             vec = op.vec
@@ -347,6 +347,29 @@ class Tab:
             ops.append(op)
             
         return Tab(ops, (l0+l1)//2)
+
+    def act(self, tgt):
+        assert isinstance(tgt, Pauli)
+        #print("\nact", tgt, tgt.vec)
+        #print(self)
+        assert tgt.n == self.nright
+        jj0 = 2*self.nleft
+        jj1 = 2*self.n
+        ops, pivots = normal_form(self.ops, jj0, jj1)
+        #for op in ops:
+        #    print("\t", op)
+        lhs = Pauli(pad(2*self.n), tgt.phase)
+        vec = tgt.vec
+        for (i,jj) in pivots:
+            #print("lhs =", lhs)
+            r = vec[jj-jj0]
+            if r==0:
+                continue
+            lhs = lhs*ops[i]
+        #print("lhs =", lhs)
+        lhs = Pauli(lhs.vec[:2*self.nleft], lhs.phase)
+        #print("lhs =", lhs)
+        return lhs
 
 
 
@@ -397,8 +420,43 @@ def test():
 
     assert i@i == ii
 
+    gen = [h@i, i@h, s@i, i@s, cx]
     G = mulclose([h@i, i@h, s@i, i@s, cx])
+    G = list(G)
     assert len(G) == 11520
+    print(len(G))
+
+    basis = [X@I, I@X, Z@I, I@Z, Y@I, I@Y]
+    Pauli = mulclose(basis)
+    Pauli = list(Pauli)
+    assert len(Pauli) == 64
+    N = len(Pauli)
+    lookup = {g:i for (i,g) in enumerate(Pauli)}
+    assert len(lookup) == N
+
+    for trial in range(1000):
+        g = choice(G)
+        h = choice(G)
+        for p in basis:
+            lhs = g.act(h.act(p))
+            rhs = (g*h).act(p)
+            assert lhs == rhs
+
+    from bruhat.gset import Group, Perm
+    perms = []
+    for g in gen:
+        idxs = []
+        for (i,p) in enumerate(Pauli):
+            q = g.act(p)
+            assert q in lookup
+            j = lookup[q]
+            idxs.append(j)
+        perm = Perm(idxs)
+        perms.append(perm)
+    G = Group.generate(perms)
+    assert len(G) == 11520
+    assert G.structure_description() == "((C2 x C2 x C2 x C2) : A6) : C2"
+        
 
 
 
