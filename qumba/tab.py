@@ -438,9 +438,16 @@ def test():
     #G = cayley(G)
     #print(G.structure_description(True)) # S4
 
+    l = Tab([X], 0)
+    r = Tab([-X], 1)
+    l*r
+
     u = Tab([], 0)
     px = Tab([X], 1)
     mx = Tab([X], 0)
+
+    
+
     print(mx*px)
     print(mx)
     print(mx * h)

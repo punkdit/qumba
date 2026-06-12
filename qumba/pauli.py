@@ -682,6 +682,21 @@ def test_hexacode():
     IIYZYZ
     """) # Macwilliams-Sloane p598
 
+    print(code)
+
+    if 0:
+        dode = code.shorten(0)
+        print(dode)
+        print(dode.longstr())
+        print(dode.get_autos())
+        print(dode.is_gf4())
+    
+        eode = QCode.fromstr("XYX.Y .XYXY YZY.Z .YZYZ", None, "YXIIY ZYIIZ")
+        assert dode.is_equiv(eode)
+    
+    
+        return
+
     pauli = PauliCode.from_qcode(code)
     w = pauli.weight_enum()
     for (k,v) in w.items():

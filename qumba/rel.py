@@ -644,6 +644,18 @@ def test_pascal():
                 print(rel)
 
 
+def test_code():
+    code = construct.get_golay()
+    print(code)
+    #H = code.H
+    #print(H.shape)
+    css = code.to_css()
+    H = Matrix(css.Hx)
+    print(H, H.shape)
+
+    rel = Relation(H, zeros(12,0))
+    print(rel)
+
     
 def test():
     test_linear()
