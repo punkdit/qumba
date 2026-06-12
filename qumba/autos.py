@@ -235,6 +235,7 @@ def get_autos_selfdualcss(code, maxw=None):
     ops = []
     for perm in gen:
         f = [perm[i] - N for i in range(N, N+n)]
+        print(f)
         dode = code.apply_perm(f)
         assert dode.is_equiv(code)
         L = dode.get_logical(code)

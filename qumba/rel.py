@@ -656,6 +656,45 @@ def test_code():
     rel = Relation(H, zeros(12,0))
     print(rel)
 
+
+def test_603():
+
+    E = Matrix.parse("""
+    1..1.1
+    .1.11.
+    ..1.11""")
+    F = Matrix.parse("""
+    11.1..
+    .11.1.
+    1.1..1""")
+
+    print(E)
+
+    make = lambda ldx,rdx: Relation(E[:, ldx], E[:, rdx])
+
+    for idx in [0,1,2]:
+      for jdx in [3,4,5]:
+        rdx = [idx, jdx]
+        ldx = [i for i in range(6) if i not in rdx]
+        left = make(ldx, rdx)
+        right = make(rdx, ldx)
+    
+        #print(left)
+        rel = left * right
+        #print(rel)
+        Hx = rel.A
+        #print(Hx)
+        Hz = Hx.kernel()
+        #print(Hz)
+    
+        code = QCode.build_css(Hx, Hz)
+        #print(code)
+        #print(code.get_autos())
+        dode = code.shorten(0)
+        if dode.d == 3:
+            print(idx, jdx, dode)
+
+
     
 def test():
     test_linear()
