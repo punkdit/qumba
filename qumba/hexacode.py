@@ -11,6 +11,8 @@ from functools import reduce, lru_cache
 cache = lru_cache(maxsize=None)
 from operator import add, mul, matmul, lshift
 
+import numpy
+
 from qumba.action import mulclose, mulclose_find
 from qumba.matrix import Matrix, DEFAULT_P, pullback
 from qumba.symplectic import symplectic_form, SymplecticSpace
@@ -45,18 +47,18 @@ def contract(codes, links):
     for code in codes:
         i = idxs[-1]
         idxs.append(i + code.n)
-    print(idxs)
+    #print(idxs)
 
     links = [(idxs[i]+j, idxs[k]+l) for (i,j,k,l) in links]
-    print(links)
+    #print(links)
 
     while links:
 
         m, nn = H.shape
         n = nn//2
 
-        print("H:", m, n)
-        print(links)
+        #print("H:", m, n)
+        #print(links)
 
         i, j = links.pop()
         assert i!=j, (i,j)
@@ -154,8 +156,8 @@ def test_A5():
     print(X)
 
 
-def test():
-    from bruhat.gset import Group, Perm
+def test_refl():
+    from bruhat.gset import Group, Perm, Coset
     from bruhat.todd_coxeter import Schreier
 
     # Bring's curve reflection group
@@ -177,35 +179,134 @@ def test():
     #print(G.structure_description()) # C2 x A5
 
     a, b, c = G.gens
+    ab = a*b
+    bc = b*c
+    ac = a*c
 
-    R = Group.generate([a*b, b*c])
+    # Orientation subgroup
+    R = Group.generate([ab, bc])
     assert len(R) == 60
 
-    F = Group.generate([a*b])
+    F = Group.generate([ab])
     assert len(F) == 5
     faces = [gF for gF in G.left_cosets(F) if len(gF.intersect(R))==len(F)]
     assert len(faces) == 12
 
-    E = Group.generate([a*c])
+    for face in faces:
+        for f in F:
+            assert face*f == face
+
+    E = Group.generate([ac])
     edges = [gE for gE in G.left_cosets(E) if len(gE.intersect(R))==len(E)]
     assert len(edges) == 30
 
-    V = Group.generate([b*c])
+    for edge in edges:
+        found = set()
+        for f in F:
+            fe = f*edge
+            assert fe in edges
+            found.add(fe)
+        assert len(found) == 5
+
+    V = Group.generate([bc])
     verts = [gV for gV in G.left_cosets(V) if len(gV.intersect(R))==len(V)]
     assert len(verts) == 12
 
-    import numpy
-    H = numpy.zeros((len(faces), len(edges)), dtype=int)
-    for i,face in enumerate(faces):
-      for j,edge in enumerate(edges):
-        if face.intersect(edge):
-            H[i,j] = 1
-    print(H)
+    strop = lambda H : '\n'.join(''.join(str(i) for i in row) for row in H)
+    A = numpy.zeros((len(faces), len(edges)), dtype=int)
 
+    for i,face in enumerate(faces):
+        for j,edge in enumerate(edges):
+            if face.intersect(edge):
+                A[i,j] = 1
+    print(strop(A).replace("0",'.'))
+    print()
+
+    i = 0
+    face = Coset(F)
+    assert ab in face
+    assert faces[0] == face
+    edge = Coset(E)
+    assert edges[0] == edge
+
+    cols = [() for j in range(30)]
+    bdy = [(ab**idx)*edge for idx in range(5)]
+    for e in bdy:
+        assert e.intersect(face)
+    H = numpy.empty((len(faces), len(edges)), dtype=object)
+    H[:] = '.'
+    for i,face in enumerate(faces):
+        g = face[0]
+        assert (~g)*face == Coset(F)
+
+        for idx,e in enumerate(bdy):
+            edge = g*e
+            j = edges.index(edge)
+            H[i, j] = idx
+            cols[j] += (i,idx)
+            assert A[i,j] == 1
+            
+    print(strop(H), H.shape)
+
+    for link in cols:
+        print(link)
 
     code = get_hexacode()
-    dode = code.apply_perm([1,2,3,4,0,5])
-    assert code.is_equiv(dode)
+
+    Hx = Matrix.parse("""
+    1..1.1
+    .1.11.
+    ..1.11""")
+
+    codes = []
+    for i in range(H.shape[0]):
+        while 1:
+            Hx = Matrix.rand(3,6)
+            if Hx.rank() == 3:
+                break
+        Hz = Hx.kernel()
+        code = QCode.build_css(Hx, Hz)
+        codes.append(code)
+
+    #dode = code.apply_perm([1,2,3,4,0,5])
+    #assert code.is_equiv(dode)
+
+    code = QCode.fromstr("XXIIII IIXXII IIIIXX ZZIIII IIZZII IIIIZZ")
+
+    codes = [code]*H.shape[0]
+    code = contract(codes, cols)
+    print(code)
+    print(code.longstr())
+
+    return
+
+    N, perms = code.get_autos()
+    print(N)
+    G = Group.generate([Perm(idxs) for idxs in perms])
+    print(G.structure_description())
+
+
+test = test_refl
+
+def test_rot():
+    from bruhat.gset import Group, Perm
+    from bruhat.todd_coxeter import Schreier
+
+    # Bring's curve rotation group ?!? XXX TODO
+    ngens = 3
+    a, b, c = range(ngens)
+    rels = [
+        (a,)*2, (b,)*2, (c,)*2,
+        (a,b)*5, (b,c)*5, (a,c)*2,
+    ]
+    a1 = (b,a)
+    b1 = (a,c)
+    rels += [ (3*a1+b1)*3 ]
+    graph = Schreier(ngens, rels)
+    graph.build()
+    assert len(graph) == 120 # == 12 * 10
+    G = graph.get_gset()
+    assert len(G) == 120
 
 
 
