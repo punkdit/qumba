@@ -1223,6 +1223,7 @@ def test_cube():
         print((dim,xdim,zdim), css)
         if css is None or css.k==0:
             continue
+        print(css.to_qcode().longstr())
         dump_transverse(css.Hx, css.Lx, 5)
 
 
