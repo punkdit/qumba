@@ -250,6 +250,11 @@ if 1:
     assert cnot * cnot.op == I@I # invertible
     assert cnot == (w_ww@I)*(I@bb_b)
 
+    cup = bb_b * b_
+    assert cup == ww_w * w_
+    cap = _b * b_bb
+    assert cap == _w * w_ww
+
 
 def is_xop(op, i):
     A = op.A
@@ -807,11 +812,6 @@ def test_symplectic():
 
     assert( w1 * w_ww == w_ww * (w1@I) )
     assert( w1 * w_ww == w_ww * (I@w1) )
-
-    cup = bb_b * b_
-    assert cup == ww_w * w_
-    cap = _b * b_bb
-    assert cap == _w * w_ww
 
     # snakes
     assert (I @ cap) * (cup @ I) == I
