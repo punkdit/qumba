@@ -16,24 +16,15 @@ from functools import reduce, cache
 from operator import matmul, add, mul, lshift
 from random import random, randint, choice, shuffle
 
-import z3
-
 import numpy
-
-from sage import all_cmdline as sage
 
 from qumba.argv import argv
 from qumba.qcode import strop, QCode, SymplecticSpace
 from qumba.csscode import CSSCode
 from qumba import construct 
 from qumba.matrix import Matrix
+from qumba.lin import shortstr
 
-#from qumba.matrix_sage import Matrix
-#from qumba.clifford import Clifford, w8, w4, r2, ir2, half
-#from qumba import clifford 
-#from qumba.action import mulclose
-#from qumba.lin import shortstr
-#from qumba.distill import PauliDistill
 
 
 class Op:
@@ -326,41 +317,56 @@ def test_unwrap():
 
 
 def main_tensor():
-    H = Matrix([[1,1]])
-    Ht = H.t
+    #H = Matrix([[1,1]])
+    H = Matrix.parse("11.\n.11")
+    H = Matrix.parse("11..\n.11.\n..11")
+    print("H =")
+    print(H)
 
+    Ht = H.t
     m, n = H.shape
     concatenate = Matrix.concatenate
     identity = Matrix.identity
     zeros = Matrix.zeros
 
-    I1 = identity(1)
-    I2 = identity(2)
+    Im = identity(m)
+    In = identity(n)
 
-    H0 = concatenate(H@I2@I1, I2@H@I1, I2@I2@Ht)
+    for op in [H@In@Im, In@H@Im, In@In@Ht]:
+        print(op.shape)
+
+    H0 = concatenate(H@In@Im, In@H@Im, In@In@Ht)
 
     H1 = concatenate(
-        concatenate(I1@H@I1, H@I1@I1, zeros((1, 8)), axis=1),
-        concatenate(I1@I2@Ht, zeros((4,2)), H@I2@I2, axis=1),
-        concatenate(zeros((4,2)), I2@I1@Ht, I2@H@I2, axis=1))
+        concatenate(Im@H@Im, H@Im@Im, zeros((m**3, n**3)), axis=1),
+        concatenate(Im@In@Ht, zeros((m*n*n,n*m*m)), H@In@In, axis=1),
+        concatenate(zeros((n*m*n,m*n*m)), In@Im@Ht, In@H@In, axis=1))
 
     assert (H1*H0).is_zero()
 
-    H2 = concatenate(I1@I1@Ht, I1@H@I2, H@I1@I2, axis=1)
+    H2 = concatenate(Im@Im@Ht, Im@H@In, H@Im@In, axis=1)
     assert (H2*H1).is_zero()
 
     Hx = H0.t
     Hz = H1
     css = CSSCode(Hx=Hx.A, Hz=Hz.A)
-    css.bz_distance()
+    print("Hx:", Hx.sum(1))
+    print("Hz:", Hz.sum(1))
+    print("H2:")
+    print(H2.sum(0))
+    print(H2.sum(1))
+    if css.n < 100:
+        css.bz_distance()
     print(css)
 
     dual = css.get_dual()
     code = css+css+css
     print(code)
 
-    from qumba.gcolor import dump_transverse
-    dump_transverse(code.Hx, code.Lx)
+    if 0:
+        # FAIL
+        from qumba.gcolor import dump_transverse
+        dump_transverse(code.Hx, code.Lx)
 
     return
 
@@ -421,7 +427,18 @@ def main_vasmer():
 
     C0 = parse(n, stabs)
     print(C0)
-    #print(C0.longstr())
+
+    q0 = C0.to_qcode()
+    print(q0.longstr())
+    N, perms = q0.get_autos()
+    print(N) # 144
+
+    #from bruhat.gset import Group, Perm
+    #G = Group.generate([Perm(f) for f in perms])
+    #print(G)
+    #print(G.structure_description()) # C2 x ((S3 x S3) : C2)
+
+    return
 
     stabs = """
     X1X5X6X9, X2X6X7X10,
@@ -435,6 +452,11 @@ def main_vasmer():
     print(C1)
     #print(C1.longstr())
 
+    q1 = C1.to_qcode()
+    print(q1.longstr())
+    N, perms = q1.get_autos()
+    print(N)
+
     stabs = """
     X1X2X3X4X5X6X7X8,
     X6X9X10, X8X11X12,
@@ -446,6 +468,17 @@ def main_vasmer():
     C2 = parse(n, stabs)
     print(C2)
     #print(C2.longstr())
+
+    if 0:
+        q0 = C0.to_qcode()
+        q1 = C1.to_qcode()
+        q2 = C2.to_qcode()
+    
+        print(q0.get_isomorphism(q1)) # None 
+        print(q0.get_isomorphism(q2)) # [8, 10, 9, 11, 5, 0, 7, 1, 2, 4, 3, 6]
+        print(q1.get_isomorphism(q2)) # None 
+    
+        return
 
     code = C0+C1+C2
     code.bz_distance()
@@ -467,7 +500,10 @@ def main_vasmer():
 
     Hx = Matrix(code.Hx)
     Hz = Matrix(code.Hz)
+    print("Hx:")
     print(Hx, Hx.shape)
+    print("Hz:")
+    print(Hz, Hz.shape)
     print(op)
 
     Hzt = Hz.t
@@ -530,6 +566,7 @@ def test_vasmer():
     print(cube)
 
     right = C0+C1+C2
+    print(shortstr(right.Hx))
     right = right.to_qcode()
     print(right)
 
