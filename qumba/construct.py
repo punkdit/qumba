@@ -639,7 +639,7 @@ def get_surface(rows, cols):
     assert len(ops) == n-1
     ops = ' '.join(ops)
     H = fromstr(ops)
-    assert rank(H) == n-1
+    assert H.rank() == n-1
     code = QCode(H)
     return code
 
@@ -1338,7 +1338,7 @@ def test():
     print(stabs)
 
     H = fromstr(stabs)
-    print(shortstr(H), H.shape, rank(H))
+    print(H, H.shape, H.rank())
 
     edges = []
     for i in range(nedge):
@@ -1369,8 +1369,8 @@ def test():
         #print(op)
         estabs.append(op)
     H = fromstr(stabs + estabs)
-    H = linear_independent(H)
-    print(shortstr(H), H.shape, rank(H))
+    H = H.linear_independent()
+    print(shortstr(H), H.shape, H.rank())
 
     code = QCode(H)
     from qumba.distance import distance_z3

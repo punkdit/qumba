@@ -438,7 +438,7 @@ def main_vasmer():
     #print(G)
     #print(G.structure_description()) # C2 x ((S3 x S3) : C2)
 
-    return
+    #return
 
     stabs = """
     X1X5X6X9, X2X6X7X10,
@@ -450,7 +450,7 @@ def main_vasmer():
 
     C1 = parse(n, stabs)
     print(C1)
-    #print(C1.longstr())
+    print(C1.to_qcode().longstr())
 
     q1 = C1.to_qcode()
     print(q1.longstr())
@@ -467,7 +467,9 @@ def main_vasmer():
 
     C2 = parse(n, stabs)
     print(C2)
-    #print(C2.longstr())
+    print(C2.to_qcode().longstr())
+
+    return
 
     if 0:
         q0 = C0.to_qcode()

@@ -48,6 +48,7 @@ def fromstr(Hs):
         H.append(row)
     H = array2(H)
     H = flatten(H)
+    H = Matrix(H)
     return H
 
 
