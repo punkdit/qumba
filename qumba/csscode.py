@@ -1496,11 +1496,13 @@ def selfdual_z3():
 
     n, k, d = argv.get("code", (7,1,3))
 
+    weight = argv.get("weight")
+
     assert (n+k)%2 == 0
     m = (n-k)//2
 
     import z3
-    from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, sat, ForAll
+    from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, sat, ForAll, PbEq
     from qumba.transversal import UMatrix
 
     solver = Solver()
@@ -1542,6 +1544,13 @@ def selfdual_z3():
         term = If(And(t_parity, t_logical),t_distance,True)
         add(ForAll([L[0,i].v for i in range(n)], term))
 
+    if weight is not None:
+        print("weight", weight-1)
+        for i in range(m):
+            add( PbEq([(A[i,j].get(), True) for j in range(n-m)], weight-1) )
+
+    print("go:")
+
     found = {}
 
     while 1:
@@ -1581,7 +1590,8 @@ def selfdual_z3():
         #for h in Hx.rowspan():
         #    print(h, h.sum())
         #print()
-        #break
+        if not argv.all:
+            break
 
     print(result)
 
