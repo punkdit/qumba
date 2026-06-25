@@ -40,7 +40,7 @@ def render(view, poly, fill):
     for v in poly.faces(0):
         v = v.vertices()[0]
         v = Mat(v)
-        view.add_circle(v, 0.6, fill=red)
+        view.add_circle(v, 1.0, fill=grey)
 
     edges = poly.faces(1)
     for e in edges:
@@ -116,7 +116,7 @@ class Geometry:
         return vs
 
     def get_code(self, deco):
-        print("get_code")
+        print("get_code", deco)
         vs = self.vertices()
         #lookup = {v:i for (i,v) in enumerate(vs)}
         lookup = self.lookup
@@ -129,12 +129,6 @@ class Geometry:
         ops = []
         for (poly,_) in xstab:
             verts = [tuple(v) for v in poly.vertices()]
-            if len([v for v in verts if v[2] == 3])==len(verts):
-                assert 0
-                continue
-            if len([v for v in verts if v[2] == -1])==len(verts):
-                assert 0
-                continue
             op = ['.']*n
             for v in poly.vertices():
                 op[lookup[v]] = 'X'
@@ -180,11 +174,8 @@ class Geometry:
         return code
 
 
-
-def test():
+def make_view():
     stroke = orange
-    fill = orange.alpha(0.2)
-    
     st_axis = st_thick+[grey]
 
     v0 = Mat([0,0,0])
@@ -203,37 +194,21 @@ def test():
     view.add_line(v0-L*cy, L*cy, st_stroke=st_axis+st_arrow)
     view.add_line(v0-L*cz, L*cz, st_stroke=st_axis+st_arrow)
 
+    return view
+
+
+def test():
     cubo = sage.polytopes.cuboctahedron()
     for v in cubo.vertices():
         print(tuple(v), end=' ')
     print()
-
-
-    geometry = Geometry()
-    rd, bl, gn = "red blue green".split()
-    for (p, dx, dy, dz, deco) in [
-        #(cubo,  0,  2,  0, rd),
-        #(cubo,  2,  2, +2, rd),
-        #(cubo, 0,  0,  2, rd),
-        (cubo,  0,  2, +2, bl),
-        (cubo,  2,  2,  0, bl),
-#        (cubo,  2,  0, +2, bl),
-        (cubo, -0,  0, -0, bl),
-#        (cubo,  0, -2, +2, bl),
-#        (cubo,  2, -2,  0, bl),
-    ]:
-        p = p.translation((dx, dy, dz))
-        #geometry.add(p, deco)
-        #render(view, p.translation((dx, dy, dz)), fill)
 
     octa = sage.polytopes.octahedron()
     for v in octa.vertices():
         print(tuple(v), end=' ')
     print()
     
-    #geometry.add(octa.translation((1,1,1)), gn)
-
-    #for dy in [-2, 0, 2]:
+    geometry = Geometry()
     for j in range(3):
         dy = 2*(j-1)
         for i in range(-1,3):
@@ -254,7 +229,7 @@ def test():
             dx = 2*i
             dz = 2*k
             p = octa.translation((dx-1,dy-1,dz-1))
-            geometry.add(p, gn)
+            geometry.add(p, "green")
 
     #geometry = geometry.get("blue")
     #geometry = geometry.get("green", "red")
@@ -283,13 +258,29 @@ def test():
             geometry.remove(poly, deco)
         if deco=="red" and (
             poly.intersection(left)==poly or poly.intersection(right)==poly):
-            print(poly, deco)
             geometry.remove(poly, deco)
 
-    geometry.get("blue").render(view)
+    cvs = Canvas()
+    view = make_view()
+    geometry.render(view)
+    cvs = view.render(bg=None)
+    cvs.writePDFfile("cubeocta3.pdf")
+
+    cvs = Canvas()
+    x = 0
+    for deco in "red green blue".split():
+        view = make_view()
+        geometry.get(deco).render(view)
+        fg = view.render(bg=None)
+        cvs.insert(x, 0, fg)
+        x = x + 1.2*fg.get_bound_box().width
+
+    cvs.writePDFfile("cubeocta.pdf")
 
     print("vertices:", len(geometry.vertices()))
 
+    code = geometry.get_code("red")
+    code = geometry.get_code("green")
     code = geometry.get_code("blue")
 
     if 0:
@@ -313,8 +304,6 @@ def test():
     #        if v[2]==3:
     #            print(v)
 
-    cvs = view.render(bg=None)
-    cvs.writePDFfile("cubeocta.pdf")
 
     #Hz = Hz[:, idxs]
     #Hx = Hx[:, idxs]
