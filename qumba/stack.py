@@ -169,7 +169,8 @@ class Geometry:
         code = QCode(H)
         #print(code.longstr())
         css = (code.to_css())
-        css.bz_distance()
+        if css.n < 20:
+            css.bz_distance()
         print(css)
         return code
 
@@ -234,31 +235,33 @@ def test():
     #geometry = geometry.get("blue")
     #geometry = geometry.get("green", "red")
 
+    N = 2
+
     up = (0,1,0)
     dn = (0,-1,0)
     fwd = (0,0,1)
     back = (0,0,-1)
     left = (-1,0,0)
     right = (+1,0,0) # pointing right
-    geometry = geometry.clip((+2,)+dn)
-    geometry = geometry.clip((+2,)+up)
+    geometry = geometry.clip((+2,)+up) # lower boundary
+    geometry = geometry.clip((+N-2,)+dn) # upper boundary
     geometry = geometry.clip((+1,)+fwd) # back at -1
-    geometry = geometry.clip((+3,)+back) # front (closest) boundary at +3
-    geometry = geometry.clip((+3,)+left)
+    geometry = geometry.clip((+N-1,)+back) # front (closest) boundary at +3
     geometry = geometry.clip((+1,)+right) # left boundary
+    geometry = geometry.clip((+N-1,)+left) # right boundary
 
     plane = lambda *arg:sage.Polyhedron(eqns=[arg], base_ring=sage.ZZ)
-    front = plane(3,0,0,-1)
-    back = plane(1,0,0,+1)
-    left = plane(3,-1,0,0)
+    back = plane(1,0,0,+1) # back at -1
+    front = plane(N-1,0,0,-1)
     right = plane(1,1,0,0)
-    for (poly,deco) in list(geometry):
-        if deco=="blue" and (
-            poly.intersection(front)==poly or poly.intersection(back)==poly):
-            geometry.remove(poly, deco)
-        if deco=="red" and (
-            poly.intersection(left)==poly or poly.intersection(right)==poly):
-            geometry.remove(poly, deco)
+    left = plane(N-1,-1,0,0)
+#    for (poly,deco) in list(geometry):
+#        if deco=="blue" and (
+#            poly.intersection(front)==poly or poly.intersection(back)==poly):
+#            geometry.remove(poly, deco)
+#        if deco=="red" and (
+#            poly.intersection(left)==poly or poly.intersection(right)==poly):
+#            geometry.remove(poly, deco)
 
     cvs = Canvas()
     view = make_view()
@@ -279,38 +282,137 @@ def test():
 
     print("vertices:", len(geometry.vertices()))
 
-    code = geometry.get_code("red")
-    code = geometry.get_code("green")
-    code = geometry.get_code("blue")
+    C0 = geometry.get_code("red")
+    print(C0.longstr())
+    print()
+    C1 = geometry.get_code("green")
+    print(C1.longstr())
+    print()
+    C2 = geometry.get_code("blue")
+    print(C2.longstr())
+    print()
+
+    #build_ccz(C0, C1, C2)
+
+
+def test_12():
+    C0 = QCode.fromstr("""
+    XXXXXXXX....
+    ....X....XX.
+    ......X.X..X
+    Z.Z.........
+    Z...Z....Z..
+    ZZ..........
+    Z.....Z.Z...
+    ...Z.Z......
+    ....ZZ....Z.
+    .....Z.Z....
+    .....ZZ....Z
+    """)
+    C1 = QCode.fromstr("""
+    X.X.X....X..
+    XX....X.X...
+    ...XXX....X.
+    .....XXX...X
+    ZZZ.........
+    ..ZZZ.......
+    .Z....ZZ....
+    ...Z.Z.Z....
+    Z.......ZZ..
+    ....Z....ZZ.
+    ......Z.Z..Z
+    """)
+    C2 = QCode.fromstr("""
+    XXX.........
+    ...X.X.X....
+    X...XXX.XXXX
+    Z.Z.Z.......
+    ZZ....Z.....
+    ...ZZZ......
+    .....ZZZ....
+    ....Z....Z..
+    ....Z.....Z.
+    ......Z.Z...
+    ......Z....Z
+    """)
+    build_ccz(C0, C1, C2)
+
+
+
+
+def build_ccz(C0, C1, C2):
+
+    n = C0.n
+    assert C1.n == n
+    assert C2.n == n
+
+    right = C0+C1+C2
+    print(right)
+
+    cube = construct.get_832()
+    print(cube)
+
+    Er = right.get_encoder()
+    #code = QCode.from_encoder(Er, k=3)
+
+    Er = SymplecticSpace(cube.m * n).get_identity() << Er
+    print(Er.shape)
+    #print(Er)
 
     if 0:
-        css = code.to_css()
-        Hx, Hz = css.Hx, css.Hz
-        wz = Hz.sum(0)
+        code = QCode.from_encoder(Er, k=3)
+        print(code)
+        code = code.to_css()
+        code.bz_distance()
+        print(code)
+
+    #return
+
+    E = cube.get_encoder()
+
+    El = reduce(lshift, [E]*n)
+    print(El.shape)
+
+    idxs = []
+    for i in range(n):
+      for j in range(cube.m):
+        idxs.append(cube.n*i + j)
+
+    N = cube.m*n
+    for i in range(cube.k):
+      for j in range(n):
+        idxs.append(cube.n*j + cube.m + i)
+
+    #print(idxs)
+
+    assert len(set(idxs)) == len(idxs)
+    assert set(idxs) == set(range(len(idxs)))
+
+    assert len(idxs)*2 == len(El)
+    assert len(idxs) == n * cube.n
+    P = SymplecticSpace(n*cube.n).get_perm(idxs).t
+    E = El * P * Er
+    code = QCode.from_encoder(E, k=3)
+    #d = code.distance("z3")
+    #print(code, d)
     
-        op = "....X........X........X.................X...X......"
-        radius = 7.0
-        idxs = list(range(code.n))
-        for (i,w) in enumerate(wz):
-            if w:
-                continue
-            idxs.remove(i)
-            v = geometry.verts[i]
-            print(i, v)
-            view.add_circle(Mat(v), 2, fill=red)
-            radius -= 1
+    #print(code.longstr())
+    print(code)
+
+    #return
+
+    if 0:
+        code = code.to_css()
+        code.bz_distance()
+        print(code)
+
+    from qumba.gcolor import dump_transverse
+    code = code.to_css()
+    code.bz_distance()
+    print(code)
+    dump_transverse(code.Hx, code.Lx)
+
     
-    #    for v in geometry.verts:
-    #        if v[2]==3:
-    #            print(v)
-
-
-    #Hz = Hz[:, idxs]
-    #Hx = Hx[:, idxs]
-    #code = CSSCode(Hx=Hx, Hz=Hz)
-    #print(code) # [[45,0,?]]
-
-
 
 def test_14():
     code = construct.get_15_1_3()
@@ -352,5 +454,6 @@ if __name__ == "__main__":
 
     t = time() - start_time
     print("\nOK! finished in %.3f seconds\n"%t)
+
 
 

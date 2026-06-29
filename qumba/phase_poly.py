@@ -617,13 +617,14 @@ def test_vasmer():
     d = code.distance("z3")
     print(code, d)
     
-    #print(code.longstr())
+    print(code.longstr())
 
     #return
 
-    code = code.to_css()
-    code.bz_distance()
-    print(code)
+    if 0:
+        code = code.to_css()
+        code.bz_distance()
+        print(code)
 
     from qumba.gcolor import dump_transverse
     dump_transverse(code.Hx, code.Lx)

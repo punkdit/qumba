@@ -1283,6 +1283,20 @@ def test_CCZ():
         rows.append(row)
     CCZ = Matrix(c3.K, rows)
 
+    tgt = CCZ * XII* CCZ.inverse()
+    #print("tgt =")
+    #print(tgt)
+
+    #w2III = w4*III
+    #pauli_gen = [XII, IXI, IIX, ZII, IZI, IIZ]
+    #Pauli3 = mulclose([w2III] + pauli_gen)
+    #assert len(Pauli3) == 256
+
+    #print(tgt == CZ01@X)
+    print(tgt == X @ c2.CZ(0,1))
+
+    #return
+
     X3 = reduce(matmul, [X]*3)
 
     tgt = CCZ * XII*IXI*IIX * CCZ.inverse()
