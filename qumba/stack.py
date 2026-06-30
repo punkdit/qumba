@@ -29,7 +29,7 @@ from huygens.pov import View, Mat
 
 from qumba.argv import argv
 from qumba.qcode import strop, QCode, SymplecticSpace, fromstr
-from qumba.csscode import CSSCode
+from qumba.csscode import CSSCode, distance_z3_css
 from qumba import construct 
 from qumba.matrix import Matrix
 from qumba.lin import shortstr
@@ -115,14 +115,17 @@ class Geometry:
         vs = list(set(vs))
         return vs
 
-    def get_code(self, deco):
+    def get_code(self, deco, lookup=None):
         print("get_code", deco)
         vs = self.vertices()
         #lookup = {v:i for (i,v) in enumerate(vs)}
-        lookup = self.lookup
-        n = len(lookup)
+        lookup = self.lookup if lookup is None else lookup
+        values = list(set(lookup.values()))
+        values.sort()
+        n = len(values)
+        assert values == list(range(n))
         nn = 2*n
-        assert n == len(vs)
+        #assert n == len(vs)
         others = "red green blue".split()
         others.remove(deco)
         xstab = self.get(deco)   
@@ -153,7 +156,7 @@ class Geometry:
             if len(face.vertices()) == 2:
                 vec = Matrix(vec)
                 #print(vec, Hx*vec)
-                if (Hx*vec).sum():
+                if (Hx*vec).sum(): # XXX this is a bit of a hack...
                     #print("skipping")
                     continue
                 #assert 0 # nope..
@@ -175,7 +178,7 @@ class Geometry:
         return code
 
 
-def make_view():
+def make_view(x=4, y=1.5, z=10):
     stroke = orange
     st_axis = st_thick+[grey]
 
@@ -187,7 +190,6 @@ def make_view():
     view = View(sort_gitems=True)
     view.perspective()
 
-    x, y, z = 4, 1.5, 10
     view.lookat([x, y, z], [0., 0, 0], [0, 1, 0]) # eye, center, up
 
     L = 2
@@ -198,22 +200,17 @@ def make_view():
     return view
 
 
-def test():
-    cubo = sage.polytopes.cuboctahedron()
-    for v in cubo.vertices():
-        print(tuple(v), end=' ')
-    print()
+def build_cubocta(N):
+    assert N%2 == 0
 
+    cubo = sage.polytopes.cuboctahedron()
     octa = sage.polytopes.octahedron()
-    for v in octa.vertices():
-        print(tuple(v), end=' ')
-    print()
     
     geometry = Geometry()
-    for j in range(3):
+    for j in range(N): # or N-1 ?
         dy = 2*(j-1)
-        for i in range(-1,3):
-          for k in range(-1,3):
+        for i in range(-1,N):
+          for k in range(-1,N):
             dx = 2*i
             dz = 2*k
             if (i+k+j)%2==0:
@@ -223,19 +220,84 @@ def test():
             p = cubo.translation((dx, dy, dz))
             geometry.add(p, deco)
     
-    for j in range(3):
+    for j in range(N):
         dy = 2*(j-1)
-        for i in range(3):
-          for k in range(3):
+        for i in range(N):
+          for k in range(N):
             dx = 2*i
             dz = 2*k
             p = octa.translation((dx-1,dy-1,dz-1))
             geometry.add(p, "green")
+    return geometry
 
+
+def render_geometry(geometry, name="cubeocta"):
+    cvs = Canvas()
+    view = make_view(4, 8, 20)
+    geometry.render(view)
+    cvs = view.render(bg=None)
+    cvs.writePDFfile(name + "_all.pdf")
+
+    cvs = Canvas()
+    x = 0
+    for deco in "red green blue".split():
+        view = make_view(4, 8, 20)
+        geometry.get(deco).render(view)
+        fg = view.render(bg=None)
+        cvs.insert(x, 0, fg)
+        x = x + 1.2*fg.get_bound_box().width
+
+    cvs.writePDFfile(name + ".pdf")
+
+
+def test_periodic():
+    N = argv.get("N", 4)
+
+    cubo = sage.polytopes.cuboctahedron()
+    octa = sage.polytopes.octahedron()
+    print("cuboctahedron:", end=' ')
+    for v in cubo.vertices():
+        print(tuple(v), end=' ')
+    print()
+
+    geometry = build_cubocta(N)
+    tlookup = {}
+    vlookup = {}
+    for v in geometry.lookup.keys():
+        dw = [0,0,0]
+        #dw[2] = 1*(v[0]//N) # attempt to add shear... FAIL
+        w = [(vi+dwi)%N for vi,dwi in zip(v,dw)]
+        #print(tuple(v), "-->", w, v[0]//N)
+        w = tuple(w)
+        if w not in tlookup:
+            tlookup[w] = len(tlookup)
+        i = tlookup[w]
+        #print("\t", tuple(v), w, "-->", i)
+        vlookup[v] = i
+    print(len(geometry.lookup), "-->", len(set(vlookup.values())))
+
+    codes = []
+    for deco in "red green blue".split():
+        code = geometry.get_code(deco, vlookup)
+        codes.append(code)
+    
+        css = code.to_css()
+        css.bz_distance()
+        print(css)
+    
+    if argv.ccz:
+        build_ccz(*codes)
+
+    #render_geometry(geometry, "cubeocta_toric")
+
+
+
+def test():
+    N = argv.get("N", 4)
+
+    geometry = build_cubocta(N)
     #geometry = geometry.get("blue")
     #geometry = geometry.get("green", "red")
-
-    N = 2
 
     up = (0,1,0)
     dn = (0,-1,0)
@@ -255,44 +317,28 @@ def test():
     front = plane(N-1,0,0,-1)
     right = plane(1,1,0,0)
     left = plane(N-1,-1,0,0)
-#    for (poly,deco) in list(geometry):
-#        if deco=="blue" and (
-#            poly.intersection(front)==poly or poly.intersection(back)==poly):
-#            geometry.remove(poly, deco)
-#        if deco=="red" and (
-#            poly.intersection(left)==poly or poly.intersection(right)==poly):
-#            geometry.remove(poly, deco)
-
-    cvs = Canvas()
-    view = make_view()
-    geometry.render(view)
-    cvs = view.render(bg=None)
-    cvs.writePDFfile("cubeocta3.pdf")
-
-    cvs = Canvas()
-    x = 0
-    for deco in "red green blue".split():
-        view = make_view()
-        geometry.get(deco).render(view)
-        fg = view.render(bg=None)
-        cvs.insert(x, 0, fg)
-        x = x + 1.2*fg.get_bound_box().width
-
-    cvs.writePDFfile("cubeocta.pdf")
+    for (poly,deco) in list(geometry):
+        if deco=="blue" and (
+            poly.intersection(front)==poly or poly.intersection(back)==poly):
+            geometry.remove(poly, deco)
+        if deco=="red" and (
+            poly.intersection(left)==poly or poly.intersection(right)==poly):
+            geometry.remove(poly, deco)
 
     print("vertices:", len(geometry.vertices()))
 
     C0 = geometry.get_code("red")
-    print(C0.longstr())
-    print()
+    #print(C0.longstr())
+    #print()
     C1 = geometry.get_code("green")
-    print(C1.longstr())
-    print()
+    #print(C1.longstr())
+    #print()
     C2 = geometry.get_code("blue")
-    print(C2.longstr())
-    print()
+    #print(C2.longstr())
+    #print()
 
-    #build_ccz(C0, C1, C2)
+    if argv.ccz:
+        build_ccz(C0, C1, C2)
 
 
 def test_12():
@@ -350,13 +396,13 @@ def build_ccz(C0, C1, C2):
     print(right)
 
     cube = construct.get_832()
-    print(cube)
+    #print(cube)
 
     Er = right.get_encoder()
     #code = QCode.from_encoder(Er, k=3)
 
     Er = SymplecticSpace(cube.m * n).get_identity() << Er
-    print(Er.shape)
+    #print(Er.shape)
     #print(Er)
 
     if 0:
@@ -371,7 +417,7 @@ def build_ccz(C0, C1, C2):
     E = cube.get_encoder()
 
     El = reduce(lshift, [E]*n)
-    print(El.shape)
+    #print(El.shape)
 
     idxs = []
     for i in range(n):
@@ -392,7 +438,7 @@ def build_ccz(C0, C1, C2):
     assert len(idxs) == n * cube.n
     P = SymplecticSpace(n*cube.n).get_perm(idxs).t
     E = El * P * Er
-    code = QCode.from_encoder(E, k=3)
+    code = QCode.from_encoder(E, k=right.k)
     #d = code.distance("z3")
     #print(code, d)
     
@@ -408,8 +454,10 @@ def build_ccz(C0, C1, C2):
 
     from qumba.gcolor import dump_transverse
     code = code.to_css()
-    code.bz_distance()
-    print(code)
+    #code.bz_distance()
+    if argv.distance:
+        distance_z3_css(code, verbose=True)
+        print(code)
     dump_transverse(code.Hx, code.Lx)
 
     
