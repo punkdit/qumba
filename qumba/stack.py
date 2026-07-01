@@ -250,8 +250,35 @@ def render_geometry(geometry, name="cubeocta"):
     cvs.writePDFfile(name + ".pdf")
 
 
+def get_distance(code):
+    css = code.to_css()
+    if css.n > 100:
+        print(css)
+        distance_z3_css(css, verbose=True)
+    else:
+        distance_z3_css(css)
+    return css
+
+def show_info(code):
+    css = get_distance(code)
+    print(css)
+
+def dump_transverse(code):
+
+    from qumba.gcolor import dump_transverse
+    code = code.to_css()
+    #code.bz_distance()
+    if argv.distance:
+        distance_z3_css(code, verbose=True)
+        print(code)
+    dump_transverse(code.Hx, code.Lx)
+
+    
+
+
 def test_periodic():
     N = argv.get("N", 4)
+    assert N%4 == 0
 
     cubo = sage.polytopes.cuboctahedron()
     octa = sage.polytopes.octahedron()
@@ -282,11 +309,12 @@ def test_periodic():
         codes.append(code)
     
         css = code.to_css()
-        css.bz_distance()
-        print(css)
+        #css.bz_distance()
+        #print(css)
     
-    if argv.ccz:
-        build_ccz(*codes)
+    if argv.stack:
+        code = stack(*codes)
+        print(code)
 
     #render_geometry(geometry, "cubeocta_toric")
 
@@ -337,8 +365,9 @@ def test():
     #print(C2.longstr())
     #print()
 
-    if argv.ccz:
-        build_ccz(C0, C1, C2)
+    if argv.stack:
+        code = stack(C0, C1, C2)
+        print(code)
 
 
 def test_12():
@@ -381,12 +410,37 @@ def test_12():
     ......Z.Z...
     ......Z....Z
     """)
-    build_ccz(C0, C1, C2)
+    code = stack(C0, C1, C2)
+
+    if argv.stitch:
+        stitch(code)
+
+def stitch(code):
+    import stabgraph as stg
+    import flag_stitcher
+
+    code.distance("z3")
+
+    #H = code.H.concatenate(
+    stabs = strop(code.H, "I").split()
+    L = strop(code.L, "I").split()
+    stabs += [op for op in L if "Z" in op]
+    #print(stabs)
+    
+    #stabs=['XXIXIXI','IXXXXII','IIIXXXX','ZZIZIZI','IZZZZII','IIIZZZZ','ZZZIIII']
+    #distance=3
+    distance = code.d
+    if distance % 2==0:
+        distance -= 1
+    G,c,t,_,_=stg.convert(stabs,shuffle=True)
+    circuit = flag_stitcher.build_ft_circuit(G,c,t,distance)
+
+    print("circuit:", len(circuit))
+    print(circuit[:100], "...")
 
 
 
-
-def build_ccz(C0, C1, C2):
+def stack(C0, C1, C2):
 
     n = C0.n
     assert C1.n == n
@@ -443,24 +497,23 @@ def build_ccz(C0, C1, C2):
     #print(code, d)
     
     #print(code.longstr())
-    print(code)
-
-    #return
-
-    if 0:
-        code = code.to_css()
-        code.bz_distance()
-        print(code)
-
-    from qumba.gcolor import dump_transverse
-    code = code.to_css()
-    #code.bz_distance()
+    css = code.to_css()
+    print(css)
+    wx = ([int(w) for w in css.Hx.sum(1)])
+    print({w:wx.count(w) for w in set(wx)})
+    wz = ([int(w) for w in css.Hz.sum(1)])
+    print({w:wz.count(w) for w in set(wz)})
     if argv.distance:
-        distance_z3_css(code, verbose=True)
-        print(code)
-    dump_transverse(code.Hx, code.Lx)
+        show_info(C0)
+        show_info(C1)
+        show_info(C2)
+        show_info(code)
+    if argv.dump:
+        print(code.longstr())
 
-    
+    return code
+
+
 
 def test_14():
     code = construct.get_15_1_3()
