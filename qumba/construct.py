@@ -428,17 +428,19 @@ def classical_codes(n, m, distance=3):
 
 
 
-def all_css(n, k, distance=3):
+def all_css(n, k, distance=3, mx=None):
     from bruhat.algebraic import qchoose_2
     m = (n-k)
-    assert m%2 == 0
-    m = m//2
+    if mx is None:
+        mx = m//2
+    mz = m - mx
+    assert mx+mz+k == n
 
-    for Hx in qchoose_2(n, m):
+    for Hx in qchoose_2(n, mx):
         K = kernel(Hx)
         #print(Hx, Hx.shape)
         #print(K, K.shape)
-        for Mz in qchoose_2(K.shape[0], m):
+        for Mz in qchoose_2(K.shape[0], mz):
             #print(Mz)
             Hz = dot2(Mz, K)
             #print(Hz)

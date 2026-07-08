@@ -916,6 +916,65 @@ def test_hexacode():
     print(code.get_autos())
 
 
+def test_css_wenum():
+    from qumba.csscode import CSSCode
+    
+    ws = []
+    for hx in [
+    """
+    11....
+    ..11..
+    ....11
+    """,
+    """
+    111..1
+    ...1.1
+    ....11
+    """,
+    ]:
+        Hx = Matrix.parse(hx)
+        Hz = Hx.kernel()
+        css = CSSCode(Hx=Hx.A, Hz=Hz.A)
+        code = css.to_qcode()
+        pauli = PauliCode.from_qcode(code)
+        pauli.check()
+        ws.append(pauli.weight_enum())
+
+    w0,w1 = ws
+    assert w0 != w1
+
+    n = 7
+    perms = list(allperms(list(range(n))))
+    print("perms:", len(perms))
+
+    found = {}
+    for code in construct.all_css(n,0,0, mx=3):
+        w = PauliCode.from_qcode(code).weight_enum()
+        items = list(w.items())
+        items.sort()
+        w = tuple(items)
+        if w not in found:
+            found[w] = []
+        found[w].append(code)
+    #print(len(found))
+    for k,codes in found.items():
+        print("codes:", len(codes))
+        N = len(codes)
+        code = codes[0]
+        print(code)
+        for j in range(1, N):
+            dode = codes[j]
+            #f = codes[i].get_isomorphism(codes[j])
+            #if f is None:
+            for perm in perms:
+                if (perm*code).is_equiv(dode):
+                    break
+            else:
+                print(codes[i].longstr())
+                print(codes[j].longstr())
+                print(k)
+                return
+    print()
 
 
 
