@@ -615,7 +615,8 @@ class CSSCode(object):
             count += 1
             if count%16 == 0:
                 print('.', flush=True, end='')
-        print() 
+        if count:
+            print() 
         return C
     
     _dual = None

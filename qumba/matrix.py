@@ -321,7 +321,8 @@ class Matrix(object):
 
     def solve(self, other):
         A = lin.solve(self.A, other.A)
-        return Matrix(A, self.p) if A is not None else None
+        if A is not None:
+            return Matrix(A, self.p) 
 
     def where(self):
         return list(zip(*numpy.where(self.A))) # list ?
@@ -567,7 +568,8 @@ class Matrix(object):
         iso = [None]*len(f)
         for i in range(len(f)):
             iso[f[i]] = g[i]
-        return iso
+        m, n = self.shape
+        return iso[:n]
 
     def get_autos(self):
         m, n = self.shape

@@ -976,6 +976,142 @@ def test_css_wenum():
                 return
     print()
 
+def old_test_css_random():
+    from qumba.csscode import CSSCode
+
+    n = argv.get("n", 8)
+    mx = n//2
+    mz = n-mx
+
+    perms = list(allperms(list(range(n))))
+    print("perms:", len(perms))
+
+    found = {}
+    while 1:
+
+        css = CSSCode.random(n, mx, mz)
+        code = css.to_qcode()
+        w = PauliCode.from_qcode(code).weight_enum()
+        items = list(w.items())
+        items.sort()
+        w = tuple(items)
+
+        if w not in found:
+            found[w] = code
+            continue
+
+        print(".", end='', flush=True)
+        dode = found[w]
+        for perm in perms:
+            if (perm*dode).is_equiv(code):
+                break
+        else:
+            print("\ncollision")
+            print(w)
+            print(code.longstr())
+            print(dode.longstr())
+            break
+
+
+def test_css_random():
+    from qumba.csscode import CSSCode
+
+    n = argv.get("n", 8)
+    mx = n//2
+    mz = n-mx
+
+    found = {}
+    while 1:
+
+        Hx = Matrix.rand(mx, n)
+        if Hx.rank() < mx:
+            continue
+
+        Hz = Hx.kernel()
+
+        css = CSSCode(Hx=Hx.A, Hz=Hz.A)
+        code = css.to_qcode()
+        w = PauliCode.from_qcode(code).weight_enum()
+        items = list(w.items())
+        items.sort()
+        w = tuple(items)
+
+        if w not in found:
+            found[w] = Hx
+            continue
+
+        Jx = found[w]
+
+        print("--> ", end='', flush=True)
+        f = Hx.get_isomorphism(Jx)
+        print(f, len(found))
+        if f is None:
+            break
+
+        K = Jx[:, f]
+        assert K.t.solve(Hx.t) is not None
+
+
+    print("Hx =")
+    print(Hx)
+    print("Jx =")
+    print(Jx)
+
+
+def test_inequiv():
+    from qumba.csscode import CSSCode
+    for s in [
+    """
+    1...1.1...
+    .1...111..
+    ..1..11.11
+    ...1..111.
+    """,
+    """
+    1...1...11
+    .1..1111..
+    ..1..111..
+    ...1111..1
+    """,
+    ]:
+        H = Matrix.parse(s)
+        J = H.kernel()
+        print(H)
+        print(H.get_tutte())
+
+        css = CSSCode(Hx=H.A, Hz=J.A)
+        code = css.to_qcode()
+        w = PauliCode.from_qcode(code).weight_enum()
+        items = list(w.items())
+        items.sort()
+        w = tuple(items)
+        print(w)
+
+
+def test_enum_css():
+
+    from bruhat.dev.geometry import all_codes
+
+    n = argv.get("n", 6)
+    m = argv.get("m", n//2)
+
+    print(n, m)
+
+    count = 0
+    found = set()
+    for Hx in all_codes(m, n):
+        Hx = Matrix(Hx)
+        Hz = Hx.kernel()
+        code = QCode.build_css(Hx, Hz)
+        w = PauliCode.from_qcode(code).weight_enum()
+        items = list(w.items())
+        items.sort()
+        w = tuple(items)
+        found.add(w)
+
+        count += 1
+    print(count, len(found))
+
 
 
 if __name__ == "__main__":
