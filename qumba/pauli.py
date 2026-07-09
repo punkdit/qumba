@@ -21,7 +21,7 @@ from qumba.action import mulclose, mulclose_find
 from qumba.matrix import Matrix, DEFAULT_P, pullback
 from qumba.symplectic import symplectic_form, SymplecticSpace
 from qumba.clifford import Clifford, half
-from qumba.qcode import QCode, strop
+from qumba.qcode import QCode, strop, css_to_isotropic
 from qumba.util import cross, allperms
 from qumba import construct
 
@@ -186,7 +186,7 @@ class PauliCode:
         self.n = n
         self.m = m
         self.k = k
-        self.check()
+        #self.check()
 
     def __str__(self):
         stabs = ' '.join(str(op) for op in self.stabs)
@@ -1102,7 +1102,9 @@ def test_enum_css():
     for Hx in all_codes(m, n):
         Hx = Matrix(Hx)
         Hz = Hx.kernel()
-        code = QCode.build_css(Hx, Hz)
+        code = QCode.build_css(Hx, Hz, check=False)
+        #H = css_to_isotropic(Hx, Hz)
+        #code = QCode(H, check=False) # slower than build_css?
         w = PauliCode.from_qcode(code).weight_enum()
         items = list(w.items())
         items.sort()
@@ -1121,9 +1123,10 @@ if __name__ == "__main__":
 
     start_time = time()
 
-
     profile = argv.profile
     name = argv.next() or "test"
+    fn = eval(name)
+
     _seed = argv.get("seed")
     if _seed is not None:
         print("seed(%s)"%(_seed))
@@ -1134,17 +1137,11 @@ if __name__ == "__main__":
         #profile.run("%s()"%name)
         from pyinstrument import Profiler
         with Profiler(interval=0.01) as profiler:
-            test()
+            fn()
         profiler.print()
 
-
-
-    elif name is not None:
-        fn = eval(name)
-        fn()
-
     else:
-        test()
+        fn()
 
 
     t = time() - start_time
