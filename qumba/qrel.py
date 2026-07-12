@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
 """
+F_q Pauli and Cliff'ord group
+
+
 
 """
 
@@ -12,6 +15,8 @@ from sage.all_cmdline import (FiniteField, CyclotomicField, latex, block_diagona
     PolynomialRing)
 from sage import all_cmdline as sage
 
+from bruhat.gset import Perm, Group
+
 from qumba.action import mulclose, mulclose_names, mulclose_find
 from qumba.matrix_sage import Matrix
 from qumba.argv import argv
@@ -19,26 +24,33 @@ from qumba.argv import argv
 
 def test():
 
-    q = argv.get("q", 3)
-    assert q==3, "um... ??"
+    q = argv.get("q", 7)
 
-    K = CyclotomicField(q*4)
+    Q = q*4
+    K = CyclotomicField(Q)
     print(K)
 
     z, = K.gens()
-    w3 = z**4
+    wq = z**4
     J = z**q
     assert J**2 == -1
 
-    r3 = 2*z - z**3
-    assert r3**2 == 3
+    if q==3:
+        rq = 2*z - z**3
+    elif q==5:
+        rq = 1 + 2*z**4 - 2*z**6
+    elif q==7:
+        rq = z + z**3 - z**5 + z**9 - z**11 - z**13
+    else:
+        fail
+    assert rq**2 == q
 
     one = K.one()
     for i in range(1,q):
-        assert w3**i != one
-    assert w3**q == one
+        assert wq**i != one
+    assert wq**q == one
     half = one//2
-    ir3 = one/r3
+    irq = one/rq
 
     I = Matrix.identity(K, q)
 
@@ -51,14 +63,72 @@ def test():
 
     rows = [[0]*q for i in range(q)]
     for i in range(q):
-        rows[i][i] = w3**i
+        rows[i][i] = wq**i
     Z = Matrix(K, rows)
 
     Pauli = mulclose([X, Z])
     assert len(Pauli) == q**3
 
-    rows = [[w3**(i*j) for i in range(q)] for j in range(q)]
-    H = ir3*Matrix(K, rows)
+    found = set()
+    for g in Pauli:
+        if g==I:
+            continue
+        evs = g.eigenvectors()
+        #print(g)
+        for val,v,dim in evs:
+            #print("\t", val, dim)
+            #print(v, v.shape)
+            if val!=1:
+                continue
+            assert dim==1
+            r = (v.d * v)[0,0]
+            if r==q:
+                v = irq*v
+            else:
+                assert r==1
+            #print(v.t, r)
+            found.add(v)
+    
+    found = list(found)
+    print("found:", len(found))
+
+    #return
+
+    lookup = {}
+    for (i,v) in enumerate(found):
+        for j in range(Q):
+            w = (z**j)*v
+            #if w in lookup:
+            #    assert lookup[w] == i
+            lookup[w] = i
+    #for v in lookup:
+    #    if v[0,0]==0 and v[1,0] ==0:
+    #        print(v.t)
+
+    def make_group(ops):
+        gen = []
+        for g in ops:
+            perm = []
+            for v in found:
+                w = g*v
+                if w not in lookup:
+                    print(g)
+                    print(v.t, "-->", w.t)
+                    assert 0
+                assert w in lookup
+                j = lookup[w]
+                perm.append(j)
+            perm = Perm(perm)
+            gen.append(perm)
+        group = Group.generate(gen, verbose=True)
+        return group
+
+    pauli = make_group([X, Z])
+    #print(pauli.structure_description())
+    assert len(pauli) == q**2
+
+    rows = [[wq**(i*j) for i in range(q)] for j in range(q)]
+    H = irq*Matrix(K, rows)
     assert H.order() == 4
     assert (H.d)*H == I
     assert ~H == H.d
@@ -66,22 +136,21 @@ def test():
     for g in Pauli:
         assert (~H)*g*H in Pauli
 
-    qhalf = 2 # fix for q!=3
+    qhalf = 2**(q-2)
+    assert (2*qhalf)%q == 1
     
     rows = [[0]*q for i in range(q)]
     for i in range(q):
-        rows[i][i] = w3**(i*(i+1)*qhalf)
+        rows[i][i] = wq**(i*(i+1)*qhalf)
     S = Matrix(K, rows)
 
     for g in Pauli:
         assert (~S)*g*S in Pauli
     assert ~S == S.d
     
-    Cliff = mulclose([X, S, H])
-    print(len(Cliff))
-
-    op = J*I
-    print(op in Cliff)
+    cliff = make_group([X, S, H])
+    print(len(cliff))
+    print(cliff.structure_description())
 
     # yes, works:
     #for g in Cliff:
@@ -89,6 +158,12 @@ def test():
     #        assert (g.d)*h*g in Pauli
     assert type(Pauli) is set
     
+    Cliff = mulclose([X, S, H], verbose=True)
+    print(len(Cliff))
+
+    print("-I in Cliff:", -I in Cliff)
+    print("JI in Cliff:", J*I in Cliff)
+
 
 
 if __name__ == "__main__":
