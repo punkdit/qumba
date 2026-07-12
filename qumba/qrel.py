@@ -22,6 +22,36 @@ from qumba.matrix_sage import Matrix
 from qumba.argv import argv
 
 
+def gauss_sum(q):
+    Q = q*4
+    K = CyclotomicField(Q)
+    #print(K)
+
+    z, = K.gens()
+    wq = z**4
+    J = z**q
+    assert J**2 == -1
+
+    # https://en.wikipedia.org/wiki/Quadratic_Gauss_sum#Properties
+    rq = 0
+    for n in range(q):
+        rq += wq**(n**2)
+
+    #print(q, rq**2)
+    if q%4==3:
+        rq = -J*rq
+    return rq
+    
+
+def test_gauss_sum():
+
+    for q in [3, 5, 7, 11, 13]:
+
+        rq = gauss_sum(q)
+        assert rq**2 == q
+
+
+
 def test():
 
     q = argv.get("q", 7)
@@ -35,15 +65,17 @@ def test():
     J = z**q
     assert J**2 == -1
 
-    if q==3:
-        rq = 2*z - z**3
-    elif q==5:
-        rq = 1 + 2*z**4 - 2*z**6
-    elif q==7:
-        rq = z + z**3 - z**5 + z**9 - z**11 - z**13
-    else:
-        fail
-    assert rq**2 == q
+#    if q==3:
+#        rq = 2*z - z**3
+#    elif q==5:
+#        rq = 1 + 2*z**4 - 2*z**6
+#    elif q==7:
+#        rq = z + z**3 - z**5 + z**9 - z**11 - z**13
+#    else:
+#        fail
+#    assert rq**2 == q
+
+    rq = gauss_sum(q)
 
     one = K.one()
     for i in range(1,q):
