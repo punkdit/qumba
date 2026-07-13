@@ -159,6 +159,19 @@ def get_golay(n=24):
     return QCode.build_css(H, H)
 
 
+def get_ghz(n):
+    ops = ['X'*n]
+    for i in range(n-1):
+        op = ['.']*n
+        op[i] = 'Z'
+        op[i+1] = 'Z'
+        ops.append(''.join(op))
+    code = QCode.fromstr(' '.join(ops))
+    return code
+    
+
+
+
 def get_10_2_3():
     return QCode.fromstr("""
     X..X..XX..
