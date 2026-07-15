@@ -1121,22 +1121,26 @@ def find_shor():
             fn[j,i] = 1
             i += 1
     fn = Matrix(fn)
+    print("fn:")
     print(fn)
-    #print(Hxt0.t)
-    #print(fn.shape)
 
-#    #fx = Matrix([[1]*mx0]).t
-#    fx = zeros2(mx1, mx0)
-#    fx[:] = 1
-#    fx = Matrix(fx)
-#
-#    print(fx.shape) 
-#    print(fz.shape)
-#
-#    print( fn*Hxt0 == Hxt1*fx)
-#    #print( fn*Hxt0 )
-#    #print()
-#    #print( Hxt1*fx)
+    #print("Hz0 inv:")
+    r = ~Hz0 # an extension needs a retraction 
+
+    fz = Hz1*fn*r
+    print("fz:")
+    print(fz)
+
+    s = ~Hxt1 # a lift needs a section
+    fx = s*fn*Hxt0
+    print("fx:")
+    print(fx)
+
+    assert (Hxt1*fx == fn*Hxt0)
+    assert (fz*Hz0 == Hz1*fn)
+
+
+    return
     
     add(Hxt1*fx == fn*Hxt0)
     add(fz*Hz0 == Hz1*fn)
@@ -1167,10 +1171,11 @@ def find_shor():
         #yield result
         print("fx:")
         print(_fx)
-        print()
         print("fz:")
         print(_fz)
-        print()
+        print("fz*Hz0:")
+        print(_fz*Hz0 )
+
         prev = (_fx, _fn, _fz)
 
         add(Not(And(fx==_fx, fn==_fn, fz==_fz)))
