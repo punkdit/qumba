@@ -1,5 +1,14 @@
 #!/usr/bin/env python
 
+"""
+
+TODO: 
+
+argh, uses numpy matrices, port to use Matrix objects
+
+
+"""
+
 import sys, os
 from math import *
 from random import *
@@ -215,6 +224,17 @@ def direct_sum(A, B):
     return C
 
 
+def demote(M):
+    if M is None:
+        pass
+    elif isinstance(M, numpy.ndarray):
+        pass
+    else:
+        assert isinstance(M, Matrix)
+        M = M.A
+    return M
+
+
 class CSSCode(object):
 
     def __init__(self,
@@ -224,6 +244,17 @@ class CSSCode(object):
             Gx=None, Gz=None, 
             Ax=None, Az=None,
             build=True, check=True, verbose=False, logops_only=False, dx=None, dz=None):
+
+        Lx = demote(Lx)
+        Lz = demote(Lz)
+        Hx = demote(Hx)
+        Tz = demote(Tz)
+        Hz = demote(Hz)
+        Tx = demote(Tx)
+        Gx = demote(Gx)
+        Gz = demote(Gz)
+        Ax = demote(Ax)
+        Az = demote(Az)
 
         if Hx is None and Hz is not None:
             # This is a classical code
@@ -1090,6 +1121,9 @@ def distance_meetup(code, max_m=None, verbose=False):
     assert isinstance(code, CSSCode)
     lz = logop_meetup(code.Hx, code.Lx, max_m, verbose)
     lx = logop_meetup(code.Hz, code.Lz, max_m, verbose)
+    if verbose:
+        print("distance_meetup: lz =", lz)
+        print("distance_meetup: lx =", lx)
     dx = dz = None
     if lz is not None:
         dz = int(lz.sum())
@@ -1119,9 +1153,12 @@ def logop_meetup(Hx, Lx, max_m=None, verbose=False):
     #print(v)
     m = 1
     while m <= max_m:
-      if verbose: print("m =", m)
-      for idxs in choose(items, m):
-        for bits in numpy.ndindex((2,)*m):
+        if verbose: print("m =", m)
+        # ugh, do we really need to search all of these for the best? XXX
+        best = None
+        best_w = max_m+1 # ?
+        for idxs in choose(items, m):
+          for bits in numpy.ndindex((2,)*m):
             v[:] = 0
             for i,idx in enumerate(idxs):
                 v[idx] = bits[i]
@@ -1135,12 +1172,21 @@ def logop_meetup(Hx, Lx, max_m=None, verbose=False):
                 #print("*", end="")
                 l = (u+v)%2
                 assert dot2(Hx, l).sum() == 0
-                if dot2(Lx, l).sum():
-                    if verbose: print("lookup size:", len(lookup))
-                    #print("found")
-                    return l
-      #print()
-      m += 1
+                if dot2(Lx, l).sum() == 0:
+                    continue
+                # ugh, stupid and slow but works (where is my brain?)
+                w = l.sum()
+                if w < best_w:
+                    best_w = w
+                    best = l
+                #print("found")
+                #return l
+        if best is not None:
+            if verbose:
+                print("lookup size:", len(lookup))
+            return best
+        #print()
+        m += 1
 
 
 
@@ -1150,6 +1196,7 @@ def test_distance():
     d = argv.get("d", 3)
 
     for trial in range(100):
+        print()
         code = CSSCode.random(n, n//2, n//2, d, check=False)
         print(code)
         #print(code.longstr())
@@ -1157,6 +1204,8 @@ def test_distance():
         print("distance_z3: ", d0)
         d1 = distance_meetup(code, verbose=True)
         print("distance_meetup: ", d1)
+        #d_x, d_z = code.bz_distance()
+        #print("bz_distance:", d_x, d_z)
         assert d0==d1, (d0, d1, d0==d1)
 
     return
@@ -2095,6 +2144,7 @@ if __name__ == "__main__":
     if _seed is not None:
         print("seed(%s)"%(_seed))
         seed(_seed)
+        ra.seed(_seed)
 
     if profile:
         import cProfile as profile

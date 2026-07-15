@@ -1008,185 +1008,120 @@ def get_logops(css):
     return ops
             
 
+def get_subcode(css, idxs):
+    """ 
+    Find the subspace of the Hx sector that lives within idxs.
+    These form the Hx stabilizers of a stabilizer state.
+    """
+    idxs = list(idxs)
+    idxs.sort()
 
-#def find_shor_rev():
-#    src = construct.get_golay()
-#    print(src)
-#    print(src.longstr())
-#
-#    tgt = construct.get_ghz(8)
-#    print(tgt)
-#    print(tgt.longstr())
-#
-#    src = src.to_css()
-#    tgt = tgt.to_css()
-#
-#    # mx ---Hx.t--> n --Hz--> mz : 0
-#    # |             |         |
-#    # |fx           |fn       |fz
-#    # |             |         |
-#    # v             v         v
-#    # mx ---Hx.t--> n --Hz--> mz : 1
-#
-#    Hz0, Hxt0 = Matrix(src.Hz), Matrix(src.Hx).t
-#    Hz1, Hxt1 = Matrix(tgt.Hz), Matrix(tgt.Hx).t
-#    assert ( Hz0 * Hxt0 ).is_zero()
-#    assert ( Hz1 * Hxt1 ).is_zero()
-#
-#    Lz0, Lx0 = Matrix(src.Lz), Matrix(src.Lx)
-#    Lz1, Lx1 = Matrix(tgt.Lz), Matrix(tgt.Lx)
-#
-#    mx0, mx1 = Hxt0.shape[1], Hxt1.shape[1]
-#    n0, n1 = Hz0.shape[1], Hz1.shape[1]
-#    assert (n0, n1) == (Hxt0.shape[0], Hxt1.shape[0])
-#    mz0, mz1 = Hz0.shape[0], Hz1.shape[0]
-#
-#    # solver -------------------------------
-#
-#    solver = Solver()
-#    add = solver.add
-#
-#    #fx = UMatrix.unknown(mx1, mx0) # mx1<--mx0
-#    #fn = UMatrix.unknown(n1, n0) # n1<--n0
-#    fz = UMatrix.unknown(mz1, mz0) # mx1<--mx0
-#
-#    fn = zeros2(n1, n0)
-#    i = 0
-#    for j in range(n0):
-#        if Hxt0[j,0]:
-#            print(j)
-#            fn[i,j] = 1
-#            i += 1
-#    fn = Matrix(fn)
-#    #print(fn)
-#    #print(Hxt0.t)
-#    #print(fn.shape)
-#
-#    #fx = Matrix([[1]*mx0])
-#    fx = zeros2(mx1, mx0)
-#    fx[0,0] = 1
-#    fx = Matrix(fx)
-#
-#    print(fx.shape) 
-#    print(fz.shape)
-#
-#    print( fn*Hxt0 == Hxt1*fx)
-#    print( fn*Hxt0 )
-#    print()
-#    print( Hxt1*fx)
-    
+    css = css.to_css()
+    Hx = Matrix(css.Hx)
+    Hz = Matrix(css.Hz)
 
-def find_shor():
-    src = construct.get_ghz(8)
-    tgt = construct.get_golay()
+    mx, n = Hx.shape
+    #print("get_subcode", idxs)
+
+    I = Matrix.identity(n)
+    P = I[idxs, :]
+    PHxt = P * Hx.t
+    #print(Hx, Hx.shape)
+    #print(P)
+    #print()
+    Jx = (P.t * PHxt).t
+    #print(Jx, Jx.shape)
+
+    K = Jx.intersect(Hx)
+    #print("K =")
+    #print(K)
+
+    Kx = K*P.t
+    #print("Kx:")
+    #print(Kx)
+
+    Kz = Kx.kernel()
+    #print("Kz:")
+    #print(Kz)
+
+    src = CSSCode(Hx=Kx, Hz=Kz)
+    return src
+
+def chainmap_inclusion(src, tgt, idxs):
 
     src = src.to_css()
     tgt = tgt.to_css()
 
-    # mx ---Hx.t--> n --Hz--> mz : 0
-    # |             |         |
-    # |fx           |fn       |fz
-    # |             |         |
-    # v             v         v
-    # mx ---Hx.t--> n --Hz--> mz : 1
+    # src  mx ---Hx.t--> n --Hz--> mz : 0
+    #  |   |             |         |
+    #  |   |fx           |fn       |fz
+    #  |   |             |         |
+    #  v   v             v         v
+    # tgt  mx ---Hx.t--> n --Hz--> mz : 1
 
     Hz0, Hxt0 = Matrix(src.Hz), Matrix(src.Hx).t
     Hz1, Hxt1 = Matrix(tgt.Hz), Matrix(tgt.Hx).t
+
     assert ( Hz0 * Hxt0 ).is_zero()
     assert ( Hz1 * Hxt1 ).is_zero()
-
-    Lz0, Lx0 = Matrix(src.Lz), Matrix(src.Lx)
-    Lz1, Lx1 = Matrix(tgt.Lz), Matrix(tgt.Lx)
 
     mx0, mx1 = Hxt0.shape[1], Hxt1.shape[1]
     n0, n1 = Hz0.shape[1], Hz1.shape[1]
     assert (n0, n1) == (Hxt0.shape[0], Hxt1.shape[0])
     mz0, mz1 = Hz0.shape[0], Hz1.shape[0]
 
-    # solver -------------------------------
-
-    solver = Solver()
-    add = solver.add
-
-    fx = UMatrix.unknown(mx1, mx0) # mx1<--mx0
-    #fn = UMatrix.unknown(n1, n0) # n1<--n0
-    fz = UMatrix.unknown(mz1, mz0) # mx1<--mx0
-
-    #print(Hxt1)
-    fn = zeros2(n1, n0)
-    i = 0
-    for j in range(n1):
-        if Hxt1[j,0]:
-            #print(j)
-            fn[j,i] = 1
-            i += 1
-    fn = Matrix(fn)
-    print("fn:")
-    print(fn)
+    fn = Matrix.identity(n1)[:, idxs]
+    #print("fn:")
+    #print(fn)
 
     #print("Hz0 inv:")
     r = ~Hz0 # an extension needs a retraction 
 
     fz = Hz1*fn*r
-    print("fz:")
-    print(fz)
+    #print("fz:")
+    #print(fz)
 
     s = ~Hxt1 # a lift needs a section
     fx = s*fn*Hxt0
-    print("fx:")
-    print(fx)
+    #print("fx:")
+    #print(fx)
 
     assert (Hxt1*fx == fn*Hxt0)
     assert (fz*Hz0 == Hz1*fn)
 
+    return (fx, fn, fz)
 
-    return
+
+
+def test_subcode():
+    tgt = construct.get_golay()
+    n = tgt.n
+
+    op = ".X...........XX...XXX.XX"
+    idxs = [i for i in range(n) if op[i]=="X"]
+
+    src = get_subcode(tgt, idxs)
+    rhs = construct.get_ghz(8).to_css()
+    assert src.is_equiv(rhs)
+    fx, fn, fz = chainmap_inclusion(src, tgt, idxs)
+
+    idxs = [1, 13, 14, 18, 19, 20, 22, 23]
+
+    idxs = [0, 1, 12, 13, 14, 17, 18, 19, 20, 21, 22, 23] # rank 2
+    src = get_subcode(tgt, idxs)
+    assert len(src.Hx) == 2
+    fx, fn, fz = chainmap_inclusion(src, tgt, idxs)
+
+    # random
+    idxs = set()
+    while len(idxs) < 16:
+        idxs.add(randint(0, n-1))
+    idxs = list(idxs)
+    idxs.sort()
+    src = get_subcode(tgt, idxs)
+    #print(src.Hx)
+    fx, fn, fz = chainmap_inclusion(src, tgt, idxs)
     
-    add(Hxt1*fx == fn*Hxt0)
-    add(fz*Hz0 == Hz1*fn)
-
-    # ---------------------------------------
-
-    print()
-    print("solve:")
-    count = 0
-    prev = None
-    while 1:
-        result = solver.check()
-        if str(result) != "sat":
-            break
-        count += 1
-    
-        model = solver.model()
-        _fx = fx.get_interp(model)
-        #_fn = fn.get_interp(model)
-        _fn = fn
-        _fz = fz.get_interp(model)
-
-        assert (Hxt1*_fx == _fn*Hxt0)
-        assert (Hz1*_fn == _fz*Hz0)
-
-        result = (_fx, _fn, _fz)
-        assert result != prev
-        #yield result
-        print("fx:")
-        print(_fx)
-        print("fz:")
-        print(_fz)
-        print("fz*Hz0:")
-        print(_fz*Hz0 )
-
-        prev = (_fx, _fn, _fz)
-
-        add(Not(And(fx==_fx, fn==_fn, fz==_fz)))
-        add(fn != _fn)
-
-        #break
-        #if count>10:
-        #    break
-
-    print("count =", count)
-
 
 
 def find_chainmap(src, tgt, injective=False):
