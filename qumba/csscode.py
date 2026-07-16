@@ -2,10 +2,9 @@
 
 """
 
-TODO: 
-
-argh, uses numpy matrices, port to use Matrix objects
-
+Previous verion is csscode_lin.py which uses numpy matrices.
+Here we are half-way through a port to use Matrix objects,
+and many things are probably broken. Please fix.
 
 """
 
@@ -18,20 +17,57 @@ cache = lru_cache(None)
 
 import numpy
 import numpy.random as ra
-from numpy.linalg import lstsq
-from numpy import concatenate as cat
-dot = numpy.dot
+#from numpy import concatenate as cat
+#dot = numpy.dot
 
-from qumba import lin
+#from qumba import lin
 from qumba import qcode
 from qumba.qcode import QCode, SymplecticSpace
 from qumba.isomorph import Tanner, search
-from qumba.lin import (
-    shortstr, shortstrx, eq2, dot2, compose2, rand2, enum2,
-    pop2, insert2, append2, array2, zeros2, identity2, rank, linear_independent)
+#from qumba.lin import (
+#    shortstr, shortstrx, eq2, dot2, compose2, rand2, enum2,
+#    pop2, insert2, append2, array2, zeros2, identity2, rank, linear_independent)
 from qumba.action import Perm
 from qumba.matrix import Matrix
 from qumba.argv import argv
+
+
+def demote(M):
+    if M is None:
+        pass
+    elif isinstance(M, numpy.ndarray):
+        pass
+    else:
+        assert isinstance(M, Matrix)
+        M = M.A
+    return M
+
+promote = Matrix.promote
+
+zeros2 = lambda *shape : Matrix.zeros(shape)
+shortstr = str
+shortstrx = lambda *items : shortstrx(*[M.A for M in items])
+eq2 = lambda A,B:A==B
+dot2 = lambda A,B:promote(A)*promote(B)
+compose2 = lambda A,B:B*A
+identity2 = Matrix.identity
+rand2 = Matrix.rand
+rank = Matrix.rank
+
+import lin as _lin
+class lin:
+    linear_independent = Matrix.linear_independent
+
+    @staticmethod
+    def find_logops(Hx, Hz, verbose=False):
+        Hx = demote(Hx)
+        Hz = demote(Hz)
+        Lz = _lin.find_logops(Hx, Hz, verbose=verbose)
+        return Matrix(Lz)
+
+    solve = Matrix.solve
+    kernel = Matrix.kernel
+    span = Matrix.span
 
 
 
@@ -135,10 +171,10 @@ def find_logicals(Ax, Az):
     print("logicals:", len(logicals))
     gens = logicals
 
-    from sage.all_cmdline import GF, matrix, MatrixGroup
+    from sage.all_cmdline import GF, matrix, _MatrixGroup
     field = GF(2)
     logicals = [matrix(field, kk, A.A.copy()) for A in logicals]
-    G = MatrixGroup(logicals)
+    G = _MatrixGroup(logicals)
     print("|G| =", G.order())
     print("G =", G.structure_description())
 
@@ -202,8 +238,10 @@ def check_conjugate(A, B):
     if A is None or B is None:
         return
     assert A.shape == B.shape
-    I = numpy.identity(A.shape[0], dtype=numpy.int32)
-    assert eq2(dot(A, B.transpose())%2, I)
+    #I = numpy.identity(A.shape[0], dtype=numpy.int32)
+    #assert eq2(dot(A, B.transpose())%2, I)
+    I = Matrix.identity(A.shape[0])
+    assert A*B.t == I
 
 
 def check_commute(A, B):
@@ -216,23 +254,7 @@ def check_commute(A, B):
 def direct_sum(A, B):
     if A is None or B is None:
         return None
-    m = A.shape[0] + B.shape[0] # rows
-    n = A.shape[1] + B.shape[1] # cols
-    C = zeros2(m, n)
-    C[:A.shape[0], :A.shape[1]] = A
-    C[A.shape[0]:, A.shape[1]:] = B
-    return C
-
-
-def demote(M):
-    if M is None:
-        pass
-    elif isinstance(M, numpy.ndarray):
-        pass
-    else:
-        assert isinstance(M, Matrix)
-        M = M.A
-    return M
+    return A<<B
 
 
 class CSSCode(object):
@@ -245,16 +267,16 @@ class CSSCode(object):
             Ax=None, Az=None,
             build=True, check=True, verbose=False, logops_only=False, dx=None, dz=None):
 
-        Lx = demote(Lx)
-        Lz = demote(Lz)
-        Hx = demote(Hx)
-        Tz = demote(Tz)
-        Hz = demote(Hz)
-        Tx = demote(Tx)
-        Gx = demote(Gx)
-        Gz = demote(Gz)
-        Ax = demote(Ax)
-        Az = demote(Az)
+        Lx = promote(Lx)
+        Lz = promote(Lz)
+        Hx = promote(Hx)
+        Tz = promote(Tz)
+        Hz = promote(Hz)
+        Tx = promote(Tx)
+        Gx = promote(Gx)
+        Gz = promote(Gz)
+        Ax = promote(Ax)
+        Az = promote(Az)
 
         if Hx is None and Hz is not None:
             # This is a classical code
@@ -374,14 +396,19 @@ class CSSCode(object):
             code = self + code
         return code
 
-    def __hash__(self): # do we mutate ? check this...
-        ss = []
-        for H in [
+#    def __hash__(self): # do we mutate ? check this...
+#        ss = []
+#        for H in [
+#            self.Lx, self.Lz, self.Hx,
+#            self.Tz, self.Hz, self.Tx]:
+#            if H is not None:
+#                ss.append(H.tobytes())
+#        return hash(tuple(ss))
+
+    def __hash__(self): # TODO: check we don't mutate
+        return hash((
             self.Lx, self.Lz, self.Hx,
-            self.Tz, self.Hz, self.Tx]:
-            if H is not None:
-                ss.append(H.tobytes())
-        return hash(tuple(ss))
+            self.Tz, self.Hz, self.Tx))
 
     def build_from_gauge(self, check=True, verbose=False):
 
@@ -517,6 +544,10 @@ class CSSCode(object):
 
         assert len(Lx)==k
 
+        #print("Lx")
+        #print(Lx, Lx.shape)
+        #print("Hx")
+        #print(Hx, Hx.shape)
         if check:
             check_commute(Lx, Hz)
             check_commute(Lz, Hx)
@@ -529,7 +560,11 @@ class CSSCode(object):
         #assert eq2(dot2(U, A), I)
         #assert eq2(dot2(Lz, Lx.transpose(), A), I)
 
-        Lx = dot2(A.transpose(), Lx)
+        #print(A.shape)
+
+        #Lx = dot2(A.transpose(), Lx)
+        Lx = A.t*Lx
+        #print(Lx.shape)
 
         if check:
             check_conjugate(Lz, Lx)
@@ -538,34 +573,37 @@ class CSSCode(object):
 
             # Find Tz --------------------------
             _write('Find(Tz):')
-            U = zeros2(mx+k, n)
-            U[:mx] = Hx
-            U[mx:] = Lx
-            B = zeros2(mx+k, mx)
-            B[:mx] = identity2(mx)
+            U = _lin.zeros2(mx+k, n)
+            assert U.shape == (mx+k, n)
+            U[:mx, :] = Hx.A
+            #print(U[mx:].shape, Lx.shape)
+            U[mx:, :] = Lx.A
+            B = _lin.zeros2(mx+k, mx)
+            B[:mx] = _lin.identity2(mx)
     
-            Tz_t = lin.solve(U, B)
+            Tz_t = _lin.solve(U, B)
             Tz = Tz_t.transpose()
             assert len(Tz) == mx
     
-            check_conjugate(Hx, Tz)
-            check_commute(Lx, Tz)
-    
             # Find Tx --------------------------
             _write('Find(Tx):')
-            U = zeros2(n, n)
-            U[:mz] = Hz
-            U[mz:mz+k] = Lz
+            U = _lin.zeros2(n, n)
+            U[:mz] = Hz.A
+            U[mz:mz+k] = Lz.A
             U[mz+k:] = Tz
     
-            B = zeros2(n, mz)
-            B[:mz] = identity2(mz)
-            Tx_t = lin.solve(U, B)
+            B = _lin.zeros2(n, mz)
+            B[:mz] = _lin.identity2(mz)
+            Tx_t = _lin.solve(U, B)
             Tx = Tx_t.transpose()
+            Tx = Matrix(Tx)
+            Tz = Matrix(Tz)
     
             _write('\n')
         
             if check:
+                check_conjugate(Hx, Tz)
+                check_commute(Lx, Tz)
                 check_conjugate(Hz, Tx)
                 check_commute(Lz, Tx)
                 check_commute(Tz, Tx)
@@ -622,17 +660,15 @@ class CSSCode(object):
             #d = 56
             #print(1-2*H(1.*distance/n)) # works!
     
-            Hz = rand2(mz, n)
-            #print(shortstr(Hz))
-            if rank(Hz) < mz:
+            Hz = Matrix.rand(mz, n)
+            if Hz.rank() < mz:
                 continue
-            kern = numpy.array(lin.kernel(Hz))
-            #print("kern:", kern.shape)
-    
-            Hx = zeros2(mx, n)
-            for i in range(mx):
-                v = rand2(1, n-mz)
-                Hx[i] = dot2(v, kern)
+            K = Hz.kernel()
+            #print("Hz:")
+            #print(Hz, Hz.shape)
+            #print("K:")
+            #print(K, K.shape)
+            Hx = Matrix.rand(mx, len(K)) * K
             C = cls(Hx=Hx, Hz=Hz, **kw)
     
             if distance is None:
@@ -658,7 +694,7 @@ class CSSCode(object):
             self.Lz, self.Lx, 
             self.Hz, self.Tx, 
             self.Hx, self.Tz, self.Gz, self.Gx, 
-            build, self.check or check)
+            build=build, check=self.check or check)
         self._dual = code
         return code
 
@@ -849,7 +885,8 @@ class CSSCode(object):
         dx = self.n
         for u in lin.span(self.Hx):
             for v in Lx:
-                w = (u+v)%2
+                #w = (u+v)%2
+                w = u+v
                 d = w.sum()
                 if 0<d<dx:
                     dx = d
@@ -862,7 +899,8 @@ class CSSCode(object):
         dz = self.n
         for u in lin.span(self.Hz):
             for v in Lz:
-                w = (u+v)%2
+                #w = (u+v)%2
+                w = u+v
                 d = w.sum()
                 if 0<d<dz:
                     dz = d
@@ -953,9 +991,9 @@ def find_z3(n, mx, mz, d=None):
     solver = Solver()
     add = solver.add
 
-    Hx = zeros2(mx, n)
-    Hx[:, :mx] = identity2(mx)
-    Hz = zeros2(mz, n)
+    #Hx = zeros2(mx, n)
+    #Hx[:, :mx] = identity2(mx)
+    #Hz = zeros2(mz, n)
 
     Hx = UMatrix.unknown(mx, n)
     Hx[:, :mx] = identity2(mx)
@@ -1014,9 +1052,21 @@ def find_z3(n, mx, mz, d=None):
     Tz = Tz.get_interp(model)
     Tx = Tx.get_interp(model)
 
-    code = CSSCode(Hx=Hx.A, Hz=Hz.A, Lx=Lx.A, Lz=Lz.A, Tx=Tx.A, Tz=Tz.A, check=True)
-    #code = CSSCode(Hx=Hx.A, Hz=Hz.A, check=True)
+    code = CSSCode(Hx=Hx, Hz=Hz, Lx=Lx, Lz=Lz, Tx=Tx, Tz=Tz, check=True)
     return code
+
+
+def test():
+
+    css = CSSCode.random(20, 5, 5)
+    print(css)
+    dual = css.get_dual()
+    print(dual)
+
+    code = find_z3(15, 7, 7, 3)
+    code.bz_distance()
+    d_x, d_z = (code.distance())
+    print(code, d_x, d_z)
 
 
 def test_find():

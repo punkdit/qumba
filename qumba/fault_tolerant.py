@@ -1059,8 +1059,8 @@ def chainmap_inclusion(src, tgt, idxs):
     #  v   v             v         v
     # tgt  mx ---Hx.t--> n --Hz--> mz : 1
 
-    Hz0, Hxt0 = Matrix(src.Hz), Matrix(src.Hx).t
-    Hz1, Hxt1 = Matrix(tgt.Hz), Matrix(tgt.Hx).t
+    Hz0, Hxt0 = (src.Hz), (src.Hx).t
+    Hz1, Hxt1 = (tgt.Hz), (tgt.Hx).t
 
     assert ( Hz0 * Hxt0 ).is_zero()
     assert ( Hz1 * Hxt1 ).is_zero()
@@ -1136,13 +1136,13 @@ def find_chainmap(src, tgt, injective=False):
     src = src.to_css()
     tgt = tgt.to_css()
 
-    Hz0, Hxt0 = Matrix(src.Hz), Matrix(src.Hx).t
-    Hz1, Hxt1 = Matrix(tgt.Hz), Matrix(tgt.Hx).t
+    Hz0, Hxt0 = (src.Hz), (src.Hx).t
+    Hz1, Hxt1 = (tgt.Hz), (tgt.Hx).t
     assert ( Hz0 * Hxt0 ).is_zero()
     assert ( Hz1 * Hxt1 ).is_zero()
 
-    Lz0, Lx0 = Matrix(src.Lz), Matrix(src.Lx)
-    Lz1, Lx1 = Matrix(tgt.Lz), Matrix(tgt.Lx)
+    Lz0, Lx0 = (src.Lz), (src.Lx)
+    Lz1, Lx1 = (tgt.Lz), (tgt.Lx)
 
     mx0, mx1 = Hxt0.shape[1], Hxt1.shape[1]
     n0, n1 = Hz0.shape[1], Hz1.shape[1]

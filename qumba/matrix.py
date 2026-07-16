@@ -57,7 +57,7 @@ def complement(H):
     return W
 
 
-class Matrix(object):
+class Matrix:
     def __init__(self, A, p=DEFAULT_P, shape=None, name="?"):
         #if type(A) == list or type(A) == tuple:
         if isinstance(A, (list,tuple)):
@@ -666,6 +666,9 @@ def pullback(j, k, j1=None, k1=None):
 def test():
     I = Matrix.identity(5)
     assert I*I == I
+
+    A = numpy.array(I)
+    print(A)
 
 
 def mstr(M):
