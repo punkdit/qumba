@@ -18,7 +18,7 @@ from qumba import lin
 from qumba.lin import (
     array2, zeros2, shortstr, dot2, solve2, linear_independent, row_reduce, kernel,
     span, intersect, rank, enum2, shortstrx, identity2, eq2, pseudo_inverse)
-from qumba.matrix import Matrix, flatten
+from qumba.matrix import Matrix, flatten, demote
 from qumba.symplectic import SymplecticSpace, symplectic_form
 from qumba.argv import argv
 from qumba.smap import SMap
@@ -56,8 +56,8 @@ def css_to_symplectic(Lx, Lz):
     assert Lz.shape == Lx.shape
     m, n = Lx.shape
     L = zeros2(2*m, n, 2)
-    L[0::2, :, 0] = Lx
-    L[1::2, :, 1] = Lz
+    L[0::2, :, 0] = demote(Lx)
+    L[1::2, :, 1] = demote(Lz)
     L = flatten(L)
     return L
 
@@ -67,8 +67,8 @@ def css_to_isotropic(Hx, Hz):
     mz, n1 = Hz.shape
     assert n==n1
     H = zeros2(mx+mz, n, 2)
-    H[:mx, :, 0] = Hx
-    H[mx:, :, 1] = Hz
+    H[:mx, :, 0] = demote(Hx)
+    H[mx:, :, 1] = demote(Hz)
     return H
 
 

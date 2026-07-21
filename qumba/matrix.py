@@ -33,6 +33,19 @@ def flatten(H):
     return H
 
 
+def demote(M):
+    if M is None:
+        pass
+    elif isinstance(M, numpy.ndarray):
+        pass
+    else:
+        assert isinstance(M, Matrix)
+        M = M.A
+    return M
+
+
+
+
 def complement(H):
     H = flatten(H)
     H = row_reduce(H)

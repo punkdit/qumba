@@ -17,30 +17,14 @@ cache = lru_cache(None)
 
 import numpy
 import numpy.random as ra
-#from numpy import concatenate as cat
-#dot = numpy.dot
 
-#from qumba import lin
 from qumba import qcode
 from qumba.qcode import QCode, SymplecticSpace
 from qumba.isomorph import Tanner, search
-#from qumba.lin import (
-#    shortstr, shortstrx, eq2, dot2, compose2, rand2, enum2,
-#    pop2, insert2, append2, array2, zeros2, identity2, rank, linear_independent)
 from qumba.action import Perm
-from qumba.matrix import Matrix
+from qumba.matrix import Matrix, demote
 from qumba.argv import argv
 
-
-def demote(M):
-    if M is None:
-        pass
-    elif isinstance(M, numpy.ndarray):
-        pass
-    else:
-        assert isinstance(M, Matrix)
-        M = M.A
-    return M
 
 promote = Matrix.promote
 
@@ -54,7 +38,7 @@ identity2 = Matrix.identity
 rand2 = Matrix.rand
 rank = Matrix.rank
 
-import lin as _lin
+import qumba.lin as _lin
 class lin:
     linear_independent = Matrix.linear_independent
 
@@ -668,7 +652,10 @@ class CSSCode(object):
             #print(Hz, Hz.shape)
             #print("K:")
             #print(K, K.shape)
-            Hx = Matrix.rand(mx, len(K)) * K
+            while 1:
+                Hx = Matrix.rand(mx, len(K)) * K
+                if Hx.rank() == mx:
+                    break
             C = cls(Hx=Hx, Hz=Hz, **kw)
     
             if distance is None:
@@ -1120,11 +1107,11 @@ def distance_lower_bound_z3(Hx, Lx, d):
     model = solver.model()
     v = [model.evaluate(v[i]) for i in range(n)]
     v = [int(eval(str(vi))) for vi in v]
-    v = array2(v)
+    v = _lin.array2(v)
 
-    u = dot2(Hx, v)
+    u = _lin.dot2(Hx, v)
     assert u.sum() == 0, "bug bug... try updating z3? pip3 install z3-solver"
-    u = dot2(Lx, v)
+    u = _lin.dot2(Lx, v)
     assert u.sum() != 0, "bug bug... try updating z3? pip3 install z3-solver"
     assert v.sum() <= d, ("v.sum()==%d: bug bug... try updating z3? pip3 install z3-solver"%v.sum())
     return v

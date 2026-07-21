@@ -2071,6 +2071,7 @@ def get_code(name, **kw):
 
 def test():
     code = get_code("qc20")
+    print(code)
 
 
 

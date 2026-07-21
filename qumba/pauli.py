@@ -1115,6 +1115,37 @@ def test_enum_css():
     print(count, len(found))
 
 
+def test_find_wenum():
+    from qumba.csscode import CSSCode
+
+    n = argv.get("n", 6)
+    m = argv.get("m", n//2)
+    count = argv.get("count", 22)
+
+    print("(n, m) =", (n, m))
+    print("count =", count)
+
+    found = set()
+    while len(found) < count:
+        css = CSSCode.random(n, m, n-m)
+        #Hz, Hx = css.Hz, css.Hx
+        #print(Hz, len(Hz), Hz.rank())
+        #print(Hx, len(Hx), Hx.rank())
+        #print()
+        code = css.to_qcode()
+        w = PauliCode.from_qcode(code).weight_enum()
+        items = list(w.items())
+        items.sort()
+        w = tuple(items)
+        if w not in found:
+            #print(css)
+            found.add(w)
+            #print(w)
+            print("[%d]"%len(found), end='', flush=True)
+    #print(len(found))
+    print("\ndone.")
+
+
 
 if __name__ == "__main__":
 
