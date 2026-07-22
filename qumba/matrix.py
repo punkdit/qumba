@@ -530,7 +530,6 @@ class Matrix:
             wenum[v.sum()] += 1
         return tuple(wenum[i] for i in range(n+1))
 
-
     def get_pivots(H):
         "return pivots of a normal_form"
         m, nn = H.shape
@@ -558,6 +557,7 @@ class Matrix:
         #print("V =")
         #print(V)
         m, n = V.shape
+        #print("get_graph", m, n)
         g = Graph(n+m, True) # bits + checks
         for bit in range(n):
             checks = [n+check for check in range(m) if V[check, bit]]
@@ -568,8 +568,9 @@ class Matrix:
         ])
         return g
 
-    def get_isomorphism(self, other):
+    def get_isomorphism_slow(self, other):
         "find a column permutation self-->other"
+        assert isinstance(other, Matrix)
         import pynauty
         lhs = self.get_graph()
         rhs = other.get_graph()
@@ -584,7 +585,7 @@ class Matrix:
         m, n = self.shape
         return iso[:n]
 
-    def get_autos(self):
+    def get_autos_slow(self):
         m, n = self.shape
         assert m <= 20, ("um... %s is too big ??"%(m))
         from pynauty import Graph, autgrp
@@ -595,6 +596,95 @@ class Matrix:
         perms = [perm[:n] for perm in gen]
         return N, perms
 
+    def get_tanner(self):
+        "encode tanner graph into a pynauty Graph"
+        from pynauty import Graph
+        V = self.A
+        m, n = V.shape
+        #print("get_graph", m, n)
+        g = Graph(n+m, True) # bits + checks
+        for bit in range(n):
+            checks = [n+check for check in range(m) if V[check, bit]]
+            g.connect_vertex(bit, checks)
+        g.set_vertex_coloring([
+            set(i for i in range(n)),
+            set(range(n, m+n))
+        ])
+        return g
+
+    def get_lw_span(A):
+        rows = [v for v in A.span() if v.sum()]
+        ws = {int(v.sum()) for v in rows}
+        ws = list(ws)
+        ws.sort()
+        rows.sort(key = lambda v:v.sum())
+        k = A.rank()
+        while ws:
+            w = ws.pop(0)
+            sows = [v for v in rows if v.sum() <= w]
+            A1 = Matrix(sows)
+            if A1.rank() == k:
+                break
+        else:
+            assert 0
+        return A1
+
+    def get_isomorphism(A, B):
+        A1 = A.get_lw_span()
+        lhs = A1.get_tanner()
+    
+        B1 = B.get_lw_span()
+        rhs = B1.get_tanner()
+    
+        import pynauty
+        if not pynauty.isomorphic(lhs, rhs):
+            #print("not isomorphic")
+            return
+    
+        f = pynauty.canon_label(lhs) # lhs--f-->C
+        g = pynauty.canon_label(rhs) # rhs--g-->C
+        #print(f)
+        #print(g)
+    
+        iso = [None]*len(f)
+        for i in range(len(f)):
+            iso[f[i]] = g[i]
+        _, n = A.shape
+        iso = iso[:n]
+    
+        #print("iso:", iso)
+        A1 = A[:, iso]
+        B1 = B[:, iso]
+    
+        #K = B.solve(A1)
+    
+        #print("B[:, iso] =")
+        #print(B1)
+        #print()
+        #print("A =")
+        #print(A)
+    
+        K = B1.t.solve(A.t)
+        #print("K =")
+        #print(K, K.shape, K.rank())
+    
+        assert K.t*B1 == A
+    
+        return iso
+
+    def get_autos(self):
+        m, n = self.shape
+        assert m <= 20, ("um... %s is too big ??"%(m))
+        from pynauty import Graph, autgrp
+        A = self.get_lw_span()
+        g = A.get_tanner()
+        aut = autgrp(g)
+        gen = aut[0]
+        N = int(aut[1])
+        perms = [perm[:n] for perm in gen]
+        return N, perms
+
+    
 
 
 
@@ -787,8 +877,69 @@ def test_wenum():
     print(M.get_tutte())
 
 
+def test_isomorphism():
+    A = Matrix.parse("""
+    ...1..11...1
+    ...1.......1
+    ....111..1..
+    ..11111.11..
+    .1..11..1.1.
+    11.111......
+    """)
+    B = Matrix.parse("""
+    11...11..1..
+    1..11...1.1.
+    .1.1.11...11
+    1.1..1.1.111
+    111.11.1..11
+    111..111..11
+    """)
 
-    
+    iso = A.get_isomorphism(B)
+    assert iso == [8, 10, 1, 4, 2, 7, 0, 5, 9, 3, 11, 6]
+
+    A = Matrix.parse("""
+    11..1.11..1.
+    ...1......1.
+    ..1.1.1.1...
+    1.....1..111
+    11.11.11...1
+    1..1..111..1
+    """)
+    B = Matrix.parse("""
+    .1..1..1....
+    .1.1.1.....1
+    111.1....111
+    11..111...1.
+    .....11..1..
+    11..1....1..
+    """)
+    #print(A.get_wenum())
+    #print(B.get_wenum())
+
+    #iso = A.get_isomorphism(B)
+    #print(iso)
+    iso = A.get_isomorphism(B)
+    assert iso == [3, 7, 4, 2, 0, 8, 1, 6, 9, 5, 11, 10]
+
+    A = Matrix.parse("""
+    1...........11...111.1.1
+    .1...........11...111.11
+    ..1.........1111.11.1...
+    ...1.........1111.11.1..
+    ....1.........1111.11.1.
+    .....1......11.11..11..1
+    ......1......11.11..11.1
+    .......1......11.11..111
+    ........1...11.111...11.
+    .........1..1.1.1..1.111
+    ..........1.1..1..11111.
+    ...........11...111.1.11
+    """)
+
+    N, perms = A.get_autos()
+    assert N == 244823040 # M_24
+
 
 
 

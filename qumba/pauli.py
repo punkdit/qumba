@@ -22,6 +22,7 @@ from qumba.matrix import Matrix, DEFAULT_P, pullback
 from qumba.symplectic import symplectic_form, SymplecticSpace
 from qumba.clifford import Clifford, half
 from qumba.qcode import QCode, strop, css_to_isotropic
+from qumba.csscode import CSSCode
 from qumba.util import cross, allperms
 from qumba import construct
 
@@ -1116,7 +1117,6 @@ def test_enum_css():
 
 
 def test_find_wenum():
-    from qumba.csscode import CSSCode
 
     n = argv.get("n", 6)
     m = argv.get("m", n//2)
@@ -1144,6 +1144,46 @@ def test_find_wenum():
             print("[%d]"%len(found), end='', flush=True)
     #print(len(found))
     print("\ndone.")
+
+
+def test_collide():
+    # find non-isomorphic CSSCode's with same wenum
+    n = argv.get("n", 10)
+    m = argv.get("m", n//2)
+
+    print("(n, m) =", (n, m))
+
+    lookup = {}
+    while 1:
+        css = CSSCode.random(n, m, n-m)
+        code = css.to_qcode()
+        w = PauliCode.from_qcode(code).weight_enum()
+        items = list(w.items())
+        items.sort()
+        w = tuple(items)
+        if w not in lookup:
+            lookup[w] = css
+            print("[%d]"%len(lookup), end='', flush=True)
+            continue
+        prev = lookup[w]
+        print("/", end='', flush=True)
+        #print()
+        #print("prev.Hx =")
+        #print(prev.Hx)
+        #print("css.Hx =")
+        #print(css.Hx)
+        iso = prev.Hx.get_isomorphism(css.Hx)
+        print("\\", end='', flush=True)
+        if iso is None:
+            break
+        assert (iso * css).is_equiv(prev)
+    print()
+    print(css.longstr())
+    print(" !=")
+    print(prev.longstr())
+    print("wenum =")
+    print(w)
+    
 
 
 

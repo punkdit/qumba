@@ -373,11 +373,15 @@ class CSSCode(object):
             Hz=Hz, Tx=Tx, check=self.check)
         return code
 
-    def __rmul__(self, r):
-        assert type(r) is int
-        code = self
-        for i in range(r-1):
-            code = self + code
+    def __rmul__(self, op):
+        if type(op) is int:
+            code = self
+            for i in range(op-1):
+                code = self + code
+        elif isinstance(op, (list, tuple)) and len(op) == self.n:
+            code = self.apply_perm(op)
+        else:
+            raise TypeError( "what's this:%r"%(type(op),) )
         return code
 
 #    def __hash__(self): # do we mutate ? check this...
