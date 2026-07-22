@@ -1185,6 +1185,17 @@ def test_collide():
     print(w)
     
 
+def test_wenum_rand():
+    n = 8
+    m = n//2
+    css = CSSCode.random(n, m, n-m)
+    code = css.to_qcode()
+    w = PauliCode.from_qcode(code).weight_enum()
+    print(w)
+    items = list(w.items())
+    items.sort()
+    w = tuple(items)
+    #print(w)    
 
 
 if __name__ == "__main__":
