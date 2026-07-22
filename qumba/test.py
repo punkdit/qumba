@@ -2599,31 +2599,10 @@ def test_804():
 
 
 def test_isomorphism():
-#    code = QCode.fromstr("X. .Z")
-#    dode = code.apply_perm([1,0])
-#    iso = code.get_isomorphism(dode)
-#    assert iso == [1, 0]
-
-#    code = QCode.fromstr("""
-#    ...XZ
-#    ..ZZY
-#    XX...
-#    ZZZ..
-#    """, None, """
-#    ...YX
-#    X.XX.""")
-#
-#    code = QCode.fromstr("""
-#    X.Z..
-#    Z.YZ.
-#    .X..X
-#    .Z.ZZ""", None, """
-#    Y.X..
-#    XX.X.""")
-
-    #print(code)
-
-    #return
+    code = QCode.fromstr("X. .Z")
+    dode = code.apply_perm([1,0])
+    iso = code.get_isomorphism(dode)
+    assert iso == [1, 0]
 
     code = QCode.fromstr("""
     X...Z
@@ -2632,44 +2611,94 @@ def test_isomorphism():
     .ZYZZ
     """)
     assert code.d == 1
-    #code.get_distance()
-    #print(code)
-    #return
 
-    n = 9
+    code = construct.get_hexacode()
+    N, perms = code.get_autos()
+    assert N==60
+
+    n = 7
     count = 0
     while count < 10:
         m = n-1
         code = QCode.random(n, m)
         d = code.d
         assert d is not None
-        print(code)
-        print(code.longstr())
+        #print(code)
+        #print(code.longstr())
         code.get_distance()
         assert code.d == d, code
         idxs = list(range(n))
         shuffle(idxs)
-        print(idxs)
+        #print(idxs)
     
         dode = idxs * code
-        print(dode)
-        print(dode.longstr())
+        #print(dode)
+        #print(dode.longstr())
     
         f = dode.get_isomorphism(code)
-        print(f)
     
         assert (f*code).is_equiv(dode)
     
-        print(dode.get_distance())
         assert code.d == dode.d
 
+        N, perms = code.get_autos()
+        assert N>1 or idxs == f
 
         count += 1
+
+
+def get_random(n, m):
+    space = SymplecticSpace(n)
+
+    gens = []
+    for i in range(n):
+        gens.append(space.H(i))
+        gens.append(space.S(i))
+        for j in range(n):
+            if i!=j:
+                gens.append(space.CX(i,j))
+            if i<j:
+                gens.append(space.CZ(i,j))
+
+    E = space.get_identity()
+    N = 10*(n**2) # umm .. seems to be enough... ?
+    for k in range(N):
+        op = choice(gens)
+        E = op*E
+    #print(E)
+
+    idxs = [2*i for i in range(m)]
+    H = E[idxs, :]
+
+    code = QCode(H)
+    return code
+
+
+def test_random():
+    print("test_random")
+
+    n = 15
+    m = n-1
+
+    for trial in range(10):
+        code = get_random(n, m)
+        code.distance(method="z3")
+        print(code, end=' ', flush=True)
+    print()
+
+    return
+
+    print()
+    for trial in range(20):
+        code = QCode.random(n, m)
+        code.get_distance()
+        print(code)
 
 
 def test():
     print("\ntest()")
     get_422()
+    test_random()
     test_isomorphism()
     test_symplectic()
     test_concatenate()

@@ -19,7 +19,7 @@ from qumba.symplectic import symplectic_form, SymplecticSpace
 from qumba.clifford import Clifford, half
 from qumba.qcode import QCode, strop
 from qumba.util import cross, allperms
-from qumba import construct
+from qumba.construct import get_hexacode
 from qumba.lagrel import cup, cap, Lagrangian
 
 
@@ -97,19 +97,6 @@ def contract(codes, links):
         links = _links
 
     code = QCode(H)
-    return code
-
-
-def get_hexacode():
-    code = QCode.fromstr("""
-    XYXIIY
-    IXYXIY
-    IIXYXY
-    YZYIIZ
-    IYZYIZ
-    IIYZYZ
-    """) # Macwilliams-Sloane p598
-
     return code
 
 

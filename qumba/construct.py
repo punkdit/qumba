@@ -197,6 +197,19 @@ def get_913():
     """, None, "XXXXXXXXX ZZZZZZZZZ".split())
     
 
+def get_hexacode():
+    code = QCode.fromstr("""
+    XYXIIY
+    IXYXIY
+    IIXYXY
+    YZYIIZ
+    IYZYIZ
+    IIYZYZ
+    """) # Macwilliams-Sloane p598
+
+    return code
+
+
 
 def get_512():
     return QCode.fromstr("""
@@ -1411,6 +1424,7 @@ def get_autos(code):
         if dode.is_equiv(code):
             perms.append(idxs)
     return perms
+
 
 def test_hexacode():
     code = QCode.fromstr("""

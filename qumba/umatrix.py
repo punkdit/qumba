@@ -566,8 +566,8 @@ def get_random_qcode(n, m, distance=None, row_echelon=True):
         count += 1
         assert count < m*nn
 
-        print('.', flush=True, end='')
-    print()
+        #print('.', flush=True, end='')
+    #print()
 
     #print(count)
 

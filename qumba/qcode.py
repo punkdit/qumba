@@ -743,10 +743,7 @@ class QCode(object):
         return HL
 
     def get_distance(self, max_mk=22):
-        #print("get_distance:", self)
         L = self.get_logops()
-#        print("get_distance")
-#        print(self.longstr())
         kk = len(L)
         H = self.H
         m = len(H)
@@ -755,21 +752,16 @@ class QCode(object):
         if mk > max_mk:
             return None
         d = self.n
-#        print("HL =")
-#        print(strop(HL))
         for w in numpy.ndindex((2,)*mk):
             u, v = w[:m], w[m:]
             if sum(v) == 0:
                 continue
             v = dot2(w, HL)
-#            print("get_weight", w, v, end=' ')
             count = get_weight(v) # destructive
-#            print(count)
             if count:
                 d = min(count, d)
         if kk:
             self.d = d
-        #print("get_distance:", self)
         return d
 
     def distance(self, method=None, verbose=False):
