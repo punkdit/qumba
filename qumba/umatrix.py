@@ -6,7 +6,7 @@ sat / smt solving for unknown F_2 matrices, etc.
 from math import prod
 from functools import reduce
 from operator import add, matmul, mul
-from random import shuffle
+from random import shuffle, randint, choice
 
 import numpy
 
@@ -518,12 +518,101 @@ def test():
     print("done.")
 
 
+def get_random_qcode(n, m, distance=None, row_echelon=True):
+    assert distance is None, "TODO: add distance constraints"
+    nn = 2*n
+
+    H = UMatrix.unknown(m, nn)
+    space = SymplecticSpace(n)
+
+    solver = Solver()
+    add = solver.add
+
+    H = UMatrix.unknown(m, nn)
+    add( H*space.F*H.t == 0 )
+
+    if row_echelon:
+        # not much faster, if at all...
+        for i in range(m):
+            for j in range(m):
+                add( H[i,j] == int(i==j) )
+
+        idxs = [(i,j) for i in range(m) for j in range(m, nn)]
+
+    else:
+
+        idxs = [(i,j) for i in range(m) for j in range(nn)]
+
+    count = 0
+    while 1:
+        result = solver.check()
+        if str(result) != "sat":
+            break
+
+        model = solver.model()
+        H0 = H.get_interp(model)
+        #print(H0, H0.shape, H0.rank())
+        #print()
+        #add(H != H0)
+
+        solver.push()
+
+        i = randint(0, len(idxs)-1)
+        idx = idxs.pop(i)
+        val = randint(0, 1)
+        #print(idx, val)
+        add( H[idx] == val )
+
+        count += 1
+        assert count < m*nn
+
+        print('.', flush=True, end='')
+    print()
+
+    #print(count)
+
+    solver.pop()
+    found = []
+    while 1:
+        result = solver.check()
+        if str(result) != "sat":
+            break
+
+        model = solver.model()
+        H0 = H.get_interp(model)
+        #print(H0, H0.shape, H0.rank())
+        #print()
+        add(H != H0)
+        found.append(H0)
+
+    #print("choice from", len(found))
+    H0 = choice(found)
+    assert H0.rank() == m, "wut"
+    #H0 = H0.linear_independent()
+    code = QCode(H0)
+    return code
+
+
+def test_random():
+
+    n = argv.get("n", 15)
+    m = argv.get("m", n-1)
+
+    code = QCode.random(n, m)
+
+    print(code)
+    print(code.longstr())
+
+
+
+
 
 
 if __name__ == "__main__":
     from time import time
     start_time = time()
     fn = argv.next() or "test"
+    print(fn)
 
     if argv.profile:
         import cProfile as profile

@@ -373,6 +373,13 @@ class QCode(object):
             return False
         return True
 
+    @classmethod
+    def random(cls, n, m, distance=None):
+        assert n < 20, "too big... ?"
+        from qumba.umatrix import get_random_qcode
+        code = get_random_qcode(n, m, distance)
+        return code
+
     @cache 
     def to_css(self):
         from qumba.csscode import CSSCode
