@@ -211,6 +211,25 @@ def find_zx_duality(Ax, Az):
 
 
 
+def get_tanner(Hx, Hz):
+    "encode CSS tanner graph into a pynauty Graph"
+    from pynauty import Graph
+    mx, n = Hx.shape
+    mz, _ = Hz.shape
+    #print("get_graph", m, n)
+    g = Graph(n+mx+mz, True) # bits + checks
+    for bit in range(n):
+        checks  = [n+check for check in range(mx) if Hx[check, bit]]
+        checks += [n+mx+check for check in range(mz) if Hz[check, bit]]
+        g.connect_vertex(bit, checks)
+    g.set_vertex_coloring([
+        set(i for i in range(n)),
+        set(range(n, n+mx)),
+        set(range(n+mx, n+mx+mz))
+    ])
+    return g
+
+
 
 
 def sparsestr(A):
@@ -969,6 +988,47 @@ class CSSCode(object):
             else:
                 zxs.append(zx)
         return zxs
+
+    def get_isomorphism(css, dss):
+        import pynauty
+    
+        n = css.n
+        Hx = css.Hx.get_lw_span()
+        Hz = css.Hz.get_lw_span()
+        Jx = dss.Hx.get_lw_span()
+        Jz = dss.Hz.get_lw_span()
+    
+        lhs = get_tanner(Hx, Hz)
+        rhs = get_tanner(Jx, Jz)
+        if not pynauty.isomorphic(lhs, rhs):
+            return None
+    
+        f = pynauty.canon_label(lhs) # lhs--f-->C
+        g = pynauty.canon_label(rhs) # rhs--g-->C
+        #print(f)
+        #print(g)
+    
+        iso = [None]*len(f)
+        for i in range(len(f)):
+            iso[f[i]] = g[i]
+        iso = iso[:n]
+    
+        return iso
+
+    def get_autos(css):
+        from pynauty import Graph, autgrp
+        n = css.n
+        Hx = css.Hx.get_lw_span()
+        Hz = css.Hz.get_lw_span()
+        g = get_tanner(Hx, Hz)
+        aut = autgrp(g)
+        gen = aut[0]
+        N = int(aut[1])
+        perms = [perm[:n] for perm in gen]
+        return N, perms
+
+
+
 
 
 
@@ -2170,6 +2230,61 @@ def find_selfdual():
             #w4 = get_wenum4(css)
             #print("\t", w4)
             #print()
+
+
+
+def test_iso():
+
+    n = 10
+    m = 5
+    k = 1
+
+    for trial in range(10):
+        css = CSSCode.random(n, m, n-m-k, distance=2)
+        #css.bz_distance()
+    
+        idxs = list(range(n))
+        shuffle(idxs)
+    
+        dss = idxs * css
+    
+        dss.bz_distance()
+        print("get_isomorphism")
+        iso = dss.get_isomorphism(css)
+    
+        assert (iso*css).is_equiv(dss)
+
+        print("get_autos")
+        N, perms = css.get_autos()
+        assert N>1 or iso == idxs
+        print(N)
+        for iso in perms:
+            #print(iso)
+            assert (iso*css).is_equiv(css)
+
+        if 0:
+            code = css.to_qcode()
+            dode = dss.to_qcode()
+            iso = code.get_isomorphism(dode)
+            print(iso)
+            assert (iso*dode).is_equiv(code)
+
+        dss = CSSCode.random(n, m, n-m-k, distance=2)
+        assert dss.get_isomorphism(css) is None
+
+
+
+    from qumba import construct
+    css = construct.get_golay()
+    css = css.to_css()
+    print(css)
+
+    N, perms = css.get_autos()
+    assert N == 244823040
+
+
+    
+
 
 
 
