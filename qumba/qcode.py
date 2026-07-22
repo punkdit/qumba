@@ -180,6 +180,7 @@ class QCode(object):
         self.kk = 2*self.k
         self.d_lower_bound = d_lower_bound or 1
         self.d_upper_bound = d_upper_bound or n
+        #print("QCode.__init__", self)
         if d is not None:
             self.d = d
         self.shape = m, n
@@ -195,6 +196,7 @@ class QCode(object):
         self.name = name
         self.desc = desc
         self.attrs = attrs # serialize these attrs
+        #print("QCode.__init__", self)
 
         #if argv.store_db:
         #    from qumba import db
@@ -205,6 +207,10 @@ class QCode(object):
             return self.d_lower_bound
 
     def set_d(self, d):
+        #print(self, id(self), "set_d", d)
+        if self.d:
+            assert d==self.d, ("d has changed! %s --> %s"%(str(self), d))
+        #assert 0
         d = int(d)
         assert type(d) is int
         self.d_lower_bound = d
@@ -666,8 +672,8 @@ class QCode(object):
         if self.d is not None:
             return
 
-        if numpy.min(W) > 0 and self.d_lower_bound<2:
-            self.d_lower_bound = 2
+        #if numpy.min(W) > 0 and self.d_lower_bound<2:
+        #    self.d_lower_bound = 2 # WRONG
 
         if self.n > 100:
             return
@@ -684,13 +690,14 @@ class QCode(object):
         if self.k == 0:
             return
 
-        from qumba.distance import distance_meetup
-        max_m = argv.get("max_m", 5)
-        d = distance_meetup(self, max_m)
-        if d is None:
-            self.d_lower_bound = 2*max_m + 1
-        else:
-            self.d = d
+        # XXX broken
+        #from qumba.distance import distance_meetup
+        #max_m = argv.get("max_m", 5)
+        #d = distance_meetup(self, max_m)
+        #if d is None:
+        #    self.d_lower_bound = 2*max_m + 1
+        #else:
+        #    self.d = d
 
     def get_destabilizers(self):
         if self.T is not None:
@@ -736,7 +743,10 @@ class QCode(object):
         return HL
 
     def get_distance(self, max_mk=22):
+        #print("get_distance:", self)
         L = self.get_logops()
+#        print("get_distance")
+#        print(self.longstr())
         kk = len(L)
         H = self.H
         m = len(H)
@@ -745,16 +755,21 @@ class QCode(object):
         if mk > max_mk:
             return None
         d = self.n
+#        print("HL =")
+#        print(strop(HL))
         for w in numpy.ndindex((2,)*mk):
             u, v = w[:m], w[m:]
             if sum(v) == 0:
                 continue
             v = dot2(w, HL)
+#            print("get_weight", w, v, end=' ')
             count = get_weight(v) # destructive
+#            print(count)
             if count:
                 d = min(count, d)
         if kk:
             self.d = d
+        #print("get_distance:", self)
         return d
 
     def distance(self, method=None, verbose=False):

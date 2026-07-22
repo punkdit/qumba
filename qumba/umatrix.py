@@ -544,7 +544,7 @@ def get_random_qcode(n, m, distance=None, row_echelon=True):
         idxs = [(i,j) for i in range(m) for j in range(nn)]
 
     count = 0
-    while 1:
+    while len(idxs):
         result = solver.check()
         if str(result) != "sat":
             break
@@ -571,7 +571,9 @@ def get_random_qcode(n, m, distance=None, row_echelon=True):
 
     #print(count)
 
+    #if str(result) != "sat":
     solver.pop()
+
     found = []
     while 1:
         result = solver.check()
@@ -585,6 +587,7 @@ def get_random_qcode(n, m, distance=None, row_echelon=True):
         add(H != H0)
         found.append(H0)
 
+    assert len(found)
     #print("choice from", len(found))
     H0 = choice(found)
     assert H0.rank() == m, "wut"

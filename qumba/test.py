@@ -45,13 +45,6 @@ def test_codetables():
         print()
 
 
-def test_isomorphism():
-    code = QCode.fromstr("X. .Z")
-    dode = code.apply_perm([1,0])
-    iso = code.get_isomorphism(dode)
-    assert iso == [1, 0]
-
-
 def test_10_2_3_logicals():
     Ax = parse("""
     X..X..XX..
@@ -2604,6 +2597,74 @@ def test_804():
     print(H.structure_description()) # PSL(3,2)
     print(len(H))
 
+
+def test_isomorphism():
+#    code = QCode.fromstr("X. .Z")
+#    dode = code.apply_perm([1,0])
+#    iso = code.get_isomorphism(dode)
+#    assert iso == [1, 0]
+
+#    code = QCode.fromstr("""
+#    ...XZ
+#    ..ZZY
+#    XX...
+#    ZZZ..
+#    """, None, """
+#    ...YX
+#    X.XX.""")
+#
+#    code = QCode.fromstr("""
+#    X.Z..
+#    Z.YZ.
+#    .X..X
+#    .Z.ZZ""", None, """
+#    Y.X..
+#    XX.X.""")
+
+    #print(code)
+
+    #return
+
+    code = QCode.fromstr("""
+    X...Z
+    Z..XY
+    .XYX.
+    .ZYZZ
+    """)
+    assert code.d == 1
+    #code.get_distance()
+    #print(code)
+    #return
+
+    n = 9
+    count = 0
+    while count < 10:
+        m = n-1
+        code = QCode.random(n, m)
+        d = code.d
+        assert d is not None
+        print(code)
+        print(code.longstr())
+        code.get_distance()
+        assert code.d == d, code
+        idxs = list(range(n))
+        shuffle(idxs)
+        print(idxs)
+    
+        dode = idxs * code
+        print(dode)
+        print(dode.longstr())
+    
+        f = dode.get_isomorphism(code)
+        print(f)
+    
+        assert (f*code).is_equiv(dode)
+    
+        print(dode.get_distance())
+        assert code.d == dode.d
+
+
+        count += 1
 
 
 def test():

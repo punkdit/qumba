@@ -119,6 +119,7 @@ def distance_meetup(code, max_m=None, verbose=False):
 
 
 def logop_meetup(code, max_m=None, verbose=False):
+    assert 0, "broken"
     from qumba.util import choose
 
     n = code.n
