@@ -26,11 +26,11 @@ from qumba.unwrap import Cover
 from qumba import transversal 
 #from qumba import clifford, matrix
 #from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
-#from qumba.syntax import Syntax
 from qumba.circuit import (Circuit, measure, barrier, send, vdump, variance,
     parsevec, strvec, find_state, get_inverse, load_batch, send_idxs)
 
 def css_encoder(Hx, dual=False):
+    from qumba.syntax import Syntax
     _, n = Hx.shape
     s = Syntax()
     CX, CZ, H, X, Z, I = s.CX, s.CZ, s.H, s.X, s.Z, s.get_identity()

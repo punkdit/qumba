@@ -28,9 +28,10 @@ from qumba.argv import argv
 
 promote = Matrix.promote
 
+import qumba.lin as _lin
 zeros2 = lambda *shape : Matrix.zeros(shape)
 shortstr = str
-shortstrx = lambda *items : shortstrx(*[M.A for M in items])
+shortstrx = lambda *items : _lin.shortstrx(*[M.A for M in items])
 eq2 = lambda A,B:A==B
 dot2 = lambda A,B:promote(A)*promote(B)
 compose2 = lambda A,B:B*A
@@ -38,7 +39,6 @@ identity2 = Matrix.identity
 rand2 = Matrix.rand
 rank = Matrix.rank
 
-import qumba.lin as _lin
 class lin:
     linear_independent = Matrix.linear_independent
 
@@ -832,6 +832,9 @@ class CSSCode(object):
         return code
 
     def longstr(self):
+        assert isinstance(self.Lz, Matrix)
+        assert isinstance(self.Lx, Matrix)
+
         lines = [
             "CSSCode:",
             "Lx:Lz =", shortstrx(self.Lx, self.Lz),
