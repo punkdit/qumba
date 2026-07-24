@@ -2616,6 +2616,14 @@ def test_isomorphism():
     N, perms = code.get_autos()
     assert N==60
 
+    # another hexacode, from Wilson p. 184
+    code = QCode.fromstr("""
+    XZZXZX
+    ZXXZZX
+    ZXZXXZ""")
+    N, perms = code.get_autos()
+    print(N)
+
     n = 7
     count = 0
     while count < 10:
