@@ -10,6 +10,76 @@ from qumba.smap import SMap
 from qumba.matrix import Matrix
 from qumba.csscode import CSSCode
 from qumba import construct
+#from qumba import decode
+
+from qumba import lin
+
+
+class Decoder:
+    def __init__(self, code):
+        code = code.to_css()
+        self.code = code
+
+#    def get_T(self, err_op):
+    def get_T(self, syndrome):
+        # bitflip X-type errors, frustrate Hz checks, and produce Tx
+        code = self.code
+        n = code.n
+        #T = zeros2(n)
+        Hz = code.Hz
+        Tx = code.Tx
+        T = syndrome * Tx
+        return T
+#        m = Hz.shape[0]
+#        for i in range(m):
+#            #if dot2(err_op, Hz[i]):
+#            if syndrome[i]:
+#                T += Tx[i]
+#        T %= 2
+#        return T
+
+    def decode(self, p, err_op, verbose=False, **kw):
+        return None
+
+
+class SimpleDecoder(Decoder):
+    """
+    Simple (&slow) optimal decoder that sums probabilities over cosets.
+    """
+    def __init__(self, code):
+        Decoder.__init__(self, code)
+        self.all_Lx = list(code.Lx.span())
+        self.all_Hx = list(code.Hx.span())
+        self.code = code
+
+    def get_dist(self, p, T):
+        "distribution over logical operators"
+        code = self.code
+        dist = []
+        sr = 0.
+        n = code.n
+        for l_op in self.all_Lx:
+            r = 0.
+            T1 = l_op + T
+            for s_op in self.all_Hx:
+                T2 = s_op + T1
+                d = T2.sum()
+                r += (1-p)**(n-d)*p**d
+            sr += r
+            dist.append(r)
+        dist = [r/sr for r in dist]
+        return dist
+
+    def decode(self, p, syndrome, verbose=False, **kw):
+        T = self.get_T(syndrome)
+        dist = self.get_dist(p, T)
+        p1 = max(dist)
+        idx = dist.index(p1)
+        l_op = self.all_Lx[idx]
+        op = l_op+T
+        return op
+
+
 
 
 class Circuit:
@@ -36,13 +106,13 @@ class Circuit:
 def test_decode():
 
     #code = construct.get_713()
-    #code = construct.get_15_1_3()
-    code = CSSCode.random(18, 8, 8, distance=3)
-    code = CSSCode.random(27, 13, 13, distance=5)
-    code = construct.get_golay(23)
+    code = construct.get_15_1_3()
+    #code = CSSCode.random(17, 8, 8, distance=4)
+    #code = CSSCode.random(27, 13, 13, distance=5)
+    #code = construct.get_golay(23)
 
     print(code)
-    #print(code.to_qcode().longstr())
+    print(code.to_qcode().longstr())
 
     css = code.to_css()
     #print(css)
@@ -54,6 +124,7 @@ def test_decode():
 
 
     n = css.n # 1 ancilla
+    k = css.k
 
     idxs = list(range(n)) # code 
     adx = idxs[-1]+1 # ancilla
@@ -84,7 +155,8 @@ def test_decode():
     #c.H(idxs) # |+>^n
     c.TICK()
 
-    c.DEPOLARIZE1(idxs, 0.05)
+    p = 0.05
+    c.DEPOLARIZE1(idxs, p)
     names = []
 
     for h in css.Hz:
@@ -120,7 +192,7 @@ def test_decode():
     #print()
     #print(c)
 
-    N = 30
+    N = 120
     circuit = c.circuit
     sampler = circuit.compile_sampler()
     result = sampler.sample(shots=N)
@@ -142,6 +214,21 @@ def test_decode():
     print(smap)
     #print(bits, bits.shape)
 
+    decoder = SimpleDecoder(css.get_dual())
+    #print(decoder)
+
+    x_syndrome = syndrome[:, mz:]
+    ops = []
+    for i in range(N):
+        op = decoder.decode(p, x_syndrome[i])
+        ops.append(op)
+
+    correct = Matrix(ops)
+    #print("\ncorrect:")
+    #print(correct, correct.shape)
+    A = bits.A + correct.A
+    bits = Matrix(A)
+
     Lx = css.Lx
     Lz = css.Lz
     Tx = css.Tx
@@ -152,6 +239,12 @@ def test_decode():
     #print(HLx.t.solve(bits.t))
     A = Jz.t.solve(bits.t)
     assert A is not None
+
+    fails = A[-k:, :]
+    print(fails)
+    err = fails.sum() / N
+    print("err: %.2f%%"%(100*err))
+
     smap = SMap()
     for i in range(N):
         smap[0,i] = str(i%10)
