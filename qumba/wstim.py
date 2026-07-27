@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
 """
-Learning how to use stim .
+experimenting with stim .
 
 """
 
+import numpy
 
 from qumba.smap import SMap
 from qumba.matrix import Matrix
@@ -105,11 +106,15 @@ class Circuit:
 
 def test_decode():
 
-    #code = construct.get_713()
+    code = construct.get_713()
+
     code = construct.get_15_1_3()
     #code = code.get_dual()
 
-    #code = CSSCode.random(17, 8, 8, distance=4)
+    code = construct.get_512()
+
+    #code = CSSCode.random(17, 7, 7, distance=3)
+    #code = CSSCode.random(27, 11, 11, distance=4)
     #code = CSSCode.random(27, 13, 13, distance=5)
     #code = construct.get_golay(23)
 
@@ -157,31 +162,40 @@ def test_decode():
     #c.H(idxs) # |+>^n
     c.TICK()
 
-    p = 0.05
-    c.DEPOLARIZE1(idxs, p)
+    p = 0.01
     names = []
+    R = 3 # repeat
 
-    for h in css.Hz:
-        #print("Hz", h)
-        c.R(adx)
-        for i in range(n):
-            if h[i]:
-                c.CX(i, adx)
-                c.TICK()
-        c.MR(adx)
-        names.append("Hz")
+    for count in range(R):
+        c.DEPOLARIZE1(idxs, p)
+        for idx,h in enumerate(css.Hz):
+            #print("Hz", h)
+            c.R(adx)
+            c.DEPOLARIZE1([adx], p)
+            for i in range(n):
+                if h[i]:
+                    #c.DEPOLARIZE1([i, adx], p) # <--- the really bad errors
+                    c.CX(i, adx)
+                    c.TICK()
+            c.MR(adx)
+            names.append("Hz[%d,%d]"%(idx, count))
+    
+        for idx,h in enumerate(css.Hx):
+            #print("Hx", h)
+            c.R(adx)
+            c.H(adx)
+            c.DEPOLARIZE1([adx], p)
+            for i in range(n):
+                if h[i]:
+                    #c.DEPOLARIZE1([i, adx], p) # <--- the really bad errors
+                    c.CX(adx, i)
+                    c.TICK()
+            c.H(adx)
+            c.MR(adx)
+            names.append("Hx[%d,%d]"%(idx, count))
 
-    for h in css.Hx:
-        #print("Hx", h)
-        c.R(adx)
-        c.H(adx)
-        for i in range(n):
-            if h[i]:
-                c.CX(adx, i)
-                c.TICK()
-        c.H(adx)
-        c.MR(adx)
-        names.append("Hx")
+    lookup = {name:i for (i,name) in enumerate(names)}
+    print(lookup)
 
     c.H(idxs)
     c.M(idxs)
@@ -194,7 +208,7 @@ def test_decode():
     #print()
     #print(c)
 
-    N = 120
+    N = 100
     circuit = c.circuit
     sampler = circuit.compile_sampler()
     result = sampler.sample(shots=N)
@@ -214,22 +228,56 @@ def test_decode():
     for (i, name) in enumerate(names):
         smap[1+i,N+2] = name
     print(smap)
+    print()
     #print(bits, bits.shape)
 
     decoder = SimpleDecoder(css.get_dual())
-    #print(decoder)
+    print(decoder)
 
-    x_syndrome = syndrome[:, mz:]
+    rows = [lookup["Hx[%d,%d]"%(i,0)] for i in range(mx)]
+    #x_syndrome = syndrome[:, mz:]
+    x_syndrome = syndrome[:, rows]
+
+    x_syndrome = []
+    for i in range(mx):
+        rows = [lookup["Hx[%d,%d]"%(i,j)] for j in range(R)]
+        row = syndrome[:, rows]
+        #print("row:")
+        #print(row.t)
+        A = row.A.sum(1)
+        A = A.astype(float)
+        A /= R
+        A = numpy.round(A)
+        assert numpy.max(A) <= 1.
+        assert numpy.min(A) >= 0.
+        A = A.astype(int)
+        A = Matrix(A)
+        #print("average:")
+        #print(A, A.shape)
+        x_syndrome.append(A)
+        #x_syndrome.append(row)
+
+    x_syndrome = Matrix(x_syndrome).t
+
+    print("x_syndrome.t:")
+    print(x_syndrome.t)
+
     ops = []
     for i in range(N):
         op = decoder.decode(p, x_syndrome[i])
         ops.append(op)
 
+    #return
+
     correct = Matrix(ops)
     #print("\ncorrect:")
     #print(correct, correct.shape)
-    A = bits.A + correct.A
-    bits = Matrix(A)
+    bits = bits + correct
+
+    assert bits.shape == (N, n)
+    print("bits:")
+    print(bits.t)
+    print()
 
     Lx = css.Lx
     Lz = css.Lz
@@ -237,14 +285,42 @@ def test_decode():
     Tz = css.Tz
     HLx = Hx.concatenate(Lx)
     HLz = Hz.concatenate(Lz)
-    Jz = Hz.concatenate(Tz).concatenate(Lz)
+
+    # return to groundstate, brute force it
+    assert len(HLz) < 20, "too big?"
+    Uz = list(HLz.span())
+    Uz = Matrix(Uz)
+    print("Uz:", Uz.shape)
+
+    send = []
+    for u in bits:
+        Jz = Uz + u
+        jz = Jz.sum(1)
+        weight = jz.min()
+        idxs, = numpy.where(jz == weight)
+        send.append(Uz[idxs[0], :].reshape(n))
+    ubits = Matrix(send)
+    #print(bits.shape)
+    assert ubits.shape == (N, n)
+    #print((bits + ubits).t)
+    bits = ubits
+
+    # read out logical errors:
+    HTLz = Hz.concatenate(Tz).concatenate(Lz)
+
     #print(HLx.t.solve(bits.t))
-    A = Jz.t.solve(bits.t)
+    A = HTLz.t.solve(bits.t)
     assert A is not None
 
+    print("\nfails:")
     fails = A[-k:, :]
     print(fails)
-    err = fails.sum() / N
+    fails = fails.sum(0)
+    #print("fails:")
+    #print(fails)
+    idxs, = numpy.where(fails)
+    print("fails:", idxs)
+    err = len(idxs) / N
     print("err: %.2f%%"%(100*err))
 
     smap = SMap()
@@ -264,6 +340,7 @@ def test_decode():
         smap[row, col] = "Lz"
         row += 1
     print()
+    print("A = HTLz.solve(bits + correct)")
     print(smap)
 
 
