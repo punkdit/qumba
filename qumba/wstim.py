@@ -107,6 +107,8 @@ def test_decode():
 
     #code = construct.get_713()
     code = construct.get_15_1_3()
+    #code = code.get_dual()
+
     #code = CSSCode.random(17, 8, 8, distance=4)
     #code = CSSCode.random(27, 13, 13, distance=5)
     #code = construct.get_golay(23)
