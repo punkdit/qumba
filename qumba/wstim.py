@@ -82,11 +82,16 @@ class SimpleDecoder(Decoder):
 
 
 
+class Builder:
+    pass
 
-class Circuit:
+
+class StimBuilder(Builder):
     def __init__(self):
         import stim
         self.circuit = stim.Circuit()
+        self.lookup = {} # name -> idx
+        self.names = [] # list of names of measure's
 
     def CX(self, i, j):
         self.circuit.append("CX", [i, j])
@@ -94,13 +99,118 @@ class Circuit:
     def CZ(self, i, j):
         self.circuit.append("CZ", [i, j])
 
-    def __getattr__(self, name):
-        f = lambda *args, **kw : self.circuit.append(name, *args, **kw)
-        return f
+    def TICK(self):
+        self.circuit.append("TICK")
+
+    def H(self, idxs):
+        self.circuit.append("H", idxs)
+
+    def R(self, idxs):
+        self.circuit.append("R", idxs)
+
+    def M(self, idxs, name=None):
+        self.circuit.append("M", idxs)
+        names = self.names
+        lookup = self.lookup
+        if name is None:
+            if isinstance(idxs, int):
+                idxs = [idxs]
+            idx = len(self.names)
+            for idx in idxs:
+                name = "M%d"%idx
+                assert name not in lookup
+                lookup[name] = len(names)
+                names.append(name)
+        else:
+            assert name not in lookup
+            lookup[name] = len(names)
+            names.append(name)
+            
+    def DEPOLARIZE1(self, idxs, p):
+        self.circuit.append("DEPOLARIZE1", idxs, p)
+
+    def x_error(self, idxs, p):
+        self.circuit.append("x_error", idxs, p)
+
+    def z_error(self, idxs, p):
+        self.circuit.append("z_error", idxs, p)
 
     def __str__(self):
         circuit = self.circuit
         return str(circuit)
+
+
+def get(builder, code):
+    css = code.to_css()
+    n = css.n # 1 ancilla
+    k = css.k
+
+    idxs = list(range(n)) # code 
+    adx = idxs[-1]+1 # ancilla
+
+    Hx = css.Hx
+    Hz = css.Hz
+    mx = len(Hx)
+    mz = len(Hz)
+
+    if 1:
+        # state prep for logical |0>^k 
+        builder.R(idxs) # |0>^n
+        HLx = Hx.concatenate(css.Lx)
+        Jx = HLx.normal_form()
+        px = Jx.get_pivots()
+        #print("Jx:")
+        #print(Jx, px)
+    
+        builder.H([col for (row,col) in px])
+        #for i in range(mx):
+        for (row, col) in px:
+            for j in range(col+1, n):
+                if Jx[row,j]:
+                    builder.CX(col, j)
+    
+    #builder.H(idxs) # |+>^n
+    builder.TICK()
+
+    p = 0.01
+    names = []
+    R = 3 # repeat
+
+    for count in range(R):
+        builder.DEPOLARIZE1(idxs, p)
+        for idx,h in enumerate(css.Hz):
+            #print("Hz", h)
+            builder.R(adx)
+            builder.DEPOLARIZE1([adx], p)
+            for i in range(n):
+                if h[i]:
+                    #builder.DEPOLARIZE1([i, adx], p) # <--- the really bad errors
+                    builder.CX(i, adx)
+                    builder.TICK()
+            name = ("Hz[%d,%d]"%(idx, count))
+            builder.M(adx, name)
+    
+        for idx,h in enumerate(css.Hx):
+            #print("Hx", h)
+            builder.R(adx)
+            builder.H(adx)
+            builder.DEPOLARIZE1([adx], p)
+            for i in range(n):
+                if h[i]:
+                    #builder.DEPOLARIZE1([i, adx], p) # <--- the really bad errors
+                    builder.CX(adx, i)
+                    builder.TICK()
+            builder.H(adx)
+            name = ("Hx[%d,%d]"%(idx, count))
+            builder.M(adx, name)
+
+    builder.H(idxs)
+    builder.M(idxs)
+
+    builder.R = R
+    builder.p = p
+
+    return builder
 
 
 
@@ -121,94 +231,18 @@ def test_decode():
     print(code)
     print(code.to_qcode().longstr())
 
+    n = code.n
     css = code.to_css()
-    #print(css)
-
-    #print(css.longstr())
-
-    #E = code.get_encoder()
-    #print(E)
-
-
-    n = css.n # 1 ancilla
+    mx = css.mx
+    mz = css.mz
     k = css.k
 
-    idxs = list(range(n)) # code 
-    adx = idxs[-1]+1 # ancilla
+    builder = StimBuilder()
+    c = get(builder, css)
 
-    c = Circuit()
-    c.R(idxs) # |0>^n
-
-    Hx = css.Hx
-    Hz = css.Hz
-    mx = len(Hx)
-    mz = len(Hz)
-
-    if 1:
-        # state prep for logical |0>^k 
-        HLx = Hx.concatenate(css.Lx)
-        Jx = HLx.normal_form()
-        px = Jx.get_pivots()
-        #print("Jx:")
-        #print(Jx, px)
-    
-        c.H([col for (row,col) in px])
-        #for i in range(mx):
-        for (row, col) in px:
-            for j in range(col+1, n):
-                if Jx[row,j]:
-                    c.CX(col, j)
-    
-    #c.H(idxs) # |+>^n
-    c.TICK()
-
-    p = 0.01
-    names = []
-    R = 3 # repeat
-
-    for count in range(R):
-        c.DEPOLARIZE1(idxs, p)
-        for idx,h in enumerate(css.Hz):
-            #print("Hz", h)
-            c.R(adx)
-            c.DEPOLARIZE1([adx], p)
-            for i in range(n):
-                if h[i]:
-                    #c.DEPOLARIZE1([i, adx], p) # <--- the really bad errors
-                    c.CX(i, adx)
-                    c.TICK()
-            c.MR(adx)
-            names.append("Hz[%d,%d]"%(idx, count))
-    
-        for idx,h in enumerate(css.Hx):
-            #print("Hx", h)
-            c.R(adx)
-            c.H(adx)
-            c.DEPOLARIZE1([adx], p)
-            for i in range(n):
-                if h[i]:
-                    #c.DEPOLARIZE1([i, adx], p) # <--- the really bad errors
-                    c.CX(adx, i)
-                    c.TICK()
-            c.H(adx)
-            c.MR(adx)
-            names.append("Hx[%d,%d]"%(idx, count))
-
-    lookup = {name:i for (i,name) in enumerate(names)}
-    print(lookup)
-
-    c.H(idxs)
-    c.M(idxs)
-
-    #import stim
-    #print(stim.target_rec(-1))
-    #c.DETECTOR([stim.target_rec(-1)])
     #return
 
-    #print()
-    #print(c)
-
-    N = 100
+    N = 60
     circuit = c.circuit
     sampler = circuit.compile_sampler()
     result = sampler.sample(shots=N)
@@ -225,7 +259,8 @@ def test_decode():
     smap[1,0] = str(syndrome.t)
     for i in range(N):
         smap[0,i] = str(i%10)
-    for (i, name) in enumerate(names):
+    for i in range(len(syndrome.t)):
+        name = builder.names[i]
         smap[1+i,N+2] = name
     print(smap)
     print()
@@ -234,19 +269,19 @@ def test_decode():
     decoder = SimpleDecoder(css.get_dual())
     print(decoder)
 
-    rows = [lookup["Hx[%d,%d]"%(i,0)] for i in range(mx)]
+    rows = [builder.lookup["Hx[%d,%d]"%(i,0)] for i in range(mx)]
     #x_syndrome = syndrome[:, mz:]
     x_syndrome = syndrome[:, rows]
 
     x_syndrome = []
     for i in range(mx):
-        rows = [lookup["Hx[%d,%d]"%(i,j)] for j in range(R)]
+        rows = [builder.lookup["Hx[%d,%d]"%(i,j)] for j in range(builder.R)]
         row = syndrome[:, rows]
         #print("row:")
         #print(row.t)
         A = row.A.sum(1)
         A = A.astype(float)
-        A /= R
+        A /= builder.R
         A = numpy.round(A)
         assert numpy.max(A) <= 1.
         assert numpy.min(A) >= 0.
@@ -264,7 +299,7 @@ def test_decode():
 
     ops = []
     for i in range(N):
-        op = decoder.decode(p, x_syndrome[i])
+        op = decoder.decode(builder.p, x_syndrome[i])
         ops.append(op)
 
     #return
@@ -283,6 +318,8 @@ def test_decode():
     Lz = css.Lz
     Tx = css.Tx
     Tz = css.Tz
+    Hx = css.Hx
+    Hz = css.Hz
     HLx = Hx.concatenate(Lx)
     HLz = Hz.concatenate(Lz)
 
