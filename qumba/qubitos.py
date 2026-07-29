@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 
 """
-experimenting with stim .
-
-see: qubitos.py for more
+experimenting with _simulating qec circuits .
 
 """
 
@@ -84,62 +82,114 @@ class SimpleDecoder(Decoder):
 
 
 
+
 class Builder:
-    pass
-
-
-class StimBuilder(Builder):
     def __init__(self):
-        import stim
-        self.circuit = stim.Circuit()
         self.lookup = {} # name -> idx
-        self.names = [] # list of names of measure's
+        self.names = [] # list of names of qubit's
+        self.items = []
+        self.measure = {} # name -> idx for measure's
 
-    def CX(self, i, j):
-        self.circuit.append("CX", [i, j])
+    def ALLOC(self, name=None):
+        lookup = self.lookup
+        names = self.names
+        if name is None:
+            name = "q%d"%len(names)
+        assert type(name) is str
+        assert name not in lookup
+        idx = len(names)
+        #print("ALLOC", name, "-->", idx)
+        lookup[name] = idx
+        names.append(name)
+        self.append("R", [name]) # <---- reset
+        return name
 
-    def CZ(self, i, j):
-        self.circuit.append("CZ", [i, j])
+    def M(self, names):
+        if isinstance(names, str):
+            names = [names]
+        self.append("M", names)
+        # mark these qubits as dead 
+        for name in names:
+            idx = self.lookup[name]
+            assert name not in self.measure
+            self.measure[name] = len(self.measure)
 
     def TICK(self):
-        self.circuit.append("TICK")
+        self.append("TICK", [])
+
+    def CX(self, i, j):
+        self.append("CX", [i, j])
 
     def H(self, idxs):
-        self.circuit.append("H", idxs)
+        self.append("H", idxs)
 
-    def R(self, idxs):
-        self.circuit.append("R", idxs)
-
-    def M(self, idxs, name=None):
-        self.circuit.append("M", idxs)
-        names = self.names
-        lookup = self.lookup
-        if name is None:
-            if isinstance(idxs, int):
-                idxs = [idxs]
-            idx = len(self.names)
-            for idx in idxs:
-                name = "M%d"%idx
-                assert name not in lookup
-                lookup[name] = len(names)
-                names.append(name)
-        else:
-            assert name not in lookup
-            lookup[name] = len(names)
-            names.append(name)
-            
     def DEPOLARIZE1(self, idxs, p):
-        self.circuit.append("DEPOLARIZE1", idxs, p)
+        self.append("DEPOLARIZE1", idxs, p=p)
 
     def x_error(self, idxs, p):
-        self.circuit.append("x_error", idxs, p)
+        self.append("x_error", idxs, p=p)
 
     def z_error(self, idxs, p):
-        self.circuit.append("z_error", idxs, p)
+        self.append("z_error", idxs, p=p)
 
-    def __str__(self):
-        circuit = self.circuit
-        return str(circuit)
+#    def __str__(self):
+#        circuit = self.circuit
+#        return str(circuit)
+
+    def dump(self, result):
+        print("\nresult:")
+        N, M = result.shape
+        smap = SMap()
+        smap[1,0] = str(result.t)
+        for i in range(N):
+            smap[0,i] = str(i%10)
+        for i in range(M):
+            name = self.names[i]
+            smap[1+i,N+2] = name
+        print(smap)
+        print()
+        #print(bits, bits.shape)
+
+    def append(self, gate, names, **kw):
+        if isinstance(names, str):
+            names = [names]
+        lookup = self.lookup
+        idxs = []
+        for name in names:
+            assert isinstance(name, str), "name expected, got %r instead"%name
+            assert name in lookup, "qubit %r not found"%name
+            idx = lookup[name]
+            idxs.append(idx)
+        arg = (gate, idxs, kw)
+        self.items.append(arg)
+
+    def get_stim(self):
+        import stim
+        circuit = stim.Circuit()
+        for arg in self.items:
+            gate, idxs, kw = arg
+            # AAghghghgrrrr...
+            if "p" in kw:
+                circuit.append(gate, idxs, kw["p"])
+            else:
+                circuit.append(gate, idxs)
+            #print(gate, idxs)
+        return circuit
+
+    def simulate(self, N):
+        circuit = self.get_stim()
+        sampler = circuit.compile_sampler()
+        result = sampler.sample(shots=N)
+        result = result.astype(int)
+        result = Matrix(result)
+        #print(result.shape)
+        #assert 0
+        cols = [self.measure[name] for name in self.names]
+        #print(cols)
+        assert result.shape == (N, len(cols)), "measure all the qubits?"
+        result = result[:, cols]
+        return result
+
 
 
 def get(builder, code):
@@ -147,8 +197,11 @@ def get(builder, code):
     n = css.n # 1 ancilla
     k = css.k
 
-    idxs = list(range(n)) # code 
-    adx = idxs[-1]+1 # ancilla
+    #idxs = list(range(n)) # code 
+    #adx = idxs[-1]+1 # ancilla
+
+    data = [builder.ALLOC("q%d"%i) for i in range(n)]
+    print(data)
 
     Hx = css.Hx
     Hz = css.Hz
@@ -157,57 +210,58 @@ def get(builder, code):
 
     if 1:
         # state prep for logical |0>^k 
-        builder.R(idxs) # |0>^n
+        #builder.R(idxs) # |0>^n
         HLx = Hx.concatenate(css.Lx)
         Jx = HLx.normal_form()
         px = Jx.get_pivots()
         #print("Jx:")
         #print(Jx, px)
     
-        builder.H([col for (row,col) in px])
+        builder.H([data[col] for (row,col) in px])
         #for i in range(mx):
         for (row, col) in px:
             for j in range(col+1, n):
                 if Jx[row,j]:
-                    builder.CX(col, j)
+                    builder.CX(data[col], data[j])
     
     #builder.H(idxs) # |+>^n
     builder.TICK()
 
     p = 0.01
-    names = []
     R = 3 # repeat
 
     for count in range(R):
-        builder.DEPOLARIZE1(idxs, p)
+        builder.DEPOLARIZE1(data, p)
         for idx,h in enumerate(css.Hz):
             #print("Hz", h)
-            builder.R(adx)
-            builder.DEPOLARIZE1([adx], p)
+            #builder.R(adx)
+            ancilla = ("Hz[%d,%d]"%(idx, count))
+            builder.ALLOC(ancilla)
+            builder.DEPOLARIZE1([ancilla], p)
             for i in range(n):
                 if h[i]:
                     #builder.DEPOLARIZE1([i, adx], p) # <--- the really bad errors
-                    builder.CX(i, adx)
+                    builder.CX(data[i], ancilla)
                     builder.TICK()
-            name = ("Hz[%d,%d]"%(idx, count))
-            builder.M(adx, name)
+            builder.M(ancilla)
     
         for idx,h in enumerate(css.Hx):
             #print("Hx", h)
-            builder.R(adx)
-            builder.H(adx)
-            builder.DEPOLARIZE1([adx], p)
+            #builder.R(adx)
+            ancilla = ("Hx[%d,%d]"%(idx, count))
+            builder.ALLOC(ancilla)
+            builder.H(ancilla)
+            builder.DEPOLARIZE1([ancilla], p)
             for i in range(n):
                 if h[i]:
                     #builder.DEPOLARIZE1([i, adx], p) # <--- the really bad errors
-                    builder.CX(adx, i)
+                    builder.CX(ancilla, data[i])
                     builder.TICK()
-            builder.H(adx)
-            name = ("Hx[%d,%d]"%(idx, count))
-            builder.M(adx, name)
+            builder.H(ancilla)
+            builder.M(ancilla)
 
-    builder.H(idxs)
-    builder.M(idxs)
+    builder.H(data)
+    builder.M(data)
 
     builder.R = R
     builder.p = p
@@ -239,53 +293,22 @@ def test_decode():
     mz = css.mz
     k = css.k
 
-    builder = StimBuilder()
+    builder = Builder()
     c = get(builder, css)
 
     #return
 
     N = 60
-    circuit = c.circuit
-    sampler = circuit.compile_sampler()
-    result = sampler.sample(shots=N)
-    result = result.astype(int)
-
-    result = Matrix(result)
-    print(result.t)
-    print()
-
-    syndrome = result[:, :-n]
-    bits = result[:, -n:]
-    #print(result, result.shape)
-
-    #bits = Matrix(bits)
-
-    syndrome = Matrix(syndrome)
-    bits = Matrix(bits)
-
-    print("\nsyndrome:")
-    smap = SMap()
-    smap[1,0] = str(syndrome.t)
-    for i in range(N):
-        smap[0,i] = str(i%10)
-    for i in range(len(syndrome.t)):
-        name = builder.names[i]
-        smap[1+i,N+2] = name
-    print(smap)
-    print()
-    #print(bits, bits.shape)
+    result = builder.simulate(N)
+    builder.dump(result)
 
     decoder = SimpleDecoder(css.get_dual())
     print(decoder)
 
-    rows = [builder.lookup["Hx[%d,%d]"%(i,0)] for i in range(mx)]
-    #x_syndrome = syndrome[:, mz:]
-    x_syndrome = syndrome[:, rows]
-
     x_syndrome = []
     for i in range(mx):
         rows = [builder.lookup["Hx[%d,%d]"%(i,j)] for j in range(builder.R)]
-        row = syndrome[:, rows]
+        row = result[:, rows]
         #print("row:")
         #print(row.t)
         A = row.A.sum(1)
@@ -312,6 +335,7 @@ def test_decode():
         ops.append(op)
 
     #return
+    bits = result[:, [builder.lookup["q%d"%i] for i in range(n)]]
 
     correct = Matrix(ops)
     #print("\ncorrect:")
