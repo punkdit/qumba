@@ -12,8 +12,8 @@ from qumba.matrix import Matrix
 from qumba.csscode import CSSCode
 from qumba import construct
 #from qumba import decode
-
 from qumba import lin
+from qumba.qcode import strop, SymplecticSpace
 
 
 class Decoder:
@@ -26,7 +26,6 @@ class Decoder:
         # bitflip X-type errors, frustrate Hz checks, and produce Tx
         code = self.code
         n = code.n
-        #T = zeros2(n)
         Hz = code.Hz
         Tx = code.Tx
         T = syndrome * Tx
@@ -82,13 +81,18 @@ class SimpleDecoder(Decoder):
 
 
 
-
 class Builder:
     def __init__(self):
         self.lookup = {} # name -> idx
         self.names = [] # list of names of qubit's
         self.items = []
         self.measure = {} # name -> idx for measure's
+
+    def __getitem__(self, idx):
+        return self.items[idx]
+
+    def __len__(self):
+        return len(self.items)
 
     def ALLOC(self, name=None):
         lookup = self.lookup
@@ -126,15 +130,14 @@ class Builder:
     def DEPOLARIZE1(self, idxs, p):
         self.append("DEPOLARIZE1", idxs, p=p)
 
-    def x_error(self, idxs, p):
-        self.append("x_error", idxs, p=p)
+    def X_ERROR(self, idxs, p):
+        self.append("X_ERROR", idxs, p=p)
 
-    def z_error(self, idxs, p):
-        self.append("z_error", idxs, p=p)
+    def Z_ERROR(self, idxs, p):
+        self.append("Z_ERROR", idxs, p=p)
 
-#    def __str__(self):
-#        circuit = self.circuit
-#        return str(circuit)
+    def __str__(self):
+        return str(self.items)
 
     def dump(self, result):
         print("\nresult:")
@@ -168,10 +171,10 @@ class Builder:
         circuit = stim.Circuit()
         for arg in self.items:
             gate, idxs, kw = arg
-            # AAghghghgrrrr...
             if "p" in kw:
-                circuit.append(gate, idxs, kw["p"])
+                circuit.append(gate, idxs, kw["p"]) # whack whack
             else:
+                assert not kw, str(kw)
                 circuit.append(gate, idxs)
             #print(gate, idxs)
         return circuit
@@ -190,9 +193,40 @@ class Builder:
         result = result[:, cols]
         return result
 
+    def prep_zero(builder, code, data): # XXX (or is it logical plus ?)
+        css = code.to_css()
+        n = css.n
+        assert n==len(data)
+        Hx = css.Hx
+        Hz = css.Hz
+        mx = len(Hx)
+        mz = len(Hz)
+    
+        if 1:
+            # state prep for logical |0>^k  (or is it logical plus ?)
+            #builder.R(idxs) # |0>^n
+            HLx = Hx.concatenate(css.Lx)
+            Jx = HLx.normal_form()
+            px = Jx.get_pivots()
+            #print("Jx:")
+            #print(Jx, px)
+        
+            builder.H([data[col] for (row,col) in px])
+            #for i in range(mx):
+            for (row, col) in px:
+                for j in range(col+1, n):
+                    if Jx[row,j]:
+                        builder.CX(data[col], data[j])
+        
+        #builder.H(idxs) # |+>^n
+        builder.TICK()
+
 
 
 def get(builder, code):
+    p = 0.01
+    R = 3 # repeat
+
     css = code.to_css()
     n = css.n # 1 ancilla
     k = css.k
@@ -200,47 +234,33 @@ def get(builder, code):
     #idxs = list(range(n)) # code 
     #adx = idxs[-1]+1 # ancilla
 
+    ERROR = builder.DEPOLARIZE1
+    ERROR = builder.Z_ERROR
+
     data = [builder.ALLOC("q%d"%i) for i in range(n)]
     print(data)
+
+    builder.prep_zero(css, data)
 
     Hx = css.Hx
     Hz = css.Hz
     mx = len(Hx)
     mz = len(Hz)
 
-    if 1:
-        # state prep for logical |0>^k 
-        #builder.R(idxs) # |0>^n
-        HLx = Hx.concatenate(css.Lx)
-        Jx = HLx.normal_form()
-        px = Jx.get_pivots()
-        #print("Jx:")
-        #print(Jx, px)
-    
-        builder.H([data[col] for (row,col) in px])
-        #for i in range(mx):
-        for (row, col) in px:
-            for j in range(col+1, n):
-                if Jx[row,j]:
-                    builder.CX(data[col], data[j])
-    
-    #builder.H(idxs) # |+>^n
-    builder.TICK()
-
-    p = 0.01
-    R = 3 # repeat
+    #for i in range(n):
+    #    builder.X_ERROR(data[i], 0.1)
 
     for count in range(R):
-        builder.DEPOLARIZE1(data, p)
+        ERROR(data, p)
         for idx,h in enumerate(css.Hz):
             #print("Hz", h)
             #builder.R(adx)
             ancilla = ("Hz[%d,%d]"%(idx, count))
             builder.ALLOC(ancilla)
-            builder.DEPOLARIZE1([ancilla], p)
+            ERROR([ancilla], p)
             for i in range(n):
                 if h[i]:
-                    #builder.DEPOLARIZE1([i, adx], p) # <--- the really bad errors
+                    #ERROR([i, adx], p) # <--- the really bad errors
                     builder.CX(data[i], ancilla)
                     builder.TICK()
             builder.M(ancilla)
@@ -251,10 +271,10 @@ def get(builder, code):
             ancilla = ("Hx[%d,%d]"%(idx, count))
             builder.ALLOC(ancilla)
             builder.H(ancilla)
-            builder.DEPOLARIZE1([ancilla], p)
+            ERROR([ancilla], p)
             for i in range(n):
                 if h[i]:
-                    #builder.DEPOLARIZE1([i, adx], p) # <--- the really bad errors
+                    #ERROR([i, adx], p) # <--- the really bad errors
                     builder.CX(ancilla, data[i])
                     builder.TICK()
             builder.H(ancilla)
@@ -267,6 +287,95 @@ def get(builder, code):
     builder.p = p
 
     return builder
+
+
+class Tableau:
+    def __init__(self, M):
+        n, nn = M.shape
+        assert nn == 2*n
+        space = SymplecticSpace(n)
+        assert space.is_isotropic(M)
+        self.M = M
+        self.space = space
+        self.shape = M.shape
+
+    @classmethod
+    def zeros(cls, n):
+        nn = 2*n
+        M = []
+        for i in range(n):
+            v = [0]*nn
+            v[2*i+1] = 1
+            M.append(v)
+        M = Matrix(M)
+        return Tableau(M)
+
+    def __str__(self):
+        n, nn = self.shape
+        smap = SMap()
+        smap[1,0] = strop(self.M)
+        smap[0,0] = "="*n
+        smap[n+1,0] = "="*n
+        return str(smap)
+
+    def apply(self, *arg):
+        print("apply", arg)
+        space = self.space
+        M = self.M
+        gate, idxs = arg[:2]
+        if type(idxs) is int:
+            idxs = [idxs]
+        if gate == "H":
+            for idx in idxs:
+                op = space.H(idx)
+                M = M*op.t
+        elif gate == "CX":
+            i, j = idxs
+            op = space.CX(i, j)
+            M = M*op.t
+        elif gate == "R":
+            pass
+        elif gate == "TICK":
+            pass
+        else:
+            assert 0, arg
+        tab = Tableau(M)
+        return tab
+
+
+def test():
+
+    #test_decode()
+    #return
+
+    n = 2
+    tab = Tableau.zeros(n)
+    #print(tab)
+    tab = tab.apply("H", 0)
+    #print(tab)
+    tab = tab.apply("CX", [0, 1])
+    #print(repr(str(tab)))
+    assert str(tab).replace(" ", "") == "==\nXX\nZZ\n=="
+
+    code = construct.get_713()
+    print(code.longstr())
+    n = code.n
+
+    builder = Builder()
+    #get(builder, code)
+    
+    data = [builder.ALLOC("q%d"%i) for i in range(n)]
+    builder.prep_zero(code, data)
+
+    tab = Tableau.zeros(n)
+
+    print(builder)
+    #builder.act(tab)
+    for item in builder:
+        tab = tab.apply(*item)
+
+    print(tab)
+
 
 
 
@@ -294,7 +403,16 @@ def test_decode():
     k = css.k
 
     builder = Builder()
-    c = get(builder, css)
+    get(builder, css)
+
+    #print(builder)
+    items = builder.items
+
+#    for arg in items:
+#        if arg[0] == "M":
+#            print(arg)
+#
+#    return
 
     #return
 
@@ -413,36 +531,6 @@ def test_decode():
     print("A = HTLz.solve(bits + correct)")
     print(smap)
 
-
-def test_sample():
-    import stim
-
-    circuit = stim.Circuit()
-
-    circuit.append("R", [0, 1])
-
-    
-    # First, the circuit will initialize a Bell pair.
-    circuit.append("H", [0])
-    circuit.append("X_ERROR", [0, 1], 0.05)
-    circuit.append("CNOT", [0, 1])
-    
-    # Then, the circuit will measure both qubits of the Bell pair in the Z basis.
-    circuit.append("M", [0, 1])
-
-    print(circuit)
-
-    print(len(circuit))
-    for op in circuit:
-        print("\t", op)
-
-    N = 1000
-    sampler = circuit.compile_sampler()
-    result = (sampler.sample(shots=N))
-    result = (result.astype(int))
-    stats = ( result.sum(axis=1) % 2 )
-
-    print( stats.sum() / N )
 
 
 
