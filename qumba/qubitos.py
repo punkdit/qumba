@@ -74,7 +74,7 @@ class SimpleDecoder(Decoder):
 
 
 
-class Builder:
+class Circuit:
     def __init__(self):
         self.lookup = {} # name -> idx
         self.names = [] # list of names of qubit's
@@ -186,7 +186,7 @@ class Builder:
         result = result[:, cols]
         return result
 
-    def prep(builder, code, data): 
+    def prep(circuit, code, data): 
         "prepare a logical (plus?) state for <code> on <data> qubits"
         css = code.to_css()
         n = css.n
@@ -196,26 +196,26 @@ class Builder:
         mx = len(Hx)
         mz = len(Hz)
     
-        #builder.R(idxs) # |0>^n
+        #circuit.R(idxs) # |0>^n
         HLx = Hx.concatenate(css.Lx)
         Jx = HLx.normal_form()
         px = Jx.get_pivots()
         #print("Jx:")
         #print(Jx, px)
     
-        builder.H([data[col] for (row,col) in px])
+        circuit.H([data[col] for (row,col) in px])
         #for i in range(mx):
         for (row, col) in px:
             for j in range(col+1, n):
                 if Jx[row,j]:
-                    builder.CX(data[col], data[j])
+                    circuit.CX(data[col], data[j])
         
-        #builder.H(idxs) # |+>^n
-        builder.TICK()
+        #circuit.H(idxs) # |+>^n
+        circuit.TICK()
 
 
 
-def get(builder, code):
+def get(circuit, code):
     p = 0.01
     R = 3 # repeat
 
@@ -226,13 +226,13 @@ def get(builder, code):
     #idxs = list(range(n)) # code 
     #adx = idxs[-1]+1 # ancilla
 
-    ERROR = builder.DEPOLARIZE1
-    ERROR = builder.Z_ERROR
+    ERROR = circuit.DEPOLARIZE1
+    ERROR = circuit.Z_ERROR
 
-    data = [builder.ALLOC("q%d"%i) for i in range(n)]
+    data = [circuit.ALLOC("q%d"%i) for i in range(n)]
     print(data)
 
-    builder.prep(css, data)
+    circuit.prep(css, data)
 
     Hx = css.Hx
     Hz = css.Hz
@@ -240,49 +240,51 @@ def get(builder, code):
     mz = len(Hz)
 
     #for i in range(n):
-    #    builder.X_ERROR(data[i], 0.1)
+    #    circuit.X_ERROR(data[i], 0.1)
 
     for count in range(R):
         ERROR(data, p)
         for idx,h in enumerate(css.Hz):
             #print("Hz", h)
-            #builder.R(adx)
+            #circuit.R(adx)
             ancilla = ("Hz[%d,%d]"%(idx, count))
-            builder.ALLOC(ancilla)
+            circuit.ALLOC(ancilla)
             ERROR([ancilla], p)
             for i in range(n):
                 if h[i]:
                     #ERROR([i, adx], p) # <--- the really bad errors
-                    builder.CX(data[i], ancilla)
-                    builder.TICK()
-            builder.M(ancilla)
+                    circuit.CX(data[i], ancilla)
+                    circuit.TICK()
+            circuit.M(ancilla)
     
         for idx,h in enumerate(css.Hx):
             #print("Hx", h)
-            #builder.R(adx)
+            #circuit.R(adx)
             ancilla = ("Hx[%d,%d]"%(idx, count))
-            builder.ALLOC(ancilla)
-            builder.H(ancilla)
+            circuit.ALLOC(ancilla)
+            circuit.H(ancilla)
             ERROR([ancilla], p)
             for i in range(n):
                 if h[i]:
                     #ERROR([i, adx], p) # <--- the really bad errors
-                    builder.CX(ancilla, data[i])
-                    builder.TICK()
-            builder.H(ancilla)
-            builder.M(ancilla)
+                    circuit.CX(ancilla, data[i])
+                    circuit.TICK()
+            circuit.H(ancilla)
+            circuit.M(ancilla)
 
-    builder.H(data)
-    builder.M(data)
+    circuit.H(data)
+    circuit.M(data)
 
-    builder.R = R
-    builder.p = p
+    circuit.R = R
+    circuit.p = p
 
-    return builder
+    return circuit
 
 
 class Tableau:
     def __init__(self, M):
+        if len(M.shape) == 1:
+            M = M.reshape(1, M.shape[0])
         m, nn = M.shape
         assert nn%2 == 0
         n = nn//2
@@ -315,12 +317,16 @@ class Tableau:
         return Tableau(M)
 
     def __str__(self):
-        n, nn = self.shape
+        m, nn = self.shape
+        n = nn//2
         smap = SMap()
         smap[0,1] = "="*n
         smap[1,1] = strop(self.M)
-        smap[n+1,1] = "="*n
+        smap[m+1,1] = "="*n
         return str(smap)
+
+    def __repr__(self):
+        return "Tableau(%r)"%(self.M,)
 
     def apply_gate(self, *arg):
         #print("apply", arg)
@@ -341,22 +347,66 @@ class Tableau:
             pass
         elif gate == "TICK":
             pass
-        else:
-            assert 0, arg
+        #else:
+        #    assert 0, arg
         tab = Tableau(M)
         return tab
 
-    def apply(self, builder):
+    def apply(self, circuit):
         tab = self
-        for item in builder:
+        for item in circuit:
             tab = tab.apply_gate(*item)
         return tab
+
+
+class Model:
+    def __init__(self, n):
+        self.n = n
+        self.nn = 2*n
+        self.state = Tableau.zero(n)
+        self.noise = []
+
+    def DEPOLARIZE1(self, idxs, p):
+        print("Model.DEPOLARIZE1", idxs, p)
+        noise = self.noise
+        nn = self.nn
+        for idx in idxs:
+            v = [0]*nn
+            v[2*idx+1] = 1
+            tab = Tableau(Matrix(v))
+            noise.append((tab, p))
+
+    def apply_gate(self, *arg):
+        print("Model.apply_gate", arg, len(self.noise))
+        self.state = self.state.apply_gate(*arg)
+        self.noise = [
+            (tab.apply_gate(*arg), p)
+            for (tab, p) in self.noise]
+
+    def apply(self, circuit):
+        for item in circuit:
+            name = item[0]
+            meth = getattr(self, name, None) 
+            if meth is not None:
+                meth(*item[1:])
+            else:
+                self.apply_gate(*item)
+
+    def __str__(self):
+        #return "Model\n%s\n%s"%(
+            #self.state, self.noise)
+        lines = ["Model", str(self.state)]
+        for (tab,p) in self.noise:
+            lines.append("%s p=%s"%(tab, p))
+        return "\n".join(lines)
 
 
 def test():
 
     #test_decode()
     #return
+
+    # ------------------------------------------------------------------------
 
     n = 2
     tab = Tableau.zero(n)
@@ -367,23 +417,31 @@ def test():
     #print(repr(str(tab)))
     assert str(tab).replace(" ", "") == "==\nXX\nZZ\n=="
 
+    # ------------------------------------------------------------------------
+
     code = construct.get_713()
     print(code.longstr())
     n = code.n
 
-    builder = Builder()
-    #get(builder, code)
+    circuit = Circuit()
+    #get(circuit, code)
     
-    data = [builder.ALLOC("q%d"%i) for i in range(n)]
-    builder.prep(code, data)
+    data = [circuit.ALLOC("q%d"%i) for i in range(n)]
 
-    tab = Tableau.zero(n)
+    p = 0.01
+    circuit.DEPOLARIZE1(data, p)
 
-    print(builder)
-    tab = tab.apply(builder)
+    circuit.prep(code, data)
+    print(circuit)
 
-    print(tab)
+    #tab = Tableau.zero(n)
+    #tab = tab.apply(circuit)
+    #print(tab)
 
+    model = Model(n)
+    model.apply(circuit)
+
+    print(model)
 
 
 
@@ -410,11 +468,11 @@ def test_decode():
     mz = css.mz
     k = css.k
 
-    builder = Builder()
-    get(builder, css)
+    circuit = Circuit()
+    get(circuit, css)
 
-    #print(builder)
-    items = builder.items
+    #print(circuit)
+    items = circuit.items
 
 #    for arg in items:
 #        if arg[0] == "M":
@@ -425,21 +483,21 @@ def test_decode():
     #return
 
     N = 60
-    result = builder.simulate(N)
-    builder.dump(result)
+    result = circuit.simulate(N)
+    circuit.dump(result)
 
     decoder = SimpleDecoder(css.get_dual())
     print(decoder)
 
     x_syndrome = []
     for i in range(mx):
-        rows = [builder.lookup["Hx[%d,%d]"%(i,j)] for j in range(builder.R)]
+        rows = [circuit.lookup["Hx[%d,%d]"%(i,j)] for j in range(circuit.R)]
         row = result[:, rows]
         #print("row:")
         #print(row.t)
         A = row.A.sum(1)
         A = A.astype(float)
-        A /= builder.R
+        A /= circuit.R
         A = numpy.round(A)
         assert numpy.max(A) <= 1.
         assert numpy.min(A) >= 0.
@@ -457,11 +515,11 @@ def test_decode():
 
     ops = []
     for i in range(N):
-        op = decoder.decode(builder.p, x_syndrome[i])
+        op = decoder.decode(circuit.p, x_syndrome[i])
         ops.append(op)
 
     #return
-    bits = result[:, [builder.lookup["q%d"%i] for i in range(n)]]
+    bits = result[:, [circuit.lookup["q%d"%i] for i in range(n)]]
 
     correct = Matrix(ops)
     #print("\ncorrect:")
