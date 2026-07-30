@@ -2,6 +2,7 @@
 
 """
 experimenting with _simulating qec circuits .
+previous version: wstim.py 
 
 """
 
@@ -21,7 +22,6 @@ class Decoder:
         code = code.to_css()
         self.code = code
 
-#    def get_T(self, err_op):
     def get_T(self, syndrome):
         # bitflip X-type errors, frustrate Hz checks, and produce Tx
         code = self.code
@@ -30,13 +30,6 @@ class Decoder:
         Tx = code.Tx
         T = syndrome * Tx
         return T
-#        m = Hz.shape[0]
-#        for i in range(m):
-#            #if dot2(err_op, Hz[i]):
-#            if syndrome[i]:
-#                T += Tx[i]
-#        T %= 2
-#        return T
 
     def decode(self, p, err_op, verbose=False, **kw):
         return None
@@ -193,7 +186,8 @@ class Builder:
         result = result[:, cols]
         return result
 
-    def prep_zero(builder, code, data): # XXX (or is it logical plus ?)
+    def prep(builder, code, data): 
+        "prepare a logical (plus?) state for <code> on <data> qubits"
         css = code.to_css()
         n = css.n
         assert n==len(data)
@@ -202,21 +196,19 @@ class Builder:
         mx = len(Hx)
         mz = len(Hz)
     
-        if 1:
-            # state prep for logical |0>^k  (or is it logical plus ?)
-            #builder.R(idxs) # |0>^n
-            HLx = Hx.concatenate(css.Lx)
-            Jx = HLx.normal_form()
-            px = Jx.get_pivots()
-            #print("Jx:")
-            #print(Jx, px)
-        
-            builder.H([data[col] for (row,col) in px])
-            #for i in range(mx):
-            for (row, col) in px:
-                for j in range(col+1, n):
-                    if Jx[row,j]:
-                        builder.CX(data[col], data[j])
+        #builder.R(idxs) # |0>^n
+        HLx = Hx.concatenate(css.Lx)
+        Jx = HLx.normal_form()
+        px = Jx.get_pivots()
+        #print("Jx:")
+        #print(Jx, px)
+    
+        builder.H([data[col] for (row,col) in px])
+        #for i in range(mx):
+        for (row, col) in px:
+            for j in range(col+1, n):
+                if Jx[row,j]:
+                    builder.CX(data[col], data[j])
         
         #builder.H(idxs) # |+>^n
         builder.TICK()
@@ -240,7 +232,7 @@ def get(builder, code):
     data = [builder.ALLOC("q%d"%i) for i in range(n)]
     print(data)
 
-    builder.prep_zero(css, data)
+    builder.prep(css, data)
 
     Hx = css.Hx
     Hz = css.Hz
@@ -291,8 +283,9 @@ def get(builder, code):
 
 class Tableau:
     def __init__(self, M):
-        n, nn = M.shape
-        assert nn == 2*n
+        m, nn = M.shape
+        assert nn%2 == 0
+        n = nn//2
         space = SymplecticSpace(n)
         assert space.is_isotropic(M)
         self.M = M
@@ -300,7 +293,7 @@ class Tableau:
         self.shape = M.shape
 
     @classmethod
-    def zeros(cls, n):
+    def zero(cls, n):
         nn = 2*n
         M = []
         for i in range(n):
@@ -310,16 +303,27 @@ class Tableau:
         M = Matrix(M)
         return Tableau(M)
 
+    @classmethod
+    def plus(cls, n):
+        nn = 2*n
+        M = []
+        for i in range(n):
+            v = [0]*nn
+            v[2*i] = 1
+            M.append(v)
+        M = Matrix(M)
+        return Tableau(M)
+
     def __str__(self):
         n, nn = self.shape
         smap = SMap()
-        smap[1,0] = strop(self.M)
-        smap[0,0] = "="*n
-        smap[n+1,0] = "="*n
+        smap[0,1] = "="*n
+        smap[1,1] = strop(self.M)
+        smap[n+1,1] = "="*n
         return str(smap)
 
-    def apply(self, *arg):
-        print("apply", arg)
+    def apply_gate(self, *arg):
+        #print("apply", arg)
         space = self.space
         M = self.M
         gate, idxs = arg[:2]
@@ -342,6 +346,12 @@ class Tableau:
         tab = Tableau(M)
         return tab
 
+    def apply(self, builder):
+        tab = self
+        for item in builder:
+            tab = tab.apply_gate(*item)
+        return tab
+
 
 def test():
 
@@ -349,11 +359,11 @@ def test():
     #return
 
     n = 2
-    tab = Tableau.zeros(n)
+    tab = Tableau.zero(n)
     #print(tab)
-    tab = tab.apply("H", 0)
+    tab = tab.apply_gate("H", 0)
     #print(tab)
-    tab = tab.apply("CX", [0, 1])
+    tab = tab.apply_gate("CX", [0, 1])
     #print(repr(str(tab)))
     assert str(tab).replace(" ", "") == "==\nXX\nZZ\n=="
 
@@ -365,14 +375,12 @@ def test():
     #get(builder, code)
     
     data = [builder.ALLOC("q%d"%i) for i in range(n)]
-    builder.prep_zero(code, data)
+    builder.prep(code, data)
 
-    tab = Tableau.zeros(n)
+    tab = Tableau.zero(n)
 
     print(builder)
-    #builder.act(tab)
-    for item in builder:
-        tab = tab.apply(*item)
+    tab = tab.apply(builder)
 
     print(tab)
 
