@@ -81,6 +81,10 @@ class Circuit:
         self.items = []
         self.measure = {} # name -> idx for measure's
 
+    @property
+    def n(self):
+        return len(self.names)
+
     def __getitem__(self, idx):
         return self.items[idx]
 
@@ -211,13 +215,11 @@ class Circuit:
                     circuit.CX(data[col], data[j])
         
         #circuit.H(idxs) # |+>^n
-        circuit.TICK()
+        #circuit.TICK()
 
 
 
-def get(circuit, code):
-    p = 0.01
-    R = 3 # repeat
+def basic_syndrome(circuit, code, p=0.01, R=3):
 
     css = code.to_css()
     n = css.n # 1 ancilla
@@ -230,7 +232,7 @@ def get(circuit, code):
     ERROR = circuit.Z_ERROR
 
     data = [circuit.ALLOC("q%d"%i) for i in range(n)]
-    print(data)
+    #print(data)
 
     circuit.prep(css, data)
 
@@ -316,6 +318,33 @@ class Tableau:
         M = Matrix(M)
         return Tableau(M)
 
+    @classmethod
+    def I(cls, n):
+        nn = 2*n
+        v = [0]*nn
+        return Tableau(Matrix(v))
+
+    @classmethod
+    def X(cls, n, i):
+        nn = 2*n
+        v = [0]*nn
+        v[2*i] = 1
+        return Tableau(Matrix(v))
+
+    @classmethod
+    def Y(cls, n, i):
+        nn = 2*n
+        v = [0]*nn
+        v[2*i:2*i+2] = [1,1]
+        return Tableau(Matrix(v))
+
+    @classmethod
+    def Z(cls, n, i):
+        nn = 2*n
+        v = [0]*nn
+        v[2*i+1] = 1
+        return Tableau(Matrix(v))
+
     def __str__(self):
         m, nn = self.shape
         n = nn//2
@@ -325,11 +354,15 @@ class Tableau:
         smap[m+1,1] = "="*n
         return str(smap)
 
+    def shortstr(self):
+        return strop(self.M)
+
     def __repr__(self):
         return "Tableau(%r)"%(self.M,)
 
-    def apply_gate(self, *arg):
-        #print("apply", arg)
+    def act(self, *arg):
+        #print("act", arg)
+        #print(self)
         space = self.space
         M = self.M
         gate, idxs = arg[:2]
@@ -350,13 +383,32 @@ class Tableau:
         #else:
         #    assert 0, arg
         tab = Tableau(M)
+        #print("-->")
+        #print(tab)
         return tab
 
-    def apply(self, circuit):
+    def run(self, circuit):
         tab = self
         for item in circuit:
-            tab = tab.apply_gate(*item)
+            tab = tab.act(*item)
         return tab
+
+
+class Tensor:
+    "a distribution over Pauli errors"
+    def __init__(self, items):
+        self.items = items
+
+    def __str__(self):
+        return "Tensor(%s)"%(
+            ', '.join("%s:%.4f"%(tab.shortstr(), p) for (tab,p) in self.items))
+
+    def act(self, *arg):
+        #print("Tensor.act", arg, self)
+        items = [(tab.act(*arg), p) for (tab,p) in self.items]
+        tensor = Tensor(items)
+        #print("\t", tensor)
+        return tensor
 
 
 class Model:
@@ -366,22 +418,45 @@ class Model:
         self.state = Tableau.zero(n)
         self.noise = []
 
-    def DEPOLARIZE1(self, idxs, p):
-        print("Model.DEPOLARIZE1", idxs, p)
+    def DEPOLARIZE1(self, idxs, kw):
+        #print("Model.DEPOLARIZE1", idxs, kw)
+        p = kw['p'] # um...
         noise = self.noise
-        nn = self.nn
+        n = self.n
+        assert 0. <= p <= 1., repr(p)
         for idx in idxs:
-            v = [0]*nn
-            v[2*idx+1] = 1
-            tab = Tableau(Matrix(v))
-            noise.append((tab, p))
+            tensor = Tensor([
+                (Tableau.I(n), 1-p),
+                (Tableau.X(n, idx), p/3),
+                (Tableau.Y(n, idx), p/3),
+                (Tableau.Z(n, idx), p/3)])
+            noise.append(tensor)
+
+    def X_ERROR(self, idxs, kw):
+        #print("Model.X_ERROR", idxs, kw)
+        p = kw['p'] # um...
+        noise = self.noise
+        n = self.n
+        assert 0. <= p <= 1., repr(p)
+        for idx in idxs:
+            tensor = Tensor([(Tableau.I(n), 1-p), (Tableau.X(n, idx), p)])
+            noise.append(tensor)
+
+    def Z_ERROR(self, idxs, kw):
+        #print("Model.Z_ERROR", idxs, kw)
+        p = kw['p'] # um...
+        noise = self.noise
+        n = self.n
+        assert 0. <= p <= 1., repr(p)
+        for idx in idxs:
+            tensor = Tensor([(Tableau.I(n), 1-p), (Tableau.Z(n, idx), p)])
+            noise.append(tensor)
 
     def apply_gate(self, *arg):
-        print("Model.apply_gate", arg, len(self.noise))
-        self.state = self.state.apply_gate(*arg)
-        self.noise = [
-            (tab.apply_gate(*arg), p)
-            for (tab, p) in self.noise]
+        #print("Model.apply_gate", arg, len(self.noise))
+        self.state = self.state.act(*arg)
+        self.noise = [tensor.act(*arg) for tensor in self.noise]
+        #print(self)
 
     def apply(self, circuit):
         for item in circuit:
@@ -396,12 +471,16 @@ class Model:
         #return "Model\n%s\n%s"%(
             #self.state, self.noise)
         lines = ["Model", str(self.state)]
-        for (tab,p) in self.noise:
-            lines.append("%s p=%s"%(tab, p))
+        #for (tab,p) in self.noise:
+        #    lines.append("%s p=%s"%(tab, p))
+        for t in self.noise:
+            lines.append(str(t))
         return "\n".join(lines)
 
 
 def test():
+
+    print("\ntest():")
 
     #test_decode()
     #return
@@ -411,20 +490,40 @@ def test():
     n = 2
     tab = Tableau.zero(n)
     #print(tab)
-    tab = tab.apply_gate("H", 0)
+    tab = tab.act("H", 0)
     #print(tab)
-    tab = tab.apply_gate("CX", [0, 1])
+    tab = tab.act("CX", [0, 1])
     #print(repr(str(tab)))
     assert str(tab).replace(" ", "") == "==\nXX\nZZ\n=="
 
     # ------------------------------------------------------------------------
 
+    n = 2
+    circuit = Circuit()
+    data = [circuit.ALLOC("q%d"%i) for i in range(n)]
+
+    p = 0.01
+    circuit.H(data[0])
+    circuit.X_ERROR(data, p)
+    circuit.CX(data[0], data[1])
+
+    #print(circuit)
+
+    model = Model(n)
+    model.apply(circuit)
+    #print(model)
+
+    #return
+
+
+    # ------------------------------------------------------------------------
+
     code = construct.get_713()
-    print(code.longstr())
+    #print(code.longstr())
     n = code.n
 
     circuit = Circuit()
-    #get(circuit, code)
+    #basic_syndrome(circuit, code)
     
     data = [circuit.ALLOC("q%d"%i) for i in range(n)]
 
@@ -432,7 +531,7 @@ def test():
     circuit.DEPOLARIZE1(data, p)
 
     circuit.prep(code, data)
-    print(circuit)
+    #print(circuit)
 
     #tab = Tableau.zero(n)
     #tab = tab.apply(circuit)
@@ -441,8 +540,19 @@ def test():
     model = Model(n)
     model.apply(circuit)
 
-    print(model)
+    #print(model)
 
+    # ------------------------------------------------------------------------
+
+    code = construct.get_713()
+    circuit = Circuit()
+    basic_syndrome(circuit, code)
+
+    n = circuit.n
+    model = Model(n)
+    model.apply(circuit)
+
+    print(model)
 
 
 def test_decode():
@@ -469,7 +579,7 @@ def test_decode():
     k = css.k
 
     circuit = Circuit()
-    get(circuit, css)
+    basic_syndrome(circuit, css)
 
     #print(circuit)
     items = circuit.items
