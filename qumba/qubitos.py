@@ -6,6 +6,9 @@ previous version: wstim.py
 
 """
 
+from functools import reduce
+from operator import add, mul, matmul
+
 import numpy
 
 from qumba.smap import SMap
@@ -15,6 +18,7 @@ from qumba import construct
 #from qumba import decode
 from qumba import lin
 from qumba.qcode import strop, SymplecticSpace
+from qumba import dense 
 
 
 class Decoder:
@@ -91,6 +95,9 @@ class Circuit:
     def __len__(self):
         return len(self.items)
 
+    ##########################################################################
+    # circuit constructors:
+
     def ALLOC(self, name=None):
         lookup = self.lookup
         names = self.names
@@ -118,20 +125,22 @@ class Circuit:
     def TICK(self):
         self.append("TICK", [])
 
-    def CX(self, i, j):
-        self.append("CX", [i, j])
+    def CX(self, nami, namj):
+        self.append("CX", [nami, namj])
 
-    def H(self, idxs):
-        self.append("H", idxs)
+    def H(self, names):
+        self.append("H", names)
 
-    def DEPOLARIZE1(self, idxs, p):
-        self.append("DEPOLARIZE1", idxs, p=p)
+    def DEPOLARIZE1(self, names, p):
+        self.append("DEPOLARIZE1", names, p=p)
 
-    def X_ERROR(self, idxs, p):
-        self.append("X_ERROR", idxs, p=p)
+    def X_ERROR(self, names, p):
+        self.append("X_ERROR", names, p=p)
 
-    def Z_ERROR(self, idxs, p):
-        self.append("Z_ERROR", idxs, p=p)
+    def Z_ERROR(self, names, p):
+        self.append("Z_ERROR", names, p=p)
+
+    ##########################################################################
 
     def __str__(self):
         return str(self.items)
@@ -299,6 +308,7 @@ class Tableau:
         self.M = M
         self.space = space
         self.shape = M.shape
+        self.n = n
 
     @classmethod
     def zero(cls, n):
@@ -393,6 +403,89 @@ class Tableau:
             tab = tab.act(*item)
         return tab
 
+    def to_dense(self):
+        n = self.n
+        space = dense.Space(n)
+        #print("to_dense", space)
+        M = self.M
+        p = self.p
+        rho = space.I # ??
+        for i,row in enumerate(M):
+            pauli = strop(row)
+            op = space.get_pauli(pauli)
+            rho = 0.5 * rho * (space.I + p[i]*op)
+        return rho
+
+
+#class Density:
+#    def __init__(self, A):
+#        if type(A) is list:
+#            A = numpy.array(A)
+#        assert isinstance(A, numpy.ndarray)
+#        self.A = A.copy()
+
+
+def density(circuit):
+    #print("density")
+
+    space = dense.Space(1)
+    I = space.I
+    X = space.X()
+    Z = space.Z()
+    zero = 0.5*(I+Z)
+    plus = 0.5*(I+X)
+
+    n = circuit.n
+    space = dense.Space(n)
+
+    rho = reduce(matmul, [zero]*n)
+    #print(rho)
+
+    In = space.I
+    for item in circuit:
+        #print(item)
+        gate = item[0]
+        idxs = item[1]
+        op = None
+        if gate == "R":
+            pass
+        elif gate == "H":
+            op = In
+            for i in idxs:
+                op = space.H(i) * op
+            rho = op*rho*op.d
+        elif gate == "CX":
+            i, j = idxs
+            op = space.CX(i, j)
+            rho = op*rho*op.d
+        elif gate == "X_ERROR":
+            kw = item[2]
+            p = kw["p"]
+            assert 0.<=p<=1.
+            for i in idxs:
+                Xi = space.X(i)
+                rho = (1-p) * rho + p*Xi*rho*Xi # apply Xi with probability p
+        elif gate == "Z_ERROR":
+            kw = item[2]
+            p = kw["p"]
+            assert 0.<=p<=1.
+            for i in idxs:
+                Zi = space.Z(i)
+                rho = (1-p) * rho + p*Zi*rho*Zi # apply Zi with probability p
+        elif gate == "DEPOLARIZE1":
+            kw = item[2]
+            p = kw["p"]
+            assert 0.<=p<=1.
+            for i in idxs:
+                Xi = space.X(i)
+                Yi = space.Y(i)
+                Zi = space.Z(i)
+                rho = (1-p) * rho + (p/3)*(Xi*rho*Xi + Yi*rho*Yi + Zi*rho*Zi) # apply Xi,Yi or Zi
+        else:
+            assert 0, item
+    #print(rho)
+    return rho
+
 
 def test():
 
@@ -413,23 +506,37 @@ def test():
 
     # ------------------------------------------------------------------------
 
-    n = 2
+    n = 3
     circuit = Circuit()
     data = [circuit.ALLOC("q%d"%i) for i in range(n)]
 
-    p = 0.01
     circuit.H(data[0])
     circuit.CX(data[0], data[1])
-    circuit.X_ERROR(data, p)
+    circuit.CX(data[0], data[2])
+
+    p = 0.01
+    #circuit.X_ERROR(data[0], p)
 
     #print(circuit)
 
     tab = Tableau.zero(n)
     tab = tab.run(circuit)
 
-    #print(tab)
+    print(tab)
 
-    #return
+    lhs = density(circuit)
+
+    rhs = tab.to_dense()
+
+    print("lhs:")
+    print(lhs)
+    print("=?")
+    print("rhs:")
+    print(rhs)
+
+    assert lhs == rhs
+
+    return
 
 
     # ------------------------------------------------------------------------

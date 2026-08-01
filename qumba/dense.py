@@ -184,6 +184,9 @@ class Space:
         self.w = exp(1j*pi/4)
         self.I = Matrix.identity(2**n)
 
+    def __str__(self):
+        return "Space(%d)"%(self.n,)
+
     def wI(self):
         w = self.w
         return w*self.I
