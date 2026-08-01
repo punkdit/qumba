@@ -4,6 +4,9 @@
 experimenting with _simulating qec circuits .
 previous version: wstim.py 
 
+See also: qubitos.py
+
+
 """
 
 import numpy

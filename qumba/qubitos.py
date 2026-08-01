@@ -284,7 +284,7 @@ def basic_syndrome(circuit, code, p=0.01, R=3):
 
 
 class Tableau:
-    def __init__(self, M):
+    def __init__(self, M, p):
         if len(M.shape) == 1:
             M = M.reshape(1, M.shape[0])
         m, nn = M.shape
@@ -292,6 +292,10 @@ class Tableau:
         n = nn//2
         space = SymplecticSpace(n)
         assert space.is_isotropic(M)
+        assert m == n
+        assert len(p) == n
+        p = numpy.array(p)
+        self.p = p
         self.M = M
         self.space = space
         self.shape = M.shape
@@ -304,8 +308,9 @@ class Tableau:
             v = [0]*nn
             v[2*i+1] = 1
             M.append(v)
+        p = [1.]*n
         M = Matrix(M)
-        return Tableau(M)
+        return Tableau(M, p)
 
     @classmethod
     def plus(cls, n):
@@ -315,35 +320,9 @@ class Tableau:
             v = [0]*nn
             v[2*i] = 1
             M.append(v)
+        p = [1.]*n
         M = Matrix(M)
-        return Tableau(M)
-
-    @classmethod
-    def I(cls, n):
-        nn = 2*n
-        v = [0]*nn
-        return Tableau(Matrix(v))
-
-    @classmethod
-    def X(cls, n, i):
-        nn = 2*n
-        v = [0]*nn
-        v[2*i] = 1
-        return Tableau(Matrix(v))
-
-    @classmethod
-    def Y(cls, n, i):
-        nn = 2*n
-        v = [0]*nn
-        v[2*i:2*i+2] = [1,1]
-        return Tableau(Matrix(v))
-
-    @classmethod
-    def Z(cls, n, i):
-        nn = 2*n
-        v = [0]*nn
-        v[2*i+1] = 1
-        return Tableau(Matrix(v))
+        return Tableau(M, p)
 
     def __str__(self):
         m, nn = self.shape
@@ -352,6 +331,8 @@ class Tableau:
         smap[0,1] = "="*n
         smap[1,1] = strop(self.M)
         smap[m+1,1] = "="*n
+        for i in range(n):
+            smap[i+1, n+2] = "%.4f"%self.p[i]
         return str(smap)
 
     def shortstr(self):
@@ -365,6 +346,7 @@ class Tableau:
         #print(self)
         space = self.space
         M = self.M
+        p = self.p
         gate, idxs = arg[:2]
         if type(idxs) is int:
             idxs = [idxs]
@@ -380,9 +362,27 @@ class Tableau:
             pass
         elif gate == "TICK":
             pass
-        #else:
-        #    assert 0, arg
-        tab = Tableau(M)
+
+        if gate == "X_ERROR" or gate == "DEPOLARIZE1":
+            kw = arg[2]
+            a = kw["p"]
+            for idx in idxs:
+                i = 2*idx + 1 # Z anti-commutes with X_ERROR
+                rows, = numpy.where(M[:, i])
+                for jdx in rows:
+                    p[jdx] *= (1-2*a)
+        if gate == "Z_ERROR" or gate == "DEPOLARIZE1":
+            kw = arg[2]
+            a = kw["p"]
+            for idx in idxs:
+                i = 2*idx # X anti-commutes with Z_ERROR
+                rows, = numpy.where(M[:, i])
+                for jdx in rows:
+                    p[jdx] *= (1-2*a)
+        if gate == "Y_ERROR":
+            assert 0, "todo"
+
+        tab = Tableau(M, p)
         #print("-->")
         #print(tab)
         return tab
@@ -392,90 +392,6 @@ class Tableau:
         for item in circuit:
             tab = tab.act(*item)
         return tab
-
-
-class Tensor:
-    "a distribution over Pauli errors"
-    def __init__(self, items):
-        self.items = items
-
-    def __str__(self):
-        return "Tensor(%s)"%(
-            ', '.join("%s:%.4f"%(tab.shortstr(), p) for (tab,p) in self.items))
-
-    def act(self, *arg):
-        #print("Tensor.act", arg, self)
-        items = [(tab.act(*arg), p) for (tab,p) in self.items]
-        tensor = Tensor(items)
-        #print("\t", tensor)
-        return tensor
-
-
-class Model:
-    def __init__(self, n):
-        self.n = n
-        self.nn = 2*n
-        self.state = Tableau.zero(n)
-        self.noise = []
-
-    def DEPOLARIZE1(self, idxs, kw):
-        #print("Model.DEPOLARIZE1", idxs, kw)
-        p = kw['p'] # um...
-        noise = self.noise
-        n = self.n
-        assert 0. <= p <= 1., repr(p)
-        for idx in idxs:
-            tensor = Tensor([
-                (Tableau.I(n), 1-p),
-                (Tableau.X(n, idx), p/3),
-                (Tableau.Y(n, idx), p/3),
-                (Tableau.Z(n, idx), p/3)])
-            noise.append(tensor)
-
-    def X_ERROR(self, idxs, kw):
-        #print("Model.X_ERROR", idxs, kw)
-        p = kw['p'] # um...
-        noise = self.noise
-        n = self.n
-        assert 0. <= p <= 1., repr(p)
-        for idx in idxs:
-            tensor = Tensor([(Tableau.I(n), 1-p), (Tableau.X(n, idx), p)])
-            noise.append(tensor)
-
-    def Z_ERROR(self, idxs, kw):
-        #print("Model.Z_ERROR", idxs, kw)
-        p = kw['p'] # um...
-        noise = self.noise
-        n = self.n
-        assert 0. <= p <= 1., repr(p)
-        for idx in idxs:
-            tensor = Tensor([(Tableau.I(n), 1-p), (Tableau.Z(n, idx), p)])
-            noise.append(tensor)
-
-    def apply_gate(self, *arg):
-        #print("Model.apply_gate", arg, len(self.noise))
-        self.state = self.state.act(*arg)
-        self.noise = [tensor.act(*arg) for tensor in self.noise]
-        #print(self)
-
-    def apply(self, circuit):
-        for item in circuit:
-            name = item[0]
-            meth = getattr(self, name, None) 
-            if meth is not None:
-                meth(*item[1:])
-            else:
-                self.apply_gate(*item)
-
-    def __str__(self):
-        #return "Model\n%s\n%s"%(
-            #self.state, self.noise)
-        lines = ["Model", str(self.state)]
-        #for (tab,p) in self.noise:
-        #    lines.append("%s p=%s"%(tab, p))
-        for t in self.noise:
-            lines.append(str(t))
-        return "\n".join(lines)
 
 
 def test():
@@ -494,7 +410,6 @@ def test():
     #print(tab)
     tab = tab.act("CX", [0, 1])
     #print(repr(str(tab)))
-    assert str(tab).replace(" ", "") == "==\nXX\nZZ\n=="
 
     # ------------------------------------------------------------------------
 
@@ -504,14 +419,15 @@ def test():
 
     p = 0.01
     circuit.H(data[0])
-    circuit.X_ERROR(data, p)
     circuit.CX(data[0], data[1])
+    circuit.X_ERROR(data, p)
 
     #print(circuit)
 
-    model = Model(n)
-    model.apply(circuit)
-    #print(model)
+    tab = Tableau.zero(n)
+    tab = tab.run(circuit)
+
+    #print(tab)
 
     #return
 
@@ -533,14 +449,10 @@ def test():
     circuit.prep(code, data)
     #print(circuit)
 
-    #tab = Tableau.zero(n)
-    #tab = tab.apply(circuit)
-    #print(tab)
+    tab = Tableau.zero(n)
+    tab = tab.run(circuit)
 
-    model = Model(n)
-    model.apply(circuit)
-
-    #print(model)
+    print(tab)
 
     # ------------------------------------------------------------------------
 
@@ -549,10 +461,11 @@ def test():
     basic_syndrome(circuit, code)
 
     n = circuit.n
-    model = Model(n)
-    model.apply(circuit)
 
-    print(model)
+    tab = Tableau.zero(n)
+    tab = tab.run(circuit)
+
+    print(tab)
 
 
 def test_decode():

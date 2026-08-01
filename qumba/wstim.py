@@ -3,6 +3,8 @@
 """
 experimenting with stim .
 
+next version: wstim_v1.py
+
 see: qubitos.py for more
 
 """
