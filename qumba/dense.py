@@ -89,7 +89,8 @@ class Matrix:
             else:
                 term = str(a)+term
             terms.append(term)
-            assert len(terms) <= 1024, "%s too big"%(self.shape,)
+            #assert len(terms) <= 1024, "%s too big"%(self.shape,)
+            assert len(terms) <= 4096, "%s too many terms"%(len(terms),)
         s = "+".join(terms)
         s = s.replace("+-", "-")
         #print()
@@ -200,6 +201,12 @@ class Space:
     def get_identity(self):
         return self.I
     get_I = get_identity
+
+    def get_zero(self):
+        N = 2**self.n
+        U = numpy.zeros((N, N), dtype=scalar)
+        U = Matrix(U)
+        return U
 
     def mkop(self, i, g, name):
         n = self.n

@@ -292,6 +292,251 @@ def basic_syndrome(circuit, code, p=0.01, R=3):
     return circuit
 
 
+class Tableau:
+    def __init__(self, M):
+        if len(M.shape) == 1:
+            M = M.reshape(1, M.shape[0])
+        m, nn = M.shape
+        assert nn%2 == 0
+        n = nn//2
+        space = SymplecticSpace(n)
+        assert space.is_isotropic(M)
+        self.M = M
+        self.space = space
+        self.shape = M.shape
+
+    def __getitem__(self, idx):
+        return self.M[idx] # um..
+
+    def __len__(self):
+        return len(self.M)
+
+    @classmethod
+    def zero(cls, n):
+        nn = 2*n
+        M = []
+        for i in range(n):
+            v = [0]*nn
+            v[2*i+1] = 1
+            M.append(v)
+        M = Matrix(M)
+        return Tableau(M)
+
+    @classmethod
+    def plus(cls, n):
+        nn = 2*n
+        M = []
+        for i in range(n):
+            v = [0]*nn
+            v[2*i] = 1
+            M.append(v)
+        M = Matrix(M)
+        return Tableau(M)
+
+    @classmethod
+    def I(cls, n):
+        nn = 2*n
+        v = [0]*nn
+        return Tableau(Matrix(v))
+
+    @classmethod
+    def X(cls, n, i):
+        nn = 2*n
+        v = [0]*nn
+        v[2*i] = 1
+        return Tableau(Matrix(v))
+
+    @classmethod
+    def Y(cls, n, i):
+        nn = 2*n
+        v = [0]*nn
+        v[2*i:2*i+2] = [1,1]
+        return Tableau(Matrix(v))
+
+    @classmethod
+    def Z(cls, n, i):
+        nn = 2*n
+        v = [0]*nn
+        v[2*i+1] = 1
+        return Tableau(Matrix(v))
+
+    def __str__(self):
+        m, nn = self.shape
+        n = nn//2
+        smap = SMap()
+        smap[0,1] = "="*n
+        smap[1,1] = strop(self.M)
+        smap[m+1,1] = "="*n
+        return str(smap)
+
+    def shortstr(self):
+        return strop(self.M)
+
+    def __repr__(self):
+        return "Tableau(%r)"%(self.M,)
+
+    def act(self, *arg):
+        #print("act", arg)
+        #print(self)
+        space = self.space
+        M = self.M
+        gate, idxs = arg[:2]
+        if type(idxs) is int:
+            idxs = [idxs]
+        if gate == "H":
+            for idx in idxs:
+                op = space.H(idx)
+                M = M*op.t
+        elif gate == "CX":
+            i, j = idxs
+            op = space.CX(i, j)
+            M = M*op.t
+        elif gate == "R":
+            pass
+        elif gate == "TICK":
+            pass
+        #else:
+        #    assert 0, arg
+        tab = Tableau(M)
+        #print("-->")
+        #print(tab)
+        return tab
+
+    def run(self, circuit):
+        tab = self
+        for item in circuit:
+            tab = tab.act(*item)
+        return tab
+
+
+class PauliDist:
+    "a distribution over Pauli errors"
+    def __init__(self, items):
+        self.items = items
+
+    def __str__(self):
+        return "PauliDist(%s)"%(
+            ', '.join("%s:%.4f"%(tab.shortstr(), p) for (tab,p) in self.items))
+
+    def act(self, *arg):
+        #print("PauliDist.act", arg, self)
+        items = [(tab.act(*arg), p) for (tab,p) in self.items]
+        tensor = PauliDist(items)
+        #print("\t", tensor)
+        return tensor
+
+    def channel(self, space, rho):
+        #print("channel", self)
+        result = space.get_zero()
+        for t, p in self.items:
+            desc = strop(t)
+            #print("\t", desc, p)
+            if t.M.sum() == 0:
+                result += p * rho
+            else:
+                op = space.get_pauli(desc)
+                result += p*op*rho*op
+        return result
+
+
+class Model:
+    def __init__(self, n):
+        self.n = n
+        self.nn = 2*n
+        self.state = Tableau.zero(n)
+        self.noise = []
+
+    def DEPOLARIZE1(self, idxs, kw):
+        #print("Model.DEPOLARIZE1", idxs, kw)
+        p = kw['p'] # um...
+        noise = self.noise
+        n = self.n
+        assert 0. <= p <= 1., repr(p)
+        for idx in idxs:
+            tensor = PauliDist([
+                (Tableau.I(n), 1-p),
+                (Tableau.X(n, idx), p/3),
+                (Tableau.Y(n, idx), p/3),
+                (Tableau.Z(n, idx), p/3)])
+            noise.append(tensor)
+
+    def X_ERROR(self, idxs, kw):
+        #print("Model.X_ERROR", idxs, kw)
+        p = kw['p'] # um...
+        noise = self.noise
+        n = self.n
+        assert 0. <= p <= 1., repr(p)
+        for idx in idxs:
+            tensor = PauliDist([(Tableau.I(n), 1-p), (Tableau.X(n, idx), p)])
+            noise.append(tensor)
+
+    def Z_ERROR(self, idxs, kw):
+        #print("Model.Z_ERROR", idxs, kw)
+        p = kw['p'] # um...
+        noise = self.noise
+        n = self.n
+        assert 0. <= p <= 1., repr(p)
+        for idx in idxs:
+            tensor = PauliDist([(Tableau.I(n), 1-p), (Tableau.Z(n, idx), p)])
+            noise.append(tensor)
+
+    def apply_gate(self, *arg):
+        #print("Model.apply_gate", arg, len(self.noise))
+        self.state = self.state.act(*arg)
+        self.noise = [tensor.act(*arg) for tensor in self.noise]
+        #print(self)
+
+    def apply(self, circuit):
+        for item in circuit:
+            name = item[0]
+            meth = getattr(self, name, None) 
+            if meth is not None:
+                meth(*item[1:])
+            else:
+                self.apply_gate(*item)
+
+    def __str__(self):
+        #return "Model\n%s\n%s"%(
+            #self.state, self.noise)
+        lines = ["Model", str(self.state)]
+        #for (tab,p) in self.noise:
+        #    lines.append("%s p=%s"%(tab, p))
+        for t in self.noise:
+            lines.append(str(t))
+        return "\n".join(lines)
+
+    def density(self):
+        n = self.n
+        assert n<12, "too big?"
+
+        space = dense.Space(1)
+        I = space.I
+        X = space.X()
+        Z = space.Z()
+        zero = 0.5*(I+Z)
+        plus = 0.5*(I+X)
+    
+        space = dense.Space(n)
+        rho = reduce(matmul, [zero]*n)
+        #print(rho)
+
+        In = space.I
+        rho = In
+        for row in self.state:
+            desc = strop(row)
+            #print(desc)
+            op = space.get_pauli(desc)
+            op = 0.5*(In + op)
+            rho = op*rho
+
+        for dist in self.noise:
+            rho = dist.channel(space, rho)
+
+        return rho
+
+
+
+
 def density(circuit):
     #print("density")
 
@@ -303,8 +548,9 @@ def density(circuit):
     plus = 0.5*(I+X)
 
     n = circuit.n
-    space = dense.Space(n)
+    assert n<12, "too big?"
 
+    space = dense.Space(n)
     rho = reduce(matmul, [zero]*n)
     #print(rho)
 
@@ -348,10 +594,33 @@ def density(circuit):
                 Yi = space.Y(i)
                 Zi = space.Z(i)
                 rho = (1-p) * rho + (p/3)*(Xi*rho*Xi + Yi*rho*Yi + Zi*rho*Zi) # apply Xi,Yi or Zi
+        elif gate == "TICK":
+            pass
+        elif gate == "M":
+            pass
         else:
             assert 0, item
     #print(rho)
     return rho
+
+
+def test_density(circuit):
+    n = circuit.n
+    lhs = density(circuit)
+
+    #print("lhs:")
+    #print(lhs)
+
+    model = Model(n)
+    model.apply(circuit)
+    #print(model)
+    rhs = model.density()
+
+    #print("rhs:")
+    #print(rhs)
+
+    assert lhs==rhs
+
 
 
 def test():
@@ -367,20 +636,15 @@ def test():
     circuit = Circuit()
     data = [circuit.ALLOC("q%d"%i) for i in range(n)]
 
+
+    p = 0.01
+    circuit.DEPOLARIZE1(data, p)
+
     circuit.H(data[0])
     circuit.CX(data[0], data[1])
     circuit.CX(data[0], data[2])
 
-    p = 0.01
-    circuit.X_ERROR(data[0], p)
-
-    lhs = density(circuit)
-
-    print("lhs:")
-    print(lhs)
-
-    return
-
+    test_density(circuit)
 
     # ------------------------------------------------------------------------
 
@@ -395,27 +659,27 @@ def test():
 
     p = 0.01
     circuit.DEPOLARIZE1(data, p)
-
     circuit.prep(code, data)
     #print(circuit)
 
-    tab = Tableau.zero(n)
-    tab = tab.run(circuit)
+    test_density(circuit)
 
-    print(tab)
 
     # ------------------------------------------------------------------------
 
-    code = construct.get_713()
+    #code = construct.get_713()
+    code = construct.get_422()
     circuit = Circuit()
     basic_syndrome(circuit, code)
 
     n = circuit.n
 
-    tab = Tableau.zero(n)
-    tab = tab.run(circuit)
+    model = Model(n)
+    model.apply(circuit)
+    print(model)
+    print(n)
 
-    print(tab)
+    test_density(circuit)
 
 
 def test_decode():
@@ -602,5 +866,4 @@ if __name__ == "__main__":
 
     t = time() - start_time
     print("OK! finished in %.3f seconds\n"%t)
-
 
