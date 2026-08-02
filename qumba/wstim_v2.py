@@ -292,6 +292,139 @@ def basic_syndrome(circuit, code, p=0.01, R=3):
     return circuit
 
 
+class Tableau:
+    def __init__(self, M, p):
+        if len(M.shape) == 1:
+            M = M.reshape(1, M.shape[0])
+        m, nn = M.shape
+        assert nn%2 == 0
+        n = nn//2
+        space = SymplecticSpace(n)
+        assert space.is_isotropic(M)
+        assert m == n
+        assert len(p) == n
+        p = numpy.array(p)
+        self.p = p
+        self.M = M
+        self.space = space
+        self.shape = M.shape
+        self.n = n
+
+    @classmethod
+    def zero(cls, n):
+        nn = 2*n
+        M = []
+        for i in range(n):
+            v = [0]*nn
+            v[2*i+1] = 1
+            M.append(v)
+        p = [1.]*n
+        M = Matrix(M)
+        return Tableau(M, p)
+
+    @classmethod
+    def plus(cls, n):
+        nn = 2*n
+        M = []
+        for i in range(n):
+            v = [0]*nn
+            v[2*i] = 1
+            M.append(v)
+        p = [1.]*n
+        M = Matrix(M)
+        return Tableau(M, p)
+
+    def __str__(self):
+        m, nn = self.shape
+        n = nn//2
+        smap = SMap()
+        smap[0,1] = "="*n
+        smap[1,1] = strop(self.M)
+        smap[m+1,1] = "="*n
+        for i in range(n):
+            smap[i+1, n+2] = "%.4f"%self.p[i]
+        return str(smap)
+
+    def shortstr(self):
+        return strop(self.M)
+
+    def __repr__(self):
+        return "Tableau(%r)"%(self.M,)
+
+    def act(self, *arg):
+        #print("act", arg)
+        #print(self)
+        space = self.space
+        M = self.M
+        p = self.p
+        gate, idxs = arg[:2]
+        if type(idxs) is int:
+            idxs = [idxs]
+        if gate == "H":
+            for idx in idxs:
+                op = space.H(idx)
+                M = M*op.t
+        elif gate == "CX":
+            i, j = idxs
+            op = space.CX(i, j)
+            M = M*op.t
+        elif gate == "R":
+            pass
+        elif gate == "TICK":
+            pass
+
+        if gate == "X_ERROR" or gate == "DEPOLARIZE1":
+            kw = arg[2]
+            a = kw["p"]
+            for idx in idxs:
+                i = 2*idx + 1 # Z anti-commutes with X_ERROR
+                rows, = numpy.where(M[:, i])
+                for jdx in rows:
+                    p[jdx] *= (1-2*a)
+        if gate == "Z_ERROR" or gate == "DEPOLARIZE1":
+            kw = arg[2]
+            a = kw["p"]
+            for idx in idxs:
+                i = 2*idx # X anti-commutes with Z_ERROR
+                rows, = numpy.where(M[:, i])
+                for jdx in rows:
+                    p[jdx] *= (1-2*a)
+        if gate == "Y_ERROR":
+            assert 0, "todo"
+
+        tab = Tableau(M, p)
+        #print("-->")
+        #print(tab)
+        return tab
+
+    def run(self, circuit):
+        tab = self
+        for item in circuit:
+            tab = tab.act(*item)
+        return tab
+
+    def to_dense(self):
+        n = self.n
+        space = dense.Space(n)
+        #print("to_dense", space)
+        M = self.M
+        p = self.p
+        rho = space.I # ??
+        for i,row in enumerate(M):
+            pauli = strop(row)
+            op = space.get_pauli(pauli)
+            rho = 0.5 * rho * (space.I + p[i]*op)
+        return rho
+
+
+#class Density:
+#    def __init__(self, A):
+#        if type(A) is list:
+#            A = numpy.array(A)
+#        assert isinstance(A, numpy.ndarray)
+#        self.A = A.copy()
+
+
 def density(circuit):
     #print("density")
 
@@ -363,6 +496,16 @@ def test():
 
     # ------------------------------------------------------------------------
 
+    n = 2
+    tab = Tableau.zero(n)
+    #print(tab)
+    tab = tab.act("H", 0)
+    #print(tab)
+    tab = tab.act("CX", [0, 1])
+    #print(repr(str(tab)))
+
+    # ------------------------------------------------------------------------
+
     n = 3
     circuit = Circuit()
     data = [circuit.ALLOC("q%d"%i) for i in range(n)]
@@ -374,10 +517,24 @@ def test():
     p = 0.01
     circuit.X_ERROR(data[0], p)
 
+    #print(circuit)
+
+    tab = Tableau.zero(n)
+    tab = tab.run(circuit)
+
+    print(tab)
+
     lhs = density(circuit)
+
+    rhs = tab.to_dense()
 
     print("lhs:")
     print(lhs)
+    print("=?")
+    print("rhs:")
+    print(rhs)
+
+    assert lhs == rhs
 
     return
 
