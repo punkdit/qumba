@@ -269,7 +269,7 @@ class Matrix:
             return NotImplemented
 
     def hadamard_product(self, other):
-        assert self.shape == other.shape
+        #assert self.shape == other.shape
         return Matrix(self.A*other.A, self.p)
 
     def __pow__(self, n):
