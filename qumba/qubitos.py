@@ -27,6 +27,8 @@ from qumba import lin
 from qumba.qcode import strop, SymplecticSpace
 from qumba import dense 
 
+from qumba.pauli import Pauli
+
 
 class Decoder:
     def __init__(self, code):
@@ -393,113 +395,91 @@ def density(circuit):
     return rho
 
 
-# should we be using qumba.pauli.Pauli ???
 class Tableau:
-    def __init__(self, M):
-        if len(M.shape) == 1:
-            M = M.reshape(1, M.shape[0])
-        m, nn = M.shape
-        assert nn%2 == 0
-        n = nn//2
+    def __init__(self, ops):
+        m = len(ops)
+        assert m>0
+        n = ops[0].n
+        self.ops = list(ops)
         space = SymplecticSpace(n)
-        assert space.is_isotropic(M)
-        self.M = M
         self.space = space
-        self.shape = M.shape
+        self.shape = (m, 2*n)
 
     def __getitem__(self, idx):
-        return self.M[idx] # um..
+        return self.ops[idx]
 
     def __len__(self):
-        return len(self.M)
+        return len(self.ops)
 
     @classmethod
     def zero(cls, n):
-        nn = 2*n
-        M = []
-        for i in range(n):
-            v = [0]*nn
-            v[2*i+1] = 1
-            M.append(v)
-        M = Matrix(M)
-        return Tableau(M)
+        ops = [Pauli.Z(n, i) for i in range(n)]
+        return Tableau(ops)
 
     @classmethod
     def plus(cls, n):
-        nn = 2*n
-        M = []
-        for i in range(n):
-            v = [0]*nn
-            v[2*i] = 1
-            M.append(v)
-        M = Matrix(M)
-        return Tableau(M)
+        ops = [Pauli.X(n, i) for i in range(n)]
+        return Tableau(ops)
 
     @classmethod
     def I(cls, n):
-        nn = 2*n
-        v = [0]*nn
-        return Tableau(Matrix(v))
+        return Tableau([Pauli.I(n)])
 
     @classmethod
     def X(cls, n, i):
-        nn = 2*n
-        v = [0]*nn
-        v[2*i] = 1
-        return Tableau(Matrix(v))
+        return Tableau([Pauli.X(n, i)])
 
     @classmethod
     def Y(cls, n, i):
-        nn = 2*n
-        v = [0]*nn
-        v[2*i:2*i+2] = [1,1]
-        return Tableau(Matrix(v))
+        return Tableau([Pauli.Y(n, i)])
 
     @classmethod
     def Z(cls, n, i):
-        nn = 2*n
-        v = [0]*nn
-        v[2*i+1] = 1
-        return Tableau(Matrix(v))
+        return Tableau([Pauli.Z(n, i)])
 
     def __str__(self):
         m, nn = self.shape
         n = nn//2
         smap = SMap()
         smap[0,1] = "="*n
-        smap[1,1] = strop(self.M)
+        #smap[1,1] = strop(self.M)
+        for i,op in enumerate(self.ops):
+            smap[i+1,1] = str(op)
         smap[m+1,1] = "="*n
         return str(smap)
 
     def shortstr(self):
-        return strop(self.M)
+        return ",".join(str(op) for op in self.ops)
 
     def __repr__(self):
-        return "Tableau(%r)"%(self.M,)
+        return "Tableau(%r)"%(self.ops,)
 
     def act(self, *arg):
         #print("act", arg)
         #print(self)
         space = self.space
-        M = self.M
+        ops = self.ops
         gate, idxs = arg[:2]
         if type(idxs) is int:
             idxs = [idxs]
         if gate == "H":
             for idx in idxs:
-                op = space.H(idx)
-                M = M*op.t
+                #cliffop = space.H(idx)
+                ops = [op.H(idx) for op in ops]
         elif gate == "CX":
             i, j = idxs
-            op = space.CX(i, j)
-            M = M*op.t
+            #cliffop = space.CX(i, j)
+            #M = M*op.t
+            ops = [op.CX(i, j) for op in ops]
         elif gate == "R":
             pass
         elif gate == "TICK":
             pass
-        #else:
-        #    assert 0, arg
-        tab = Tableau(M)
+        elif gate == "M":
+            pass
+        else:
+            assert 0, arg
+        tab = Tableau(ops)
         #print("-->")
         #print(tab)
         return tab
@@ -530,14 +510,19 @@ class PauliDist:
     def channel(self, space, rho):
         #print("channel", self)
         result = space.get_zero()
-        for t, p in self.items:
-            desc = strop(t)
+        #for t, p in self.items:
+            #desc = strop(t)
             #print("\t", desc, p)
-            if t.M.sum() == 0:
-                result += p * rho
-            else:
-                op = space.get_pauli(desc)
-                result += p*op*rho*op
+            #if t.M.sum() == 0:
+            #    result += p * rho
+            #else:
+            #    op = space.get_pauli(desc)
+            #    result += p*op*rho*op
+        for tab, p in self.items:
+            assert len(tab) == 1
+            pauli = tab[0]
+            op = pauli.get_dense()
+            result += p*op*rho*op
         return result
 
 
@@ -624,10 +609,11 @@ class Model:
 
         In = space.I
         rho = In
-        for row in self.state:
-            desc = strop(row)
+        for pauli in self.state:
+            #desc = strop(row)
             #print(desc)
-            op = space.get_pauli(desc)
+            #op = space.get_pauli(desc)
+            op = pauli.get_dense()
             op = 0.5*(In + op)
             rho = op*rho
 
@@ -638,6 +624,7 @@ class Model:
 
     def get_dist(self):
         print("get_dist")
+        assert 0
         tab = self.state
         M = tab.M
         print(strop(M))
@@ -662,8 +649,8 @@ class Model:
 
 
 
-
 def test_density(circuit):
+
     n = circuit.n
     print("\ntest_density:", 2**n)
 
@@ -686,6 +673,7 @@ def test_density(circuit):
         print("lhs != rhs")
         print(lhs)
         print(rhs)
+        print()
         print(circuit)
         print(model)
         assert 0
@@ -706,20 +694,91 @@ def test_density(circuit):
         if r > 0.01:
             print(idx, "%.4f"%r, "%.4f"%(stats[idx]/N))
 
-    print(model)
-    dist = model.get_dist()
-    for k,v in dist.items():
-        print(k,v)
-
-    print()
+    #print(model)
+    #dist = model.get_dist()
+    #for k,v in dist.items():
+    #    print(k,v)
+#
+#    print()
 
 
 def test():
 
     print("\ntest():")
 
-    #test_decode()
-    #return
+    Y = dense.Y
+    YY = Y@Y
+
+    #print(YY)
+
+    from qumba import pauli
+    yy = (pauli.nI@pauli.I) *( pauli.Y @ pauli.Y )
+    assert str(yy) == "-YY"
+
+    op = yy.get_dense()
+    assert op == -YY
+
+    ZX = dense.Z @ dense.X
+    CX = dense.Space(2).CX(1, 0)
+    assert( CX.d * ZX * CX == -YY )
+
+    ops = [dense.Z @ dense.I]
+    s = dense.Space(2)
+    seq = [s.H(1), s.CX(1,0), s.H(1), s.CX(1,0)] # reversed !
+    for g in reversed(seq):
+        ops.append( g.d * ops[-1] * g )
+
+    assert ops[0] == dense.Z @ dense.I
+    assert ops[1] == dense.Z @ dense.Z
+    assert ops[2] == dense.Z @ dense.X
+    assert ops[3] == -dense.Y @ dense.Y
+    assert ops[4] == dense.Y @ dense.Y
+
+    # ------------------------------------------------------------------------
+
+    n = 2
+    circuit = Circuit()
+    data = [circuit.ALLOC("q%d"%i) for i in range(n)]
+    H = lambda i:circuit.H(data[i])
+    CX = lambda i,j:circuit.CX(data[i], data[j])
+
+    CX(1,0)
+    H(1)
+    CX(1,0)
+    H(1)
+
+    if 1:
+
+        s = dense.Space(2)
+        ops = [s.H(1), s.CX(1,0), s.H(1), s.CX(1,0)] # reversed !
+        op = reduce(mul, ops)
+        zero = dense.ket0
+        op = op*(zero@zero)
+        #print()
+        lhs = op*op.d
+        #print("lhs =", lhs)
+    
+        # dense Tableau
+        tbl = [s.Z(0), s.Z(1)]
+        for op in reversed(ops):
+            tbl = [op * pa * op.d for pa in tbl] # conjugate action
+
+        II = s.I
+        XZ = s.X(0)*s.Z(1)
+        XI = s.X(0)
+        rho = (1/4) * (II+YY) * (II+XZ)
+        #print("rho =", rho)
+        assert(rho == lhs)
+        assert(tbl[0] == YY)
+        assert(tbl[1] == XZ)
+    
+        #model = Model(2)
+        #for arg in circuit:
+        #    print(model.state.shortstr(), "-->", arg)
+        #    model.apply([arg])
+        #print(model)
+
+    test_density(circuit)
 
     # ------------------------------------------------------------------------
 
@@ -765,13 +824,16 @@ def test():
     circuit.H(data[1])
     circuit.CX(data[1], data[0])
     test_density(circuit)
-    return
+    #return
 
-    while 1:
-        circuit = Circuit.random(3, 5)
+    # ------------------------------------------------------------------------
+
+    #while 1:
+    for trial in range(10):
+        circuit = Circuit.random(4, 20)
         test_density(circuit)
 
-    return
+    #return
 
     # ------------------------------------------------------------------------
 

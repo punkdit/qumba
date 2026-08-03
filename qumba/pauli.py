@@ -25,6 +25,7 @@ from qumba.qcode import QCode, strop, css_to_isotropic
 from qumba.csscode import CSSCode
 from qumba.util import cross, allperms
 from qumba import construct
+from qumba import dense
 
 
 # Crucial equation: 
@@ -139,6 +140,62 @@ class Pauli:
         s = strop(self.vec, "I")
         op = clifford.get_pauli(s)
         return self.sign()*op
+
+    def get_dense(self):
+        v = self.vec
+        s = strop(v, "I")
+        ops = [getattr(dense, si) for si in s]
+        op = reduce(matmul, ops)
+        phase = (self.phase + s.count("Y")) % 4
+        phase = [1, 1j, -1, -1j][phase]
+        return phase * op
+
+    def H(self, i):
+        vec = list(self.vec)
+        vec[2*i], vec[2*i+1] = vec[2*i+1], vec[2*i]
+        #op = SymplecticSpace(self.n).H(i)
+        #vec = self.vec * op.t
+        phase = self.phase
+        n = self.n
+        #print("H", i, vec)
+        if vec[2*i] == 1 and vec[2*i+1] == 1:
+            phase += 2
+        return Pauli(vec, phase%4)
+
+    def CX(self, i, j):
+        op = SymplecticSpace(self.n).CX(i, j)
+        vec = self.vec * op.t
+        return Pauli(vec, self.phase)
+
+    @classmethod
+    def I(cls, n):
+        nn = 2*n
+        vec = [0]*nn
+        return cls(vec)
+
+    @classmethod
+    def X(cls, n, idx):
+        assert 0<=idx<n
+        nn = 2*n
+        vec = [0]*nn
+        vec[2*idx] = 1
+        return cls(vec)
+
+    @classmethod
+    def Y(cls, n, idx):
+        assert 0<=idx<n
+        nn = 2*n
+        vec = [0]*nn
+        vec[2*idx:2*idx+2] = [1, 1]
+        return cls(vec, 3)
+
+    @classmethod
+    def Z(cls, n, idx):
+        assert 0<=idx<n
+        nn = 2*n
+        vec = [0]*nn
+        vec[2*idx+1] = 1
+        return cls(vec)
 
 
 

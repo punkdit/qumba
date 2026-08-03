@@ -390,6 +390,12 @@ class Space:
         names = mulclose_names(gen, names)
         return names
 
+space = Space(1)
+I = space.I
+X = space.X(0)
+Y = space.Y(0)
+Z = space.Z(0)
+
 
 
 ket0 = Matrix([[1,0]]).d
