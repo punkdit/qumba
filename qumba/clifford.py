@@ -1817,28 +1817,6 @@ def test_su2():
     assert set(G) == set(Q)
 
 
-def test_goto():
-
-    from qumba.syntax import Syntax
-
-    syntax = Syntax()
-    CX, H = syntax.CX, syntax.H
-
-    prog = (CX(6,7)*CX(5,7)*CX(0,7)
-        *CX(6,4)*CX(1,5)*CX(3,6)*CX(2,0)
-        *CX(1,4)*CX(2,6)*CX(3,5)*CX(1,0)
-        *H(1)*H(2)*H(3))
-
-    n = 8
-    c = Clifford(n)
-
-    u = c.PZ()
-
-    X, Z = c.X, c.Z
-
-    #print(X(2)*Z(2) == -Z(2)*X(2) )
-
-
 def test_eigs():
     c = Clifford(1)
     S, H = c.S(), c.H()
