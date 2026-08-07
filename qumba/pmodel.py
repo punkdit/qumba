@@ -99,10 +99,10 @@ def test():
     a1 = get_alpha(1)
     assert a1.sum() == 1
 
-    ev = fv = 0.1
+    ev = fv = 0.001
     alphas = []
     #bits = (0,)
-    for i in range(4):
+    for i in range(6):
         ai = get_alpha(i)
         assert ai.sum() == 1
         alphas.append(ai)
@@ -114,11 +114,18 @@ def test():
             values.append(v)
         ys = Table(ai.names[1:], values)
 
-        ybits = (0,)*i + (1,)
+        ybits = (0,)*i + (0,)
         print("i=%d"%i, ybits, ai.names)
         denom = ys(*ybits)
-        print("\t x%d=0:"%i, (ai(0,*ybits)/denom).subs(e=ev, f=fv))
-        print("\t x%d=1:"%i, (ai(1,*ybits)/denom).subs(e=ev, f=fv))
+        #print("\t x%d=0:"%i, (ai(0,*ybits)/denom).subs(e=ev, f=fv))
+        #print("\t x%d=1:"%i, (ai(1,*ybits)/denom).subs(e=ev, f=fv))
+        poly = ai(1,*ybits)/denom
+        print("\t x%d=1:"%i)
+        top = poly.numerator()
+        bot = poly.denominator()
+        for weight,mono in top:
+            print(mono.degree(), end=' ')
+        print()
 
         bits = (0,) + bits
 
