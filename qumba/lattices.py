@@ -26,6 +26,8 @@ from huygens.front import RGB, Rotate, RGBA
 from huygens.namespace import red, green, blue, orange, yellow, white, st_round
 
 from qumba.qcode import QCode, fromstr, lin, shortstr
+from qumba import construct
+from qumba.smap import SMap
 from qumba.matrix_sage import Matrix
 from qumba.argv import argv
 from qumba import transversal 
@@ -664,9 +666,61 @@ def test():
         print()
 
 
-def choose_colour():
-    d = 7
-    build_colour_666(d)
+def test_tutte():
+
+    for d in [3,5]:
+      for code in [construct.get_surface(d,d)]:
+        css = code.to_css()
+        H = css.Hx
+        #H = css.Hx.concatenate(css.Lx) # dual to H
+        print(code)
+        #print(H, H.shape)
+        p = H.get_tutte()
+        print(display(p))
+        print()
+
+    return
+
+    for code in [build_colour_488(3), build_colour_488(5), build_colour_666(5)]:
+        css = code.to_css()
+        print(css)
+    
+        H = get_selfdual(css)
+        print(H)
+        p = H.get_tutte()
+        smap = display(p)
+        print(smap)
+        print()
+
+    
+def display(p):
+    smap = SMap()
+    n = p.degree()
+    w = max(len(str(c)) for c,monic in p)+1
+    for i in range(n+1):
+      for j in range(n+1):
+        smap[i, w*j+w-1] = '.'
+    for c,monic in p:
+        i,j = monic.degrees()
+        #print(c, monic[key])
+        smap[i, w*j] = str(c).rjust(w)
+    return smap
+
+
+def get_selfdual(css):
+    css = css.to_css()
+    from qumba.lin import array2, zeros2
+    from qumba.matrix import Matrix
+    Hx = css.Hx
+    m, n = Hx.shape
+    H1 = zeros2(m+1, n+1)
+    H1[:m, :n] = Hx
+    H1[m, :] = 1
+    H1 = Matrix(H1)
+    return H1
+
+    
+
 
 
 def find_lw():
