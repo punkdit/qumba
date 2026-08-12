@@ -264,7 +264,7 @@ class Circuit:
 
 
 
-def basic_syndrome(circuit, code, p=0.01, R=3):
+def basic_syndrome(circuit, code, p, R=3):
 
     css = code.to_css()
     n = css.n # 1 ancilla
@@ -273,7 +273,7 @@ def basic_syndrome(circuit, code, p=0.01, R=3):
     #idxs = list(range(n)) # code 
     #adx = idxs[-1]+1 # ancilla
 
-    ERROR = circuit.DEPOLARIZE1
+    #ERROR = circuit.DEPOLARIZE1
     ERROR = circuit.Z_ERROR
 
     data = [circuit.ALLOC("q%d"%i) for i in range(n)]
@@ -299,7 +299,7 @@ def basic_syndrome(circuit, code, p=0.01, R=3):
             ERROR([ancilla], p)
             for i in range(n):
                 if h[i]:
-                    #ERROR([i, adx], p) # <--- the really bad errors
+                    #ERROR([data[i], ancilla], p) # <--- the really bad errors
                     circuit.CX(data[i], ancilla)
                     circuit.TICK()
             circuit.M(ancilla)
@@ -313,7 +313,7 @@ def basic_syndrome(circuit, code, p=0.01, R=3):
             ERROR([ancilla], p)
             for i in range(n):
                 if h[i]:
-                    #ERROR([i, adx], p) # <--- the really bad errors
+                    #ERROR([data[i], ancilla], p) # <--- the really bad errors
                     circuit.CX(ancilla, data[i])
                     circuit.TICK()
             circuit.H(ancilla)
@@ -854,9 +854,11 @@ def test():
 
 def test_decode():
 
-    code = construct.get_713()
+    #code = construct.get_713()
 
-    code = construct.get_15_1_3()
+    code = construct.get_surface(5, 5)
+
+    #code = construct.get_15_1_3()
     #code = code.get_dual()
 
     #code = construct.get_512()
@@ -875,8 +877,10 @@ def test_decode():
     mz = css.mz
     k = css.k
 
+    p = 0.05
+
     circuit = Circuit()
-    basic_syndrome(circuit, css)
+    basic_syndrome(circuit, css, p)
 
     #print(circuit)
     items = circuit.items
@@ -889,7 +893,7 @@ def test_decode():
 
     #return
 
-    N = 60
+    N = 120
     result = circuit.simulate(N)
     circuit.dump(result)
 
@@ -920,9 +924,10 @@ def test_decode():
     print("x_syndrome.t:")
     print(x_syndrome.t)
 
+    p1 = 10*p
     ops = []
     for i in range(N):
-        op = decoder.decode(circuit.p, x_syndrome[i])
+        op = decoder.decode(p1, x_syndrome[i])
         ops.append(op)
 
     #return
