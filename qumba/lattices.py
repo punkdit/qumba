@@ -668,6 +668,8 @@ def test():
 
 def test_tutte():
 
+
+    #for code in [construct.get_15_1_3()]:
     for d in [3,5]:
       for code in [construct.get_surface(d,d)]:
         css = code.to_css()
