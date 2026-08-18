@@ -356,18 +356,27 @@ def test():
     print("vertices:", len(geometry.vertices()))
 
     C0 = geometry.get_code("red")
-    #print(C0.longstr())
-    #print()
-    C1 = geometry.get_code("green")
-    #print(C1.longstr())
-    #print()
+    if N==2:
+        C1 = get_middle_12() # fix a glitch 
+    else:
+        C1 = geometry.get_code("green")
     C2 = geometry.get_code("blue")
-    #print(C2.longstr())
-    #print()
+
+    if argv.verbose:
+        print(C0.longstr())
+        print()
+        print(C1.longstr())
+        print()
+        print(C2.longstr())
+        print()
 
     if argv.stack:
         code = stack(C0, C1, C2)
         print(code)
+        if argv.verbose:
+            print(code.longstr())
+
+    render_geometry(geometry, "cubeocta_stack")
 
 
 def test_12():
@@ -415,6 +424,68 @@ def test_12():
     if argv.stitch:
         stitch(code)
 
+
+def get_middle_12():
+    # this is N=2 test() with a hack
+    # see also test_12 
+
+    # broken code:
+    code = QCode.fromstr("""
+    X.X.X....X..
+    XX....X.X...
+    ...XXX....X.
+    .....XXX...X
+    ZZZ.........
+    ...Z.Z.Z....
+    Z...ZZZ.....
+    ....Z....ZZ.
+    ......Z.Z..Z
+    """)
+
+    # See cubeocta_stack_num.pdf
+    """
+        E   HGF      
+        012345678901
+        X.X.X....X..
+        XX....X.X...
+        .....XXX...X
+        ...XXX....X.
+        ZZZ.........
+        Z.......ZZ.. +
+        ...Z.Z.Z....
+        .....Z....ZZ +
+        ....Z....ZZ.
+        ..ZZZ....... +
+        ......Z.Z..Z
+        .Z....ZZ.... +
+        Z...ZZZ.....
+    """
+
+    H = fromstr("""
+        X.X.X....X..
+        XX....X.X...
+        .....XXX...X
+        ...XXX....X.
+        ZZZ.........
+        Z.......ZZ..
+        ...Z.Z.Z....
+        .....Z....ZZ
+        ....Z....ZZ.
+        ..ZZZ.......
+        ......Z.Z..Z
+        .Z....ZZ....
+        Z...ZZZ.....
+    """)
+    #print(H, H.shape, H.rank())
+    H = H.linear_independent()
+    code = QCode(H)
+
+    css = code.to_css()
+    css.bz_distance()
+    #print(css)
+    return code
+
+    
 def stitch(code):
     import stabgraph as stg
     import flag_stitcher
@@ -526,7 +597,7 @@ def test_14():
     from qumba.gcolor import dump_transverse
     dump_transverse(code.Hx, code.Lx)
 
-    
+
 
 if __name__ == "__main__":
 
