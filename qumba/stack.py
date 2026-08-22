@@ -313,7 +313,7 @@ def test_periodic():
         #print(css)
     
     if argv.stack:
-        code = stack(*codes)
+        code = stack3(*codes)
         print(code)
 
     #render_geometry(geometry, "cubeocta_toric")
@@ -370,13 +370,37 @@ def test():
         print(C2.longstr())
         print()
 
-    if argv.stack:
-        code = stack(C0, C1, C2)
-        print(code)
-        if argv.verbose:
-            print(code.longstr())
+    if not argv.stack:
+        return
 
-    render_geometry(geometry, "cubeocta_stack")
+    code = stack3(C0, C1, C2)
+    print(code)
+    if argv.verbose:
+        print(code.longstr())
+
+    if argv.render:
+        render_geometry(geometry, "cubeocta_stack")
+
+    css = code.to_css()
+    Hx = css.Hx
+    from qumba.triorthogonal import is_morthogonal
+    print("is_morthogonal(2):", is_morthogonal(Hx, 2))
+    print("is_morthogonal(3):", is_morthogonal(Hx, 3))
+    print("is_morthogonal(4):", is_morthogonal(Hx, 4))
+
+    print(Hx, Hx.shape)
+    print()
+    #w = Hx.get_wenum()
+    #print(w)
+
+    m, n = Hx.shape
+    rows = []
+    for bits in numpy.ndindex((2,)*m):
+        u = numpy.dot(bits, Hx.A)%2
+        if u.sum() == 12:
+            rows.append(u)
+    U = Matrix(rows)
+    print(U, U.shape, U.rank())
 
 
 def test_12():
@@ -419,7 +443,7 @@ def test_12():
     ......Z.Z...
     ......Z....Z
     """)
-    code = stack(C0, C1, C2)
+    code = stack3(C0, C1, C2)
 
     if argv.stitch:
         stitch(code)
@@ -511,7 +535,7 @@ def stitch(code):
 
 
 
-def stack(C0, C1, C2):
+def stack3(C0, C1, C2):
 
     n = C0.n
     assert C1.n == n
@@ -521,6 +545,95 @@ def stack(C0, C1, C2):
     print(right)
 
     cube = construct.get_832()
+    #print(cube)
+
+    Er = right.get_encoder()
+    #code = QCode.from_encoder(Er, k=3)
+
+    Er = SymplecticSpace(cube.m * n).get_identity() << Er
+    #print(Er.shape)
+    #print(Er)
+
+    if 0:
+        code = QCode.from_encoder(Er, k=3)
+        print(code)
+        code = code.to_css()
+        code.bz_distance()
+        print(code)
+
+    #return
+
+    E = cube.get_encoder()
+
+    El = reduce(lshift, [E]*n)
+    #print(El.shape)
+
+    idxs = []
+    for i in range(n):
+      for j in range(cube.m):
+        idxs.append(cube.n*i + j)
+
+    N = cube.m*n
+    for i in range(cube.k):
+      for j in range(n):
+        idxs.append(cube.n*j + cube.m + i)
+
+    #print(idxs)
+
+    assert len(set(idxs)) == len(idxs)
+    assert set(idxs) == set(range(len(idxs)))
+
+    assert len(idxs)*2 == len(El)
+    assert len(idxs) == n * cube.n
+    P = SymplecticSpace(n*cube.n).get_perm(idxs).t
+    E = El * P * Er
+    code = QCode.from_encoder(E, k=right.k)
+    #d = code.distance("z3")
+    #print(code, d)
+    
+    #print(code.longstr())
+    css = code.to_css()
+    print(css)
+    wx = ([int(w) for w in css.Hx.sum(1)])
+    print({w:wx.count(w) for w in set(wx)})
+    wz = ([int(w) for w in css.Hz.sum(1)])
+    print({w:wz.count(w) for w in set(wz)})
+    if argv.distance:
+        show_info(C0)
+        show_info(C1)
+        show_info(C2)
+        show_info(code)
+    if argv.dump:
+        print(code.longstr())
+
+    return code
+
+
+def test_stack2():
+
+    C0 = construct.get_512()
+    C1 = C0.get_dual()
+    print(C0.longstr())
+    print(C1.longstr())
+
+    D = stack2(C0, C1)
+    D.distance("z3")
+    print(D)
+    print(D.longstr())
+    assert D.is_selfdual()
+
+
+
+
+def stack2(C0, C1):
+
+    n = C0.n
+    assert C1.n == n
+
+    right = C0+C1
+    print(right)
+
+    cube = construct.get_422()
     #print(cube)
 
     Er = right.get_encoder()
