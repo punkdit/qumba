@@ -674,7 +674,7 @@ class Matrix:
 
     def get_autos(self):
         m, n = self.shape
-        assert m <= 20, ("um... %s is too big ??"%(m))
+        assert m <= 22, ("um... %s is too big ??"%(m))
         from pynauty import Graph, autgrp
         A = self.get_lw_span()
         g = A.get_tanner()
