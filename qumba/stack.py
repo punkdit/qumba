@@ -898,10 +898,7 @@ def test_autos():
 
     #return
 
-    print(G.structure_description())
-    #print(len(G))
-
-    print(len(G))
+    #print(G.structure_description()) # slooooooo...ooow
 
     #from qumba.autos import get_autos_css
     #result = get_autos_css(css)

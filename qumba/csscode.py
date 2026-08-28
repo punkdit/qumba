@@ -23,6 +23,7 @@ from qumba.qcode import QCode, SymplecticSpace
 from qumba.isomorph import Tanner, search
 from qumba.action import Perm
 from qumba.matrix import Matrix, demote
+from qumba.lin import enum2
 from qumba.argv import argv
 
 
