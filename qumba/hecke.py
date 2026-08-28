@@ -55,7 +55,7 @@ def get_equi(G):
         H = gap.to_group(item, N=N)
         #print("\t", H)
         assert G.is_subgroup(H)
-        if len(G) > len(H) > 1:
+        if len(G) > len(H) > 1: # right ?!?
             Hs.append(H)
 
     print("subgroups:", len(Hs))
@@ -92,8 +92,8 @@ def get_equi(G):
                 css.bz_distance()
             if css.d <= 2:
                 continue
-            if css.n > 20 and css.d <= 4:
-                continue
+            #if css.n > 20 and css.d <= 4:
+            #    continue
 
             #print(css, H.shape)
             s = str(css)
@@ -122,8 +122,11 @@ def main():
     gap = Gap()
 
     if argv.GL:
-        _G = gap.GL(3,2)
-        G = gap.to_group(_G, smaller=False, N=8)
+        m = argv.get("m", 3)
+        n = argv.get("n", 2)
+        N = argv.get("N", None)
+        _G = gap.PSL(m, n)
+        G = gap.to_group(_G, smaller=False, N=N)
         get_equi(G)
         return
 
