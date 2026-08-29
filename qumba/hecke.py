@@ -14,6 +14,7 @@ gap = Gap()
 from qumba.argv import argv
 from qumba.matrix import Matrix
 from qumba.csscode import CSSCode
+from qumba import construct
 
 
 def span_ops(ops):
@@ -21,6 +22,8 @@ def span_ops(ops):
     m, n = ops[0].shape
     if N > 12:
         print("(span_ops: N=%d is too big?)" % N, end=" ", flush=True)
+        for op in ops:
+            yield op # at least we tried...
         return
     for bits in numpy.ndindex((2,)*N):
         if sum(bits) == 0:
@@ -121,6 +124,42 @@ def get_selfdual(G, desc=None):
                 print(css, weight)
 
 
+
+def get_weight(H):
+    m, n = H.shape
+
+    vecs = [[] for i in range(n+1)]
+    for u in numpy.ndindex((2,)*m):
+        v = Matrix(u) * H
+        w = v.sum()
+        vecs[w].append(v)
+
+    rows = []
+    for w,vs in enumerate(vecs):
+        if not w or not len(vs):
+            continue
+        rows += vs
+        H1 = Matrix(rows)
+        H1 = H1.row_reduce()
+        if len(H1) == m:
+            return w
+    assert 0
+
+
+
+def get_css_weight(css):
+
+    Hx = css.Hx
+    Hz = css.Hz
+
+    wx = get_weight(Hx)
+    wz = get_weight(Hz)
+    return wx, wz
+
+    
+
+
+
 def get_css(G, desc=None):
 
     s = G.structure_description()
@@ -143,6 +182,9 @@ def get_css(G, desc=None):
         H = gap.to_group(item, N=N)
         #print("\t", H)
         assert G.is_subgroup(H)
+        index = len(G) // len(H)
+        if argv.index and index != argv.index:
+            continue
         if len(G) > len(H) > 1: # right ?!?
             Hs.append(H)
 
@@ -158,6 +200,14 @@ def get_css(G, desc=None):
       for j in range(N):
         ops = list(get_operators(Xs[i].gens, Xs[j].gens))
         ops = [Matrix(op) for op in ops]
+        if argv.show:
+            print(i, j)
+            for op in ops:
+                print(op)
+                print("-" * 7)
+                print(op.normal_form())
+                print("=" * 7)
+            print()
         ops = [H.linear_independent() for H in span_ops(ops)]
         pairs[i,j] = ops
 
@@ -194,7 +244,10 @@ def get_css(G, desc=None):
                 continue
 
             found.add((wx,wz))
-            print(css)
+
+            w = get_css_weight(css)
+            print(css, w)
+
 
 
 
@@ -297,7 +350,16 @@ def test_24():
     print(gap.IsomorphicSubgroups(M, _G, get=True)) # yes
 
 
+def test_bring():
+    css = construct.get_bring()
+    print(css)
 
+    perms = css.find_autos()
+    perms = [Perm(idxs) for idxs in perms]
+    G = Group(perms)
+    print(G.structure_description())
+
+    get_css(G)
 
 
 

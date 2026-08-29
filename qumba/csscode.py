@@ -289,9 +289,9 @@ class CSSCode(object):
         Ax = Hx if Ax is None else Ax
         Az = Hz if Az is None else Az
         if Hx is None and Ax is not None:
-            Hx = linear_independent(Ax)
+            Hx = lin.linear_independent(Ax)
         if Hz is None and Az is not None:
-            Hz = linear_independent(Az)
+            Hz = lin.linear_independent(Az)
 
         self.Lx = Lx
         self.Lz = Lz
