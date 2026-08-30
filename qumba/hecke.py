@@ -20,7 +20,7 @@ from qumba import construct
 def span_ops(ops):
     N = len(ops)
     m, n = ops[0].shape
-    if N > 12:
+    if N > 16:
         print("(span_ops: N=%d is too big?)" % N, end=" ", flush=True)
         for op in ops:
             yield op # at least we tried...
@@ -35,6 +35,61 @@ def span_ops(ops):
         yield op
 
         
+def get_weight(H):
+    m, n = H.shape
+
+    vecs = [[] for i in range(n+1)]
+    for u in numpy.ndindex((2,)*m):
+        v = Matrix(u) * H
+        w = v.sum()
+        vecs[w].append(v)
+
+    rows = []
+    for w,vs in enumerate(vecs):
+        if not w or not len(vs):
+            continue
+        rows += vs
+        H1 = Matrix(rows)
+        H1 = H1.row_reduce()
+        if len(H1) == m:
+            return w
+    assert 0
+
+
+
+def get_css_weight(css):
+
+    Hx = css.Hx
+    Hz = css.Hz
+
+    wx = get_weight(Hx)
+    wz = get_weight(Hz)
+    return wx, wz
+
+    
+def get_pairs(G, Hs):
+    print("get_pairs ...", end=' ', flush=True)
+    Xs = [G.left_action(H) for H in Hs]
+    N = len(Xs)
+    pairs = {}
+    for i in range(N):
+      for j in range(N):
+        ops = list(get_operators(Xs[i].gens, Xs[j].gens))
+        ops = [Matrix(op) for op in ops]
+        if argv.show:
+            print(i, j)
+            for op in ops:
+                print(op)
+                print("-" * 7)
+                print(op.normal_form())
+                print("=" * 7)
+            print()
+        ops = [H.row_reduce() for H in span_ops(ops)]
+        pairs[i,j] = ops
+    print("done.")
+    return pairs
+
+
 
 found = set()
 
@@ -68,19 +123,29 @@ def get_selfdual(G, desc=None):
         if len(G) > len(H) > 1: # right ?!?
             Hs.append(H)
 
-    print("subgroups:", len(Hs))
+    N = len(Hs)
+    print("subgroups:", N)
+
+    Xs = [G.left_action(Hs[i]) for i in range(N)]
+
     for i in range(len(Hs)):
       for j in range(i, len(Hs)):
-
-        X = G.left_action(Hs[i])
-        Y = G.left_action(Hs[j])
-
-        ops = list(get_operators(X.gens, Y.gens))
+        ops = list(get_operators(Xs[i].gens, Xs[j].gens))
         #print(ops[0].shape, end=' ')
         ops = [Matrix(op) for op in ops]
 
         for H0 in span_ops(ops):
           for H in [H0, H0.t]:
+
+# much slower:
+#    pairs = get_pairs(G, Hs)
+#
+#    for i in range(N):
+#      for j in range(N):
+#        ops = pairs[i, j]
+#
+#        for H in ops:
+
             _, n = H.shape
             #if n <= 16: # this code is too small ...
             #    continue
@@ -89,14 +154,14 @@ def get_selfdual(G, desc=None):
             if HHt.sum() != 0:
                 continue
 
-            H = H.linear_independent()
+            H = H.row_reduce()
             m, n = H.shape
             assert 2*m <= n
             if 2*m == n:
                 continue
             #print(HHt.shape)
             #print(H.shortstr(), H.shape)
-            css = CSSCode(Hx=H, Hz=H, check=False)
+            css = CSSCode(Hx=H, Hz=H, check=False, build=False)
             if css.n-css.k < 100:
                 css.bz_distance()
             if css.d and css.d <= 2:
@@ -115,48 +180,12 @@ def get_selfdual(G, desc=None):
 
             if key not in found:
                 found.add(key)
-                weight = 0
-                if wenum is not None:
-                  for idx,wt in enumerate(wenum):
-                    if idx and wt:
-                        weight = idx
-                        break
+                weight = get_weight(H)
                 print(css, weight)
+                if argv.dump:
+                    print(H, H.shape)
 
 
-
-def get_weight(H):
-    m, n = H.shape
-
-    vecs = [[] for i in range(n+1)]
-    for u in numpy.ndindex((2,)*m):
-        v = Matrix(u) * H
-        w = v.sum()
-        vecs[w].append(v)
-
-    rows = []
-    for w,vs in enumerate(vecs):
-        if not w or not len(vs):
-            continue
-        rows += vs
-        H1 = Matrix(rows)
-        H1 = H1.row_reduce()
-        if len(H1) == m:
-            return w
-    assert 0
-
-
-
-def get_css_weight(css):
-
-    Hx = css.Hx
-    Hz = css.Hz
-
-    wx = get_weight(Hx)
-    wz = get_weight(Hz)
-    return wx, wz
-
-    
 
 
 
@@ -192,24 +221,10 @@ def get_css(G, desc=None):
     print("subgroups:", len(Hs), end=', ', flush=True)
 
     print("build action... ", end='', flush=True)
-    Xs = [G.left_action(H) for H in Hs]
 
-    N = len(Xs)
-    pairs = {}
-    for i in range(N):
-      for j in range(N):
-        ops = list(get_operators(Xs[i].gens, Xs[j].gens))
-        ops = [Matrix(op) for op in ops]
-        if argv.show:
-            print(i, j)
-            for op in ops:
-                print(op)
-                print("-" * 7)
-                print(op.normal_form())
-                print("=" * 7)
-            print()
-        ops = [H.linear_independent() for H in span_ops(ops)]
-        pairs[i,j] = ops
+    N = len(Hs)
+    pairs = get_pairs(G, Hs)
+
 
     print("done")
 
@@ -246,7 +261,14 @@ def get_css(G, desc=None):
             found.add((wx,wz))
 
             w = get_css_weight(css)
-            print(css, w)
+            print(css, w[0], w[1], "sd" if css.is_selfdual() else "")
+            if argv.dump:
+                css.build()
+                print("Hx =")
+                print(css.Hx)
+                print("Hz =")
+                print(css.Hz)
+                print()
 
 
 
@@ -348,6 +370,30 @@ def test_24():
     M = gap.MathieuGroup(24)
     _G = gap.define(G)
     print(gap.IsomorphicSubgroups(M, _G, get=True)) # yes
+
+
+def test_12():
+    Hx = Matrix.parse("""
+    1.1...1.111.
+    .11....11.11
+    ...11.11..11
+    ....111.11.1
+    """)
+    Hz = Matrix.parse("""
+    1.1...11..11
+    .11...1.11.1
+    ...1.111.1.1
+    ....11.11.11
+    """)
+    css = CSSCode(Hx=Hx, Hz=Hz)
+    N, perms = css.get_autos()
+    
+    perms = [Perm(idxs) for idxs in perms]
+    G = Group.generate(perms)
+    print(len(G))
+    print(G.structure_description())
+
+
 
 
 def test_bring():
