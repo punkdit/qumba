@@ -21,7 +21,7 @@ def span_ops(ops):
     N = len(ops)
     m, n = ops[0].shape
     if N > argv.get("max_ops", 16):
-        print("(span_ops: N=%d is too big?)" % N, end=" ", flush=True)
+        print("(span_ops: N=%d is too big?)" % N, end="\n", flush=True)
         for op in ops:
             yield op # at least we tried...
         return
@@ -186,6 +186,10 @@ def get_selfdual(G, desc=None):
                 print(css, weight)
                 if argv.dump:
                     print(H, H.shape)
+                if (css.n, css.k, css.d) == argv.dumpcode:
+                    print(H, H.shape)
+                if argv.find_autos:
+                    find_autos(H)
 
 
 
@@ -265,8 +269,7 @@ def get_css(G, desc=None):
 
             w = get_css_weight(css)
             print(css, w[0], w[1], "sd" if css.is_selfdual() else "")
-            if argv.dump:
-                css.build()
+            if argv.dump or (css.n, css.k, css.d) == argv.dumpcode:
                 print("Hx =")
                 print(css.Hx)
                 print("Hz =")
@@ -339,25 +342,7 @@ def main():
 
 
 
-def test_24():
-    H = Matrix.parse("""
-    11..1..11.1.11..1.1.1..1
-    ..11.11.1.1...111.1..11.
-    ..111..1.1.1..11.1.11..1
-    1..11.1.11...11.11..1.1.
-    1.1.11..1..11.1..11...11 
-    """)
-
-    H = Matrix.parse("""
-    ..11......111.1.1.1.
-    .11.....1..11..1..11
-    1..111...1.1....1.1.
-    11..1.1.1.1..11.....
-    ......11..11.11..11.
-    ....11111..11.1.1..1
-    """)
-    
-
+def find_autos(H):
     w = H.get_wenum()
     print(w)
 
@@ -374,6 +359,53 @@ def test_24():
     _G = gap.define(G)
     print(gap.IsomorphicSubgroups(M, _G, get=True)) # yes
 
+    from sage import all_cmdline as sage
+    R = sage.PolynomialRing(sage.ZZ, "x")
+    x = R.gens()[0]
+    f = 0
+    for (i,c) in enumerate(w):
+        f += c*(x**i)
+    print(f)
+    print(sage.factor(f))
+
+
+def test_autos():
+
+    H = Matrix.parse("""
+    ..11......111.1.1.1.
+    .11.....1..11..1..11
+    1..111...1.1....1.1.
+    11..1.1.1.1..11.....
+    ......11..11.11..11.
+    ....11111..11.1.1..1
+    """)
+
+    H = Matrix.parse("""
+    11..1..11.1.11..1.1.1..1
+    ..11.11.1.1...111.1..11.
+    ..111..1.1.1..11.1.11..1
+    1..11.1.11...11.11..1.1.
+    1.1.11..1..11.1..11...11 
+    """)
+    
+    _H = Matrix.parse("""
+    1.............1.1111..1..11...1.1.1.
+    .1............111.111...1...1..11.1.
+    ..1.........1...11..11.11..1..1.1..1
+    ...1........11...11.11....1..11..1.1
+    ....1........111.....111.1...1.1.11.
+    .....1......11.1...1..11...11..1.1.1
+    ......1......11...1.1.1...1.1111..1.
+    .......1....1...1..11.1...111.111...
+    ........1...1..1..1.1..11...11..11.1
+    .........1....1..11..1.111...11.11..
+    ..........1..1...1.1.11..111.....111
+    ...........1...11..1.1.111.1...1..11
+    ..................111111......111111
+    """)
+
+    find_autos(H)
+    
 
 def test_12():
     Hx = Matrix.parse("""
