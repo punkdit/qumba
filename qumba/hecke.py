@@ -20,7 +20,7 @@ from qumba import construct
 def span_ops(ops):
     N = len(ops)
     m, n = ops[0].shape
-    if N > 16:
+    if N > argv.get("max_ops", 16):
         print("(span_ops: N=%d is too big?)" % N, end=" ", flush=True)
         for op in ops:
             yield op # at least we tried...
@@ -149,6 +149,8 @@ def get_selfdual(G, desc=None):
             _, n = H.shape
             #if n <= 16: # this code is too small ...
             #    continue
+            if argv.code_n and n != argv.code_n:
+                continue
 
             HHt = H*H.t # overlap of the rows
             if HHt.sum() != 0:
@@ -224,17 +226,18 @@ def get_css(G, desc=None):
 
     N = len(Hs)
     pairs = get_pairs(G, Hs)
-
-
     print("done")
 
     for i in range(N):
      for jx in range(N):
        opxs = pairs[jx, i]
+       if argv.code_n and opxs and opxs[0].shape[1] != argv.code_n:
+           break 
        for jz in range(N):
         opzs = pairs[jz, i]
 
         for Hx in (opxs):
+
          for Hz in (opzs):
 
             HHt = Hx*Hz.t
