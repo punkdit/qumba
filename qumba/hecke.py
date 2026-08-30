@@ -20,7 +20,7 @@ from qumba import construct
 def span_ops(ops):
     N = len(ops)
     m, n = ops[0].shape
-    if N > argv.get("max_ops", 16):
+    if N > argv.get("span_ops", 16):
         print("(span_ops: N=%d is too big?)" % N, end="\n", flush=True)
         for op in ops:
             yield op # at least we tried...
@@ -91,6 +91,46 @@ def get_pairs(G, Hs):
 
 
 
+def find_autos(H):
+    if len(H) > 24:
+        return
+
+    print(H, H.shape)
+
+    w = H.get_wenum()
+    print(w)
+
+    from sage import all_cmdline as sage
+    R = sage.PolynomialRing(sage.ZZ, "x")
+    x = R.gens()[0]
+    f = 0
+    for (i,c) in enumerate(w):
+        f += c*(x**i)
+    print(f)
+    print(sage.factor(f))
+
+    N, perms = H.get_autos(verbose=True)
+    #print("|G| =", N, "(nauty)")
+    perms = [Perm(idxs) for idxs in perms]
+    from bruhat.gap import Gap
+    gap = Gap()
+    G = Group(None, perms)
+    N = gap.Order(G, get=True)
+    print("|G| =", N)
+
+    if N <= 244823040: # M(24) 
+        print(G.structure_description())
+
+    if argv.M24:
+    
+        M = gap.MathieuGroup(24)
+        _G = gap.define(G)
+        print(gap.IsomorphicSubgroups(M, _G, get=True)) # yes
+
+    print()
+
+
+
 found = set()
 
 
@@ -135,20 +175,11 @@ def get_selfdual(G, desc=None):
         ops = [Matrix(op) for op in ops]
 
         for H0 in span_ops(ops):
+          m, n = H0.shape
+          if argv.code_n and (m != argv.code_n and n != argv.code_n):
+                break
           for H in [H0, H0.t]:
-
-# much slower:
-#    pairs = get_pairs(G, Hs)
-#
-#    for i in range(N):
-#      for j in range(N):
-#        ops = pairs[i, j]
-#
-#        for H in ops:
-
             _, n = H.shape
-            #if n <= 16: # this code is too small ...
-            #    continue
             if argv.code_n and n != argv.code_n:
                 continue
 
@@ -181,9 +212,13 @@ def get_selfdual(G, desc=None):
                 key = (css.d, wenum)
 
             if key not in found:
+                print(css, end=' ', flush=True)
                 found.add(key)
-                weight = get_weight(H)
-                print(css, weight)
+                if argv.weight:
+                    weight = get_weight(H)
+                    print(weight)
+                else:
+                    print()
                 if argv.dump:
                     print(H, H.shape)
                 if (css.n, css.k, css.d) == argv.dumpcode:
@@ -289,6 +324,7 @@ def main():
         func = get_css
 
     print(func)
+    assert not argv.max_ops, "deprecated"
 
     if argv.PSL:
         m = argv.get("m", 3)
@@ -341,34 +377,6 @@ def main():
         func(G, desc)
 
 
-
-def find_autos(H):
-    w = H.get_wenum()
-    print(w)
-
-    N, perms = H.get_autos()
-    perms = [Perm(idxs) for idxs in perms]
-    G = Group.generate(perms)
-    print(len(G))
-    print(G.structure_description())
-
-    from bruhat.gap import Gap
-    gap = Gap()
-
-    M = gap.MathieuGroup(24)
-    _G = gap.define(G)
-    print(gap.IsomorphicSubgroups(M, _G, get=True)) # yes
-
-    from sage import all_cmdline as sage
-    R = sage.PolynomialRing(sage.ZZ, "x")
-    x = R.gens()[0]
-    f = 0
-    for (i,c) in enumerate(w):
-        f += c*(x**i)
-    print(f)
-    print(sage.factor(f))
-
-
 def test_autos():
 
     H = Matrix.parse("""
@@ -380,7 +388,7 @@ def test_autos():
     ....11111..11.1.1..1
     """)
 
-    H = Matrix.parse("""
+    _H = Matrix.parse("""
     11..1..11.1.11..1.1.1..1
     ..11.11.1.1...111.1..11.
     ..111..1.1.1..11.1.11..1
@@ -388,7 +396,7 @@ def test_autos():
     1.1.11..1..11.1..11...11 
     """)
     
-    _H = Matrix.parse("""
+    H = Matrix.parse("""
     1.............1.1111..1..11...1.1.1.
     .1............111.111...1...1..11.1.
     ..1.........1...11..11.11..1..1.1..1
@@ -405,6 +413,10 @@ def test_autos():
     """)
 
     find_autos(H)
+
+    from qumba.gcolor import dump_transverse
+    css = CSSCode(Hx=H, Hz=H)
+    dump_transverse(css.Hx, css.Lx)
     
 
 def test_12():

@@ -672,12 +672,16 @@ class Matrix:
     
         return iso
 
-    def get_autos(self):
+    def get_autos(self, verbose=False):
         m, n = self.shape
         assert m <= 22, ("um... %s is too big ??"%(m))
         from pynauty import Graph, autgrp
         A = self.get_lw_span()
+        if verbose:
+            print("get_autos: ", A.shape)
         g = A.get_tanner()
+        if verbose:
+            print("get_autos: autgrp")
         aut = autgrp(g)
         gen = aut[0]
         N = int(aut[1])
