@@ -136,12 +136,7 @@ def find_autos(H):
 found = set()
 
 
-def get_selfdual(G, desc=None):
-
-    s = G.structure_description()
-    if desc and s != desc:
-        return
-
+def get_selfdual(G):
     print("\t", G, G.structure_description(), end=", ")
 
     #print(G.perms)
@@ -252,12 +247,8 @@ def conjugacy_subgroups(G):
 
 
 
-def get_css(G, desc=None):
+def get_css(G):
     gap = Gap()
-
-    s = G.structure_description()
-    if desc and s != desc:
-        return
 
     print("\t", G, G.structure_description(), end=", ")
 
@@ -335,6 +326,77 @@ def get_css(G, desc=None):
                 print()
 
 
+def search_bimodule(G):
+    print("\t", G, G.structure_description(), end=", ")
+
+    Hs = conjugacy_subgroups(G)
+    N = len(Hs)
+    print("conjugacy_subgroups:", N)
+    Xs = [G.left_action(Hs[i]) for i in range(N)]
+
+    #Hs = [H for H in Hs if len(H)==6]
+    Hs = [H for H in Hs if 1<len(H) <len(G)]
+    found = set()
+
+    for H in Hs:
+      for K in Hs:
+        dcosets = set()
+        for g in G:
+            dc = list({h * g * k for h in H for k in K})
+            dc.sort()
+            dc = tuple(dc)
+            dcosets.add(dc)
+        dcosets = list(dcosets)
+        dcosets.sort(key = len)
+        for dc in dcosets:
+            if len(dc) == len(G):
+                continue # these are 2BGA's ?
+            #print("(%d-%d)-bimodule dim=%d, "%(len(H), len(K), len(dc)), end='', flush=True)
+            lookup = {g:i for i,g in enumerate(dc)}
+            #for i,g in enumerate(dc):
+            #    print("\t", i, g)
+            L = {}
+            R = {}
+            for h in H:
+                perm = ([lookup[h*g] for g in dc])
+                L[h] = Matrix.get_perm(perm)
+                #print(L[h])
+            for k in K:
+                perm = ([lookup[g*k] for g in dc])
+                R[k] = Matrix.get_perm(perm)
+                #print(R[k])
+            for h in H:
+              for k in K:
+                assert L[h]*R[k] == R[k]*L[h]
+            n = R[k].shape[0]
+            lhs = list(L.values())
+            rhs = list(R.values())
+            for lw in [1,2,3,4]:
+              for rw in range(lw, 4+1):
+               lops = [reduce(add, ops) for ops in choose(lhs, lw)]
+               rops = [reduce(add, ops) for ops in choose(rhs, rw)]
+               for A in lops:
+                for B in rops:
+                    assert A*B == B*A
+                    Hx = A.concatenate(B, axis=1)
+                    Hz = B.concatenate(A, axis=0).t
+                    assert (Hx*Hz.t).sum() == 0
+                    Hx = Hx.row_reduce()
+                    Hz = Hz.row_reduce()
+                    assert (Hx*Hz.t).sum() == 0
+                    css = CSSCode(Hx=Hx, Hz=Hz)
+                    if css.k:
+                        css.bz_distance()
+                    key = str(css)
+                    if key in found:
+                        continue
+                    found.add(key)
+                    if css.d==2:
+                        print('.', flush=True, end='')
+                    else:
+                        print(css, lw+rw)
+
+            
 
 
 
@@ -345,6 +407,13 @@ def main():
     func = get_selfdual
     if argv.get_css:
         func = get_css
+    elif argv.get_selfdual:
+        func = get_selfdual
+    elif argv.search_bimodule:
+        func = search_bimodule
+    else:
+        print("no func")
+        return
 
     print(func)
     assert not argv.max_ops, "deprecated"
@@ -397,7 +466,10 @@ def main():
     n1 = argv.get("n1", n0+1)
     for _G in allgroups(n0, n1):
         G = gap.to_group(_G, smaller=False)
-        func(G, desc)
+        s = G.structure_description()
+        if desc and s != desc:
+            continue
+        func(G)
 
 
 def test_autos():
@@ -554,75 +626,6 @@ def test_bring():
     get_css(G)
 
 
-def test_coset():
-
-    G = Group.symmetric(4)
-    print(G)
-
-    Hs = conjugacy_subgroups(G)
-    N = len(Hs)
-    print("conjugacy_subgroups:", N)
-    Xs = [G.left_action(Hs[i]) for i in range(N)]
-
-    #Hs = [H for H in Hs if len(H)==6]
-    Hs = [H for H in Hs if 1<len(H) <len(G)]
-    found = set()
-
-    for H in Hs:
-      for K in Hs:
-        dcosets = set()
-        for g in G:
-            dc = list({h * g * k for h in H for k in K})
-            dc.sort()
-            dc = tuple(dc)
-            dcosets.add(dc)
-        dcosets = list(dcosets)
-        dcosets.sort(key = len)
-        for dc in dcosets:
-            #print("%d-%d bimodule:"%(len(H), len(K)), len(dc))
-            lookup = {g:i for i,g in enumerate(dc)}
-            #for i,g in enumerate(dc):
-            #    print("\t", i, g)
-            L = {}
-            R = {}
-            for h in H:
-                perm = ([lookup[h*g] for g in dc])
-                L[h] = Matrix.get_perm(perm)
-                #print(L[h])
-            for k in K:
-                perm = ([lookup[g*k] for g in dc])
-                R[k] = Matrix.get_perm(perm)
-                #print(R[k])
-            for h in H:
-              for k in K:
-                assert L[h]*R[k] == R[k]*L[h]
-            n = R[k].shape[0]
-            lhs = list(L.values())
-            rhs = list(R.values())
-            lops = [reduce(add, ops) for ops in choose(lhs, 4)]
-            rops = [reduce(add, ops) for ops in choose(rhs, 4)]
-            for A in lops:
-                for B in rops:
-                    assert A*B == B*A
-                    Hx = A.concatenate(B, axis=1)
-                    Hz = B.concatenate(A, axis=0).t
-                    assert (Hx*Hz.t).sum() == 0
-                    Hx = Hx.row_reduce()
-                    Hz = Hz.row_reduce()
-                    assert (Hx*Hz.t).sum() == 0
-                    css = CSSCode(Hx=Hx, Hz=Hz)
-                    if css.k:
-                        css.bz_distance()
-                    key = str(css)
-                    if key in found:
-                        continue
-                    found.add(key)
-                    if css.d==2:
-                        print('.', flush=True, end='')
-                    else:
-                        print(css)
-
-            
             
         
 
