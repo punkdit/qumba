@@ -156,4 +156,23 @@ def divisors(n):
     return divs
 
 
+def get_complete_pairings(items):
+    n = len(items)
+    if n%2:
+        return
+
+    left = items[0]
+    for j in range(1, n):
+        right = items[j]
+        pair = (left, right)
+        jtems = items[1:j] + items[j+1:]
+        if len(jtems):
+            for rest in get_complete_pairings(jtems):
+                yield [pair] + rest
+        else:
+            yield [pair]
+
+assert len(list(get_complete_pairings(list(range(4))))) == 3
+assert len(list(get_complete_pairings(list(range(6))))) == 15
+
 

@@ -307,7 +307,8 @@ class CSSCode(object):
         if Hx is not None and len(Hx.shape)<2:
             Hx.shape = (0, Hz.shape[1])
         if Hz is not None and Hx is not None and Lz is not None and Gz is None:
-            assert Hx.shape[0]+Hz.shape[0]+Lz.shape[0] == Hx.shape[1]
+            assert Hx.shape[0]+Hz.shape[0]+Lz.shape[0] == Hx.shape[1], \
+                (Hx.shape, Hz.shape, Lx.shape, Lz.shape)
             assert Hx.shape[1] == Hz.shape[1] == Lz.shape[1], Lz.shape
 
         n = None

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from random import shuffle, randint, choice
-from operator import add, matmul, mul
+from operator import add, matmul, mul, lshift
 from functools import reduce, cache
 
 import numpy
@@ -9,11 +9,13 @@ import numpy
 from bruhat.gset import allgroups, Group, Perm
 from bruhat.hecke import get_operators
 from bruhat.gap import Gap
-gap = Gap()
 
 from qumba.argv import argv
 from qumba.matrix import Matrix
 from qumba.csscode import CSSCode
+from qumba.symplectic import SymplecticSpace
+from qumba.qcode import QCode
+from qumba.util import get_complete_pairings
 from qumba import construct
 
 
@@ -228,9 +230,30 @@ def get_selfdual(G, desc=None):
 
 
 
+def conjugacy_subgroups(G):
+    gap = Gap()
+
+    N = G.rank
+    n = gap.Order(G, get=True)
+    assert len(G) == n
+    _Hs = gap.ConjugacyClassesSubgroups(G)
+    #print("\t", gap.Length(Hs, get=True))
+    Hs = []
+    for i in range(len(_Hs)):
+        item = _Hs[i]
+        item = gap.Representative(item)
+        assert gap.IsPermGroup(item, get=True)
+        H = gap.to_group(item, N=N)
+        #print("\t", H)
+        assert G.is_subgroup(H)
+        Hs.append(H)
+
+    return Hs
+
 
 
 def get_css(G, desc=None):
+    gap = Gap()
 
     s = G.structure_description()
     if desc and s != desc:
@@ -419,6 +442,7 @@ def test_autos():
     dump_transverse(css.Hx, css.Lx)
     
 
+
 def test_12():
     Hx = Matrix.parse("""
     1.1...1.111.
@@ -433,14 +457,89 @@ def test_12():
     ....11.11.11
     """)
     css = CSSCode(Hx=Hx, Hz=Hz)
+    n = css.n
     N, perms = css.get_autos()
     
     perms = [Perm(idxs) for idxs in perms]
     G = Group.generate(perms)
-    print(len(G))
-    print(G.structure_description())
+    assert len(G) == 72
+    #assert G.structure_description() == "(C3 x A4) : C2"
 
+    for i in range(n):
+        # point stabilizer is S3
+        H = [g for g in G if g[i]==i]
+        assert len(H) == 6
+        orbits = set()
+        for j in range(12):
+            o = list(set(h[j] for h in H))
+            o.sort()
+            o = tuple(o)
+            orbits.add(o)
+        orbits = list(orbits)
+        orbits.sort(key=len)
+        #print(orbits)
+        
 
+    quads = [
+        (0, 3, 8, 11),
+        (1, 5, 6, 10),
+        (2, 4, 7, 9),
+    ] # ?
+
+    for j in range(1, 12):
+        H = [g for g in G if g[0]==0 and g[j]==j]
+        #print(len(H))
+
+    count = 0
+    for pairs in get_complete_pairings(list(range(n))):
+        #print(pairs)
+        count += 1
+    assert count == 10395
+
+    # try concatenating with 422... gives [[24,4,4]] at best.
+
+    code = construct.get_422()
+    e4 = code.get_encoder()
+    E = css.to_qcode().get_encoder()
+    rhs = SymplecticSpace(n).get_identity() << E
+    lhs = reduce(lshift, [e4]*6)
+
+    for pairs in get_complete_pairings(list(range(n))):
+        idxs = [i + 4*j for i in range(2) for j in range(6)] # stabs
+        #print("\t", pairs)
+        pairs = reduce(add, pairs)
+        #pairs = list(range(12))
+        #pairs = [1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        #print(pairs)
+        #src = [2 + i + 4*j for i in range(2) for j in range(6)] # logicals
+        src = [2 + i + 4*j for j in range(6) for i in range(2)] # logicals
+        jdxs = [src[i] for i in pairs]
+        jdxs = [None] * n
+        for i,j in enumerate(pairs):
+            jdxs[j] = src[i]
+        #print(jdxs == [src[i] for i in pairs])
+        #print("\t", jdxs)
+        idxs += jdxs
+        P = SymplecticSpace(2*n).get_perm(idxs)
+        #print(P)
+        
+        E = lhs * P.t * rhs
+        assert SymplecticSpace(2*n).is_symplectic(E)
+    
+        code = QCode.from_encoder(E, k=4)
+        assert code.is_css()
+        #code.distance("z3")
+        #print(code, "sd" if code.is_selfdual() else "css")
+        #print(code.longstr())
+        css = code.to_css()
+        css.bz_distance()
+
+        #print(css)
+        if css.d > 4:
+            break
+        print(".", flush=True, end='')
+
+    print(css)
 
 
 def test_bring():
@@ -454,6 +553,46 @@ def test_bring():
 
     get_css(G)
 
+
+def test_coset():
+
+    G = Group.symmetric(4)
+    print(G)
+
+    Hs = conjugacy_subgroups(G)
+    N = len(Hs)
+    print("conjugacy_subgroups:", N)
+    Xs = [G.left_action(Hs[i]) for i in range(N)]
+
+    Hs = [H for H in Hs if len(H)==6]
+
+    for H in Hs:
+      for K in Hs:
+        dcosets = set()
+        for g in G:
+            dc = list({h * g * k for h in H for k in K})
+            dc.sort()
+            dc = tuple(dc)
+            dcosets.add(dc)
+        dcosets = list(dcosets)
+        dcosets.sort(key = len)
+        for dc in dcosets:
+            print("%d-%d bimodule:"%(len(H), len(K)))
+            lookup = {g:i for i,g in enumerate(dc)}
+            for i,g in enumerate(dc):
+                print("\t", i, g)
+            for h in H:
+              for k in K:
+                l = Perm([lookup[h*g] for g in dc])
+                r = Perm([lookup[g*k] for g in dc])
+                assert l*r == r*l
+                print(l, r)
+        #print('+'.join([str(len(dc)) for dc in dcosets]), end=' ')
+        #print(len(dcosets), end=' ')
+      #print()
+            
+            
+        
 
 
 if __name__ == "__main__":

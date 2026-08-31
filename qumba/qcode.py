@@ -412,7 +412,7 @@ class QCode(object):
         jdxs = numpy.where(Lz.sum(1))[0]
         Lx = Lx[idxs, :]
         Lz = Lz[jdxs, :]
-        code = CSSCode(Lx, Lz, Hx, Tz, Hz, Tx)
+        code = CSSCode(Lx, Lz, Hx, Tz, Hz, Tx) # check i am CSS ?
         return code
 
     def to_qcode(self):
