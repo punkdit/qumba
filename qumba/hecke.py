@@ -15,7 +15,7 @@ from qumba.matrix import Matrix
 from qumba.csscode import CSSCode
 from qumba.symplectic import SymplecticSpace
 from qumba.qcode import QCode
-from qumba.util import get_complete_pairings
+from qumba.util import get_complete_pairings, choose
 from qumba import construct
 
 
@@ -564,7 +564,9 @@ def test_coset():
     print("conjugacy_subgroups:", N)
     Xs = [G.left_action(Hs[i]) for i in range(N)]
 
-    Hs = [H for H in Hs if len(H)==6]
+    #Hs = [H for H in Hs if len(H)==6]
+    Hs = [H for H in Hs if 1<len(H) <len(G)]
+    found = set()
 
     for H in Hs:
       for K in Hs:
@@ -577,19 +579,49 @@ def test_coset():
         dcosets = list(dcosets)
         dcosets.sort(key = len)
         for dc in dcosets:
-            print("%d-%d bimodule:"%(len(H), len(K)))
+            #print("%d-%d bimodule:"%(len(H), len(K)), len(dc))
             lookup = {g:i for i,g in enumerate(dc)}
-            for i,g in enumerate(dc):
-                print("\t", i, g)
+            #for i,g in enumerate(dc):
+            #    print("\t", i, g)
+            L = {}
+            R = {}
+            for h in H:
+                perm = ([lookup[h*g] for g in dc])
+                L[h] = Matrix.get_perm(perm)
+                #print(L[h])
+            for k in K:
+                perm = ([lookup[g*k] for g in dc])
+                R[k] = Matrix.get_perm(perm)
+                #print(R[k])
             for h in H:
               for k in K:
-                l = Perm([lookup[h*g] for g in dc])
-                r = Perm([lookup[g*k] for g in dc])
-                assert l*r == r*l
-                print(l, r)
-        #print('+'.join([str(len(dc)) for dc in dcosets]), end=' ')
-        #print(len(dcosets), end=' ')
-      #print()
+                assert L[h]*R[k] == R[k]*L[h]
+            n = R[k].shape[0]
+            lhs = list(L.values())
+            rhs = list(R.values())
+            lops = [reduce(add, ops) for ops in choose(lhs, 4)]
+            rops = [reduce(add, ops) for ops in choose(rhs, 4)]
+            for A in lops:
+                for B in rops:
+                    assert A*B == B*A
+                    Hx = A.concatenate(B, axis=1)
+                    Hz = B.concatenate(A, axis=0).t
+                    assert (Hx*Hz.t).sum() == 0
+                    Hx = Hx.row_reduce()
+                    Hz = Hz.row_reduce()
+                    assert (Hx*Hz.t).sum() == 0
+                    css = CSSCode(Hx=Hx, Hz=Hz)
+                    if css.k:
+                        css.bz_distance()
+                    key = str(css)
+                    if key in found:
+                        continue
+                    found.add(key)
+                    if css.d==2:
+                        print('.', flush=True, end='')
+                    else:
+                        print(css)
+
             
             
         
