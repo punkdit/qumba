@@ -935,6 +935,11 @@ def main_two_block():
 
     desc = argv.get("desc")
 
+    order = argv.get("order")
+    if order is not None:
+        groups = [G for G in groups if len(G) == order]
+        print("groups:", len(groups))
+
     if wa is None:
         ws = []
         for w in range(4, 9):
