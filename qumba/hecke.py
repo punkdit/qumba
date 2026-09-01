@@ -326,6 +326,15 @@ def get_css(G):
                 print()
 
 
+def rand_ops(ops, weight):
+    n = len(ops)
+    assert n >= weight
+    idxs = list(range(n))
+    shuffle(idxs)
+    ops = [ops[i] for i in idxs[:weight]]
+    return reduce(add, ops)
+
+
 def search_bimodule(G):
     print("\t", G, G.structure_description(), end=", ")
 
@@ -336,7 +345,9 @@ def search_bimodule(G):
 
     #Hs = [H for H in Hs if len(H)==6]
     Hs = [H for H in Hs if 1<len(H) <len(G)]
-    found = set()
+    #found = set() # use global
+
+    trials = argv.get("trials", 10)
 
     for H in Hs:
       for K in Hs:
@@ -351,7 +362,10 @@ def search_bimodule(G):
         for dc in dcosets:
             if len(dc) == len(G):
                 continue # these are 2BGA's ?
+            if argv.code_n and 2*len(dc) != argv.code_n:
+                continue
             #print("(%d-%d)-bimodule dim=%d, "%(len(H), len(K), len(dc)), end='', flush=True)
+            #print("*", end='', flush=True)
             lookup = {g:i for i,g in enumerate(dc)}
             #for i,g in enumerate(dc):
             #    print("\t", i, g)
@@ -371,28 +385,38 @@ def search_bimodule(G):
             n = R[k].shape[0]
             lhs = list(L.values())
             rhs = list(R.values())
-            for lw in [1,2,3,4]:
-              for rw in range(lw, 4+1):
-               lops = [reduce(add, ops) for ops in choose(lhs, lw)]
-               rops = [reduce(add, ops) for ops in choose(rhs, rw)]
+            #for lw in [1,2,3,4]:
+            for lw in [2,3,4]:
+              if len(lhs) < lw:
+                continue
+              #lops = [reduce(add, ops) for ops in choose(lhs, lw)]
+              lops = [rand_ops(lhs, lw) for _ in range(trials)]
+              #for rw in range(lw, 4+1):
+              for rw in [8-lw]:
+               if len(rhs) < rw:
+                 continue
+               #rops = [reduce(add, ops) for ops in choose(rhs, rw)]
+               rops = [rand_ops(rhs, rw) for _ in range(trials)]
                for A in lops:
                 for B in rops:
-                    assert A*B == B*A
+                    #assert A*B == B*A
                     Hx = A.concatenate(B, axis=1)
                     Hz = B.concatenate(A, axis=0).t
-                    assert (Hx*Hz.t).sum() == 0
+                    #assert (Hx*Hz.t).sum() == 0
                     Hx = Hx.row_reduce()
                     Hz = Hz.row_reduce()
-                    assert (Hx*Hz.t).sum() == 0
-                    css = CSSCode(Hx=Hx, Hz=Hz)
-                    if css.k:
-                        css.bz_distance()
+                    #assert (Hx*Hz.t).sum() == 0
+                    css = CSSCode(Hx=Hx, Hz=Hz, check=False, build=False)
+                    if css.k==0:
+                        continue
+                    css.bz_distance()
                     key = str(css)
                     if key in found:
                         continue
                     found.add(key)
                     if css.d==2:
-                        print('.', flush=True, end='')
+                        #print('.', flush=True, end='')
+                        pass
                     else:
                         print(css, lw+rw)
 
@@ -461,7 +485,7 @@ def main():
         return
 
     desc = argv.desc
-    n = argv.get("n", 27)
+    n = argv.get("n", 6)
     n0 = argv.get("n0", n)
     n1 = argv.get("n1", n0+1)
     for _G in allgroups(n0, n1):
