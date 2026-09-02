@@ -6,7 +6,7 @@ from functools import reduce, cache
 
 import numpy
 
-from bruhat.gset import allgroups, Group, Perm
+from bruhat.gset import allgroups, Group, Perm, Coset
 from bruhat.hecke import get_operators
 from bruhat.gap import Gap
 
@@ -425,23 +425,40 @@ def search_bimodule(G):
 
 def search(G):
 
-    print("search", G)
+    print("search", G, G.structure_description())
     #GG = G*G
     #GG.get_gens() # randomly choose gens
 
     #G.get_gens() # ?
-    GG = Group(gens=[g.cross(h) for g in G.gens for h in G.gens])
+    e = G.identity
+    GG = Group(
+        gens=[g.cross(e) for g in G.gens]+[e.cross(g) for g in G.gens])
+    assert len(GG) == len(G)**2
 
-    print("search", GG)
+    N = len(GG)
+    for i in range(1, N):
+        if N%i==0:
+            print(i, end=' ')
+    print()
+
+    assert argv.code_n
+    if len(G)**2 % argv.code_n:
+        return 
+
+    trials = argv.get("trials", 1000)
+    w = argv.get("w", 8)
+
+    #for g in G:
+    #  for h in G:
+    #    assert g.cross(h) in GG
+
+    print(GG, end=' ')
 
     Ls = conjugacy_subgroups(GG)
     N = len(Ls)
     print("conjugacy_subgroups:", N)
 
-    assert argv.code_n
     n = argv.code_n // 2
-
-    e = G.identity
 
     for L in Ls:
 
@@ -459,6 +476,11 @@ def search(G):
         right = {}
         for g in G:
             ge = g.cross(e)
+            #assert ge in GG
+            #for x in X:
+            #    gex = ge*x
+            #    assert isinstance(gex, Coset)
+            #    assert gex in lookup
             perm = Perm([lookup[ge*x] for x in X])
             left[g] = perm
             eg = e.cross(g)
@@ -492,8 +514,6 @@ def search(G):
         #print(smap)
         #print()
 
-        trials = 1000
-        w = 8
         for _ in range(trials):
             A = Matrix.zeros((n,n))
             B = Matrix.zeros((n,n))
@@ -506,14 +526,14 @@ def search(G):
             if B.sum() == 0:
                 continue
 
-            assert A*B == B*A
+            #assert A*B == B*A
             Hx = A.concatenate(B, axis=1)
             Hz = B.concatenate(A, axis=0).t
-            assert (Hx*Hz.t).sum() == 0
+            #assert (Hx*Hz.t).sum() == 0
             Hx = Hx.row_reduce()
             Hz = Hz.row_reduce()
-            assert (Hx*Hz.t).sum() == 0
-            css = CSSCode(Hx=Hx, Hz=Hz, check=True, build=True)
+            #assert (Hx*Hz.t).sum() == 0
+            css = CSSCode(Hx=Hx, Hz=Hz, check=False, build=False)
             if css.k==0:
                 continue
             css.bz_distance()
@@ -522,10 +542,9 @@ def search(G):
                 continue
             found.add(key)
             if css.d<=2:
-                #print('.', flush=True, end='')
-                pass
-            else:
                 print(css)
+            else:
+                print("\t", css)
 
             
             
@@ -597,13 +616,16 @@ def main():
         func(G)
         return
 
+
     desc = argv.desc
     n = argv.get("n", 6)
     n0 = argv.get("n0", n)
     n1 = argv.get("n1", n0+1)
+    print("allgroups", n0, n1)
     for _G in allgroups(n0, n1):
         G = gap.to_group(_G, smaller=False)
         s = G.structure_description()
+        print(s)
         if desc and s != desc:
             continue
         func(G)
