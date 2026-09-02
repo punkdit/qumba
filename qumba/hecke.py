@@ -17,6 +17,7 @@ from qumba.symplectic import SymplecticSpace
 from qumba.qcode import QCode
 from qumba.util import get_complete_pairings, choose
 from qumba import construct
+from qumba.smap import SMap
 
 
 def span_ops(ops):
@@ -422,6 +423,116 @@ def search_bimodule(G):
 
             
 
+def search(G):
+
+    print("search", G)
+    #GG = G*G
+    #GG.get_gens() # randomly choose gens
+
+    #G.get_gens() # ?
+    GG = Group(gens=[g.cross(h) for g in G.gens for h in G.gens])
+
+    print("search", GG)
+
+    Ls = conjugacy_subgroups(GG)
+    N = len(Ls)
+    print("conjugacy_subgroups:", N)
+
+    assert argv.code_n
+    n = argv.code_n // 2
+
+    e = G.identity
+
+    for L in Ls:
+
+        if len(GG) // len(L) != n:
+            continue
+
+        print(L, L.structure_description())
+        assert GG.is_subgroup(L)
+
+        X = GG.left_cosets(L)
+        lookup = {perm:idx for (idx,perm) in enumerate(X)}
+        assert len(X) == n
+
+        left = {}
+        right = {}
+        for g in G:
+            ge = g.cross(e)
+            perm = Perm([lookup[ge*x] for x in X])
+            left[g] = perm
+            eg = e.cross(g)
+            perm = Perm([lookup[(~eg)*x] for x in X])
+            right[g] = perm
+            #print("\t\t", perm)
+        #print()
+
+        for g in G:
+          for h in G:
+            L, R = left[g], right[h]
+            assert L*R == R*L
+
+        Ls = set(left.values())
+        Rs = set(right.values())
+
+        if len(Ls) < 4:
+            continue
+
+        Ls = [Matrix.get_perm(L) for L in Ls]
+        Rs = [Matrix.get_perm(R) for R in Rs]
+        for L in Ls:
+          for R in Rs:
+            assert L*R == R*L
+
+        smap = SMap()
+        col = 0
+        for L in Ls:
+            smap[0,col] = str(L)
+            col += L.shape[1]+1
+        #print(smap)
+        #print()
+
+        trials = 1000
+        w = 8
+        for _ in range(trials):
+            A = Matrix.zeros((n,n))
+            B = Matrix.zeros((n,n))
+            for i in range(w):
+                A += choice(Ls)
+                B += choice(Rs)
+
+            if A.sum() == 0:
+                continue
+            if B.sum() == 0:
+                continue
+
+            assert A*B == B*A
+            Hx = A.concatenate(B, axis=1)
+            Hz = B.concatenate(A, axis=0).t
+            assert (Hx*Hz.t).sum() == 0
+            Hx = Hx.row_reduce()
+            Hz = Hz.row_reduce()
+            assert (Hx*Hz.t).sum() == 0
+            css = CSSCode(Hx=Hx, Hz=Hz, check=True, build=True)
+            if css.k==0:
+                continue
+            css.bz_distance()
+            key = str(css)
+            if key in found:
+                continue
+            found.add(key)
+            if css.d<=2:
+                #print('.', flush=True, end='')
+                pass
+            else:
+                print(css)
+
+            
+            
+
+
+
+
 
 
 def main():
@@ -435,6 +546,8 @@ def main():
         func = get_selfdual
     elif argv.search_bimodule:
         func = search_bimodule
+    elif argv.search:
+        func = search
     else:
         print("no func")
         return

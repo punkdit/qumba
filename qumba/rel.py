@@ -227,7 +227,8 @@ class Relation:
 
     def get_tutte(self):
         """
-        Coloured Tutte polynomial, u is tgt variable, v is src variable
+        Coloured Tutte polynomial: u is tgt variable, v is src variable.
+        See: "A Tutte Polynomial for Coloured Graphs"
         """
         from sage import all_cmdline as sage
         R = sage.PolynomialRing(sage.ZZ, list("xyuv"))
@@ -270,6 +271,13 @@ def all_subspaces(tgt, src):
         left = left.transpose()
         rel = Relation(left, zeros(src,0))
         yield rel
+
+def all_relations(m, tgt, src):
+    assert m <= tgt+src
+    for A in all_codes(m, tgt+src):
+        rel = Relation(A[:, :tgt], A[:, tgt:])
+        yield rel
+
 
 
 def test_linear():
@@ -419,19 +427,35 @@ def test_linear():
 
 def test_tutte():
 
-    m = 3
-    l = 3
-    r = 1
-    
-    count = 0
-    for A in all_codes(m, l+r):
-        rel = Relation(A[:, :l], A[:, l:])
+    from sage import all_cmdline as sage
+    R = sage.PolynomialRing(sage.ZZ, list("xyuv"))
+    x, y, u, v = R.gens()
+
+    A = Matrix.parse("11")
+    for i in range(2+1):
+        rel = Relation(A[:,:i], A[:,i:])
         p = rel.get_tutte()
-        q = rel.A.get_tutte()
-        print(rel, p)
-        assert p.subs(u=1, v=1) == q
-        count += 1
-    print(count)
+        #print(rel, p)
+        #print("\t", p.subs(u=1,v=1))
+        #print("\t", sage.factor(p))
+    #return
+
+    for n in [1,2]:
+      for tgt in range(n+1):
+        src = n-tgt
+        for m in range(n+1):
+          for rel in all_relations(m, tgt, src):
+            p = rel.get_tutte()
+            pp = sage.factor(p)
+            q = rel.A.get_tutte()
+            r = p.subs(x=1, y=1)
+            print(rel, rel.shape, p)
+            if str(p) != str(pp):
+                print("\t =", pp)
+            print()
+            assert p.subs(u=1, v=1) == q
+            pop = rel.op.get_tutte()
+            assert p.subs(u=v, v=u) == pop
 
 
 
