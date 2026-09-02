@@ -18,6 +18,7 @@ from qumba.default_p import DEFAULT_P
 from qumba.matrix import Matrix, pullback
 from qumba.symplectic import symplectic_form
 from qumba.qcode import strop, QCode, SymplecticSpace
+from qumba.q_pascal import all_codes
 from qumba.smap import SMap
 from qumba.action import mulclose, mulclose_names
 from qumba.syntax import Syntax
@@ -224,6 +225,32 @@ class Relation:
         swap = Relation(i, [[0,1],[1,0]])
         return swap
 
+    def get_tutte(self):
+        """
+        Coloured Tutte polynomial, u is tgt variable, v is src variable
+        """
+        from sage import all_cmdline as sage
+        R = sage.PolynomialRing(sage.ZZ, list("xyuv"))
+        x, y, u, v = R.gens()
+        tgt, src = self.tgt, self.src
+        n = tgt + src
+        A = self.A
+        rA = A.rank()
+        assert rA == len(A)
+        p = 0
+        for bits in numpy.ndindex((2,)*n):
+            idxs = [i for i in range(n) if bits[i]]
+            B = A[:, idxs]
+            rB = B.rank()
+            assert rB <= rA
+            q = (x-1)**(rA - rB) * (y-1)**(len(idxs) - rB)
+            q *= u**sum(bits[:tgt]) * v**sum(bits[tgt:])
+            p += q
+        return p
+
+
+
+
 black = Relation.black
 white = Relation.white
 
@@ -391,6 +418,26 @@ def test_linear():
 
 
 def test_tutte():
+
+    m = 3
+    l = 3
+    r = 1
+    
+    count = 0
+    for A in all_codes(m, l+r):
+        rel = Relation(A[:, :l], A[:, l:])
+        p = rel.get_tutte()
+        q = rel.A.get_tutte()
+        print(rel, p)
+        assert p.subs(u=1, v=1) == q
+        count += 1
+    print(count)
+
+
+
+
+def test_delete_contract():
+    # first attempt at tutte polynomial
     black = Relation.black
     white = Relation.white
 
