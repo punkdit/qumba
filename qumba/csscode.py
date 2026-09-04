@@ -906,7 +906,9 @@ class CSSCode(object):
                 if 0<d<dx:
                     dx = d
             if dx<=min_d:
-                return dx
+                break
+        if self.dx is None and min_d==1:
+            self.dx = dx
         return dx
 
     def z_distance(self, min_d=1):
@@ -920,7 +922,9 @@ class CSSCode(object):
                 if 0<d<dz:
                     dz = d
             if dz<=min_d:
-                return dz
+                break
+        if self.dz is None and min_d==1:
+            self.dz = dz
         return dz
 
     def distance(self, min_d=1):

@@ -8,7 +8,7 @@ https://github.com/punkdit/bruhat/blob/master/bruhat/clifford_sage.py
 
 """
 
-from random import choice, randint
+from random import choice, randint, random
 from operator import mul, matmul, add
 from functools import reduce
 #from functools import cache
@@ -386,7 +386,7 @@ class Clifford:
             row = lookup[tgt]
             #signs.append([+1, -1][row.startswith('-')])
             phase = [0,2][row.startswith('-')]
-            phase = (phase + 3*row.count("Y"))%4 # argh, tricky!
+            phase = (phase + 3*row.count("Y"))%4 # argh, _tricky!
             phases.append(phase)
             row = row.replace('-', '')
             rows.append(row)
@@ -2819,6 +2819,89 @@ def test_lagrel():
         assert lag*lah == lagh
 
 
+def test_swap():
+
+    clifford = Clifford(2)
+    swap = clifford.SWAP()
+    #print(swap, type(swap))
+
+    I = clifford.get_identity()
+    #print(I)
+
+    tgt = I << swap
+    print(tgt.shape)
+    print(tgt)
+
+    P = half * (I+swap)
+    assert P*P == P
+
+    for val,vec,dim in swap.eigenvectors():
+        #print(vec, val, dim)
+        if val == 1:
+            assert P*vec == vec
+        else:
+            assert (P*vec).is_zero()
+
+    #lhs = I @ bra(0)
+    #rhs = I @ ket(0)
+
+    def get_gens(clifford):
+        n = clifford.n
+        gens = []
+        for i in range(n):
+            gens.append(clifford.T(i))
+            gens.append(clifford.S(i))
+            gens.append(clifford.X(i))
+            gens.append(clifford.H(i))
+            for j in range(i+1,n):
+                gens.append(clifford.CZ(i,j))
+                gens.append(clifford.CX(i,j))
+        return gens
+
+    clifford = Clifford(3)
+    gens = get_gens(clifford)
+
+    N = len(gens)
+
+    itgt = ~tgt
+    assert itgt == tgt
+    metric = lambda op : sage.norm( (op * itgt).trace() )
+    r0 = metric(tgt)
+    print("goal", r0)
+
+    I3 = clifford.get_identity()
+
+    for _ in range(10):
+        U = I3
+        u = metric(U)
+        result = metric(tgt)
+        for trial in range(100):
+    
+            #g = choice(gens)
+            ms = []
+            Us = []
+            for g in gens:
+                U1 = g*U
+                u1 = metric(U1)
+                ms.append(u1)
+                Us.append(U1)
+            m = max(ms)
+            idxs = [idx for idx in range(N) if 2*ms[idx] > m]
+            idx = choice(idxs)
+            U = Us[idx]
+            #print(ms, max(ms), "-->", ms[idx])
+            print(ms[idx], end=' ', flush=True)
+    
+            if U == tgt:
+                print()
+                print(U, U.name)
+                return
+
+        print()
+        print(U, U.name)
+    
+        print()
+    
 
 def test():
     test_clifford()

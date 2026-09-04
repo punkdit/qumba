@@ -18,11 +18,13 @@ from qumba.default_p import DEFAULT_P
 from qumba.matrix import Matrix, pullback
 from qumba.symplectic import symplectic_form
 from qumba.qcode import strop, QCode, SymplecticSpace
+from qumba.csscode import CSSCode
 from qumba.q_pascal import all_codes
 from qumba.smap import SMap
 from qumba.action import mulclose, mulclose_names
 from qumba.syntax import Syntax
 from qumba.argv import argv
+from qumba.util import cross
 from qumba import construct
 
 
@@ -457,6 +459,130 @@ def test_tutte():
             pop = rel.op.get_tutte()
             assert p.subs(u=v, v=u) == pop
 
+
+def all_css(n, mx, mz):
+
+    for Hx in all_codes(mx, n):
+        K = Hx.kernel()
+        #print(Hx, Hx.shape)
+        #print(K, K.shape)
+        #for Mz in qchoose_2(K.shape[0], mz):
+        for Mz in all_codes(mz, K.shape[0]):
+            Hz = Mz*K
+            assert (Hx*Hz.t).sum() == 0
+            #code = QCode.build_css(Hx, Hz)
+            css = CSSCode(Hx=Hx, Hz=Hz)
+            yield css
+        #print()
+        #return
+
+
+def get_encoder(css):
+    # get the X-type encoder Relation 
+    Hx = css.Hx
+    Lx = css.Lx
+    k = css.k
+    mx = css.mx
+    n = css.n
+    #lhs = Hx.concatenate(Matrix.zeros((k, n)))
+    lhs = Hx.concatenate(Lx)
+    rhs = Matrix.zeros((mx, k)).concatenate(Matrix.identity(k))
+    rel = Relation(lhs, rhs)
+    return rel
+
+
+def test_css():
+
+    found = set()
+    count = 0
+
+    n = argv.get("n", 9)
+    mx = argv.get("mx", 4)
+    mz = argv.get("mz", 4)
+    trials = argv.get("trials", 100)
+    for trial in range(trials):
+        css = CSSCode.random(n, mx, mz)
+        count += 1
+        css.distance()
+        E = get_encoder(css)
+        if css.d < 2:
+            continue
+
+        p = E.get_tutte()
+        if p in found:
+            continue
+        found.add(p)
+
+        print(css)
+        #print(css.longstr())
+        #print(E)
+        #print(p)
+
+        Hx, Hz = css.Hx, css.Hz
+        Lx, Lz = css.Lx, css.Lz
+        H = Hx.concatenate(Lx)
+        q = H.get_tutte()
+        assert p.subs(u=1, v=0) == q
+
+        H = Hx.concatenate(Lz)
+        q = H.get_tutte()
+        vals = [-2,-1,0,1,2]
+        for u in vals:
+          for v in vals:
+            if (p.subs(u=u, v=v)==q):
+                print(u,v)
+
+    print(count, len(found))
+
+    
+def test_special_values():
+
+    found = set()
+
+    vals = [-2,-1,0,1,2,3]
+    remain = set(cross((vals,)*4))
+
+    count = 0
+#    for mx in range(1, n-1):
+#      mz = n-mx-1
+#      for css in all_css(n, mx, mz):
+
+    n = argv.get("n", 9)
+    mx = argv.get("mx", 4)
+    mz = argv.get("mz", 4)
+    trials = argv.get("trials", 100)
+    for trial in range(trials):
+        css = CSSCode.random(n, mx, mz)
+        count += 1
+        css.distance()
+        E = get_encoder(css)
+        if css.d < 2:
+            continue
+
+        p = E.get_tutte()
+        if p in found:
+            continue
+        found.add(p)
+
+        print(css)
+        #print(css.longstr())
+        #print(E)
+        #print(p)
+
+        for key in list(remain):
+            x,y,u,v = key
+            val = p.subs(x=x, y=y, u=u, v=v)
+            if val != css.dz:
+                remain.remove(key)
+
+        print(len(remain))
+
+        if not remain:
+            break
+
+    print(count, len(found))
+
+    
 
 
 
