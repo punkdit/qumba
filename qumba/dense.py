@@ -2,6 +2,7 @@
 
 from functools import reduce
 from operator import matmul, add
+from random import choice, shuffle, randint
 import cmath
 
 import numpy
@@ -101,6 +102,9 @@ class Matrix:
         A = numpy.identity(N)
         return Matrix(A)
 
+    def is_zero(self):
+        return numpy.all(self.A==0)
+
     #def __len__(self): # ARGHH breaks show() below XXX
     #    return len(self.A)
 
@@ -142,6 +146,11 @@ class Matrix:
     @property
     def d(self):
         "dagger"
+        A = self.A.transpose()
+        A = A.conjugate()
+        return Matrix(A)
+
+    def __invert__(self):
         A = self.A.transpose()
         A = A.conjugate()
         return Matrix(A)
@@ -541,6 +550,109 @@ def test_eigs():
 
 
 
+def test_swap():
+    # look for CSWAP gate. FAIL
+
+    space = Space(2)
+    swap = space.SWAP()
+    #print(swap, type(swap))
+
+    I = space.get_identity()
+    #print(I)
+
+    src = I << swap
+    #print(src.shape)
+    #print(src)
+
+    P = 0.5 * (I+swap)
+    assert P*P == P
+
+    for val,vec in swap.eigenvectors():
+        #print(vec, val, dim)
+        if val == 1:
+            assert P*vec == vec
+        else:
+            assert (P*vec).is_zero()
+
+    #lhs = I @ bra(0)
+    #rhs = I @ ket(0)
+
+    def get_gens(space):
+        n = space.n
+        gens = []
+        for i in range(n):
+            gens.append(space.T(i))
+            gens.append(space.S(i))
+            gens.append(space.X(i))
+            gens.append(space.H(i))
+            for j in range(i+1,n):
+                gens.append(space.CZ(i,j))
+                gens.append(space.CX(i,j))
+        return gens
+
+    space = Space(3)
+    gens = get_gens(space)
+
+    N = len(gens)
+
+    assert ~src == src
+
+    #metric = lambda op : abs( (op * isrc).trace() )
+    I3 = space.get_identity()
+    def metric(U):
+        return float(numpy.linalg.norm((U - I3).A))
+
+    width = 1000
+    best = [src] * width
+    #print(' '.join(["%.1f"%metric(U) for U in best]))
+    for trial in range(1000):
+
+        found = []
+        for U in best:
+          #for g in gens:
+            g = choice(gens)
+            found.append( g*U )
+        #found.sort(key = metric)
+        #best = found[:10*width]
+        #shuffle(best)
+
+        for _ in range(width):
+            idx = randint(0, width-2)
+            jdx = randint(idx+1, width-1)
+            left = metric(found[idx])
+            right = metric(found[jdx])
+            if left > right:
+                found[idx], found[jdx] = found[jdx], found[idx]
+
+        best = found
+
+        if (trial + 1) % 10 == 0:
+            best = best[:width//2]
+            best = best+ best
+
+        #best = found[:width]
+        #best.sort(key = metric)
+
+        #U = best[0]
+        #idx = 1
+        #while idx < len(best) and best[idx] == U:
+        #    #print("pop")
+        #    best.pop(idx)
+
+        print(' '.join(["%.1f"%metric(U) for U in best[:20]]))
+
+        #print(best[3].A.real.round().astype(int))
+
+        if metric(best[0]) < 1.99:
+            break
+
+    U = best[0]
+    print(metric(U))
+    print(U.A)
+
+
+
+
 if __name__ == "__main__":
 
     numpy.set_printoptions(
@@ -572,6 +684,4 @@ if __name__ == "__main__":
 
     t = time() - start_time
     print("\nOK! finished in %.3f seconds\n"%t)
-
-
 
