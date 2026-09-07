@@ -17,8 +17,11 @@ from sage import all_cmdline as sage
 from qumba.argv import argv
 from qumba.matrix_sage import Matrix
 
+def prod(a, b, c, d):
+    return (a*c - b*d, b*c + a*d)
 
-def main():
+
+def main_2():
     # ----------------------------------------------------------------------
 
     D = 2
@@ -55,8 +58,6 @@ def main():
 
     assert J*J == -I
 
-    def prod(a, b, c, d):
-        return (a*c - b*d, b*c + a*d)
     def inner(lhs, rhs):
         a, b, c, d = [lhs[0,i] for i in range(4)]
         e, f, g, h = [rhs[i,0] for i in range(4)]
@@ -117,7 +118,21 @@ def main():
     return
 
 
+def main():
     # ----------------------------------------------------------------------
+
+    def inner(lhs, rhs):
+        a, b, c, d, e, f, g, h = [lhs[0,i] for i in range(8)]
+        i, j, k, l, m, n, o, p = [rhs[i,0] for i in range(8)]
+        #print("inner:", (a, b, c, d, e, f), (g, h, i, j, k, l))
+        u, v = prod(a, b, i, j)
+        w, x = prod(c, d, k, l)
+        y, z = prod(e, f, m, n)
+        s, t = prod(g, h, o, p)
+        #print((u,w,y), (v,x,z))
+        a, b = (u+w+y+s, v+x+z+t)
+        assert b==0, (a,b) # should be real value only
+        return a
 
     D = 4
     vs = []
@@ -136,33 +151,36 @@ def main():
 
     (a0, b0, a1, b1, a2, b2, a3, b3) = vs
 
-    vket = Matrix(R, [a0, b0, a1, b1, a2, b2, a3, b3]).reshape(2*D, 1)
-    vbra = Matrix(R, [a0, -b0, a1, -b1, a2, -b2, a3, -b3]).reshape(1, 2*D)
-    print(vbra * vket)
+    #vket = Matrix(R, [a0, b0, a1, b1, a2, b2, a3, b3]).reshape(2*D, 1)
+    #vbra = Matrix(R, [a0, -b0, a1, -b1, a2, -b2, a3, -b3]).reshape(1, 2*D)
+    #print(vbra * vket)
 
+    # Affine chart
     a3, b3 = 1, 0
     vket = Matrix(R, [a0, b0, a1, b1, a2, b2, a3, b3]).reshape(2*D, 1)
     vbra = Matrix(R, [a0, -b0, a1, -b1, a2, -b2, a3, -b3]).reshape(1, 2*D)
-    print(vbra * vket)
 
     I = Matrix.get_identity(R, 2)
     X = Matrix(R, [[0, 1], [1, 0]])
     Z = Matrix(R, [[1, 0], [0, -1]])
-    Y = X*Z
+    #Y = X*Z
     II = I@I
     XX = X@X
     ZZ = Z@Z
-    YY = Y@Y
+    #YY = Y@Y
 
-    H = II + 2*XX + 3*ZZ + 4*YY
+    #H = II + 2*XX + 3*ZZ + 4*YY
+    print(vbra)
+    print(vket)
 
     items = []
-    for op in [XX, ZZ]:
-        top = (vbra * (op@I) * vket)[0,0] # complexify the op to op@I
-        bot = (vbra * vket)[0,0]
-    
+    for op in [XX@I, ZZ@I]: # complexify the op to op@I
+        bot = inner(vbra, vket)
+        top = inner(vbra, op*vket)
+        assert top == inner(vbra*op, vket)
+
         f = top / bot
-        print(f)
+        #print(f)
         for v in affine:
             f_v = sage.diff(f, v)
             #print(f_v)
@@ -175,6 +193,7 @@ def main():
         
     #soln = P.subscheme(items)
     soln = A.subscheme(items)
+    print(soln)
     print(soln.dimension()) # how to get this down to zero ?
 
 
