@@ -143,6 +143,7 @@ def main():
     K = sage.QQ
     #R = sage.PolynomialRing(K, vs)
     R = sage.PolynomialRing(K, vs)
+    FracR = sage.FractionField(R)
     vs = R.gens()
     P = sage.ProjectiveSpace(len(vs)-1, K, list(vs))
 
@@ -170,14 +171,40 @@ def main():
     #YY = Y@Y
 
     #H = II + 2*XX + 3*ZZ + 4*YY
-    print(vbra)
-    print(vket)
+    #print(vbra)
+    #print(vket)
+
+    def divide(a, b, c, d):
+        assert c!=0 or d!=0
+        if (c,d) == (1,0):
+            return (a, b)
+        bot = c**2 + d**2
+        u = (a*c+b*d) / bot
+        v = (b*c - a*d) / bot
+        return u, v
+
+    def normalize(vec):
+        a, b, c, d, e, f, g, h = [vec[i,0] for i in range(8)]
+        a, b = divide(a, b, g, h)
+        c, d = divide(c, d, g, h)
+        e, f = divide(e, f, g, h)
+        #g, h = divide(g, h, g, h)
+        #assert g==1 and h==0
+        return Matrix(FracR, [[a, b, c, d, e, f, 1, 0]]).t
 
     items = []
     for op in [XX@I, ZZ@I]: # complexify the op to op@I
-        bot = inner(vbra, vket)
-        top = inner(vbra, op*vket)
+        rhs = op*vket
+        #print(rhs)
+        #rhs = normalize(rhs) # nope...
+        #print(rhs)
+        top = inner(vbra, rhs)
         assert top == inner(vbra*op, vket)
+        bot = inner(vbra, vket)
+
+        #print(vbra*op)
+        #print(op*vket)
+        #continue
 
         f = top / bot
         #print(f)
