@@ -198,6 +198,12 @@ def main():
             print()
             continue
 
+        if code.n == argv.n:
+            print(code.to_qcode().longstr())
+            return
+        elif argv.n is not None:
+            continue
+
         code.bz_distance()
         #print(code)
         if code.dx < 3 or code.dz < 3:
