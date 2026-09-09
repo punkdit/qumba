@@ -260,7 +260,7 @@ def test_decode():
     mz = css.mz
     k = css.k
 
-    p = 0.05
+    p = 0.01
 
     circuit = Circuit()
     basic_syndrome(circuit, css, p)
@@ -319,7 +319,7 @@ def test_decode():
     correct = Matrix(ops)
     #print("\ncorrect:")
     #print(correct, correct.shape)
-    bits = bits + correct
+    #bits = bits + correct
 
     assert bits.shape == (N, n)
     print("bits:")

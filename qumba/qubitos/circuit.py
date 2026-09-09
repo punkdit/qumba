@@ -242,7 +242,7 @@ def basic_syndrome(circuit, code, p, R=3):
             ERROR([ancilla], p)
             for i in range(n):
                 if h[i]:
-                    #ERROR([data[i], ancilla], p) # <--- the really bad errors
+                    ERROR([data[i], ancilla], p) # <--- the really bad errors
                     circuit.CX(data[i], ancilla)
                     circuit.TICK()
             circuit.M(ancilla)
@@ -256,7 +256,7 @@ def basic_syndrome(circuit, code, p, R=3):
             ERROR([ancilla], p)
             for i in range(n):
                 if h[i]:
-                    #ERROR([data[i], ancilla], p) # <--- the really bad errors
+                    ERROR([data[i], ancilla], p) # <--- the really bad errors
                     circuit.CX(ancilla, data[i])
                     circuit.TICK()
             circuit.H(ancilla)

@@ -175,6 +175,8 @@ def main():
         return
     print("shape =", shape)
     n = len(lins_db.db[shape])
+    print("lins_db:", n)
+
     idx = start_idx
 
     best = {}
@@ -186,17 +188,21 @@ def main():
             #print(code)
             continue
     
-        if code.n > 100:
+        print("idx=%d"%idx, code, end=' ', flush=True)
+
+        if code.n > 300:
+            print()
             break
 
-        print(code, end=' ', flush=True)
+        if code.k <= 2:
+            print()
+            continue
+
         code.bz_distance()
         #print(code)
         if code.dx < 3 or code.dz < 3:
+            print()
             continue
-        if code.k <= 2:
-            continue
-
         #found.append(code)
         if argv.all:
             key = code.n, code.k, code.dx, code.dz
@@ -216,6 +222,8 @@ def main():
         print("\t%s"%code)
         if argv.show:
             print(code.longstr())
+
+    return
 
     print("best:")
     for code in best.values():
