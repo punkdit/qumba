@@ -16,6 +16,8 @@ from sage import all_cmdline as sage
 
 from qumba.argv import argv
 from qumba.matrix_sage import Matrix
+from qumba.util import cross
+
 
 def prod(a, b, c, d):
     return (a*c - b*d, b*c + a*d)
@@ -142,15 +144,20 @@ def main():
 
     K = sage.QQ
     #R = sage.PolynomialRing(K, vs)
-    R = sage.PolynomialRing(K, vs)
+    R = sage.PolynomialRing(K, vs[:6])
     FracR = sage.FractionField(R)
-    vs = R.gens()
-    P = sage.ProjectiveSpace(len(vs)-1, K, list(vs))
+    affine = R.gens()
+    #(a0, b0, a1, b1, a2, b2, a3, b3) = vs
+    (a0, b0, a1, b1, a2, b2, ) = affine
 
-    affine = vs[:6]
+    #P = sage.ProjectiveSpace(len(vs)-1, K, list(vs))
+
     A = sage.AffineSpace(K, len(affine), affine)
 
-    (a0, b0, a1, b1, a2, b2, a3, b3) = vs
+    def dag(ket):
+        a, b, c, d, e, f, g, h = [ket[i,0] for i in range(8)]
+        bra = Matrix(R, [a, -b, c, -d, e, -f, g, -h]).reshape(1, 2*D)
+        return bra
 
     #vket = Matrix(R, [a0, b0, a1, b1, a2, b2, a3, b3]).reshape(2*D, 1)
     #vbra = Matrix(R, [a0, -b0, a1, -b1, a2, -b2, a3, -b3]).reshape(1, 2*D)
@@ -160,6 +167,8 @@ def main():
     a3, b3 = 1, 0
     vket = Matrix(R, [a0, b0, a1, b1, a2, b2, a3, b3]).reshape(2*D, 1)
     vbra = Matrix(R, [a0, -b0, a1, -b1, a2, -b2, a3, -b3]).reshape(1, 2*D)
+    assert vbra == dag(vket)
+    assert inner(vbra, vket) == a0**2 + b0**2 + a1**2 + b1**2 + a2**2 + b2**2 + 1
 
     I = Matrix.get_identity(R, 2)
     X = Matrix(R, [[0, 1], [1, 0]])
@@ -192,36 +201,124 @@ def main():
         #assert g==1 and h==0
         return Matrix(FracR, [[a, b, c, d, e, f, 1, 0]]).t
 
+    def getvalue(poly, vec):
+        value = poly.subs(
+            a0=vec[0], b0=vec[1], 
+            a1=vec[2], b1=vec[3], 
+            a2=vec[4], b2=vec[5])
+        return value
+
+    def getpoints(items):
+        remain = set(cross([(-1,0,1)]*6))
+        for poly in items:
+            for vec in list(remain):
+                if getvalue(poly, vec):
+                    remain.remove(vec)
+        return remain
+
+    def expect(op, ket):
+        assert ket.shape == (2*D, 1), ket.shape
+        bra = dag(ket)
+        top = inner(bra, op * ket)
+        bot = inner(bra, ket)
+        return top / bot
+
+    XX, ZZ = XX@I, ZZ@I # complexify the op to op@I
+    assert XX*ZZ == ZZ*XX
+
+    ii = Matrix(R, [[1,0]]).t
+    zero = Matrix(R, [[1,0]]).t
+    one = Matrix(R, [[0,1]]).t
+    plus = Matrix(R, [[1,1]]).t
+    minus = Matrix(R, [[1,-1]]).t
+
+    for u in [zero, one, plus, minus]:
+      for v in [zero, one, plus, minus]:
+        print((u@v@ii).t)
+
+    for op in [XX, ZZ]:
+     for u in [zero, one, plus, minus]:
+      for v in [zero, one, plus, minus]:
+        ket = u@v@ii
+        assert expect(op, ket) == expect(op, -ket)
+        assert expect(op, ket) == expect(op, 2*ket)
+        print(expect(op, ket), end=' ')
+      print()
+     print()
+
+    points = []
+    for vec in [
+        [1,0,0,1],
+        [1,0,0,-1],
+        [0,1,1,0],
+        [0,1,-1,0]]:
+        ket = Matrix(R, vec).t @ ii
+        points.append(ket)
+        for op in [XX,ZZ]:
+            print(vec, expect(op, ket))
+
     items = []
-    for op in [XX@I, ZZ@I]: # complexify the op to op@I
-        rhs = op*vket
-        #print(rhs)
-        #rhs = normalize(rhs) # nope...
-        #print(rhs)
-        top = inner(vbra, rhs)
-        assert top == inner(vbra*op, vket)
-        bot = inner(vbra, vket)
+    for op in [XX, ZZ]:
+        print(op)
+        f = expect(op, vket)
 
-        #print(vbra*op)
-        #print(op*vket)
-        #continue
-
-        f = top / bot
-        #print(f)
         for v in affine:
             f_v = sage.diff(f, v)
             #print(f_v)
             top_v = f_v.numerator()
+            bot_v = f_v.denominator()
             #print(top_v)
             items.append(top_v)
             soln = A.subscheme([top_v])
             print(soln.dimension(), end=' ')
+            print("%s/%s"%(
+                getvalue(top_v, (-1, 0, 0, 0, 0, 0)),
+                getvalue(bot_v, (-1, 0, 0, 0, 0, 0))), end=' ')
         print()
+
+#    for p in items:
+#        #p = p.subs(a1=0,b1=0,a2=0,b2=0)
+#        p = p.subs(b0=a0)
+#        if p != 0:
+#            print("\t", sage.factor(p))
+
+    I = R.ideal(items)
+    print(I.dimension())
+    print(I)
+
+    from sage.libs.singular.function import singular_function
+    from sage.libs.singular.function import lib as singular_lib
+    
+    singular_lib('realrad.lib')
+    realrad = singular_function('realrad')
+
+    print("realrad:")
+    RI = realrad(I)
+    print("ideal:")
+    J = R.ideal(RI)
+    print("dimension:")
+    print(J.dimension())
+
+    return
+
+    #return
+
+    found = getpoints(items)
+    print(found)
         
     #soln = P.subscheme(items)
     soln = A.subscheme(items)
     print(soln)
     print(soln.dimension()) # how to get this down to zero ?
+
+    #print(' '.join(dir(soln)))
+
+    #S = soln.coordinate_ring()
+    #print(S)
+
+    #vec = [1, 0, 0, 0, 
+
+
 
 
 
