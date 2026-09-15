@@ -276,6 +276,8 @@ def main():
                 getvalue(bot_v, (-1, 0, 0, 0, 0, 0))), end=' ')
         print()
 
+        break
+
 #    for p in items:
 #        #p = p.subs(a1=0,b1=0,a2=0,b2=0)
 #        p = p.subs(b0=a0)
