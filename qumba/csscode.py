@@ -2294,6 +2294,93 @@ def test_iso():
 
     
 
+def reed_muller(r=1, m=4):
+    from qumba.util import choose
+
+    assert 0<=r<=m, "r=%s, m=%d"%(r, m)
+
+    n = 2**m # length
+
+    one = _lin.array2([1]*n)
+    basis = [one]
+
+    vs = [[] for i in range(m)]
+    for i in range(2**m):
+        for j in range(m):
+            vs[j].append(i%2)
+            i >>= 1
+        assert i==0
+
+    vs = [_lin.array2(v) for v in vs]
+
+    for k in range(r):
+        for items in choose(vs, k+1):
+            v = one
+            #print(items)
+            for u in items:
+                v = v*u
+            basis.append(v)
+
+    H = Matrix(basis)
+    H = H.linear_independent()
+    return H
+
+
+
+def test_rm():
+    #from qumba.construct import reed_muller
+
+    #code = reed_muller(2, 6)
+    #code = code.to_css()
+
+    #if code.k:
+    #    code.bz_distance()
+
+    #print(code)
+
+    lookup = {}
+    for m in [1,2,3,4,5]:
+        Hs = [reed_muller(l, m) for l in range(m+1)]
+        for idx,H in enumerate(Hs):
+          for jdx,J in enumerate(Hs):
+            A = H*J.t
+            #print(int(A.max() == 0), end=' ')
+            if A.max() > 0:
+                continue
+            css = CSSCode(Hx=H, Hz=J)
+            if css.k==0:
+                pass
+            elif css.n < 64:
+                css.bz_distance()
+            else: 
+                distance_z3_css(css)
+            lookup[m,idx,jdx] = css
+            print(str(css).ljust(14), end=' ', flush=True)
+          print()
+        print()
+
+    #print(list(lookup.keys()))
+
+    found = set()
+    for m in [1,2,3,4]:
+      for idx in range(m+1):
+        for jdx in range(m+1):
+            key = (m, idx, jdx)
+            if key not in lookup:
+                continue
+            css = lookup[key]
+            H = css.Hx
+            #if H in found:
+            #    continue
+            found.add(H)
+            p = H.get_tutte()
+            #print(H)
+            print(key, css, p)
+            #print()
+
+      print()
+
+
 
 
 

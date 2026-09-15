@@ -945,8 +945,6 @@ def test_isomorphism():
     assert N == 244823040 # M_24
 
 
-
-
 if __name__ == "__main__":
 
     from time import time
