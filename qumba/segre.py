@@ -120,7 +120,7 @@ def main_2():
     return
 
 
-def main():
+def main_bell():
     # ----------------------------------------------------------------------
 
     def inner(lhs, rhs):
@@ -324,6 +324,65 @@ def main():
     #vec = [1, 0, 0, 0, 
 
 
+def main_example():
+    K = sage.QQ
+    
+    H = Matrix(K, [[1, 1], [1,-1]])
+    
+    P = sage.ProjectiveSpace(K, 1)
+    x, y = P.gens()
+    R = sage.PolynomialRing(K, [x,y])
+    
+    v = Matrix(R, [[x,y]]).t
+    Hv = H*v
+    
+    # 2x2 minor expressing rank([v Hv]) <= 1
+    f = v[0]*Hv[1] - v[1]*Hv[0]
+    
+    E = P.subscheme([f])
+    
+    print("Hv =", Hv)
+    print("Homogeneous equations:", E.defining_polynomials())
+    print("Dimension:", E.dimension())
+    print("Degree:", E.degree())
+    
+
+def main():
+
+    n = 4
+
+    K = sage.QQ
+    P = sage.ProjectiveSpace(K, n-1)
+    xs = P.gens()
+    R = sage.PolynomialRing(K, xs)
+
+    I = Matrix.get_identity(R, 2)
+    X = Matrix(R, [[0, 1], [1, 0]])
+    Z = Matrix(R, [[1, 0], [0, -1]])
+
+    v = Matrix(R, [xs]).t
+    print(v)
+
+    def get_eqs(H):
+        Hv = H*v
+        eqns = [ v[i,0]*Hv[j,0] - v[j,0]*Hv[i,0]
+            for i in range(n) for j in range(i+1, n) ]
+        return eqns
+
+    E_XX = P.subscheme(get_eqs(X@X))
+    assert E_XX.dimension() == 1
+
+    E_ZZ = P.subscheme(get_eqs(Z@Z))
+    assert E_ZZ.dimension() == 1
+
+    E = E_XX.intersection(E_ZZ)
+    assert E.dimension() == 0
+
+    # simplify 
+    E = E.reduce()
+    print(E)
+
+    print(E.irreducible_components())
 
 
 
