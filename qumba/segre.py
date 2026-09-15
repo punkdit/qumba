@@ -258,7 +258,7 @@ def main():
             print(vec, expect(op, ket))
 
     items = []
-    for op in [XX, ZZ]:
+    for op in [ZZ]:
         print(op)
         f = expect(op, vket)
 
@@ -269,14 +269,17 @@ def main():
             bot_v = f_v.denominator()
             #print(top_v)
             items.append(top_v)
+            print("\t", top_v)
             soln = A.subscheme([top_v])
-            print(soln.dimension(), end=' ')
-            print("%s/%s"%(
-                getvalue(top_v, (-1, 0, 0, 0, 0, 0)),
-                getvalue(bot_v, (-1, 0, 0, 0, 0, 0))), end=' ')
-        print()
+            #print(soln.dimension(), end=' ')
+            #print("%s/%s"%(
+            #    getvalue(top_v, (-1, 0, 0, 0, 0, 0)),
+            #    getvalue(bot_v, (-1, 0, 0, 0, 0, 0))), end=' ')
+        #print()
 
         break
+
+    return
 
 #    for p in items:
 #        #p = p.subs(a1=0,b1=0,a2=0,b2=0)
