@@ -7,8 +7,12 @@ Use linear relations for CSS circuits (aka phase-free ZX-calculus).
 
 import time
 from functools import reduce, cache
+from operator import matmul
+
+import numpy
 
 #from qumba.qcode import QCode, SymplecticSpace
+#from qumba import lin
 from qumba.matrix import Matrix
 from qumba.rel import Relation # linear relations
 from qumba.csscode import CSSCode
@@ -28,7 +32,14 @@ class Space:
 
 
 class Hom:
-    @cache
+
+    _w = Relation.white(0, 1)
+    w_ = Relation.white(1, 0)
+    _b = Relation.black(0, 1)
+    b_ = Relation.black(1, 0)
+    I = Relation.identity(1)
+
+    @cache # singleton
     def __new__(cls, m, n=None):
         ob = object.__new__(cls)
         return ob
@@ -39,47 +50,168 @@ class Hom:
         self.m = m
         self.n = n
 
+    @property
+    def op(self):
+        return Hom(self.n, self.m)
+
     def __str__(self):
         return "(%s<--%s)"%(self.m, self.n)
     __repr__ = __str__
 
+    def __getitem__(self, i):
+        # i am a shape tuple
+        return (self.m, self.n)[i]
+
     def PX(self, *idxs):
-        "prepare X state: |+..+>"
-        n = self.n
+        "prepare X state: |+> on idxs"
+        m, n = self
+        assert m>n, "wrong Hom %s"%(self,)
         if not idxs:
-            idxs = list(range(n))
+            idxs = list(range(m-n))
         else:
             idxs = list(idxs)
+        assert m == n+len(idxs), "wrong Hom %s"%(self,)
         idxs.sort(reverse=True)
-        ops = [I]*n
+        rels = [self.I]*n
         for i in idxs:
-            ops.insert(i, w_)
-        op = reduce(matmul, ops)
-        return op
+            assert 0<=i<m
+            rels.insert(i, self.w_)
+        assert len(rels) == m
+        rel = reduce(matmul, rels)
+        assert (rel.tgt,rel.src) == (self.m, self.n), (str(rel), str(self))
+        return rel
 
     def PZ(self, *idxs):
-        "prepare Z state: |0..0>"
-        n = self.n
+        "prepare Z state: |0> on idxs"
+        m, n = self
+        assert m>n, "wrong Hom %s"%(self,)
         if not idxs:
-            idxs = list(range(n))
+            idxs = list(range(m-n))
         else:
             idxs = list(idxs)
+        assert m == n+len(idxs), "wrong Hom %s"%(self,)
         idxs.sort(reverse=True)
-        ops = [I]*n
+        rels = [self.I]*n
         for i in idxs:
-            ops.insert(i, b_)
-        op = reduce(matmul, ops)
-        return op
+            assert 0<=i<m
+            rels.insert(i, self.b_)
+        assert len(rels) == m
+        rel = reduce(matmul, rels)
+        assert (rel.tgt,rel.src) == (self.m, self.n)
+        return rel
+
+    def MX(self, *idxs):
+        "postselect <0| on idxs"
+        m, n = self
+        assert not idxs or m+len(idxs)==n, "wrong Hom %s"%(self,)
+        rel = self.op.PX(*idxs).op
+        return rel
+
+    def MZ(self, *idxs):
+        "postselect <+| on idxs"
+        m, n = self
+        assert not idxs or m+len(idxs)==n, "wrong Hom %s"%(self,)
+        rel = self.op.PZ(*idxs).op
+        return rel
 
     def CX(self, idx=0, jdx=1):
-        assert self.m == self.n, "wrong Hom %s"%(self,)
-        
+        m, n = self
+        assert m == n, "wrong Hom %s"%(self,)
+        assert m >= 2, "wrong Hom %s"%(self,)
+        assert idx != jdx
+        lhs = Matrix.identity(m)
+        rhs = numpy.identity(m, dtype=int)
+        rhs[jdx, idx] = 1
+        rhs = Matrix(rhs)
+        return Relation(lhs, rhs)
+
+    def get_perm(self, idxs):
+        """ send idxs[j]<---j """
+        m, n = self
+        assert m == n, "wrong Hom %s"%(self,)
+        assert m == len(idxs), "wrong Hom %s"%(self,)
+        assert len(set(idxs)) == m
+        lhs = Matrix.identity(m)
+        rhs = Matrix.get_perm(idxs)
+        return Relation(lhs, rhs)
+
+    def SWAP(self, idx=0, jdx=1):
+        m, n = self
+        assert m == n, "wrong Hom %s"%(self,)
+        assert m >= 2, "wrong Hom %s"%(self,)
+        assert idx != jdx
+        f = list(range(self.n))
+        f[idx], f[jdx] = f[jdx], f[idx]
+        return self.get_perm(f)
+
 
 
 def test():
-    pass
+    hom = Hom(3, 2)
 
+    for i in range(3):
+        c = hom.PX(i)
+        c = hom.PZ(i)
+
+    hom = Hom(2, 3)
+    for i in range(3):
+        c = hom.MX(i)
+        c = hom.MZ(i)
+
+    # test get_perm ----------------------------------------
+
+    rel = Hom(3).get_perm([1,2,0])
+    rhs = Hom(3,2).PX(0)
+    rhs = rel * rhs
+    lhs = Hom(3,2).PX(1) * Hom(2,2).SWAP()
+    assert lhs == rhs
     
+    rel = Hom(3).get_perm([2, 0, 1])
+    rhs = Hom(3,2).PX(0)
+    rhs = rel * rhs
+    lhs = Hom(3,2).PX(2)
+    assert lhs == rhs
+    
+    # test CX ----------------------------------------
+
+    w_ww = Relation.white(1, 2)
+    bb_b = Relation.black(2, 1)
+    identity = Relation.identity(1)
+    CX = (w_ww @ identity) * (identity @ bb_b)
+
+    space = Hom(2)
+    assert CX == space.CX()
+
+    cx01 = space.CX(0, 1)
+    cx10 = space.CX(1, 0)
+
+    rel = cx01*cx10*cx01
+    assert rel == space.SWAP()
+
+    n = 3
+    for i in range(n):
+      for j in range(n):
+        if i==j:
+            continue
+        cx = Hom(n).CX(i,j)
+        lhs = Hom(n-1, n).MZ(i) * cx
+        rhs = Hom(n-1, n).MZ(i)
+        assert lhs == rhs
+    
+        lhs = Hom(n-1, n).MX(j) * cx
+        rhs = Hom(n-1, n).MX(j)
+        assert lhs == rhs
+
+    I = Relation.identity(1)
+    _ww = Relation.white(0, 3)
+    _bb = Relation.black(0, 3)
+    
+    print(_ww, _ww.shape)
+    print(_ww @ I)
+
+    print(_bb, _bb.shape)
+    print(_bb @ I)
+
 
 def reed_muller(r=1, m=4):
 
