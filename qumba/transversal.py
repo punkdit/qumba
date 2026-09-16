@@ -1959,13 +1959,14 @@ def test_16_2_4():
     #print(eode)
     #print(eode.longstr())
 
-    from qumba.css import CSS
+    #from qumba.css import CSS
+    from qumba.csscode import CSSCode
 
     src = dode.to_css()
     tgt = code.to_css()
 
-    src = CSS(src.Hx, src.Hz)
-    tgt = CSS(tgt.Hx, tgt.Hz)
+    src = CSSCode(Hx=src.Hx, Hz=src.Hz)
+    tgt = CSSCode(Hx=tgt.Hx, Hz=tgt.Hz)
     print(src)
     print(tgt)
 
