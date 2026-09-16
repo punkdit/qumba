@@ -710,6 +710,8 @@ class CSSCode(object):
         return code
 
     def bz_distance(self):
+        if self.k == 0:
+            return
         #t0 = time()
         Hx = shortstr(self.Hx).replace("1", "X").replace('.', "I")
         Hz = shortstr(self.Hz).replace("1", "Z").replace('.', "I")
@@ -836,12 +838,9 @@ class CSSCode(object):
         assert isinstance(self.Lz, Matrix)
         assert isinstance(self.Lx, Matrix)
 
-        lines = [
-            "CSSCode:",
-            "Lx:Lz =", shortstrx(self.Lx, self.Lz),
-            "Hx:Tz =", shortstrx(self.Hx, self.Tz),
-            "Tx:Hz =", shortstrx(self.Tx, self.Hz)
-        ]
+        lines = [ "Hx =", shortstr(self.Hx), "Hz =", shortstr(self.Hz), ]
+        if len(self.Lx):
+            lines += ["Lx =", shortstr(self.Lx), "Lz =", shortstr(self.Lz)]
         return '\n'.join(lines)
 
     def weightstr(self, logops=False):

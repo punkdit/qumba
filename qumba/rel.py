@@ -89,6 +89,15 @@ class Relation:
         return op.left
     __call__ = get_left
 
+    @property
+    @cache
+    def dual(self):
+        A = self.A
+        K = A.kernel()
+        n = self.tgt
+        rel = Relation(K[:, :n], K[:, n:], self.p)
+        return rel
+
     def get_right(self, l): # __rmul__ ?
         assert isinstance(l, Matrix)
         if len(l.shape)==1:

@@ -394,6 +394,21 @@ class Matrix:
         P = A*A.pseudo_inverse()
         return P
 
+    def is_subspace(A, B):
+        assert A.shape[1] == B.shape[1]
+        if B.t.solve(A.t) is None:
+            return False
+        return True
+
+    def is_equiv(A, B):
+        "do A and B have the same rowspace?"
+        assert A.shape[1] == B.shape[1]
+        if A.t.solve(B.t) is None:
+            return False
+        if B.t.solve(A.t) is None:
+            return False
+        return True
+
     def puncture(A, i):
         A0 = A[:, :i]
         A1 = A[:, i+1:]
