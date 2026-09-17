@@ -345,9 +345,13 @@ class Matrix:
         return Matrix(A, self.p)
 
     def max(self):
+        if 0 in self.shape:
+            return None
         return self.A.max()
 
     def min(self):
+        if 0 in self.shape:
+            return None
         return self.A.min()
 
     def copy(self):

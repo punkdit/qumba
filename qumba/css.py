@@ -168,8 +168,8 @@ def from_encoder(Ex, Ez=None):
     k = Ex.src
     assert Ez.src == k
 
-    if k==0:
-        print(Ex)
+    #if k==0:
+    #    print(Ex)
 
     w = Relation.white(1,0)
     if k:
@@ -331,83 +331,15 @@ def test():
     # ------------------------------------------------
 
 
-def test_rm():
-
-    RM = {}
-    for m in range(5):
-      for l in range(m+1):
-        for r in range(m+1):
-            Hx = get_rm(l, m)
-            Hz = get_rm(r, m)
-            if (Hx*Hz.t).max():
-                continue
-            code = CSSCode(Hx=Hx, Hz=Hz)
-            code.bz_distance()
-            key = (m, l, r)
-            RM[key] = code
-            print("RM(%d,%d,%d)=%s"%(m,l,r,code), end="  ")
-        print()
-
-    op = get_rm(0,0)
-    print(op, op.shape)
-
-    #code = RM[2,0,0]
-    #n = code.n
-    #Ex, _ = get_encoder(code)
-    #Ex = Ex @ Ex
-
-    N = 2
-    n = 2**N
-
-    Ex = get_encoder(RM[2,1,0])[0] @ get_encoder(RM[2,0,1])[0]
-    hom = Space(2*n)
-    CX = hom.CX
-    for i in range(n):
-        Ex = CX(n+i, i) * Ex
-
-    dode = from_encoder(Ex)
-    dode.bz_distance()
-
-    #print(dode)
-    #print(dode.longstr())
-    
-
-    assert dode.is_equiv(RM[3,1,1])
-
-#    for l in [2,1,0]:
-#        rm = RM[3,l,2-l]
-#        print(rm)
-#        print(rm.longstr())
-#        print()
-    
-    smap = SMap()
-    keys = list(RM.keys())
-    keys.sort()
-    w,h = 32, 18
-    for (N,l,r) in keys:
-        if N!=3:
-            continue
-        desc = "RM(%s,%s,%s)"%(N,l,r)
-        smap[h*l, w*r] = desc
-        smap[h*l+1, w*r] = str(RM[N,l,r])
-        smap[h*l, w*r+18] = RM[N,l,r].longstr()
-
-    print()
-    print(smap)
-        
-    rm311 = RM[3,1,1]
-    rm310 = RM[3,1,0]
-    rm301 = RM[3,0,1]
-    assert (rm311.Hz.is_equiv( rm310.Hz.concatenate(rm310.Lz) ))
-    assert (rm311.Hx.is_equiv( rm301.Hx.concatenate(rm301.Lx) ))
-
-
 @cache
 def get_rm(r=1, m=4):
 
-    assert 0<=r<=m, "r=%s, m=%d"%(r, m)
-
     n = 2**m # length
+    if r==-1:
+        H = Matrix.zeros((0, n))
+        return H
+
+    assert 0<=r<=m, "r=%s, m=%d"%(r, m)
 
     one = Matrix([1]*n).A
     basis = [one]
@@ -432,6 +364,122 @@ def get_rm(r=1, m=4):
     H = Matrix(basis)
     H = H.linear_independent()
     return H
+
+
+def test_rm():
+
+    #for r in [-1,0,1,2,3]:
+    #    print("r =", r)
+    #    H = get_rm(r,3)
+    #    print(H, H.shape)
+    #return
+
+    RM = {}
+    lookup = [[] for m in range(5)]
+    for N in range(5):
+      for l in range(-1,N+1):
+        for r in range(-1,N+1):
+            Hx = get_rm(l, N)
+            Hz = get_rm(r, N)
+            if (Hx*Hz.t).max():
+                continue
+            code = CSSCode(Hx=Hx, Hz=Hz)
+            if code.k and code.mx and code.mz:
+                code.bz_distance()
+            else:
+                code.distance_z3()
+            key = (N, l, r)
+            RM[key] = code
+            lookup[N].append(code)
+            name = "RM(%d,%d,%d)"%(N,l,r)
+            code.name = name
+            print("%s=%s"%(name,code), end=' ')
+        print()
+
+    op = get_rm(0,0)
+    assert op == Matrix([[1]])
+    #print(op, op.shape)
+
+    def pair_cx(left, right):
+        assert left.n == right.n
+        n = left.n
+        Ex = get_encoder(left)[0] @ get_encoder(right)[0]
+        hom = Space(2*n)
+        CX = hom.CX
+        for i in range(n):
+            Ex = CX(n+i, i) * Ex
+        dode = from_encoder(Ex)
+        return dode
+
+    dode = pair_cx(RM[2,1,0], RM[2,0,1])
+    assert dode.is_equiv(RM[3,1,1])
+
+    dode = pair_cx(RM[3,2,0], RM[3,1,1])
+    assert dode.is_equiv(RM[4,2,1])
+
+    dode = pair_cx(RM[3,1,0], RM[3,0,1])
+    assert dode.is_equiv(RM[4,1,1])
+
+    def find(code):
+        for k,dode in RM.items():
+            if dode.is_equiv(code):
+                return dode
+
+    for left in lookup[3]:
+      for right in lookup[3]:
+        code = pair_cx(left, right)
+        dode = find(code)
+        if dode:
+            print(left.name, right.name, "->", dode.name)
+
+    return
+
+#    for l in [2,1,0]:
+#        rm = RM[3,l,2-l]
+#        print(rm)
+#        print(rm.longstr())
+#        print()
+    
+    smap = SMap()
+    keys = list(RM.keys())
+    keys.sort()
+    w,h = 32, 18
+    for (N,l,r) in keys:
+        if N!=3:
+            continue
+        desc = "RM(%s,%s,%s)"%(N,l,r)
+        smap[h*l, w*r] = desc
+        smap[h*l+1, w*r] = str(RM[N,l,r])
+        smap[h*l, w*r+18] = RM[N,l,r].longstr()
+
+    #print()
+    #print(smap)
+
+    def lzero(code):
+        Hz = code.Hz.concatenate(code.Lz)
+        return CSSCode(Hx=code.Hx, Hz=Hz)
+
+    def lplus(code):
+        Hx = code.Hx.concatenate(code.Lx)
+        return CSSCode(Hx=Hx, Hz=code.Hz)
+
+    rm311 = RM[3,1,1]
+    rm310 = RM[3,1,0]
+    rm301 = RM[3,0,1]
+
+    assert( lzero(rm310).is_equiv( rm311 ) )
+    assert( lplus(rm301).is_equiv( rm311 ) )
+
+    keys = [(N,l,r) for (N,l,r) in keys if N==4]
+    #print( lzero(RM[4,1,1]).is_equiv( RM[4,1,2] ) )
+    for lkey in keys:
+      for rkey in keys:
+        if lkey==rkey:
+            continue
+        if lzero(RM[lkey]).is_equiv(RM[rkey]):
+            print("lzero", lkey, rkey)
+        if lplus(RM[lkey]).is_equiv(RM[rkey]):
+            print("lplus", lkey, rkey)
 
 
 

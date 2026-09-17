@@ -710,7 +710,7 @@ class CSSCode(object):
         return code
 
     def bz_distance(self):
-        if self.k == 0:
+        if self.k == 0 or self.mx==0 or self.mz==0:
             return
         #t0 = time()
         Hx = shortstr(self.Hx).replace("1", "X").replace('.', "I")
@@ -732,6 +732,10 @@ class CSSCode(object):
         self.dx, self.dz = dx, dz
         return dx, dz
 
+    def distance_z3(code):
+        d_x, d_z = distance_z3_css(code)
+        return min(d_x, d_z)
+    
     @property
     def d(self):
         if self.dx and self.dz:
@@ -1143,6 +1147,9 @@ def distance_lower_bound_z3(Hx, Lx, d):
     from z3 import Bool, And, Or, Xor, Not, Implies, Sum, If, Solver, sat
 
     assert len(Lx)
+
+    if len(Hx)==0:
+        return 1
 
     m, n = Hx.shape
     k, n1 = Lx.shape
