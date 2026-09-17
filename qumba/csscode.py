@@ -784,8 +784,10 @@ class CSSCode(object):
         dx, dz = self.dx, self.dz
         if dx and dz:
             return "[[%d, %d, (%d, %d)]]"%(self.n, self.k, self.dx, self.dz)
-        else:
+        elif self.k:
             return "[[%d, %d, ?]]"%(self.n, self.k)
+        else:
+            return "[[%d, %d]]"%(self.n, self.k)
 
     def save(self, name=None, stem=None):
         assert name or stem

@@ -19,7 +19,7 @@ from qumba.csscode import CSSCode
 from qumba import construct
 
 from qumba.argv import argv
-from qumba.util import choose
+from qumba.util import choose, all_perms
 from qumba.smap import SMap
 
 
@@ -393,8 +393,28 @@ def test_rm():
             lookup[N].append(code)
             name = "RM(%d,%d,%d)"%(N,l,r)
             code.name = name
-            print("%s=%s"%(name,code), end=' ')
+            if l>=0 and r>=0:
+                print("%s=%s"%(name,code), end=' ')
         print()
+
+    if 0:
+        # does not seem to get anywhere
+        outer = RM[2,0,0] # [[4,2,2]]
+        print(outer)
+        inner = RM[2,0,0]
+    
+        Ei = get_encoder(inner)[0]
+        Eo = get_encoder(outer)[0]
+    
+        #P = Space(4).PERM([0,2,1,3])
+        for f in all_perms(list(range(4))):
+            P = Space(4).PERM(f)
+            E = (Eo@Eo)*P*Ei
+            code = from_encoder(E)
+            code.bz_distance()
+            print(f, code) # [[8,2,2]]
+    
+        return
 
     op = get_rm(0,0)
     assert op == Matrix([[1]])
@@ -483,10 +503,16 @@ def test_rm():
 
 
 
-def other_test_rm():
+def test_tutte():
+    for m in [1,2,3,4]:
+        for l in range(m+1):
+            H = get_rm(l, m)
+            print(H.shape, H.get_tutte())
+
+    return
 
     lookup = {}
-    for m in [1,2,3,4,5]:
+    for m in [1,2,3,4]:
         Hs = [get_rm(l, m) for l in range(m+1)]
         for idx,H in enumerate(Hs):
           for jdx,J in enumerate(Hs):
