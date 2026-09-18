@@ -210,12 +210,18 @@ class Relation:
         other = self.__class__(other, p=self.p)
         return other.__mul__(self)
 
+    def __matmul__(lhs, rhs):
+        assert 0, "deprecated: use <<"
+        assert lhs.p == rhs.p
+        left = lhs.left.direct_sum(rhs.left)
+        right = lhs.right.direct_sum(rhs.right)
+        return lhs.__class__(left, right)
+
     def __lshift__(lhs, rhs):
         assert lhs.p == rhs.p
         left = lhs.left << rhs.left
         right = lhs.right << rhs.right
         return lhs.__class__(left, right)
-    __matmul__ = __lshift__ # um... yes ??
 
     def tensor(lhs, rhs):
         left = lhs.left @ rhs.left
@@ -311,7 +317,7 @@ def test_linear():
     _bb = bb_.op
     b_bb = bb_b.op
 
-    assert b_ * _b == b_ @ _b # elevator identity
+    assert b_ * _b == b_ << _b # elevator identity
     assert str(_b * b_) == "[[|]]"
 
     assert b_ == Relation.black(1, 0)
@@ -336,9 +342,9 @@ def test_linear():
     assert _ww == Relation.white(0, 2)
     assert w_ww == Relation.white(1, 2)
 
-    assert _w*b_bb == _w@_w
+    assert _w*b_bb == _w<<_w
     assert b_ * _w == Relation([[1]],[[0]])
-    assert _b@_b == _b * w_ww
+    assert _b<<_b == _b * w_ww
 
     one = Relation(zeros(0,0), zeros(0,0))
     assert _b*w_ == one
@@ -361,32 +367,32 @@ def test_linear():
     assert w_ww*ww_w == I
 
     # _assoc
-    lhs = (bb_b @ I) * bb_b 
-    rhs = (I @ bb_b) * bb_b 
+    lhs = (bb_b << I) * bb_b 
+    rhs = (I << bb_b) * bb_b 
     assert( lhs==rhs )
 
     # unital
-    assert (I@_b)*bb_b == I
-    assert (_b@I)*bb_b == I
+    assert (I<<_b)*bb_b == I
+    assert (_b<<I)*bb_b == I
 
     # copy
-    assert bb_b * w_ == w_@w_
+    assert bb_b * w_ == w_<<w_
 
     # frobenius
     lhs = bb_b * b_bb
-    rhs = (I @ b_bb) * (bb_b @ I)
+    rhs = (I << b_bb) * (bb_b << I)
     assert lhs==rhs
-    rhs = (b_bb @ I) * (I @ bb_b)
+    rhs = (b_bb << I) * (I << bb_b)
     assert lhs==rhs
 
     lhs = ww_w * w_ww
-    rhs = (I @ w_ww) * (ww_w @ I)
+    rhs = (I << w_ww) * (ww_w << I)
     assert lhs==rhs
-    rhs = (w_ww @ I) * (I @ ww_w)
+    rhs = (w_ww << I) * (I << ww_w)
     assert lhs==rhs
 
     # bialgebra
-    lhs = (b_bb @ b_bb) * (I @ swap @ I) * (ww_w @ ww_w)
+    lhs = (b_bb << b_bb) * (I << swap << I) * (ww_w << ww_w)
     rhs = ww_w * b_bb
     assert lhs == rhs
 
@@ -395,11 +401,11 @@ def test_linear():
     assert Relation.white(1,1) == I
     assert Relation.black(1,1) == I
 
-    rel = (w_ @ I) * (I @ _b)
+    rel = (w_ << I) * (I << _b)
 
     rel = rel * Relation(Matrix.identity(2), zeros(2,0))
     #print(rel)
-    #print( (w_@w_) * (_b@_b) )
+    #print( (w_<<w_) * (_b<<_b) )
 
     #print(w_ww * bb_b)
     #print(ww_w * b_bb)
@@ -414,25 +420,25 @@ def test_linear():
     assert lhs == rhs
     assert lhs == Relation.white(2,2)
 
-    lhs = (I @ w_ww) * (bb_b @ I)
-    rhs = (b_bb @ I) * (I @ ww_w)
+    lhs = (I << w_ww) * (bb_b << I)
+    rhs = (b_bb << I) * (I << ww_w)
     assert lhs == rhs
 
     black = Relation.black
     white = Relation.white
-    #print(white(3,0) @ black(0,1))
+    #print(white(3,0) << black(0,1))
     #print(black(1,0))
 
     cup = white(2,0)
     assert cup == black(2,0)
 
     #print(lhs)
-    #print( (lhs @ I) * (I @ cup) )
-    #print( (I @ lhs) * (cup@I) )
+    #print( (lhs << I) * (I << cup) )
+    #print( (I << lhs) * (cup<<I) )
 
-    assert cup @ b_ == Relation([[1,1,0],[0,0,1]], zeros(2,0))
+    assert cup << b_ == Relation([[1,1,0],[0,0,1]], zeros(2,0))
 
-    op = (I @ w_ww @ I @ I) * (I @ I @ swap @ I) * (black(3,0) @ black(2,0))
+    op = (I << w_ww << I << I) * (I << I << swap << I) * (black(3,0) << black(2,0))
     assert op == Relation([[1,1,1,0],[0,1,0,1]], zeros(2,0))
 
     # ------------------------------------------------
@@ -631,7 +637,7 @@ def test_delete_contract():
     w_ww = ww_w.op
 
     #print(w_, w_.shape)
-    #ww_ = w_@w_
+    #ww_ = w_<<w_
     #print(ww_, ww_.shape)
 
     M = Matrix.zeros((0,1))
@@ -650,11 +656,11 @@ def test_delete_contract():
     assert Matrix([[1,1]]).contract(0) == Matrix.zeros((0,1))
 
     assert bb_ == ww_
-    M = (bb_b @ ww_w) * bb_
+    M = (bb_b << ww_w) * bb_
 
     I = black(1,1)
 
-    op = (I @ I @ white(1,2) @ I) * (black(3,0) @ black(2,0))
+    op = (I << I << white(1,2) << I) * (black(3,0) << black(2,0))
     assert M==op
 
     return
@@ -761,7 +767,7 @@ def test_delete_contract():
         j = randint(0, n-1)
         M = Matrix.rand(m, n)
         R = Relation.subspace(M)
-        R = R @ Relation.black(1,0)
+        R = R << Relation.black(1,0)
         #print(R)
         #print()
 
@@ -785,12 +791,12 @@ def test_linp():
     rhs = Relation([[1,1]], [[1]], q)
     assert rhs.p == q
     rel = (lhs*rhs)
-    other = (Relation.white(0,1,p=q) @ Relation.white(1,0,p=q))
+    other = (Relation.white(0,1,p=q) << Relation.white(1,0,p=q))
     assert rel == other
 
     q = 2
 
-    op = (white(2,1) @ black(2,1)) * black(2,0)
+    op = (white(2,1) << black(2,1)) * black(2,0)
     print(op.left)
     print(op.left.get_tutte())
     

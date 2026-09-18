@@ -7,7 +7,7 @@ Use linear relations for CSS circuits (aka phase-free ZX-calculus).
 
 import time
 from functools import reduce, cache
-from operator import matmul
+from operator import matmul, lshift
 
 import numpy
 
@@ -70,7 +70,7 @@ class Hom:
             assert 0<=i<m
             rels.insert(i, self.w_)
         assert len(rels) == m
-        rel = reduce(matmul, rels)
+        rel = reduce(lshift, rels)
         assert (rel.tgt,rel.src) == (self.m, self.n), (str(rel), str(self))
         return rel
 
@@ -89,7 +89,7 @@ class Hom:
             assert 0<=i<m
             rels.insert(i, self.b_)
         assert len(rels) == m
-        rel = reduce(matmul, rels)
+        rel = reduce(lshift, rels)
         assert (rel.tgt,rel.src) == (self.m, self.n)
         return rel
 
@@ -173,7 +173,7 @@ def from_encoder(Ex, Ez=None):
 
     w = Relation.white(1,0)
     if k:
-        op = reduce(matmul, [w]*k)
+        op = reduce(lshift, [w]*k)
         #print(op, op.shape)
         Hx = (Ex*op).left
         Hz = (Ez*op).left
@@ -211,6 +211,10 @@ def from_encoder(Ex, Ez=None):
 
 
 def test():
+
+    from qumba.rel import test_linear
+    test_linear()
+
     hom = Hom(3, 2)
 
     for i in range(3):
@@ -241,7 +245,7 @@ def test():
     w_ww = Relation.white(1, 2)
     bb_b = Relation.black(2, 1)
     identity = Relation.identity(1)
-    CX = (w_ww @ identity) * (identity @ bb_b)
+    CX = (w_ww << identity) * (identity << bb_b)
 
     space = Hom(2)
     assert CX == space.CX()
@@ -272,14 +276,14 @@ def test():
     w3 = Relation.white(3,1)
 
     iso = Hom(9,9).PERM([0,3,6,1,4,7,2,5,8])
-    Ex = (b3@b3@b3)*w3
+    Ex = (b3<<b3<<b3)*w3
     #print("Ex:")
     #print(Ex)
 
     Hx = (Ex*Relation.white(1,0)).left
     #print(Hx)
 
-    Ez = (w3@w3@w3)*b3
+    Ez = (w3<<w3<<w3)*b3
     #print("Ez:")
     #print(Ez)
 
@@ -329,6 +333,26 @@ def test():
     
 
     # ------------------------------------------------
+
+    A = Matrix.parse("11.\n.11")
+    B = Matrix.parse("11")
+    lhs = Relation(A)
+    rhs = Relation(B)
+    assert lhs.tensor(rhs) == Relation(A@B)
+
+    code = construct.get_422().to_css()
+    Ex = get_encoder(code)[0]
+    left = Ex.left
+    print(left)
+    print(left @ left)
+
+    EE = Ex.tensor(Ex)
+    print(EE)
+    dode = from_encoder(EE)
+    dode.bz_distance()
+    print(dode)
+    
+
 
 
 @cache
@@ -409,7 +433,7 @@ def test_rm():
         #P = Space(4).PERM([0,2,1,3])
         for f in all_perms(list(range(4))):
             P = Space(4).PERM(f)
-            E = (Eo@Eo)*P*Ei
+            E = (Eo<<Eo)*P*Ei
             code = from_encoder(E)
             code.bz_distance()
             print(f, code) # [[8,2,2]]
@@ -423,7 +447,7 @@ def test_rm():
     def pair_cx(left, right):
         assert left.n == right.n
         n = left.n
-        Ex = get_encoder(left)[0] @ get_encoder(right)[0]
+        Ex = get_encoder(left)[0] << get_encoder(right)[0]
         hom = Space(2*n)
         CX = hom.CX
         for i in range(n):
