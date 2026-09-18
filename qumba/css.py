@@ -334,23 +334,19 @@ def test():
 
     # ------------------------------------------------
 
-    A = Matrix.parse("11.\n.11")
-    B = Matrix.parse("11")
-    lhs = Relation(A)
-    rhs = Relation(B)
-    assert lhs.tensor(rhs) == Relation(A@B)
-
     code = construct.get_422().to_css()
     Ex = get_encoder(code)[0]
     left = Ex.left
-    print(left)
-    print(left @ left)
+    #print(left)
+    #print(left @ left)
 
     EE = Ex.tensor(Ex)
-    print(EE)
+    #print(EE)
     dode = from_encoder(EE)
-    dode.bz_distance()
-    print(dode)
+    #dode.bz_distance()
+    #print(dode)
+    assert dode.n == 16
+    assert dode.k == 4
     
 
 

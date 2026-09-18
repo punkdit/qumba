@@ -47,6 +47,7 @@ class Relation:
     """
 
     def __init__(self, left, right=None, p=DEFAULT_P):
+        # XXX should we keep the dual code aswell ? see css.py XXX
         left = Matrix.promote(left, p)
         if right is None:
             right = Matrix.identity(left.shape[0], p)
