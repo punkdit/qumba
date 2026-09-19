@@ -349,9 +349,9 @@ def main_example():
 
 def main():
 
-    n = 4
-
     K = sage.QQ
+
+    n = 4
     P = sage.ProjectiveSpace(K, n-1)
     xs = P.gens()
     R = sage.PolynomialRing(K, xs)
@@ -360,19 +360,19 @@ def main():
     X = Matrix(R, [[0, 1], [1, 0]])
     Z = Matrix(R, [[1, 0], [0, -1]])
 
-    v = Matrix(R, [xs]).t
-    print(v)
+    #print(v)
 
-    def get_eqs(H):
+    def get_eqs(H, v):
         Hv = H*v
         eqns = [ v[i,0]*Hv[j,0] - v[j,0]*Hv[i,0]
             for i in range(n) for j in range(i+1, n) ]
         return eqns
 
-    E_XX = P.subscheme(get_eqs(X@X))
+    v = Matrix(R, [xs]).t
+    E_XX = P.subscheme(get_eqs(X@X, v))
     assert E_XX.dimension() == 1
 
-    E_ZZ = P.subscheme(get_eqs(Z@Z))
+    E_ZZ = P.subscheme(get_eqs(Z@Z, v))
     assert E_ZZ.dimension() == 1
 
     E = E_XX.intersection(E_ZZ)
@@ -380,11 +380,57 @@ def main():
 
     # simplify 
     E = E.reduce()
+    #print(E)
+    #print(E.irreducible_components())
+
+    del E, n, v, xs
+    # ------------------------------------------------------
+
+    # are we teleporting yet?
+
+    n = 2**3
+    P = sage.ProjectiveSpace(K, n-1)
+    xs = P.gens()
+    (x0, x1, x2, x3, x4, x5, x6, x7) = xs
+
+    R = sage.PolynomialRing(K, xs)
+
+    I = Matrix.get_identity(R, 2)
+    X = Matrix(R, [[0, 1], [1, 0]])
+    Z = Matrix(R, [[1, 0], [0, -1]])
+
+    #v = Matrix(R, [xs]).t
+    #print(v.t)
+    #cup = Matrix(R, [
+
+    u = Matrix(R, [[x0, 0, 0, x0]]).t
+    v = Matrix(R, [[x1, x2]]).t
+    uv = u@v
+    print(uv.t)
+
+    E_0 = P.subscheme([uv[i] == xs[i] for i in range(n)])
+
+    eqs = get_eqs(I@X@X, uv)
+    #print(eqs)
+    E_XX = P.subscheme(eqs)
+    #print(P.dimension())
+    #print(E_XX.dimension())
+
+    eqs = get_eqs(I@Z@Z, uv)
+    #print(eqs)
+    E_ZZ = P.subscheme(eqs)
+    #print(E_ZZ.dimension())
+
+    E = E_XX.intersection(E_ZZ)
+    E = E.intersection(E_0)
+    #print(E.dimension())
+
+    # simplify 
+    E = E.reduce()
     print(E)
-
-    print(E.irreducible_components())
-
-
+    print(E.dimension())
+    for Ei in E.irreducible_components():
+        print(Ei)
 
 
 if __name__ == "__main__":
