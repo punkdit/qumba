@@ -39,7 +39,7 @@ from qumba.util import choose, all_perms
 from qumba.argv import argv
 
 from qumba.matrix import Matrix
-#from qumba.umatrix import UMatrix, Solver, If, Not, And, Or, PbLe
+
 
 def apply_CX(css, ctrl, tgt):
     code = css.to_qcode()
@@ -47,6 +47,28 @@ def apply_CX(css, ctrl, tgt):
     css = dode.to_css()
     distance_z3_css(css)
     return css
+
+
+def search(code, h, ancilla, move, accept):
+    n = code.n
+    idxs = [j for j in range(n) if h[j]]
+    #shuffle(idxs)
+    assert len(idxs) <= 8, "um.."
+    perms = list(all_perms(idxs))
+    shuffle(perms)
+    for jdxs in perms:
+        dode = code+ancilla
+        for j in jdxs:
+            dode = move(dode, j)
+            if not accept(dode):
+                print(jdxs, "skip")
+                break
+        else:
+            assert accept(dode)
+            print("found:", jdxs)
+            return jdxs
+    print("fail")
+    assert 0
 
 
 def find_sequence(code):
@@ -65,6 +87,34 @@ def find_sequence(code):
     mz, _ = Hz.shape
     k = code.k
 
+    plus = CSSCode(Hx=Matrix([[1]]), Hz=Matrix.zeros((0,1)))
+    zero = CSSCode(Hz=Matrix([[1]]), Hx=Matrix.zeros((0,1)))
+
+    #print(target, distance_z3_css(target))
+
+    checks = []
+    for (basis, H, ancilla, move, accept) in [
+        ("X", Hx, plus, 
+            lambda code, j: apply_CX(code,n,j), 
+            lambda code : code.dx == dx, ),
+        ("Z", Hz, zero, 
+            lambda code, j: apply_CX(code,j,n), 
+            lambda code : code.dz == dz, ),
+    ]:
+        print(H.get_wenum())
+        hs = []
+        for v in H.span():
+            if v.sum() == 4:
+                hs.append(v)
+        #m = len(H)
+        #for i in range(m):
+        #    h = H[i, :]
+        for h in hs:
+            jdxs = search(code, h, ancilla, move, accept)
+            if jdxs is None:
+                assert 0
+            checks.append((basis, tuple(jdxs)))
+
     logicals = []
     for i in range(k):
         jdxs = tuple(j for j in range(n) if Lx[i,j])
@@ -72,89 +122,43 @@ def find_sequence(code):
         jdxs = tuple(j for j in range(n) if Lz[i,j])
         logicals.append(("Z", jdxs))
 
-    plus = CSSCode(Hx=Matrix([[1]]), Hz=Matrix.zeros((0,1)))
-    zero = CSSCode(Hz=Matrix([[1]]), Hx=Matrix.zeros((0,1)))
-
-    #print(target, distance_z3_css(target))
-
-    checks = []
-
-
-    for (basis, H, ancilla, move, accept) in [
-        ("X", Hx, plus, lambda code, j: apply_CX(code,n,j), lambda code : code.dx == dx, ),
-        ("Z", Hz, zero, lambda code, j: apply_CX(code,j,n), lambda code : code.dz == dz, ),
-    ]:
-        m = len(H)
-        for i in range(m):
-            idxs = [j for j in range(n) if H[i,j]]
-            #shuffle(idxs)
-            assert len(idxs) <= 6, "um.."
-            perms = list(all_perms(idxs))
-            shuffle(perms)
-            for jdxs in perms:
-                dode = code+ancilla
-                for j in jdxs:
-                    dode = move(dode, j)
-                    if not accept(dode):
-                        print(jdxs, "skip")
-                        break
-                else:
-                    assert accept(dode)
-                    print("found:", jdxs)
-                    checks.append((basis, tuple(jdxs)))
-                    break
-    return checks, logicals
-
-
-    basis = "X"
-    ctrl = n
-
-    for i in range(mx):
-        idxs = [j for j in range(n) if Hx[i,j]]
-        #shuffle(idxs)
-        assert len(idxs) <= 6, "um.."
-        perms = list(all_perms(idxs))
-        shuffle(perms)
-        for jdxs in perms:
-            dode = code+plus
-            for j in jdxs:
-                dode = apply_CX(dode, ctrl, j)
-                if dode.dx < dx:
-                    print(jdxs, "skip")
-                    break
-            else:
-                print("found:", jdxs)
-                checks.append((basis, tuple(jdxs)))
-                break
-
-    return
-
-    basis = "Z"
-    tgt = n
-    for i in range(mz):
-        dode = code+zero
-        jdxs = [j for j in range(n) if Hz[i,j]]
-        #shuffle(jdxs)
-        for j in jdxs:
-            #print(ctrl, j, "-->")
-            dode = apply_CX(dode, j, tgt)
-            assert dode.dz == dz
-            print("\t", dode)
-        print()
-        checks.append((basis, tuple(jdxs)))
-
     return checks, logicals
 
 
 def main():
     param = argv.get("param", (15,5,3))
     print("param:", param)
-    #code = construct.get_10_2_3()
-    #code = construct.get_bring()
-    #code = construct.get_css((15,5,3))
-    #code = construct.get_css((48,18,4))
-    #code = construct.get_css((80,18,5))
-    code = construct.get_css(param)
+
+    if param == (10,2,3):
+        code = construct.get_10_2_3()
+    else:
+        code = construct.get_css(param)
+
+    code = code.to_css()
+
+
+    print(code)
+    print(code.longstr())
+
+    if argv.selfdual:
+        H = code.Hx
+        m, n = H.shape
+        #J = Matrix.zeros((0, n))
+        #print(J.shape)
+        rows = []
+        for v in H.span():
+            w = v.sum()
+            print(v, w)
+            if 0 < w <= 4:
+                #J = J.concatenate(v)
+                rows.append(v)
+    
+        J = Matrix(rows)
+        J = J.linear_independent()
+    
+        print(J)
+        code = CSSCode(Hx=J, Hz=J)
+
     checks, logicals = find_sequence(code)
     print("checks =", tuple(checks))
     print("logicals =", tuple(logicals))
