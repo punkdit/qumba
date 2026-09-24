@@ -35,7 +35,7 @@ from qumba.qcode import QCode, SymplecticSpace, strop
 from qumba.csscode import CSSCode, distance_z3_css
 from qumba import construct 
 from qumba.syntax import Syntax
-from qumba.util import choose
+from qumba.util import choose, all_perms
 from qumba.argv import argv
 
 from qumba.matrix import Matrix
@@ -51,7 +51,11 @@ def apply_CX(css, ctrl, tgt):
 
 def find_sequence(code):
     code = code.to_css()
-    d_x, d_z = distance_z3_css(code)
+    dx, dz = distance_z3_css(code)
+
+    print("find_sequence:", code)
+    print(code.longstr())
+    print()
 
     Hx = code.Hx
     Hz = code.Hz
@@ -74,18 +78,56 @@ def find_sequence(code):
     #print(target, distance_z3_css(target))
 
     checks = []
+
+
+    for (basis, H, ancilla, move, accept) in [
+        ("X", Hx, plus, lambda code, j: apply_CX(code,n,j), lambda code : code.dx == dx, ),
+        ("Z", Hz, zero, lambda code, j: apply_CX(code,j,n), lambda code : code.dz == dz, ),
+    ]:
+        m = len(H)
+        for i in range(m):
+            idxs = [j for j in range(n) if H[i,j]]
+            #shuffle(idxs)
+            assert len(idxs) <= 6, "um.."
+            perms = list(all_perms(idxs))
+            shuffle(perms)
+            for jdxs in perms:
+                dode = code+ancilla
+                for j in jdxs:
+                    dode = move(dode, j)
+                    if not accept(dode):
+                        print(jdxs, "skip")
+                        break
+                else:
+                    assert accept(dode)
+                    print("found:", jdxs)
+                    checks.append((basis, tuple(jdxs)))
+                    break
+    return checks, logicals
+
+
     basis = "X"
     ctrl = n
+
     for i in range(mx):
-        dode = code+plus
-        jdxs = [j for j in range(n) if Hx[i,j]]
-        #shuffle(jdxs)
-        for j in jdxs:
-            #print(ctrl, j, "-->")
-            dode = apply_CX(dode, ctrl, j)
-            print("\t", dode)
-        print()
-        checks.append((basis, tuple(jdxs)))
+        idxs = [j for j in range(n) if Hx[i,j]]
+        #shuffle(idxs)
+        assert len(idxs) <= 6, "um.."
+        perms = list(all_perms(idxs))
+        shuffle(perms)
+        for jdxs in perms:
+            dode = code+plus
+            for j in jdxs:
+                dode = apply_CX(dode, ctrl, j)
+                if dode.dx < dx:
+                    print(jdxs, "skip")
+                    break
+            else:
+                print("found:", jdxs)
+                checks.append((basis, tuple(jdxs)))
+                break
+
+    return
 
     basis = "Z"
     tgt = n
@@ -96,6 +138,7 @@ def find_sequence(code):
         for j in jdxs:
             #print(ctrl, j, "-->")
             dode = apply_CX(dode, j, tgt)
+            assert dode.dz == dz
             print("\t", dode)
         print()
         checks.append((basis, tuple(jdxs)))
@@ -104,8 +147,14 @@ def find_sequence(code):
 
 
 def main():
+    param = argv.get("param", (15,5,3))
+    print("param:", param)
     #code = construct.get_10_2_3()
-    code = construct.get_bring()
+    #code = construct.get_bring()
+    #code = construct.get_css((15,5,3))
+    #code = construct.get_css((48,18,4))
+    #code = construct.get_css((80,18,5))
+    code = construct.get_css(param)
     checks, logicals = find_sequence(code)
     print("checks =", tuple(checks))
     print("logicals =", tuple(logicals))
