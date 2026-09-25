@@ -57,18 +57,38 @@ def search(code, h, ancilla, move, accept):
     perms = list(all_perms(idxs))
     shuffle(perms)
     for jdxs in perms:
+        print(jdxs, end=' ', flush=True)
         dode = code+ancilla
-        for j in jdxs:
+        for i,j in enumerate(jdxs):
             dode = move(dode, j)
             if not accept(dode):
-                print(jdxs, "skip")
+                print("skip", i)
                 break
         else:
             assert accept(dode)
-            print("found:", jdxs)
+            print("found")
             return jdxs
-    print("fail")
-    assert 0
+    print("fail\n")
+
+
+plus = CSSCode(Hx=Matrix([[1]]), Hz=Matrix.zeros((0,1)))
+zero = CSSCode(Hz=Matrix([[1]]), Hx=Matrix.zeros((0,1)))
+
+def search_X(code, h):
+    dx, dz = distance_z3_css(code)
+    (basis, ancilla, move, accept) = ("X", plus, 
+            lambda code, j: apply_CX(code,code.n-1,j), 
+            lambda code : code.dx == dx)
+    jdxs = search(code, h, ancilla, move, accept)
+    return jdxs
+
+def search_Z(code, h):
+    dx, dz = distance_z3_css(code)
+    (basis, ancilla, move, accept) = ("Z", zero, 
+            lambda code, j: apply_CX(code,j,code.n-1), 
+            lambda code : code.dz == dz)
+    jdxs = search(code, h, ancilla, move, accept)
+    return jdxs
 
 
 def find_sequence(code):
@@ -76,7 +96,6 @@ def find_sequence(code):
     dx, dz = distance_z3_css(code)
 
     print("find_sequence:", code)
-    print(code.longstr())
     print()
 
     Hx = code.Hx
@@ -87,12 +106,12 @@ def find_sequence(code):
     mz, _ = Hz.shape
     k = code.k
 
-    plus = CSSCode(Hx=Matrix([[1]]), Hz=Matrix.zeros((0,1)))
-    zero = CSSCode(Hz=Matrix([[1]]), Hx=Matrix.zeros((0,1)))
+    weight = argv.weight
 
     #print(target, distance_z3_css(target))
 
     checks = []
+    metachecks = []
     for (basis, H, ancilla, move, accept) in [
         ("X", Hx, plus, 
             lambda code, j: apply_CX(code,n,j), 
@@ -102,18 +121,33 @@ def find_sequence(code):
             lambda code : code.dz == dz, ),
     ]:
         print(H.get_wenum())
+
         hs = []
-        for v in H.span():
-            if v.sum() == 4:
-                hs.append(v)
-        #m = len(H)
-        #for i in range(m):
-        #    h = H[i, :]
+        if weight is not None:
+            for v in H.span():
+                if v.sum() == weight:
+                    hs.append(v)
+        else:
+            m = len(H)
+            for i in range(m):
+                h = H[i, :]
+                hs.append(h)
+        H = Matrix(hs)
+        print(H.shape, H.rank())
+        K = H.t.kernel()
+        print("K =")
+        print(K, K.shape)
+        idxs = []
         for h in hs:
             jdxs = search(code, h, ancilla, move, accept)
             if jdxs is None:
                 assert 0
+            idxs.append(len(checks))
             checks.append((basis, tuple(jdxs)))
+        N = len(idxs)
+        for row in K:
+            meta = [idxs[j] for j in range(N) if row[j]]
+            metachecks.append(meta)
 
     logicals = []
     for i in range(k):
@@ -122,23 +156,98 @@ def find_sequence(code):
         jdxs = tuple(j for j in range(n) if Lz[i,j])
         logicals.append(("Z", jdxs))
 
-    return checks, logicals
+    return checks, logicals, metachecks
 
+
+def test_913():
+    H = Matrix.parse("""
+    11...1111
+    1.11.111.
+    11.1111..
+    1..11.111
+    """)
+    m, n = H.shape
+
+    code = CSSCode(Hx=H, Hz=H)
+    distance_z3_css(code)
+    print(code)
+
+    if 0:
+        checks, logicals, metachecks = find_sequence(code)
+        print("checks =", tuple(checks))
+        print("logicals =", tuple(logicals))
+        print("metachecks =", tuple(metachecks))
+
+    checks = []
+    verify = [
+        (5,0,7,1,6,8),
+        (6,7,2,3,0,5),
+        (3,0,4,1,6,5),
+        (6,3,4,8,0,7)
+    ]
+
+    dx, dz = distance_z3_css(code)
+    for (basis, ancilla, move, accept) in [
+        ("Z", zero, 
+            lambda code, j: apply_CX(code,j,code.n-1), 
+            lambda code : code.dz == dz),
+        ("X", plus, 
+            lambda code, j: apply_CX(code,code.n-1,j), 
+            lambda code : code.dx == dx)]:
+        for i,jdxs in enumerate(verify):
+            print(basis, jdxs)
+            dode = code+ancilla
+            for i,j in enumerate(jdxs):
+                dode = move(dode, j)
+                assert accept(dode)
+            print("OK")
+            checks.append((basis, jdxs))
+
+    logicals = []
+    for i in range(code.k):
+        jdxs = tuple(j for j in range(code.n) if code.Lx[i,j])
+        logicals.append(("X", jdxs))
+        jdxs = tuple(j for j in range(code.n) if code.Lz[i,j])
+        logicals.append(("Z", jdxs))
+
+    print("checks =", tuple(checks))
+    print("logicals =", tuple(logicals))
+
+
+    
 
 def main():
     param = argv.get("param", (15,5,3))
     print("param:", param)
 
-    if param == (10,2,3):
+    if argv.colour:
+        d = argv.get("d", 3)
+        code = construct.get_colour_666(d)
+        code = code.to_css()
+        H = code.Hx
+        print(H.get_wenum())
+        found = []
+        for v in H.span():
+            w = v.sum()
+            if w==6:
+                found.append(v)
+
+        shuffle(found)
+        for h in found:
+            jdxs = search_X(code, h)
+            #jdxs = search_Z(code, h)
+            if jdxs is not None:
+                return
+        return
+
+    elif param == (10,2,3):
         code = construct.get_10_2_3()
     else:
         code = construct.get_css(param)
 
     code = code.to_css()
 
-
     print(code)
-    print(code.longstr())
 
     if argv.selfdual:
         H = code.Hx
@@ -159,9 +268,10 @@ def main():
         print(J)
         code = CSSCode(Hx=J, Hz=J)
 
-    checks, logicals = find_sequence(code)
+    checks, logicals, metachecks = find_sequence(code)
     print("checks =", tuple(checks))
     print("logicals =", tuple(logicals))
+    print("metachecks =", tuple(metachecks))
 
 
 

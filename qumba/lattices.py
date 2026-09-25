@@ -26,7 +26,6 @@ from huygens.front import RGB, Rotate, RGBA
 from huygens.namespace import red, green, blue, orange, yellow, white, st_round
 
 from qumba.qcode import QCode, fromstr, lin, shortstr
-from qumba import construct
 from qumba.smap import SMap
 from qumba.matrix_sage import Matrix
 from qumba.argv import argv
@@ -249,7 +248,7 @@ def get_wenum(code):
     return wenum
 
 
-def build_colour_488(d=3):
+def get_colour_488(d=3):
     assert d>0, d
     assert d%2, d
 
@@ -374,7 +373,7 @@ def build_colour_488(d=3):
     return code
 
 
-def build_colour_666(d=3):
+def get_colour_666(d=3):
     global one
     assert d>0, d
     assert d%2, d
@@ -567,7 +566,7 @@ def build_colour_666(d=3):
 def test_666():
 
     for d in range(3,10,2):
-        code = build_colour_666(d)
+        code = get_colour_666(d)
 
 
 
@@ -624,10 +623,10 @@ def test():
         return rem
 
     for d in [3,5,7,9]:
-        code = build_colour_488(d)
+        code = get_colour_488(d)
         continue
 
-        code = build_colour_666(d)
+        code = get_colour_666(d)
         #continue
 
         print(code)
@@ -669,6 +668,7 @@ def test():
 def test_tutte():
 
 
+    from qumba import construct
     #for code in [construct.get_15_1_3()]:
     for d in [3,5]:
       for code in [construct.get_surface(d,d)]:
@@ -681,9 +681,7 @@ def test_tutte():
         print(display(p))
         print()
 
-    return
-
-    for code in [build_colour_488(3), build_colour_488(5), build_colour_666(5)]:
+    for code in [get_colour_488(3), get_colour_488(5), get_colour_666(5)]:
         css = code.to_css()
         print(css)
     
@@ -733,10 +731,10 @@ def find_lw():
     ws = argv.get("ws", [w])
 
     if d%2:
-        code = build_colour_666(d)
+        code = get_colour_666(d)
         print(code)
     else:
-        code = build_colour_666(d-1)
+        code = get_colour_666(d-1)
         print(code)
         code = augment(code)
         print(code)
@@ -782,7 +780,7 @@ IIIIIIIZIIZZIIZII
 
     return
 
-    code = build_colour_488(5)
+    code = get_colour_488(5)
 
     code = QCode.fromstr("""
 XIIXIIXIXIIIXXIXXIIIIIIIIIIIIII
