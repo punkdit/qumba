@@ -78,31 +78,13 @@ def build(n, checks, logicals):
 def surface47():
     checks = (
         # X checks: top boundary, bulk plaquettes, then bottom boundary.
-        ("X", (0, 1)),
-        ("X", (2, 3)),
-        ("X", (1, 2, 6, 7)),
-        ("X", (3, 4, 8, 9)),
-        ("X", (5, 6, 10, 11)),
-        ("X", (7, 8, 12, 13)),
-        ("X", (11, 12, 16, 17)),
-        ("X", (13, 14, 18, 19)),
-        ("X", (15, 16, 20, 21)),
-        ("X", (17, 18, 22, 23)),
-        ("X", (21, 22)),
-        ("X", (23, 24)),
+        ("X", (0, 1)), ("X", (2, 3)), ("X", (1, 2, 6, 7)), ("X", (3, 4, 8, 9)), ("X", (5, 6, 10, 11)),
+        ("X", (7, 8, 12, 13)), ("X", (11, 12, 16, 17)), ("X", (13, 14, 18, 19)), ("X", (15, 16, 20, 21)),
+        ("X", (17, 18, 22, 23)), ("X", (21, 22)), ("X", (23, 24)),
         # Z checks: left boundary, bulk plaquettes, then right boundary.
-        ("Z", (5, 10)),
-        ("Z", (15, 20)),
-        ("Z", (0, 5, 1, 6)),
-        ("Z", (2, 7, 3, 8)),
-        ("Z", (6, 11, 7, 12)),
-        ("Z", (8, 13, 9, 14)),
-        ("Z", (10, 15, 11, 16)),
-        ("Z", (12, 17, 13, 18)),
-        ("Z", (16, 21, 17, 22)),
-        ("Z", (18, 23, 19, 24)),
-        ("Z", (4, 9)),
-        ("Z", (14, 19)),
+        ("Z", (5, 10)), ("Z", (15, 20)), ("Z", (0, 5, 1, 6)), ("Z", (2, 7, 3, 8)),
+        ("Z", (6, 11, 7, 12)), ("Z", (8, 13, 9, 14)), ("Z", (10, 15, 11, 16)), ("Z", (12, 17, 13, 18)),
+        ("Z", (16, 21, 17, 22)), ("Z", (18, 23, 19, 24)), ("Z", (4, 9)), ("Z", (14, 19)),
     )
     logicals = (
         ("X", (0, 5, 10, 15, 20)),
@@ -136,9 +118,12 @@ def get_10_2_3( ):
 
 def get_10_2_3_p():
     n = 10
-    checks = (('X', (1, 3, 9, 5)), ('X', (9, 8, 2, 0)), ('X', (7, 8, 4, 1)), ('X', (7, 6, 0, 3)), ('X', (4, 2, 6, 5)), ('Z', (0, 1, 9, 7)), ('Z', (4, 0, 6, 8)), ('Z', (4, 3, 5, 7)), ('Z', (3, 2, 6, 9)), ('Z', (2, 1, 8, 5)))
+    checks = (
+        ('X', (1, 3, 9, 5)), ('X', (9, 8, 2, 0)), ('X', (7, 8, 4, 1)), ('X', (7, 6, 0, 3)), ('X', (4, 2, 6, 5)),
+        ('Z', (0, 1, 9, 7)), ('Z', (4, 0, 6, 8)), ('Z', (4, 3, 5, 7)), ('Z', (3, 2, 6, 9)), ('Z', (2, 1, 8, 5)))
     logicals = (('X', (0, 1, 2, 3, 4)), ('Z', (0, 1, 2, 3, 4)), ('X', (2, 3, 5)), ('Z', (1, 4, 5)))
-    return n, checks, logicals
+    meta = [(0,1,2,3,4), (5,6,7,8,9)]
+    return n, checks, logicals, meta
 
 
 def get_30_8_3():
@@ -302,6 +287,7 @@ def main():
     decoder = argv.get("decoder", "frontier")
     points = argv.get("points", 9)
 
+    title = "the plot"
 
     circuits = []
     for spec in specs:
@@ -309,15 +295,25 @@ def main():
         if spec.startswith("get_"):
             spec = spec[len("get_"):]
 
-        n, checks, logicals = get()
+        result = get()
+        n, checks, logicals = result[:3]
+        meta = []
+        if result[3:]:
+            meta = result[3]
+
         code = build(n, checks, logicals)
         d = code.d
         print(code)
+        title = str(code)
+
+        rounds = d - 1
+        #if spec.endswith("_p"):
+        #    rounds -= 1
 
         circuits += [
             build_css_bare_syndrome(
-                checks, logicals, n, 
-                basis=basis, rounds=d, name="%s %s"%(basis, spec))
+                checks, logicals, n, metachecks=meta,
+                basis=basis, rounds=rounds, name="%s(%d):%s"%(basis, rounds, spec))
             for basis in "ZX"]
 
     run_sweep(
@@ -331,7 +327,7 @@ def main():
         #bp_max_iter=args.bp_max_iter,
         seed=1234,
         output=Path("output/"),
-        title="the plot",
+        title=title,
         #metadata={"circuit": args.circuit, 
         # "distance": spec.distance, "rounds": rounds},
     )
