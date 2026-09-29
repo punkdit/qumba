@@ -5,14 +5,18 @@
 """
 
 from pathlib import Path
+import os
 
 
 import numpy 
 
 import stim
 
+from qsweeper.circuit import Circuit
 from qsweeper.builders import build_css_bare_syndrome
 from qsweeper.sweep import run_sweep
+from qsweeper.serve import serve
+from qsweeper import layout
 
 
 from qumba.matrix import Matrix
@@ -314,6 +318,126 @@ def get_80_18_5( ):
 
     return n, checks, logicals
 
+
+def from_stim(data):
+
+    lines = data.split("\n")
+    gates = []
+    rlook = {}
+    mlook = {}
+    for idx,line in enumerate(lines):
+        flds = line.strip().split()
+        gate = tuple([flds[0]] + [int(fld) for fld in flds[1:]])
+        gates.append(gate)
+
+    for idx,gate in enumerate(gates):
+        if gate[0] == "R":
+            j = gate[1]
+            assert j not in rlook
+            rlook[j] = idx
+        if gate[0] == "M":
+            j = gate[1]
+            assert j not in mlook
+            mlook[j] = idx
+
+    print(mlook)
+    for idx,gate in enumerate(gates):
+        if gate[0] == "CX":
+            _, i, j = gate
+            if i in rlook:
+                del rlook[i]
+            if j in rlook:
+                del rlook[j]
+        if gate[0] == "H":
+            _, i = gate
+            if i in rlook:
+                j = rlook[i]
+                assert gates[j] == ("R", i)
+                gates[j] = ("RX", i)
+                del rlook[i]
+            elif i in mlook:
+                j = mlook[i]
+                assert gates[j] == ("M", i)
+                gates[j] = ("MX", i)
+                del mlook[i]
+
+    #print(gates)
+    idx = 0
+    while idx < len(gates):
+        gate = gates[idx]
+        op = gate[0]
+        if op == "H":
+            gates.pop(idx)
+            continue
+        if op == "R":
+            gates[idx] = ("RZ", gate[1])
+        if op == "M":
+            gates[idx] = ("MZ", gate[1])
+        idx += 1
+    #print(gates)
+
+    tick = False
+    idx = 0
+    while idx < len(gates):
+        gate = gates[idx]
+        op = gate[0]
+        if op == "CX":
+            tick = True
+        if op[0] == "M":
+            if tick:
+                gates.insert(idx, ("TICK",))
+            tick = False
+        if tick:
+            gates.insert(idx, ("TICK",))
+            idx += 1
+        idx += 1
+
+    c = Circuit()
+    for gate in gates:
+        op = gate[0]
+        args = gate[1:]
+        getattr(c, op)(*args)
+    return c
+
+
+def test_20_2_6():
+    data = open("zero_prep_20_2_6.stim").read()
+    c = from_stim(data)
+    print(c.gates)
+    serve([c])
+
+
+def test_goto():
+
+    c = Circuit("SteanePrep")
+    RZ, RX, CX = c.RZ, c.RX, c.CX
+    MZ, MX = c.MZ, c.MX
+    TICK = c.TICK
+    for i in [0,4,5,6,7]:
+        RZ(i)
+    for i in [1,2,3]:
+        RX(i)
+    TICK()
+    for (i,j) in "10 35 26 14 20 36 15 64 07 57 67".split():
+        CX(int(i), int(j))
+        TICK()
+    MZ(7)
+
+    TICK()
+    #for i in [0,1,2,3,4,5,6]:
+    #    MZ(i)
+
+    print(c.gates)
+
+    s = layout.to_svg(c)
+    name = "SteanePrep"
+    f = open("%s.svg"%name, "w")
+    print(s, file=f)
+    f.close()
+
+    os.system("rsvg-convert SteanePrep.svg > SteanePrep.pdf")
+
+    serve([c])
 
 
 def main():
