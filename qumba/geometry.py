@@ -2,6 +2,8 @@
 
 from string import ascii_lowercase
 
+import numpy
+
 
 from bruhat.action import Perm, Group, Coset, mulclose, close_hom, is_hom
 from bruhat.todd_coxeter import Schreier
@@ -157,6 +159,107 @@ def build(shape, index):
 
 
 
+def write_mtx(path, matrix, p=2):
+    matrix = numpy.asarray(matrix)
+    if matrix.ndim != 2 or not numpy.issubdtype(matrix.dtype, numpy.integer):
+        raise ValueError("Expected a 2D integer NumPy array")
+
+    matrix = matrix % p
+    rows, cols = numpy.nonzero(matrix)
+
+    with open(path, "w", encoding="ascii") as f:
+        f.write("%%MatrixMarket matrix coordinate integer general\n")
+        f.write(f"% Field: GF({p})\n\n")
+        f.write(f"{matrix.shape[0]} {matrix.shape[1]} {len(rows)}\n")
+        for i, j in zip(rows, cols):
+            f.write(f"{i + 1} {j + 1} {int(matrix[i, j])}\n")
+
+
+def qdistrnd(code, num=100):
+    from bruhat.gap import Gap
+    gap = Gap()
+    gap.LoadPackage('QDistRnd')
+
+    css = code.to_css()
+    Hx = css.Hx.A
+    Hz = css.Hz.A
+    write_mtx("Hx.mtx", Hx)
+    write_mtx("Hz.mtx", Hz)
+
+    gx = gap.ReadMTXE("Hx.mtx", 0)[2]
+    gz = gap.ReadMTXE("Hz.mtx", 0)[2]
+    result = gap.DistRandCSS(gx,gz,num,1,get=True)
+    return result
+
+
+def test_mtx():
+    GX = numpy.array([[1, 0, 1], [0, 1, 1]], dtype=int)
+    GZ = numpy.array([[1, 1, 0]], dtype=int)
+    
+    write_mtx("GX.mtx", GX)
+    write_mtx("GZ.mtx", GZ)
+
+    from bruhat.gap import Gap
+    gap = Gap()
+    gap.LoadPackage('QDistRnd')
+    #gx = gap.ReadMTXE("GX.mtx")
+    #gz = gap.ReadMTXE("GZ.mtx")
+
+    gx = gap.ReadMTXE("QX80.mtx", 0)[2]
+    gz = gap.ReadMTXE("QZ80.mtx", 0)[2]
+    #DistRandCSS(GX,GZ,100,1,2:field:=GF(2));
+    result = gap.DistRandCSS(gx,gz,100,1,get=True)
+    print(result)
+
+
+def find_zx():
+    from csscode import get_tanner
+
+    name = argv.next()
+
+    code = CSSCode.load(name)
+    print(code)
+
+    #zxs = code.find_zx_dualities()
+    dode = code.get_dual()
+
+    #iso = code.get_isomorphism(dode)
+    #print(iso)
+
+    w = argv.get("w", 8)
+
+    n = code.n
+    Ax, Az = code.get_Axz(w, force=True)
+    Bx, Bz = dode.get_Axz(w, force=True)
+
+    print(Ax.shape)
+
+    lhs = get_tanner(Ax, Az)
+    rhs = get_tanner(Bx, Bz)
+
+    print(str(lhs).replace("\n", "")[:100], "...")
+    #print(str(rhs).replace("\n", ""))
+
+    import pynauty
+    print("pynauty...")
+    if not pynauty.isomorphic(lhs, rhs):
+        print("None")
+        return None
+
+    f = pynauty.canon_label(lhs) # lhs--f-->C
+    g = pynauty.canon_label(rhs) # rhs--g-->C
+    #print(f)
+    #print(g)
+
+    iso = [None]*len(f)
+    for i in range(len(f)):
+        iso[f[i]] = g[i]
+    iso = iso[:n]
+
+    print(iso)
+
+    eode = dode.apply_perm(iso)
+    assert eode.is_equiv(code)
 
 
 
@@ -166,6 +269,7 @@ def main():
     stop_idx = argv.get("stop_idx", None)
     shape = argv.get("shape", (5,5))
     index = argv.get("index", 1000)
+    n_max = argv.get("n_max", 1215)
     if argv.build_db or shape not in lins_db.db:
         print("lins_db.build_db...", end='', flush=True)
         lins_db.build_db(shape, index)
@@ -191,9 +295,9 @@ def main():
     
         print("idx=%d"%idx, code, end=' ', flush=True)
 
-        #if code.n > 300:
-        #    print()
-        #    break
+        if code.n > n_max:
+            print("code too big, bye")
+            break
 
         if code.k <= 2:
             print()
@@ -205,11 +309,34 @@ def main():
         elif argv.n is not None:
             continue
 
-        if code.n < 80:
-            code.bz_distance()
-        else:
-            print("\t%s"%code)
+        if argv.dump:
+            print()
+            name = "hyperbolic/%s_%s_%s.txt"%(idx, code.n, code.k)
+            print(name)
+            f = open(name, "w")
+            print("Hx =", file=f)
+            print(code.Hx, file=f)
+            print("Hz =", file=f)
+            print(code.Hz, file=f)
+            print("Lx =", file=f)
+            print(code.Lx, file=f)
+            print("Lz =", file=f)
+            print(code.Lz, file=f)
+            f.close()
             continue
+            
+
+        code.bz_distance()
+#        if code.n <= 80 or 1:
+#            code.bz_distance()
+#        else:
+#            d = qdistrnd(code, 2*code.n)
+#            #code.dx = d
+#            #code.dz = d
+#            code = code.to_qcode()
+#            code.d = d
+#            print("\t%s"%code)
+#            continue
 
         #print(code)
         if code.dx < 3 or code.dz < 3:

@@ -282,6 +282,8 @@ def find_lw(H, w=None):
         ws = H.sum(1)
         w = ws.min()
 
+    #print("find_lw", w)
+
     solver = Solver()
     Add = solver.add
 

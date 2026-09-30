@@ -30,6 +30,7 @@ promote = Matrix.promote
 
 import qumba.lin as _lin
 zeros2 = lambda *shape : Matrix.zeros(shape)
+array2 = Matrix
 shortstr = str
 shortstrx = lambda *items : _lin.shortstrx(*[M.A for M in items])
 eq2 = lambda A,B:A==B
@@ -717,7 +718,8 @@ class CSSCode(object):
         Hz = shortstr(self.Hz).replace("1", "Z").replace('.', "I")
     
         from subprocess import Popen, PIPE
-        child = Popen("distance --zx".split(), stdin=PIPE, stdout=PIPE)
+        #child = Popen("distance --zx".split(), stdin=PIPE, stdout=PIPE)
+        child = Popen("distfind --zx".split(), stdin=PIPE, stdout=PIPE)
     
         s = "%s\n%s\n"%(Hx, Hz)
         child.stdin.write(s.encode())
@@ -806,7 +808,7 @@ class CSSCode(object):
 
     @classmethod
     def load(cls, name, build=True, check=False, rebuild=False):
-        write("loading..")
+        #write("loading..")
         f = open(name)
         data = f.read()
         data = data.replace('.', '0')
@@ -833,7 +835,7 @@ class CSSCode(object):
             #print items[key]
             value = array2(items[key])
             kw[key] = value
-        write("done\n")
+        #write("done\n")
         if rebuild:
             for op in 'Lx Lz Tx Tz'.split():
                 kw[op] = None
@@ -936,16 +938,16 @@ class CSSCode(object):
         dz = self.z_distance(min_d)
         return dx, dz
 
-    def get_Axz(self):
+    def get_Axz(self, w=None, force=False):
         Ax, Az = self.Ax, self.Az
-        if Ax is not None:
+        if Ax is not None and not force:
             assert Az is not None, "wut"
             return Ax, Az
         from qumba.transversal import find_lw
-        hx = list(find_lw(self.Hx))
-        Ax = array2(hx)
-        hz = list(find_lw(self.Hz))
-        Az = array2(hz)
+        hx = list(find_lw(self.Hx, w))
+        Ax = Matrix(hx).reshape((len(hx), self.n))
+        hz = list(find_lw(self.Hz, w))
+        Az = Matrix(hz).reshape((len(hz), self.n))
         self.Ax = Ax
         self.Az = Az
         return Ax, Az

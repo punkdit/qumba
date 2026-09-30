@@ -400,14 +400,15 @@ def from_stim(data):
     return c
 
 
-def test_20_2_6():
-    data = open("zero_prep_20_2_6.stim").read()
+def load_stim():
+    name = argv.next() or "zero_prep_20_2_6.stim"
+    data = open(name).read()
     c = from_stim(data)
-    print(c.gates)
+    #print(c.gates)
     serve([c])
 
 
-def test_goto():
+def load_goto():
 
     c = Circuit("SteanePrep")
     RZ, RX, CX = c.RZ, c.RX, c.CX
