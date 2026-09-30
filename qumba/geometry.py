@@ -166,7 +166,7 @@ def main():
     stop_idx = argv.get("stop_idx", None)
     shape = argv.get("shape", (5,5))
     index = argv.get("index", 1000)
-    if shape not in lins_db.db:
+    if argv.build_db or shape not in lins_db.db:
         print("lins_db.build_db...", end='', flush=True)
         lins_db.build_db(shape, index)
         print(" done")
@@ -186,13 +186,14 @@ def main():
 
         if code is None or code.k == 0:
             #print(code)
+            print("/", end='', flush=True)
             continue
     
         print("idx=%d"%idx, code, end=' ', flush=True)
 
-        if code.n > 300:
-            print()
-            break
+        #if code.n > 300:
+        #    print()
+        #    break
 
         if code.k <= 2:
             print()
@@ -204,7 +205,12 @@ def main():
         elif argv.n is not None:
             continue
 
-        code.bz_distance()
+        if code.n < 80:
+            code.bz_distance()
+        else:
+            print("\t%s"%code)
+            continue
+
         #print(code)
         if code.dx < 3 or code.dz < 3:
             print()
