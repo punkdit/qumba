@@ -10,13 +10,17 @@ import os
 
 import numpy 
 
-import stim
+try:
+    import stim
+    
+    from qsweeper.circuit import Circuit
+    from qsweeper.builders import build_css_bare_syndrome
+    from qsweeper.sweep import run_sweep
+    from qsweeper.serve import serve
+    from qsweeper import layout
+except:
+    print("skip qsweeper")
 
-from qsweeper.circuit import Circuit
-from qsweeper.builders import build_css_bare_syndrome
-from qsweeper.sweep import run_sweep
-from qsweeper.serve import serve
-from qsweeper import layout
 
 
 from qumba.matrix import Matrix
@@ -498,6 +502,304 @@ def main():
     )
 
 
+def surface_code(L=5):
+
+    ops = []
+    #for k in range(L):
+    #    layer = k%4 + 1
+    for layer in [1,2,3,4]:
+        k = layer-1
+        _ops = []
+        for i in range(L):
+          for j in range(L):
+            if layer==1 and (i+j)%2 and j%2==0 and j+1<L:
+                _ops.append( (i,j,i,j+1) )
+            if layer==1 and (i+j)%2 and j%2==1 and j+1<L:
+                _ops.append( (i,j+1,i,j) )
+            if layer==4 and (i+j)%2==0 and j%2==0 and j+1<L:
+                _ops.append( (i,j,i,j+1) )
+            if layer==4 and (i+j)%2==0 and j%2==1 and j+1<L:
+                _ops.append( (i,j+1,i,j) )
+            if layer==2 and (i+j)%2==0 and i+1<L and i%2==1:
+                _ops.append( (i,j,i+1,j) )
+            if layer==2 and (i+j)%2==0 and i+1<L and i%2==0:
+                _ops.append( (i+1,j,i,j) )
+            if layer==3 and (i+j)%2==1 and i+1<L and i%2==1:
+                _ops.append( (i,j,i+1,j) )
+            if layer==3 and (i+j)%2==1 and i+1<L and i%2==0:
+                _ops.append( (i+1,j,i,j) )
+        ops += [(i0,j0,i1,j1,k) for (i0,j0,i1,j1) in _ops]
+    #ops.sort( key = lambda op : op[4] ) # not needed ... ?
+
+    idxs = {}
+
+    for i in range(L):
+       for j in range(L):
+        idxs[i,j] = len(idxs)
+    print(idxs)
+
+    cs = []
+
+    for basis in "XZ":
+        # Circuit ---------------------
+        c = Circuit("%s memory"%basis)
+        RZ, RX, CX = c.RZ, c.RX, c.CX
+        MZ, MX = c.MZ, c.MX
+        TICK = c.TICK
+    
+        if basis == "X":
+            reset, measure = [RX, MX]
+        else:
+            reset, measure = [RZ, MZ]
+    
+        ancilla_z = []
+        ancilla_x = []
+        data = []
+        for i in range(L):
+          for j in range(L):
+            idx = idxs[i,j]
+            if (i+j)%2 and i%2==0:
+                ancilla_z.append(idx)
+            elif (i+j)%2 and i%2==1:
+                ancilla_x.append(idx)
+            else:
+                data.append(idx)
+    
+        # start -----------------------
+    
+        for idx in data:
+            reset(idx)
+        TICK()
+    
+        for count in range(3):
+            for idx in ancilla_z:
+                RZ(idx)
+            for idx in ancilla_x:
+                RX(idx)
+            TICK()
+        
+            k = 0
+            for (i0,j0,i1,j1,k0) in ops:
+                if k0 > k:
+                    TICK()
+                    k = k0
+                idx = idxs[i0,j0]
+                jdx = idxs[i1,j1]
+                CX(idx, jdx)
+        
+            TICK()
+            for idx in ancilla_z:
+                MZ(idx)
+            for idx in ancilla_x:
+                MX(idx)
+            TICK()
+    
+        for idx in data:
+            measure(idx)
+        TICK()
+    
+        # fini -----------------------
+
+        cs.append(c)
+
+    #print(c.gates)
+
+#    s = layout.to_svg(c)
+#    name = "SteanePrep"
+#    f = open("%s.svg"%name, "w")
+#    print(s, file=f)
+#    f.close()
+#
+#    os.system("rsvg-convert SteanePrep.svg > SteanePrep.pdf")
+
+    serve(cs)
+
+
+
+
+def render():
+    """ See: https://arxiv.org/pdf/1004.0255 fig 2 b)
+      
+    *.-2-o*o-3-.*.-2-o*o-3-.*
+    o     o     o     o     o
+    1     4     1     4     1
+    .     .     .     .     .
+    * .3-o*o-2. * .3-o*o-2. *
+    .     .     .     .     .
+    4     1     4     1     4
+    o     o     o     o     o
+    *.-2-o*o-3-.*.-2-o*o-3-.*
+    o     o     o     o     o
+    1     4     1     4     1
+    .     .     .     .     .
+    * .3-o*o-2. * .3-o*o-2. *
+    .     .     .     .     .
+    4     1     4     1     4
+    o     o     o     o     o
+    *.-2-o*o-3-.*.-2-o*o-3-.*
+
+    """
+
+    L = 5
+
+    assert L%2
+
+    ops = []
+    #for k in range(L):
+    #    layer = k%4 + 1
+    for layer in [1,2,3,4]:
+        k = layer-1
+        _ops = []
+        for i in range(L):
+          for j in range(L):
+            if layer==1 and (i+j)%2 and j%2==0 and j+1<L:
+                _ops.append( (i,j,i,j+1) )
+            if layer==1 and (i+j)%2 and j%2==1 and j+1<L:
+                _ops.append( (i,j+1,i,j) )
+            if layer==4 and (i+j)%2==0 and j%2==0 and j+1<L:
+                _ops.append( (i,j,i,j+1) )
+            if layer==4 and (i+j)%2==0 and j%2==1 and j+1<L:
+                _ops.append( (i,j+1,i,j) )
+            if layer==2 and (i+j)%2==0 and i+1<L and i%2==1:
+                _ops.append( (i,j,i+1,j) )
+            if layer==2 and (i+j)%2==0 and i+1<L and i%2==0:
+                _ops.append( (i+1,j,i,j) )
+            if layer==3 and (i+j)%2==1 and i+1<L and i%2==1:
+                _ops.append( (i,j,i+1,j) )
+            if layer==3 and (i+j)%2==1 and i+1<L and i%2==0:
+                _ops.append( (i+1,j,i,j) )
+        ops += [(i0,j0,i1,j1,k) for (i0,j0,i1,j1) in _ops]
+
+    from math import sin, cos, pi
+    from huygens.namespace import (
+        Canvas, path, black, white, darkgrey, grey, st_THick, orange,
+        red, green,
+    )
+    from huygens.pov import View, Mat
+
+
+    dx = 1.0
+    dy = 1.0
+    dz = 0.3
+    radius = 1.0 # pip radius
+
+    view = View(sort_gitems=False)
+    view.perspective()
+    view.lookat(
+        #[1.4*L, 1.32*L, 0.5*L], 
+        [-0.4*L, 1.32*L, 0.5*L], 
+        [0.5*L, 0.5*L, 0.15*L*dz], 
+        [0, 0, 1]) # eye, center, up
+
+    vs = [
+        Mat([0*L,0*L,0]),
+        Mat([0*L,1*L,0]),
+        Mat([1*L,1*L,0]),
+        Mat([1*L,0*L,0]),
+    ]
+    vs = [v+Mat([-0.5,-0.5,-1.1*dz]) for v in vs]
+    view.add_poly(vs, fill=darkgrey)
+
+    #view.add_circle(Mat([0,0,0]), radius, fill=black)
+
+    coords = {}
+    idxs = {}
+
+    show = set()
+    for i in [2,3]:
+       for j in [2,3]:
+            show.add((i,j))
+    for i in range(L+1):
+       for j in range(L+1):
+            show.add((i,j))
+    for i in range(L):
+       for j in range(L):
+        idxs[i,j] = len(idxs)
+    print(idxs)
+
+    for k in range(-1, L+1):
+     for i in range(L):
+       for j in range(L):
+        coords[i,j,k] = Mat([dx*i, dy*j, dz*k])
+
+    # ancilla
+    def ancilla(k):
+     for i in range(L):
+      for j in range(L):
+        if (i+j)%2 and i%2==0 and (i,j) in show:
+            view.add_circle(coords[i,j,k], radius, fill=red, stroke=black)
+            #if k==-1:
+        if (i+j)%2 and i%2==1 and (i,j) in show:
+            view.add_circle(coords[i,j,k], radius, fill=green, stroke=black)
+
+
+    for k in range(-1, 4):
+     for i in range(L):
+       for j in range(L):
+        if (i,j) in show:
+          view.add_line(coords[i,j,k], coords[i,j,k+1])
+
+    ancilla(-1)
+
+    for (i0,j0,i1,j1,k0) in ops:
+        if (i0,j0) not in show and (i1,j1) not in show:
+            continue
+        v0 = coords[i0,j0,k0]
+        v1 = coords[i1,j1,k0]
+        view.add_line(v0, v1)
+        if (i0,j0) in show:
+            view.add_circle(v0, radius, fill=green, stroke=black)
+        if (i1,j1) in show:
+            view.add_circle(v1, radius, fill=red, stroke=black)
+
+    ancilla(4)
+    
+    cvs = view.render(bg=grey)
+    name = "surface%d"%(L**2)
+    print(name)
+    cvs.writePDFfile(name)
+    #Canvas().scale(3.).append(cvs).writePNGfile(name) # yuk
+
+    return
+
+    r = 0.1
+    dx = 1.0
+    dy = 1.0
+
+    fg = Canvas()
+    for k in range(L):
+        layer = k%4 + 1
+        cvs = Canvas()
+        for i in range(L):
+          for j in range(L):
+            x = i*dx
+            y = j*dy
+            p = path.circle(x, y, r)
+            cvs.fill(p, [grey])
+        bb = cvs.get_bound_box()
+        cvs.stroke(path.rect(bb.llx-r, bb.lly-r, bb.width+2*r, bb.height+2*r),
+            [grey]+st_THick)
+
+        for (i0,j0,i1,j1,k0) in ops:
+            if k0!=k:
+                continue
+            x0 = i0*dx
+            y0 = j0*dy
+            x1 = i1*dx
+            y1 = j1*dy
+            cvs.stroke(path.line(x0, y0, x1, y1), st_THick)
+            p0 = path.circle(x0, y0, r)
+            p1 = path.circle(x1, y1, r)
+            cvs.fill(p0, [white])
+            cvs.stroke(p0, [black])
+            cvs.fill(p1, [black])
+
+        cvs.text(0.1*dx, -0.7*dy, str(layer))
+        fg.append(cvs)
+        fg.translate((L+1)*dx, 0)
+        
+
+    fg.writePDFfile(name)
 
 
 
