@@ -13,13 +13,14 @@ import numpy
 try:
     import stim
     
-    from qsweeper.circuit import Circuit
-    from qsweeper.builders import build_css_bare_syndrome
-    from qsweeper.sweep import run_sweep
-    from qsweeper.serve import serve
-    from qsweeper import layout
+    from qhap.circuit import Circuit
+    from qhap.flow import Fault, Pauli
+    from qhap.builders import build_css_bare_syndrome
+    from qhap.sweep import run_sweep
+    from qhap.serve import serve
+    from qhap import layout
 except:
-    print("skip qsweeper")
+    print("skip qhap")
 
 
 
@@ -80,7 +81,7 @@ def build(n, checks, logicals):
         print(Lz, Lz.shape)
 
     code = CSSCode(Hx=Hx, Hz=Hz, Lx=Lx, Lz=Lz)
-    code.bz_distance()
+    #code.bz_distance()
     return code
 
 
@@ -414,7 +415,7 @@ def load_stim():
 
 def load_goto():
 
-    c = Circuit("SteanePrep")
+    c = Circuit()
     RZ, RX, CX = c.RZ, c.RX, c.CX
     MZ, MX = c.MZ, c.MX
     TICK = c.TICK
@@ -432,7 +433,7 @@ def load_goto():
     #for i in [0,1,2,3,4,5,6]:
     #    MZ(i)
 
-    print(c.gates)
+    #print(c.gates)
 
     s = layout.to_svg(c)
     name = "SteanePrep"
@@ -442,7 +443,7 @@ def load_goto():
 
     os.system("rsvg-convert SteanePrep.svg > SteanePrep.pdf")
 
-    serve([c])
+    serve({"SteanePrep":c})
 
 
 def main():
@@ -458,7 +459,7 @@ def main():
 
     title = "the plot"
 
-    circuits = []
+    circuits = {}
     for spec in specs:
         get = eval(spec)
         if spec.startswith("get_"):
@@ -471,7 +472,8 @@ def main():
         d = code.d
         print(code)
         title = str(code)
-        rounds = d
+        #rounds = d
+        rounds = 4
 
         meta = []
         if result[3:]:
@@ -479,11 +481,10 @@ def main():
         if result[4:]:
             rounds = result[4]
 
-        circuits += [
-            build_css_bare_syndrome(
+        for basis in "ZX":
+            circuits[basis+"_"+spec] = build_css_bare_syndrome(
                 checks, logicals, n, metachecks=meta,
-                basis=basis, rounds=rounds, name="%s(%d):%s"%(basis, rounds, spec))
-            for basis in "ZX"]
+                basis=basis, rounds=rounds)
 
     run_sweep(
         circuits,
@@ -538,11 +539,11 @@ def surface_code(L=5):
         idxs[i,j] = len(idxs)
     print(idxs)
 
-    cs = []
+    cs = {}
 
     for basis in "XZ":
         # Circuit ---------------------
-        c = Circuit("%s memory"%basis)
+        c = Circuit()
         RZ, RX, CX = c.RZ, c.RX, c.CX
         MZ, MX = c.MZ, c.MX
         TICK = c.TICK
@@ -600,7 +601,7 @@ def surface_code(L=5):
     
         # fini -----------------------
 
-        cs.append(c)
+        cs["Memory "+basis] = c
 
     #print(c.gates)
 
@@ -614,6 +615,56 @@ def surface_code(L=5):
 
     serve(cs)
 
+
+def test_flow():
+    circuit = Circuit()
+    circuit.TICK()
+    circuit.TICK()
+    #for idx in range(5):
+    #    circuit.RZ(idx)
+    #circuit.TICK()
+    for idx in range(4):
+        circuit.CX(idx, idx+1)
+        circuit.TICK()
+
+    circuit = Circuit()
+    #circuit.TICK()
+    #for idx in range(5):
+    #    circuit.RZ(idx)
+    circuit.TICK()
+    for idx in range(4):
+        circuit.CX(idx, idx+1)
+        circuit.TICK()
+    for idx in range(4):
+        circuit.CX(idx+1, idx)
+        circuit.TICK()
+
+    circuit.TICK()
+    for idx in range(5):
+        circuit.MZ(idx)
+    circuit.TICK()
+
+    #flow = circuit.get_flow([ Fault(4,Pauli.X(3)), ])
+    #flow = circuit.x_flow(0,3) + circuit.z_flow(1,3)
+    #flow = circuit.x_flow(0,2)
+    flow = None
+
+    circuit = Circuit()
+    circuit.TICK()
+    circuit.TICK()
+    circuit.CX(0, 1)
+    circuit.TICK()
+    circuit.TICK()
+    flow = circuit.x_flow(2, 0) + circuit.z_flow(0,1)
+
+    circuit = Circuit().TICK().RX(0).TICK().TICK().MX(0)
+    flow = circuit.z_flow(0,0)
+
+
+    layout.write_svg(circuit, flow, "flow.svg", ticks=False, qubit_labels=False)
+    os.system("rsvg-convert --format=pdf flow.svg > flow.pdf")
+    #os.system("open flow.pdf")
+    
 
 
 
