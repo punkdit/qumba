@@ -410,7 +410,7 @@ def load_stim():
     data = open(name).read()
     c = from_stim(data)
     #print(c.gates)
-    serve([c])
+    serve({name:c})
 
 
 def load_goto():
