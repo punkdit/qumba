@@ -1663,22 +1663,20 @@ def test_hexacode():
     print(code.longstr())
     print(code.get_autos())
 
+
 def test_tesseract():
-    code = CSSCode.fromstr("""
-    XIIIIXXIIXXXXXII
-    IXIIIXIXXXIXIXIX
-    IIXIIXIXXIXIXXXI
-    IIIXIIXXIXIIXXXX
-    IIIIXIXIXIXXIXXX
-    ZIIIIZZIIZZZZZII
-    IZIIIZIZZZIZIZIZ
-    IIZIIZIZZIZIZZZI
-    IIIZIIZZIZIIZZZZ
-    IIIIZIZIZIZZIZZZ
-    """)
-    code.bz_distance()
+
+    c0 = get_832()
+    c1 = c0.get_dual()
+    code = c1+c0
+    for i in range(8):
+        code = code.CX(i, 8+i)
+    code = code.to_css()
+    #code.bz_distance()
+    code.distance_z3()
     print(code)
     print(code.longstr())
+
     Hx = code.Hx
     print(Hx.get_wenum())
     n = code.n
@@ -1691,7 +1689,7 @@ def test_tesseract():
     HLx = Hx.concatenate(code.Lx)
     print(HLx.get_wenum())
 
-    return
+#    return
 
     N, perms = code.get_autos()
     print(N) # 322560 
@@ -1760,17 +1758,17 @@ def test_tesseract():
 #        else:
 #            found.append(h)
 #    print(len(found))
-
-    return
-
-    G = Group(gens=perms, build=False)
-    
-    #from bruhat.gap import Gap
-    #gap = Gap()
-    #_G = gap.define(G)
-    #print(gap.Order(_G, get=True)) 
-    #print(G.structure_description()) # (C2 x C2 x C2 x C2) : A8
-    return
+#
+#    return
+#
+#    G = Group(gens=perms, build=False)
+#    
+#    #from bruhat.gap import Gap
+#    #gap = Gap()
+#    #_G = gap.define(G)
+#    #print(gap.Order(_G, get=True)) 
+#    #print(G.structure_description()) # (C2 x C2 x C2 x C2) : A8
+#    return
 
     from qumba.triorthogonal import is_morthogonal
     A = Hx.A

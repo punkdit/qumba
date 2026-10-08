@@ -2819,6 +2819,18 @@ def test_lagrel():
         assert lag*lah == lagh
 
 
+def test_ZZ():
+    c = Clifford(2)
+    CX, T, Z, S = c.CX, c.T, c.Z, c.S
+    op = CX(0,1) * T(0) * ~T(1) * CX(0,1)
+    print(op)
+    ZZ = Z(0)*Z(1)
+    SS = S(0)*S(1)
+    print(SS)
+    print(op**2 == S(1))
+
+
+
 def test():
     test_clifford()
     test_clifford3()
