@@ -348,6 +348,12 @@ class CSSCode(object):
         self.check = check
         self.do_check()
 
+    @classmethod
+    def fromstr(cls, Hs):
+        code = QCode.fromstr(Hs)
+        css = code.to_css()
+        return css
+
     def copy(self):
         Lx, Lz, Hx, Tz, Hz, Tx = (
             self.Lx, self.Lz, self.Hx,

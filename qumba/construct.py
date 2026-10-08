@@ -13,8 +13,16 @@ from qumba.util import choose, allperms
 from qumba.qcode import QCode, SymplecticSpace, Matrix, get_weight, fromstr, strop
 from qumba.csscode import CSSCode, find_zx_duality
 from qumba.sp_pascal import i_grassmannian
-from qumba.lattices import get_colour_488, get_colour_666
 from qumba.argv import argv
+
+def get_colour_488(d):
+    from qumba.lattices import get_colour_488
+    return get_colour_488(d)
+
+def get_colour_666(d):
+    from qumba.lattices import get_colour_666
+    return get_colour_666(d)
+
 
 def get_412():
     return QCode.fromstr("XYZI IXYZ ZIXY")
@@ -1654,6 +1662,124 @@ def test_hexacode():
     print(code)
     print(code.longstr())
     print(code.get_autos())
+
+def test_tesseract():
+    code = CSSCode.fromstr("""
+    XIIIIXXIIXXXXXII
+    IXIIIXIXXXIXIXIX
+    IIXIIXIXXIXIXXXI
+    IIIXIIXXIXIIXXXX
+    IIIIXIXIXIXXIXXX
+    ZIIIIZZIIZZZZZII
+    IZIIIZIZZZIZIZIZ
+    IIZIIZIZZIZIZZZI
+    IIIZIIZZIZIIZZZZ
+    IIIIZIZIZIZZIZZZ
+    """)
+    code.bz_distance()
+    print(code)
+    print(code.longstr())
+    Hx = code.Hx
+    print(Hx.get_wenum())
+    n = code.n
+
+    h = Hx[0, :]
+    idxs = [i for i in range(n) if h[i]]
+    assert len(idxs) == 8
+    idxs = set(idxs)
+
+    HLx = Hx.concatenate(code.Lx)
+    print(HLx.get_wenum())
+
+    return
+
+    N, perms = code.get_autos()
+    print(N) # 322560 
+    print(perms)
+
+    from bruhat.gset import Group, Perm, mulclose
+    perms = [Perm(idxs) for idxs in perms]
+    G = mulclose(perms, maxsize=N)
+    print(len(G))
+    assert len(G) == N
+
+    stab = []
+    for g in G:
+        jdxs = {g[i] for i in idxs}
+        if jdxs == idxs:
+            stab.append(g)
+    print(len(stab))
+    H = Group(stab)
+    print(H.structure_description()) # 168 * 64
+
+#    swaps = []
+#    for h in H:
+#        if not (h*h).is_identity():
+#            continue
+#        for i in range(n):
+#            if h[i] == i:
+#                break
+#        else:
+#            swaps.append(h)
+#
+#    print(len(swaps))
+#    for h in swaps:
+#        pairs = set()
+#        for i in range(n):
+#            #if i<h[i]:
+#            pairs.add((i, h[i]))
+#        J = []
+#        for g in G:
+#            for (i,j) in pairs:
+#                gij = g[i], g[j]
+#                if gij == (j,i):
+#                    break
+#                if gij not in pairs:
+#                    break
+#            else:
+#                J.append(g)
+#        print(len(J), end=' ', flush=True)
+#        if len(J) == 192:
+#            break
+#    print()
+#    print(pairs)
+#
+#    J = Group(J)
+#    print(J.structure_description())
+#    pairs = list(pairs)
+#    (i,j) = pairs[0]
+#    for g in J:
+#        assert (g[i], g[j]) in pairs
+        
+
+#    found = []
+#    for h in swaps:
+#        for g in H:
+#            if g*h != h*g:
+#                break
+#        else:
+#            found.append(h)
+#    print(len(found))
+
+    return
+
+    G = Group(gens=perms, build=False)
+    
+    #from bruhat.gap import Gap
+    #gap = Gap()
+    #_G = gap.define(G)
+    #print(gap.Order(_G, get=True)) 
+    #print(G.structure_description()) # (C2 x C2 x C2 x C2) : A8
+    return
+
+    from qumba.triorthogonal import is_morthogonal
+    A = Hx.A
+    assert (is_morthogonal(A, 2))
+    assert (is_morthogonal(A, 3))
+    assert not (is_morthogonal(A, 4))
+
+    from qumba.gcolor import dump_transverse
+    dump_transverse(code.Hx.A, code.Lx.A, 3)
 
 
 

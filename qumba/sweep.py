@@ -14,6 +14,7 @@ try:
     import stim
     
     from qhap.circuit import Circuit
+    from qhap.circuit import CX, RX, RZ, MX, MZ, TICK
     from qhap.flow import Fault, Pauli
     from qhap.builders import build_css_bare_syndrome
     from qhap.sweep import run_sweep
@@ -413,6 +414,16 @@ def load_stim():
     serve({name:c})
 
 
+def load_bell():
+
+    t= TICK()
+    lhs = MX(2)*CX(2,1)*CX(2,0)*RX(2)*t
+    rhs = MZ(2)*CX(1,2)*t*CX(0,2)*t*RZ(2)*t
+    c = lhs*rhs*lhs*rhs* CX(1,0)*RZ(0)*RX(1)
+
+    serve({"bell":c})
+
+
 def load_goto():
 
     c = Circuit()
@@ -444,6 +455,104 @@ def load_goto():
     os.system("rsvg-convert SteanePrep.svg > SteanePrep.pdf")
 
     serve({"SteanePrep":c})
+
+
+def load_422():
+    """ 
+    https://sites.math.duke.edu/DOmath/DOmath2018/hu-li-shapiro.pdf
+    Quantum Benchmarking on the [[4,2,2]] Code
+    Atsushi Hu, Joey Li, Rebecca Shapiro
+    """
+    t = TICK()
+    c = t
+    for pair in [ (3,4),(0,4),(2,3),(1,2),(1,0) ]:
+        c = c*CX(*pair)*t
+
+    c = c*RX(0)*RZ(1) *RX(2)*RX(3)*RX(4)
+
+    c = t*c
+
+    items = {"Prep":c}
+
+    # -------------------
+
+    # hacked on the grok circuit (?) until it worked:
+    c = t
+    for pair in [(0,2),(1,2),(3,0),(3,1),(3,2)]:
+        c = c*CX(*pair)*t
+
+    c = t*c*RZ(2)*RX(3)
+
+    items["Encode"] = c
+    items = {"Encode":c}
+
+    # -------------------
+    # https://arxiv.org/abs/2409.04628
+    # See Fig 5. (c)
+
+    c = t
+    for pair in [(3,2),(2,0),(1,0),(3,1)]:
+        c = c*CX(*pair)*t
+
+    c = t*c*RZ(0)*RX(3)
+
+    items["Encode_2"] = c
+
+    # -------------------
+
+    serve(items)
+
+
+def load_913():
+
+    t = TICK()
+    c = t
+    for i in [1,2,4,5,7,8]:
+        c = c*RZ(i)
+    for i in [3,6]:
+        c = c*RX(i)
+
+    for pair in [(3,0), (6,0), (0,1),(0,2),(3,4),(3,5),(6,7),(6,8)]:
+        c = CX(*pair)*t*c
+
+    c = t*t*c
+    serve({"Encode":c})
+
+
+def surface17():
+
+    from qhap.plugins.surface17 import surface17_memory
+
+    circuits = {}
+    for r in [1,2,3]:
+        c = surface17_memory("Z", r)
+        circuits["Zmem%d"%r] = c
+        print("Circuit:", len(c))
+
+    shots = argv.get("shots", 100)
+    pmax = argv.get("pmax", 1e-2)
+    pmin = argv.get("pmin", 2e-3)
+    decoder = argv.get("decoder", "frontier")
+    points = argv.get("points", 9)
+    title = "the plot"
+
+    run_sweep(
+        circuits,
+        p_values=numpy.geomspace(pmax, pmin, points),
+        #p_values = [2e-3], 
+        shots=shots, K=512, Delta=12,
+        decoder=decoder,
+        engine="auto",
+        #bp_max_iter=args.bp_max_iter,
+        seed=1234,
+        output=Path("output/"),
+        title=title,
+        #metadata={"circuit": args.circuit, 
+        # "distance": spec.distance, "rounds": rounds},
+    )
+
+
+
 
 
 def main():
