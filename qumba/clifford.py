@@ -2829,8 +2829,12 @@ def test_ZZ():
     c = Clifford(2)
     CX, T, Z, S, X = c.CX, c.T, c.Z, c.S, c.X
     op = CX(0,1) * T(0) * ~T(1) * CX(0,1)
-    print(op)
-    print("product ?", op in found)
+    #print("is op a product ?", op in found)
+    for i in [1,2,3,4]:
+        print("op^%d ="%i)
+        opi = op**i
+        print(opi, opi in found)
+    print()
     ZZ = Z(0)*Z(1)
     SS = S(0)*S(1)
     #print(SS)
