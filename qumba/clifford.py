@@ -2820,14 +2820,23 @@ def test_lagrel():
 
 
 def test_ZZ():
+    c = Clifford(1)
+    ops = mulclose([c.T(0)])
+    print(len(ops))
+    found = [g@h for g in ops for h in ops]
+    #for op in found:
+    #    print(op)
     c = Clifford(2)
-    CX, T, Z, S = c.CX, c.T, c.Z, c.S
+    CX, T, Z, S, X = c.CX, c.T, c.Z, c.S, c.X
     op = CX(0,1) * T(0) * ~T(1) * CX(0,1)
     print(op)
+    print("product ?", op in found)
     ZZ = Z(0)*Z(1)
     SS = S(0)*S(1)
-    print(SS)
-    print(op**2 == S(1))
+    #print(SS)
+
+    g = X(0)
+    print( op*g*~op )
 
 
 
