@@ -11,9 +11,7 @@ from operator import matmul, lshift
 
 import numpy
 
-#from qumba.qcode import QCode, SymplecticSpace
-#from qumba import lin
-from qumba.matrix import Matrix
+from qumba.matrix import Matrix, pullback
 from qumba.rel import Relation # linear relations
 from qumba.csscode import CSSCode
 from qumba import construct
@@ -55,7 +53,7 @@ class Hom:
         # i am a shape tuple
         return (self.m, self.n)[i]
 
-    def PX(self, *idxs):
+    def RX(self, *idxs):
         "prepare X state: |+> on idxs"
         m, n = self
         assert m>n, "wrong Hom %s"%(self,)
@@ -74,7 +72,7 @@ class Hom:
         assert (rel.tgt,rel.src) == (self.m, self.n), (str(rel), str(self))
         return rel
 
-    def PZ(self, *idxs):
+    def RZ(self, *idxs):
         "prepare Z state: |0> on idxs"
         m, n = self
         assert m>n, "wrong Hom %s"%(self,)
@@ -94,17 +92,17 @@ class Hom:
         return rel
 
     def MX(self, *idxs):
-        "postselect <0| on idxs"
-        m, n = self
-        assert not idxs or m+len(idxs)==n, "wrong Hom %s"%(self,)
-        rel = self.op.PX(*idxs).op
-        return rel
-
-    def MZ(self, *idxs):
         "postselect <+| on idxs"
         m, n = self
         assert not idxs or m+len(idxs)==n, "wrong Hom %s"%(self,)
-        rel = self.op.PZ(*idxs).op
+        rel = self.op.RX(*idxs).op
+        return rel
+
+    def MZ(self, *idxs):
+        "postselect <0| on idxs"
+        m, n = self
+        assert not idxs or m+len(idxs)==n, "wrong Hom %s"%(self,)
+        rel = self.op.RZ(*idxs).op
         return rel
 
     def CX(self, idx=0, jdx=1):
@@ -209,6 +207,44 @@ def from_encoder(Ex, Ez=None):
     return code
 
 
+def detect(lhs, rhs):
+    "return (detect'ors, lhs*rhs)"
+    rhs = lhs.promote(rhs)
+    assert lhs.src == rhs.tgt, (lhs.src, rhs.tgt)
+    l, r = pullback(lhs.right.t, rhs.left.t)
+
+    left = lhs.left.t * l
+    right = rhs.right.t * r
+    f = left.concatenate(right)
+    k = f.kernel().t # find the detect'ing regions
+
+    ll = lhs.right.t * l
+    rr = rhs.left.t * r
+    assert ll==rr
+    d = (ll*k).t
+    #d = Relation(d)
+    op = Relation(left.t, right.t)
+
+    return d, op
+
+
+def test_detect():
+
+    _w = Relation.white(0, 1)
+    w_ = Relation.white(1, 0)
+    _b = Relation.black(0, 1)
+    b_ = Relation.black(1, 0)
+    I = Relation.identity(1)
+    zero = Relation.zeros(0,0)
+
+    d, op = detect(_b, b_)
+    assert d==Matrix.identity(1)
+    assert op==zero
+
+
+
+
+
 
 def test():
 
@@ -218,8 +254,8 @@ def test():
     hom = Hom(3, 2)
 
     for i in range(3):
-        c = hom.PX(i)
-        c = hom.PZ(i)
+        c = hom.RX(i)
+        c = hom.RZ(i)
 
     hom = Hom(2, 3)
     for i in range(3):
@@ -229,15 +265,15 @@ def test():
     # test get_perm ----------------------------------------
 
     rel = Hom(3).get_perm([1,2,0])
-    rhs = Hom(3,2).PX(0)
+    rhs = Hom(3,2).RX(0)
     rhs = rel * rhs
-    lhs = Hom(3,2).PX(1) * Hom(2,2).SWAP()
+    lhs = Hom(3,2).RX(1) * Hom(2,2).SWAP()
     assert lhs == rhs
     
     rel = Hom(3).get_perm([2, 0, 1])
-    rhs = Hom(3,2).PX(0)
+    rhs = Hom(3,2).RX(0)
     rhs = rel * rhs
-    lhs = Hom(3,2).PX(2)
+    lhs = Hom(3,2).RX(2)
     assert lhs == rhs
     
     # test CX ----------------------------------------

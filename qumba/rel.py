@@ -145,6 +145,12 @@ class Relation:
         return Relation(A[:, :tgt], A[:, tgt:], p)
 
     @classmethod
+    def zeros(cls, tgt, src, p=2):
+        lhs = Matrix.zeros((tgt, 0), p)
+        rhs = Matrix.zeros((src, 0), p)
+        return Relation(lhs, rhs, p)
+
+    @classmethod
     def promote(cls, item):
         if isinstance(item, cls):
             return item
