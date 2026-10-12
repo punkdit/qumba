@@ -38,7 +38,7 @@ def normalize(left, right, truncate=True):
     right = A[:, m:]
     return left, right
 
-zeros = lambda a,b : Matrix.zeros((a,b))
+zero = lambda a,b : Matrix.zeros((a,b))
 
 
 
@@ -89,6 +89,9 @@ class Relation:
         op = self*r
         return op.left
     __call__ = get_left
+
+    def spanstr(self):
+        return "%s<--%s-->%s"%(self.tgt, self.rank, self.src)
 
     @property
     @cache
@@ -145,7 +148,7 @@ class Relation:
         return Relation(A[:, :tgt], A[:, tgt:], p)
 
     @classmethod
-    def zeros(cls, tgt, src, p=2):
+    def zero(cls, tgt, src, p=2):
         lhs = Matrix.zeros((tgt, 0), p)
         rhs = Matrix.zeros((src, 0), p)
         return Relation(lhs, rhs, p)
@@ -236,7 +239,7 @@ class Relation:
 
     @classmethod
     def get_swap(cls, p=2):
-        z = zeros(2,2)
+        z = zero(2,2)
         i = Matrix.identity(2, p)
         l = z.concatenate(i)
         r = i.concatenate(z)
@@ -287,7 +290,7 @@ def all_subspaces(tgt, src):
         left = numpy.array(idxs)
         left.shape = (tgt, src)
         left = left.transpose()
-        rel = Relation(left, zeros(src,0))
+        rel = Relation(left, zero(src,0))
         yield rel
 
 def all_relations(m, tgt, src):
@@ -311,8 +314,8 @@ def test_linear():
         assert ((Relation(fg)==Relation(gh)) 
             == (Relation(g)*Relation(f)==Relation(h)*Relation(g)))
 
-    b_ = Relation([[1]], zeros(1,0))
-    bb_ = Relation([[1,1]], zeros(1,0))
+    b_ = Relation([[1]], zero(1,0))
+    bb_ = Relation([[1,1]], zero(1,0))
     bb_b = Relation([[1,1]], [[1]])
     _b = b_.op
     _bb = bb_.op
@@ -328,8 +331,8 @@ def test_linear():
     assert _bb == Relation.black(0, 2)
     assert b_bb == Relation.black(1, 2)
 
-    w_ = Relation([[0]], zeros(1,0))
-    ww_ = Relation([[1,1]], zeros(1,0))
+    w_ = Relation([[0]], zero(1,0))
+    ww_ = Relation([[1,1]], zero(1,0))
     ww_w = Relation([[1,1],[0,1]], [[0],[1]])
 
     _w = w_.op
@@ -347,7 +350,7 @@ def test_linear():
     assert b_ * _w == Relation([[1]],[[0]])
     assert _b@_b == _b * w_ww
 
-    one = Relation(zeros(0,0), zeros(0,0))
+    one = Relation(zero(0,0), zero(0,0))
     assert _b*w_ == one
 
     I = Relation([[1]], [[1]])
@@ -404,7 +407,7 @@ def test_linear():
 
     rel = (w_ @ I) * (I @ _b)
 
-    rel = rel * Relation(Matrix.identity(2), zeros(2,0))
+    rel = rel * Relation(Matrix.identity(2), zero(2,0))
     #print(rel)
     #print( (w_@w_) * (_b@_b) )
 
@@ -437,10 +440,10 @@ def test_linear():
     #print( (lhs @ I) * (I @ cup) )
     #print( (I @ lhs) * (cup@I) )
 
-    assert cup @ b_ == Relation([[1,1,0],[0,0,1]], zeros(2,0))
+    assert cup @ b_ == Relation([[1,1,0],[0,0,1]], zero(2,0))
 
     op = (I @ w_ww @ I @ I) * (I @ I @ swap @ I) * (black(3,0) @ black(2,0))
-    assert op == Relation([[1,1,1,0],[0,1,0,1]], zeros(2,0))
+    assert op == Relation([[1,1,1,0],[0,1,0,1]], zero(2,0))
 
     # ------------------------------------------------
 
@@ -620,16 +623,16 @@ def test_delete_contract():
     white = Relation.white
 
     I = Relation([[1]], [[1]])
-    b_ = Relation([[1]], zeros(1,0))
-    bb_ = Relation([[1,1]], zeros(1,0))
+    b_ = Relation([[1]], zero(1,0))
+    bb_ = Relation([[1,1]], zero(1,0))
     bb_b = Relation([[1,1]], [[1]])
     _b = b_.op
     _bb = bb_.op
     b_bb = bb_b.op
     assert b_bb == black(1, 2)
 
-    w_ = Relation([[0]], zeros(1,0))
-    ww_ = Relation([[1,1]], zeros(1,0))
+    w_ = Relation([[0]], zero(1,0))
+    ww_ = Relation([[1,1]], zero(1,0))
     ww_w = Relation([[1,1],[0,1]], [[0],[1]])
     assert ww_w == white(2, 1)
 
@@ -819,7 +822,7 @@ def test_pascal():
         assert len(rows) == n
 
         row = []
-        rel = Relation(zeros(0,n-1), zeros(0,1), p)
+        rel = Relation(zero(0,n-1), zero(0,1), p)
         assert rel.src == 1
         row.append({rel})
         #print(n, "choose", 0, "=", 1)
@@ -878,7 +881,7 @@ def test_code():
     H = Matrix(css.Hx)
     print(H, H.shape)
 
-    rel = Relation(H, zeros(12,0))
+    rel = Relation(H, zero(12,0))
     print(rel)
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Use linear relations for CSS circuits (aka phase-free ZX-calculus).
+Use linear relations for CSS _circuits (aka phase-free ZX-calculus).
 
 """
 
@@ -155,7 +155,7 @@ class Circuit:
     @classmethod
     def promote(cls, item):
         if isinstance(item, Circuit):
-            pass
+            op = item
         elif isinstance(item, (Matrix, Relation)):
             op = Operator(item)
         else:
@@ -164,6 +164,7 @@ class Circuit:
 
 
 class Operator(Circuit):
+    "The atomic Operator's in a Composite Circuit"
     def __init__(self, Ax, Az=None, check=True):
         Ax = Relation.promote(Ax)
         if Az is None:
@@ -174,12 +175,18 @@ class Operator(Circuit):
         self.pair = (Ax, Az)
         if check:
             assert Ax.dual == Az
-        Circuit.__init__(self, self) # i am my op
+        Circuit.__init__(self, self) # i am my own Operator
 
-    def __mul__(self, other):
+    def mul(self, other):
         assert isinstance(other, Operator)
         Ax = self.Ax * other.Ax
         Az = self.Az * other.Az
+        return Operator(Ax, Az)
+
+    def __matmul__(self, other):
+        assert isinstance(other, Operator)
+        Ax = self.Ax @ other.Ax
+        Az = self.Az @ other.Az
         return Operator(Ax, Az)
 
     def __eq__(self, other):
@@ -188,6 +195,31 @@ class Operator(Circuit):
 
     def __hash__(self):
         return hash(self.pair)
+
+    def __str__(self):
+        return "(%s | %s)"%(self.Ax.spanstr(), self.Az.spanstr())
+
+    @classmethod
+    def black(cls, l, r):
+        Rx = Relation.black(l, r)
+        Rz = Relation.white(l, r)
+        return Operator(Rx, Rz)
+
+    @classmethod
+    def white(cls, l, r):
+        Rx = Relation.white(l, r)
+        Rz = Relation.black(l, r)
+        return Operator(Rx, Rz)
+
+    @classmethod
+    def identity(cls, n):
+        Rx = Relation.identity(n)
+        return Operator(Rx, Rx)
+
+    @classmethod
+    def zero(cls, l, r):
+        Rx = Relation.zero(l, r)
+        return Operator(Rx)
 
     @classmethod
     def from_code(cls, code):
@@ -261,17 +293,84 @@ get_encoder = Operator.from_code
 from_encoder = Operator.to_code
 
 
+def witness(lhs, rhs):
+    """
+        compose Relation's and return the detector and witness
+    """
+    assert isinstance(lhs, Relation)
+    assert isinstance(rhs, Relation)
+
+    assert lhs.src == rhs.tgt, (lhs.src, rhs.tgt)
+    l, r = pullback(lhs.right.t, rhs.left.t)
+
+    left = lhs.left.t * l
+    right = rhs.right.t * r
+
+    f = left.concatenate(right)
+    k = f.kernel().t # find the detect'ing regions
+
+    ll = lhs.right.t * l
+    rr = rhs.left.t * r
+    assert ll==rr
+    d = (ll*k).t
+    op = Relation(left.t, right.t)
+    w = None
+    return d, w, op
+    
+
+
 class Composite(Circuit):
     def __init__(self, lhs, rhs):
         lhs = Circuit.promote(lhs)
         rhs = Circuit.promote(rhs)
         self.lhs = lhs
         self.rhs = rhs
-        op = lhs.op * rhs.op
+        lop = lhs.op
+        rop = rhs.op
+        #op = lop.mul(rop.op)
+
+        dz, wx, Ax = witness(lop.Ax, rop.Ax)
+        dx, wz, Az = witness(lop.Az, rop.Az)
+        op = Operator(Ax, Az)
+
         Circuit.__init__(self, op)
+
+        self.dx = dx
+        self.wx = wx
+        self.dz = dz
+        self.wz = wz
+
+    def __str__(self):
+        return "(%s*%s=%s, (%d|%d))"%(self.lhs, self.rhs, self.op, 
+            len(self.dx), len(self.dz))
 
 
     
+def test_composite():
+
+    white = Operator.white
+    black = Operator.black
+    _w = white(0, 1)
+    w_ = white(1, 0)
+    _b = black(0, 1)
+    b_ = black(1, 0)
+    I = Operator.identity(1)
+    zero = Operator.zero(0,0)
+
+    cx01 = (I @ black(1,2))*(white(2,1) @ I)
+    cx10 = (I @ white(1,2))*(black(2,1) @ I)
+
+    circ = _b * b_
+    circ = _w * w_
+
+    circ = (I@_b) * cx01*cx10 * (b_@I)
+    #print(circ)
+
+    circ = white(1,2)*white(2,1)
+    print(circ)
+
+
+
 def detect(lhs, rhs):
     "return (detect'ors, lhs*rhs)"
     rhs = lhs.promote(rhs)
@@ -300,7 +399,7 @@ def test_detect():
     _b = Relation.black(0, 1)
     b_ = Relation.black(1, 0)
     I = Relation.identity(1)
-    zero = Relation.zeros(0,0)
+    zero = Relation.zero(0,0)
 
     d, op = detect(_b, b_)
     assert d==Matrix.identity(1)
