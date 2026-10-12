@@ -8,6 +8,7 @@ Use linear relations for CSS circuits (aka phase-free ZX-calculus).
 import time
 from functools import reduce, cache
 from operator import matmul, lshift
+from random import choice, randint, random
 
 import numpy
 
@@ -52,6 +53,10 @@ class Hom:
     def __getitem__(self, i):
         # i am a shape tuple
         return (self.m, self.n)[i]
+
+    def identity(self):
+        assert self.m == self.n
+        return Relation.identity(self.m)
 
     def RX(self, *idxs):
         "prepare X state: |+> on idxs"
@@ -139,74 +144,134 @@ class Hom:
 Space = Hom
 
 
-def get_encoder(code):
-    assert code.is_css()
-    css = code.to_css()
+class Circuit:
+    def __init__(self, op):
+        assert isinstance(op, Operator)
+        self.op = op
 
-    left = code.Hx.concatenate(code.Lx)
-    right = Matrix.zeros((code.mx, code.k))
-    right = right.concatenate(Matrix.identity(code.k))
-    Ex = Relation(left, right)
+    def __mul__(self, other):
+        return Composite(self, other)
 
-    left = code.Hz.concatenate(code.Lz)
-    right = Matrix.zeros((code.mz, code.k))
-    right = right.concatenate(Matrix.identity(code.k))
-    Ez = Relation(left, right)
-
-    return (Ex, Ez)
-
-
-def from_encoder(Ex, Ez=None):
-    if Ez is None:
-        Ez = Ex.dual
-
-    #print("from_encoder")
-    #print(Ex, Ex.shape)
-    assert isinstance(Ex, Relation)
-    k = Ex.src
-    assert Ez.src == k
-
-    #if k==0:
-    #    print(Ex)
-
-    w = Relation.white(1,0)
-    if k:
-        op = reduce(lshift, [w]*k)
-        #print(op, op.shape)
-        Hx = (Ex*op).left
-        Hz = (Ez*op).left
-    else:
-        Hx = Ex.left
-        Hz = Ez.left
-
-    mx, n = Hx.shape
-    #print("Hx =")
-    #print(Hx, Hx.shape)
-
-    mz = len(Hz)
-    assert mz+mx+k == n
-    #print("Hz =")
-    #print(Hz, Hz.shape)
-
-    op = Relation(Matrix.identity(k), Matrix.zeros((k,0)))
-    HLx = (Ex*op).left
-    HHLx = Hx.concatenate(HLx).linear_independent()
-    assert HHLx[:mx, :] == Hx
-    Lx = HHLx[mx:, :]
-
-    #print("Lx =")
-    #print(Lx, Lx.shape)
-
-    op = Relation(Matrix.identity(k), Matrix.zeros((k,0)))
-    HLz = (Ez*op).left
-    HHLz = Hz.concatenate(HLz).linear_independent()
-    assert HHLz[:mz, :] == Hz
-    Lz = HHLz[mz:, :]
-
-    code = CSSCode(Hx=Hx, Hz=Hz, Lx=Lx, Lz=Lz)
-    return code
+    @classmethod
+    def promote(cls, item):
+        if isinstance(item, Circuit):
+            pass
+        elif isinstance(item, (Matrix, Relation)):
+            op = Operator(item)
+        else:
+            assert 0, "whats this: %s"%(item.__class__,)
+        return op
 
 
+class Operator(Circuit):
+    def __init__(self, Ax, Az=None, check=True):
+        Ax = Relation.promote(Ax)
+        if Az is None:
+            Az = Ax.dual
+        Az = Relation.promote(Az)
+        self.Ax = Ax
+        self.Az = Az
+        self.pair = (Ax, Az)
+        if check:
+            assert Ax.dual == Az
+        Circuit.__init__(self, self) # i am my op
+
+    def __mul__(self, other):
+        assert isinstance(other, Operator)
+        Ax = self.Ax * other.Ax
+        Az = self.Az * other.Az
+        return Operator(Ax, Az)
+
+    def __eq__(self, other):
+        assert isinstance(other, Operator)
+        return self.pair == other.pair
+
+    def __hash__(self):
+        return hash(self.pair)
+
+    @classmethod
+    def from_code(cls, code):
+        assert code.is_css()
+        css = code.to_css()
+    
+        left = code.Hx.concatenate(code.Lx)
+        right = Matrix.zeros((code.mx, code.k))
+        right = right.concatenate(Matrix.identity(code.k))
+        Ex = Relation(left, right)
+    
+        left = code.Hz.concatenate(code.Lz)
+        right = Matrix.zeros((code.mz, code.k))
+        right = right.concatenate(Matrix.identity(code.k))
+        Ez = Relation(left, right)
+    
+        return Operator(Ex, Ez)
+    
+    def to_code(op):
+        assert isinstance(op, Operator)
+        Ex, Ez = op.pair
+    
+        #print("from_encoder")
+        #print(Ex, Ex.shape)
+        assert isinstance(Ex, Relation)
+        k = Ex.src
+        assert Ez.src == k
+    
+        #if k==0:
+        #    print(Ex)
+    
+        w = Relation.white(1,0)
+        if k:
+            op = reduce(lshift, [w]*k)
+            #print(op, op.shape)
+            Hx = (Ex*op).left
+            Hz = (Ez*op).left
+        else:
+            Hx = Ex.left
+            Hz = Ez.left
+    
+        mx, n = Hx.shape
+        #print("Hx =")
+        #print(Hx, Hx.shape)
+    
+        mz = len(Hz)
+        assert mz+mx+k == n
+        #print("Hz =")
+        #print(Hz, Hz.shape)
+    
+        op = Relation(Matrix.identity(k), Matrix.zeros((k,0)))
+        HLx = (Ex*op).left
+        HHLx = Hx.concatenate(HLx).linear_independent()
+        assert HHLx[:mx, :] == Hx
+        Lx = HHLx[mx:, :]
+    
+        #print("Lx =")
+        #print(Lx, Lx.shape)
+    
+        op = Relation(Matrix.identity(k), Matrix.zeros((k,0)))
+        HLz = (Ez*op).left
+        HHLz = Hz.concatenate(HLz).linear_independent()
+        assert HHLz[:mz, :] == Hz
+        Lz = HHLz[mz:, :]
+    
+        code = CSSCode(Hx=Hx, Hz=Hz, Lx=Lx, Lz=Lz)
+        return code
+
+
+get_encoder = Operator.from_code
+from_encoder = Operator.to_code
+
+
+class Composite(Circuit):
+    def __init__(self, lhs, rhs):
+        lhs = Circuit.promote(lhs)
+        rhs = Circuit.promote(rhs)
+        self.lhs = lhs
+        self.rhs = rhs
+        op = lhs.op * rhs.op
+        Circuit.__init__(self, op)
+
+
+    
 def detect(lhs, rhs):
     "return (detect'ors, lhs*rhs)"
     rhs = lhs.promote(rhs)
@@ -242,6 +307,34 @@ def test_detect():
     assert op==zero
 
 
+def test_random():
+
+    def getrand(n):
+        hom = Hom(n,n)
+        ops = [hom.CX(i,j) for i in range(n) for j in range(n) if i!=j]
+        op = hom.identity()
+        count = 0
+        while count < n**2:
+            g = choice(ops)
+            op = g*op
+            count += 1
+        return op
+
+    n = 5
+    op = getrand(n)
+
+    i = randint(0,n-1)
+    mx = Hom(n-1, n).MZ(i) # 1 <-- 2 --> 2
+    op = mx*op
+
+    n -= 1
+    op = getrand(n)*op
+
+    i = randint(0,n-1)
+    mx = Hom(n-1, n).MZ(i) # 1 <-- 2 --> 2
+    op = mx*op
+        
+    print(op.nf)
 
 
 
@@ -334,7 +427,7 @@ def test():
     #print(code)
     #print(code.longstr())
 
-    assert get_encoder(code) == (Ex, Ez)
+    assert get_encoder(code) == Operator(Ex, Ez)
 
     # ------------------------------------------------
     # test from_encoder
@@ -347,13 +440,13 @@ def test():
     #print(code)
     #print(code.longstr())
 
-    Ex, Ez = get_encoder(code)
+    Ex, Ez = get_encoder(code).pair
 
     #print(Ex)
     #print(Ez)
     assert Ex!=Ez
 
-    dode = from_encoder(Ex, Ez)
+    dode = from_encoder(Operator(Ex, Ez))
     dode.bz_distance()
 
     assert code.is_equiv(dode)
@@ -361,24 +454,24 @@ def test():
     for trial in range(10):
 
         code = CSSCode.random(20, 5, 5)
-        Ex, Ez = get_encoder(code)
+        Ex, Ez = get_encoder(code).pair
         assert Ex.dual == Ez
         assert Ez.dual == Ex
-        dode = from_encoder(Ex, Ez)
+        dode = from_encoder(Operator(Ex, Ez))
         assert code.is_equiv(dode)
     
 
     # ------------------------------------------------
 
     code = construct.get_422().to_css()
-    Ex = get_encoder(code)[0]
+    Ex = get_encoder(code).pair[0]
     left = Ex.left
     #print(left)
     #print(left @ left)
 
     EE = Ex.tensor(Ex)
     #print(EE)
-    dode = from_encoder(EE)
+    dode = from_encoder(Operator(EE))
     #dode.bz_distance()
     #print(dode)
     assert dode.n == 16
@@ -459,14 +552,14 @@ def test_rm():
         print(outer)
         inner = RM[2,0,0]
     
-        Ei = get_encoder(inner)[0]
-        Eo = get_encoder(outer)[0]
+        Ei = get_encoder(inner).pair[0]
+        Eo = get_encoder(outer).pair[0]
     
         #P = Space(4).PERM([0,2,1,3])
         for f in all_perms(list(range(4))):
             P = Space(4).PERM(f)
             E = (Eo<<Eo)*P*Ei
-            code = from_encoder(E)
+            code = from_encoder(Operator(E))
             code.bz_distance()
             print(f, code) # [[8,2,2]]
     
@@ -479,12 +572,12 @@ def test_rm():
     def pair_cx(left, right):
         assert left.n == right.n
         n = left.n
-        Ex = get_encoder(left)[0] << get_encoder(right)[0]
+        Ex = get_encoder(left).pair[0] << get_encoder(right).pair[0]
         hom = Space(2*n)
         CX = hom.CX
         for i in range(n):
             Ex = CX(n+i, i) * Ex
-        dode = from_encoder(Ex)
+        dode = from_encoder(Operator(Ex))
         return dode
 
     dode = pair_cx(RM[2,1,0], RM[2,0,1])
