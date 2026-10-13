@@ -236,6 +236,7 @@ class Relation:
     #@cache # needs hash, needs _normal form
     def op(self):
         return self.__class__(self.right, self.left)
+    reverse = op # unfortunate name collision, see composite.py
 
     @classmethod
     def get_swap(cls, p=2):
