@@ -3,6 +3,9 @@
 """
 Use linear relations for CSS _circuits (aka phase-free ZX-calculus).
 
+See also: composite.py
+
+
 """
 
 import time
