@@ -30,7 +30,7 @@ from qumba.unwrap import Cover
 #from qumba import clifford, matrix
 #from qumba.clifford import Clifford, red, green, K, r2, ir2, w4, w8, half, latex
 #from qumba.syntax import Syntax
-from qumba.circuit import parsevec, Circuit, send, get_inverse, measure, barrier, variance, vdump, load
+from qumba.qasm import parsevec, Circuit, send, get_inverse, measure, barrier, variance, vdump, load
 
 from qumba.circuit_css import process
 

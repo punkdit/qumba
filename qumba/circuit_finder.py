@@ -30,7 +30,7 @@ from qumba.matrix import Matrix
 from qumba import construct
 from qumba.util import cache
 
-from qumba.circuit import parsevec, Circuit, send, get_inverse, measure, barrier, variance, vdump, load
+from qumba.qasm import parsevec, Circuit, send, get_inverse, measure, barrier, variance, vdump, load
 from qumba.circuit_css import css_encoder, process
 
 
