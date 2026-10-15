@@ -147,6 +147,7 @@ class Hom:
 Space = Hom
 
 
+# See composite.py XXX
 class Circuit:
     def __init__(self, op):
         assert isinstance(op, Operator)

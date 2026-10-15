@@ -24,7 +24,7 @@ from qumba.action import mulclose, mulclose_names
 from qumba.syntax import Syntax
 from qumba.argv import argv
 from qumba import construct
-from qumba.rel import Relation, zeros
+from qumba.rel import Relation, zero
 
 
 class Lagrangian(Relation):
@@ -81,7 +81,7 @@ class Lagrangian(Relation):
 
     @classmethod
     def get_swap(cls):
-        z = zeros(2,2)
+        z = zero(2,2)
         i = Matrix.identity(2)
         l = z.concatenate(i)
         r = i.concatenate(z)
@@ -210,7 +210,7 @@ if 1:
 
     I = Lagrangian.identity(2)
     h = Lagrangian([[0,1],[1,0]])
-    b_ = Lagrangian([[0,1]], zeros(1,0))
+    b_ = Lagrangian([[0,1]], zero(1,0))
     b1 = Lagrangian([[1,0],[1,1]]) # S gate
     w1 = h*b1*h
     b1_ = b1*b_
@@ -648,7 +648,7 @@ def test_symplectic():
 
     assert Module(3) is Module(3)
 
-    one = Lagrangian(zeros(0,0), zeros(0,0))
+    one = Lagrangian(zero(0,0), zero(0,0))
     #print(one)
     #print(one*one)
     assert one*one == one
@@ -667,7 +667,7 @@ def test_symplectic():
     assert h*h == I
 
     # black unit
-    b_ = Lagrangian([[0,1]], zeros(1,0))
+    b_ = Lagrangian([[0,1]], zero(1,0))
 
     # phase=1
     b1 = Lagrangian([[1,0],[1,1]])
@@ -895,7 +895,7 @@ def test_code():
 
     I = Lagrangian.identity(2)
     h = Lagrangian([[0,1],[1,0]])
-    b_ = Lagrangian([[0,1]], zeros(1,0))
+    b_ = Lagrangian([[0,1]], zero(1,0))
     b1 = Lagrangian([[1,0],[1,1]])
     w1 = h*b1*h
     b1_ = b1*b_
@@ -1059,14 +1059,14 @@ def test_prep():
         l = prep(x)
         assert len(l) == 1, len(l)
 
-        x = Lagrangian(x, zeros(1,0))
+        x = Lagrangian(x, zero(1,0))
         px = prep*x # ??
 
         z = module.Z(i)
         l = prep(z)
         assert len(l) == 2, len(l)
 
-        z = Lagrangian(z, zeros(1,0))
+        z = Lagrangian(z, zero(1,0))
         pz = prep*z # ??
 
     # ------------------------------------------------------------------------

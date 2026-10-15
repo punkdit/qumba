@@ -343,6 +343,7 @@ class Matrix:
     def concatenate(self, *others, axis=0):
         A = numpy.concatenate((self.A,)+tuple(other.A for other in others), axis=axis)
         return Matrix(A, self.p)
+    stack = concatenate
 
     def max(self):
         if 0 in self.shape:

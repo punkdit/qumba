@@ -2,6 +2,8 @@
 
 """
 Use linear relations for CSS _circuits (aka phase-free ZX-calculus).
+Keep track of how we compose operators using Composite objects.
+and more...
 
 See previous: css.py 
 
@@ -9,18 +11,28 @@ See previous: css.py
 
 import time
 from functools import reduce, cache
-from operator import matmul, lshift
-from random import choice, randint, random
+from operator import matmul, lshift, mul
+from random import choice
+import random
+
+def randint(a, b):
+    if a==b:
+        return a
+    return random.randint(a, b)
+
+
 
 import numpy
 
+from qumba.syntax import Syntax
 from qumba.matrix import Matrix, pullback
 from qumba.rel import Relation # linear relations
 from qumba.csscode import CSSCode
+from qumba.qcode import QCode
 from qumba import construct
 
 from qumba.argv import argv
-from qumba.util import choose, all_perms
+from qumba.util import choose
 from qumba.smap import SMap
 
 
@@ -30,11 +42,13 @@ class Circuit:
         self.op = op
         self.tgt = tgt
         self.src = src
+        self.shape = (tgt, src)
 
 #    @property
 #    def tgt(self)
 
     def __mul__(self, other):
+        assert self.src == other.tgt, (self.shape, other.shape)
         return Composite(self, other)
 
     @classmethod
@@ -46,6 +60,81 @@ class Circuit:
         else:
             assert 0, "whats this: %s"%(item.__class__,)
         return op
+
+    def deepstr(self, depth=0):
+        return " "*depth + str(self)
+
+    @classmethod
+    def from_code(cls, code):
+        assert code.is_css()
+        css = code.to_css()
+    
+        left = code.Hx.stack(code.Lx)
+        right = Matrix.zeros((code.mx, code.k))
+        right = right.stack(Matrix.identity(code.k))
+        Ex = Relation(left, right)
+    
+        left = code.Hz.stack(code.Lz)
+        right = Matrix.zeros((code.mz, code.k))
+        right = right.stack(Matrix.identity(code.k))
+        Ez = Relation(left, right)
+    
+        return Operator(Ex, Ez)
+    
+    def to_code(self):
+        op = self.op
+        assert isinstance(op, Operator)
+        Ex, Ez = op.pair
+    
+        #print("from_encoder")
+        #print(Ex, Ex.shape)
+        assert isinstance(Ex, Relation)
+        k = Ex.src
+        assert Ez.src == k
+    
+        #if k==0:
+        #    print(Ex)
+    
+        w = Relation.white(1,0)
+        if k:
+            op = reduce(matmul, [w]*k)
+            #print(op, op.shape)
+            Hx = (Ex*op).left
+            Hz = (Ez*op).left
+        else:
+            Hx = Ex.left
+            Hz = Ez.left
+    
+        mx, n = Hx.shape
+        #print("Hx =")
+        #print(Hx, Hx.shape)
+    
+        mz = len(Hz)
+        assert mz+mx+k == n
+        #print("Hz =")
+        #print(Hz, Hz.shape)
+    
+        op = Relation(Matrix.identity(k), Matrix.zeros((k,0)))
+        HLx = (Ex*op).left
+        HHLx = Hx.stack(HLx).linear_independent()
+        assert HHLx[:mx, :] == Hx
+        Lx = HHLx[mx:, :]
+    
+        #print("Lx =")
+        #print(Lx, Lx.shape)
+    
+        op = Relation(Matrix.identity(k), Matrix.zeros((k,0)))
+        HLz = (Ez*op).left
+        HHLz = Hz.stack(HLz).linear_independent()
+        assert HHLz[:mz, :] == Hz
+        Lz = HHLz[mz:, :]
+    
+        code = CSSCode(Hx=Hx, Hz=Hz, Lx=Lx, Lz=Lz)
+        return code
+
+
+get_encoder = Circuit.from_code
+from_encoder = Circuit.to_code
 
 
 class Operator(Circuit):
@@ -122,77 +211,6 @@ class Operator(Circuit):
         Rx = Relation.zero(l, r)
         return Operator(Rx)
 
-    @classmethod
-    def from_code(cls, code):
-        assert code.is_css()
-        css = code.to_css()
-    
-        left = code.Hx.concatenate(code.Lx)
-        right = Matrix.zeros((code.mx, code.k))
-        right = right.concatenate(Matrix.identity(code.k))
-        Ex = Relation(left, right)
-    
-        left = code.Hz.concatenate(code.Lz)
-        right = Matrix.zeros((code.mz, code.k))
-        right = right.concatenate(Matrix.identity(code.k))
-        Ez = Relation(left, right)
-    
-        return Operator(Ex, Ez)
-    
-    def to_code(op):
-        assert isinstance(op, Operator)
-        Ex, Ez = op.pair
-    
-        #print("from_encoder")
-        #print(Ex, Ex.shape)
-        assert isinstance(Ex, Relation)
-        k = Ex.src
-        assert Ez.src == k
-    
-        #if k==0:
-        #    print(Ex)
-    
-        w = Relation.white(1,0)
-        if k:
-            op = reduce(matmul, [w]*k)
-            #print(op, op.shape)
-            Hx = (Ex*op).left
-            Hz = (Ez*op).left
-        else:
-            Hx = Ex.left
-            Hz = Ez.left
-    
-        mx, n = Hx.shape
-        #print("Hx =")
-        #print(Hx, Hx.shape)
-    
-        mz = len(Hz)
-        assert mz+mx+k == n
-        #print("Hz =")
-        #print(Hz, Hz.shape)
-    
-        op = Relation(Matrix.identity(k), Matrix.zeros((k,0)))
-        HLx = (Ex*op).left
-        HHLx = Hx.concatenate(HLx).linear_independent()
-        assert HHLx[:mx, :] == Hx
-        Lx = HHLx[mx:, :]
-    
-        #print("Lx =")
-        #print(Lx, Lx.shape)
-    
-        op = Relation(Matrix.identity(k), Matrix.zeros((k,0)))
-        HLz = (Ez*op).left
-        HHLz = Hz.concatenate(HLz).linear_independent()
-        assert HHLz[:mz, :] == Hz
-        Lz = HHLz[mz:, :]
-    
-        code = CSSCode(Hx=Hx, Hz=Hz, Lx=Lx, Lz=Lz)
-        return code
-
-
-get_encoder = Operator.from_code
-from_encoder = Operator.to_code
-
 
 def witness(lhs, rhs):
     """
@@ -207,7 +225,7 @@ def witness(lhs, rhs):
     left = lhs.left.t * l
     right = rhs.right.t * r
 
-    f = left.concatenate(right)
+    f = left.stack(right)
     k = f.kernel().t # find the detect'ing regions
 
     ll = lhs.right.t * l
@@ -215,7 +233,7 @@ def witness(lhs, rhs):
     assert ll==rr
     d = (ll*k).t
     op = Relation(left.t, right.t)
-    w = None
+    w = None # TODO the detector is the kernel of the witness
     return d, w, op
     
 
@@ -245,6 +263,13 @@ class Composite(Circuit):
         return "(%s*%s=%s, (%d|%d))"%(self.lhs, self.rhs, self.op, 
             len(self.dx), len(self.dz))
 
+    def deepstr(self, depth=0):
+        lhs = self.lhs.deepstr(depth+1)
+        rhs = self.rhs.deepstr(depth+1)
+        d = "(%d|%d)"%(len(self.dx), len(self.dz))
+        lines = [self.op.deepstr(depth) + d + "=", lhs + "*", rhs]
+        return '\n'.join(lines)
+
     @property
     @cache
     def reverse(self):
@@ -253,6 +278,7 @@ class Composite(Circuit):
     
 
 class Hom:
+    " Hom( tgt <--- src ) "
 
     _w = Operator.white(0, 1)
     w_ = Operator.white(1, 0)
@@ -299,7 +325,7 @@ class Hom:
         idxs.sort(reverse=True)
         rels = [self.I]*n
         for i in idxs:
-            assert 0<=i<m
+            assert 0<=i<m, (i, m)
             rels.insert(i, self.w_)
         assert len(rels) == m
         rel = reduce(matmul, rels)
@@ -318,7 +344,7 @@ class Hom:
         idxs.sort(reverse=True)
         rels = [self.I]*n
         for i in idxs:
-            assert 0<=i<m
+            assert 0<=i<m, (i, m)
             rels.insert(i, self.b_)
         assert len(rels) == m
         rel = reduce(matmul, rels)
@@ -373,6 +399,293 @@ class Hom:
         rel = self.get_perm(f)
         return Operator.promote(rel)
 
+    def random(self):
+        m, n = self
+        if m==n==0:
+            op = self.identity()
+        elif m==0 and n==1:
+            op = choice([self.MX(0), self.MZ(0)])
+        elif n==0 and m==1:
+            op = choice([self.RX(0), self.RZ(0)])
+        elif m==n and n==1:
+            op = choice([
+                self.identity(), 
+                self.w_*self._w,
+                self.w_*self._b,
+                self.b_*self._b,
+                self.b_*self._w])
+            assert op.tgt == m, (op.tgt, op.src, self)
+            assert op.src == n, (op.tgt, op.src, self)
+        elif m==n>1:
+            i = randint(0, n-1)
+            j = randint(0, n-2)
+            j = j+1 if j>=i else j
+            op = self.CX(i,j)
+        elif m == n-1:
+            i = randint(0, n-1)
+            op = choice([self.MX(i), self.MZ(i)])
+        elif n == m-1:
+            i = randint(0, n-1)
+            op = choice([self.RX(i), self.RZ(i)])
+        else:
+            assert 0, (m, n)
+        assert op.tgt == m, (op.tgt, op.src, self)
+        assert op.src == n, (op.tgt, op.src, self)
+        return op
+        
+
+class Module:
+    """ A mutable context for keeping track of live qubits
+        and evaluating Syntax expressions.
+    """
+    # is this an Actegory ?
+    # We could take "hom" as a factory arg (for Hom)
+
+    def __init__(self, idxs=[]):
+        self.alloc = {} # qubit idxs
+        for i in idxs:
+            self.add(i)
+
+    @property
+    def n(self):
+        return len(self.alloc)
+
+    def check(self):
+        alloc = self.alloc
+        idxs = list(alloc.values())
+        idxs.sort()
+        n = len(idxs)
+        assert idxs == list(range(n)), idxs
+
+    def add(self, i):
+        alloc = self.alloc
+        #print("add:", i, alloc)
+        assert i not in alloc, alloc
+        n = len(alloc)
+        alloc[i] = n
+        #print("\tadd:", alloc)
+        self.check()
+        return n
+
+    def remove(self, i):
+        alloc = self.alloc
+        assert i in alloc, alloc
+        idx = alloc[i]
+        del alloc[i]
+        for key in list(alloc.keys()):
+            jdx = alloc[key]
+            assert jdx != idx
+            if jdx > idx:
+                alloc[key] = jdx-1
+        self.check()
+
+    def get_identity(self):
+        return Operator.identity(self.n)
+
+#    def I(self, i):
+#        alloc = self.alloc
+#        if i in alloc:
+#            n = len(alloc)
+#            op = Hom(n, n).identity()
+#        else:
+#        idx = self.add(i)
+#        n = len(alloc)
+#        op = Hom(n, n).identity()
+#        return op
+
+    def RX(self, i):
+        alloc = self.alloc
+        n = len(alloc)
+        idx = self.add(i)
+        op = Hom(n+1, n).RX(idx)
+        return op
+
+    def RZ(self, i):
+        alloc = self.alloc
+        n = len(alloc)
+        idx = self.add(i)
+        op = Hom(n+1, n).RX(idx)
+        return op
+
+    def CX(self, i, j):
+        alloc = self.alloc
+        n = len(alloc)
+        idx = alloc[i]
+        jdx = alloc[j]
+        op = Hom(n, n).CX(idx, jdx)
+        return op
+
+    def MX(self, i):
+        alloc = self.alloc
+        n = len(alloc)
+        idx = alloc[i]
+        self.remove(i)
+        op = Hom(n-1, n).MX(idx)
+        return op
+
+    def MZ(self, i):
+        alloc = self.alloc
+        n = len(alloc)
+        idx = alloc[i]
+        self.remove(i)
+        op = Hom(n-1, n).MZ(idx)
+        return op
+
+
+def stack(code):
+    assert code.k == 1
+    assert code.is_css()
+    assert "Y" not in code.longstr()
+    #print(code.longstr())
+    css = code.to_css()
+    #print("stack", css)
+    HLx = (css.Hx.stack(css.Lx))
+    return HLx.t
+
+def encoder(code):
+
+    orig = code
+
+    syntax = Syntax()
+    space = code.space
+    H = stack(code)
+    n, m = H.shape
+
+    spec = []
+    row = 0
+    col = 0
+    count = 0
+    while row < n and col < m: # and count < 20:
+        count += 1
+        assert count < m*n, "woah"
+        print()
+        print("row=%d, col=%d"%(row, col))
+        H = stack(code)
+        print(H, H.shape)
+        assert H.shape == (n, m)
+        for j in range(row, n):
+            if H[j, col]:
+                break
+        assert H[j, col] # TODO
+        item = None
+        if j > row:
+            item = syntax.SWAP(j, row)
+            op = space.SWAP(j, row)
+            print("SWAP(%d,%d)"%(j, row))
+        else:
+            idxs = list(range(n))
+            for j in idxs[:row] + idxs[row+1:]:
+                if H[j, col]:
+                    item = syntax.CX(row, j)
+                    op = space.CX(row, j)
+                    print("CX(%d,%d)"%(row, j))
+                    break
+            else:
+                col += 1
+                row += 1
+                continue 
+        spec.append(item)
+        E = code.get_encoder()
+        E = op * E
+        #E = space.CX(i, j)*E # col j += col i
+        #E = E * space.CX(i, j) # FAIL
+        assert code.k == 1
+        code = QCode.from_encoder(E, k=code.k)
+        assert code.k == 1
+
+    H = stack(code)
+    print(H)
+
+    #spec = list(reversed(spec))
+
+    css = code.to_css()
+    for i in range(css.mx):
+        spec.append(syntax.RX(i))
+    src = []
+    for i in range(css.k):
+        src.append(css.mx+i)
+    for i in range(css.mz):
+        spec.append(syntax.RZ(css.mx+css.k+i))
+    print(spec)
+
+    spec = reduce(mul, spec)
+    print(spec)
+
+    #return
+
+    E = spec*Module(src)
+    E = E.op
+
+    print(E.Ax)
+    print(E.Az)
+
+    dode = E.to_code()
+    print(dode.longstr())
+    dode.bz_distance()
+    print(dode)
+    #assert dode.is_equiv(code)
+
+    from qhap.circuit import RX, RZ, CX, TICK
+    from qhap.layout import to_svg
+    #c = CX(3,6)*CX(3,4)*CX(2,6)*CX(2,5)*CX(2,4)*\
+    #    CX(1,6)*CX(1,5)*CX(0,5)*CX(0,4)*RZ(6)*RZ(5)*RZ(4)*RX(2)*RX(1)*RX(0)
+    circuit = eval(str(spec))*TICK()
+    flow = circuit.z_flow(0,6)
+    svg = to_svg(circuit, flow)
+    f = open("encode.svg", "w").write(svg)
+    import os
+    cmd = 'rsvg-convert -f pdf -o encode.pdf encode.svg'
+    print(cmd)
+    rval = os.system(cmd)
+    assert rval == 0
+
+    code = QCode.fromstr(
+    """
+    XIIXIXX
+    IXIXXXI
+    IIXIXXX
+    ZIZZZII
+    ZZZIIZI
+    IZZZIIZ
+    """)
+    print(code)
+    print(code.longstr())
+
+    assert code.is_equiv(orig)
+
+
+
+def test_encoder():
+
+    s = Syntax()
+    MX, MZ, CX, RX, RZ = s.MX, s.MZ, s.CX, s.RX, s.RZ
+    spec = RX(1)
+    op = spec*Module([0])
+    op = op.op
+    assert Hom(2,1).RX(1) == op
+
+    code = construct.get_713()
+    print(code)
+
+    E = encoder(code)
+
+
+
+def test_syntax():
+    s = Syntax()
+    MX, MZ, CX, RX, RZ = s.MX, s.MZ, s.CX, s.RX, s.RZ
+    spec = MX(0)*CX(0,1)*RX(0)*RZ(1)
+
+    assert str(spec) == "MX(0)*CX(0,1)*RX(0)*RZ(1)"
+
+    mod = Module()
+    op = spec * mod
+    assert mod.alloc == {1:0}
+
+    lhs, rhs = (RX(0)*RZ(1))*Module(), (RZ(1)*RX(0))*Module()
+    assert eqop(lhs, rhs)
+
+
 
 def test_composite():
 
@@ -395,13 +708,15 @@ def test_composite():
     #print(circ)
 
     circ = white(1,2)*white(2,1)
-    print(circ)
+    s = str(circ)
 
 
 
-def test_random():
+def test_rnd():
 
-    def getrand(n):
+    def getrand(n, m=None):
+        if m is None:
+            m = n
         hom = Hom(n,n)
         ops = [hom.CX(i,j) for i in range(n) for j in range(n) if i!=j]
         op = hom.identity()
@@ -425,8 +740,37 @@ def test_random():
     i = randint(0,n-1)
     mx = Hom(n-1, n).MZ(i) # 1 <-- 2 --> 2
     op = mx*op
+
+
         
-    s = str(op)
+
+def get_random(size):
+    n = 0
+    hom = Hom(n,n)
+    circ = hom.identity()
+    for count in range(size):
+        #print(circ.op)
+        i = randint(0,1)
+        if i==0:
+            n = circ.src
+            m = randint(max(0, n-1), n+1)
+            hom = Hom(n, m)
+            rhs = hom.random()
+            #print(hom, rhs)
+            circ = circ * rhs
+        elif i==1:
+            m = circ.tgt
+            n = randint(max(0, m-1), m+1)
+            hom = Hom(n, m)
+            lhs = hom.random()
+            #print(hom, lhs)
+            circ = lhs * circ
+    return circ
+
+def test_random():
+    for trial in range(10):
+        circ = get_random(10)
+        print(circ.deepstr())
 
 
 def eqop(A, B):

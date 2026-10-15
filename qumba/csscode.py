@@ -758,6 +758,10 @@ class CSSCode(object):
             dx=self.dx, dz=self.dz, d=d, css=True, cssname=str(self), **attrs)
 
     def is_equiv(self, other):
+        if isinstance(other, QCode):
+            if not other.is_css():
+                return False
+            other = other.to_css()
         assert isinstance(other, CSSCode)
         if self.n != other.n or self.mx != other.mx or self.mz != other.mz:
             return False
@@ -906,6 +910,14 @@ class CSSCode(object):
         Gz = Gz[:, cols] if Gz is not None else None
         code = CSSCode(Lx, Lz, Hx, Tz, Hz, Tx, Gx, Gz)
         return code
+
+    def CX(self, i, j):
+        # TODO: faster 
+        code = self.to_qcode()
+        code = code.CX(i, j)
+        assert code.is_css()
+        css = code.to_css()
+        return css
 
     def x_distance(self, min_d=1):
         Lx = [v for v in lin.span(self.Lx) if v.sum()]
