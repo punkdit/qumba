@@ -28,7 +28,7 @@ from qumba.syntax import Syntax
 from qumba.matrix import Matrix, pullback
 from qumba.rel import Relation # linear relations
 from qumba.csscode import CSSCode
-from qumba.qcode import QCode
+from qumba.qcode import QCode, SymplecticSpace
 from qumba import construct
 
 from qumba.argv import argv
@@ -167,6 +167,9 @@ class Operator(Circuit):
         Ax, Az = self.Ax, self.Az
         return Operator(Az, Ax)
 
+    def walk(self):
+        yield self
+
     def mul(self, other):
         assert isinstance(other, Operator), type(other)
         Ax = self.Ax * other.Ax
@@ -274,6 +277,12 @@ class Composite(Circuit):
     @cache
     def reverse(self):
         assert 0, "todo"
+
+    def walk(self):
+        for item in self.lhs.walk():
+            yield item
+        for item in self.rhs.walk():
+            yield item
 
     
 
@@ -482,17 +491,6 @@ class Module:
     def get_identity(self):
         return Operator.identity(self.n)
 
-#    def I(self, i):
-#        alloc = self.alloc
-#        if i in alloc:
-#            n = len(alloc)
-#            op = Hom(n, n).identity()
-#        else:
-#        idx = self.add(i)
-#        n = len(alloc)
-#        op = Hom(n, n).identity()
-#        return op
-
     def RX(self, i):
         alloc = self.alloc
         n = len(alloc)
@@ -504,7 +502,7 @@ class Module:
         alloc = self.alloc
         n = len(alloc)
         idx = self.add(i)
-        op = Hom(n+1, n).RX(idx)
+        op = Hom(n+1, n).RZ(idx)
         return op
 
     def CX(self, i, j):
@@ -513,6 +511,14 @@ class Module:
         idx = alloc[i]
         jdx = alloc[j]
         op = Hom(n, n).CX(idx, jdx)
+        return op
+
+    def SWAP(self, i, j):
+        alloc = self.alloc
+        n = len(alloc)
+        idx = alloc[i]
+        jdx = alloc[j]
+        op = Hom(n, n).SWAP(idx, jdx)
         return op
 
     def MX(self, i):
@@ -533,7 +539,6 @@ class Module:
 
 
 def stack(code):
-    assert code.k == 1
     assert code.is_css()
     assert "Y" not in code.longstr()
     #print(code.longstr())
@@ -542,15 +547,20 @@ def stack(code):
     HLx = (css.Hx.stack(css.Lx))
     return HLx.t
 
-def encoder(code):
+
+def encoder(code, verbose=False):
+
+    # TODO: clean up this mess (no going via QCode etc etc)
 
     orig = code
 
     syntax = Syntax()
-    space = code.space
+    #space = code.space
+    space = SymplecticSpace(code.n)
     H = stack(code)
     n, m = H.shape
 
+    # we do echelon row/col reduction form with CX/SWAP gates
     spec = []
     row = 0
     col = 0
@@ -558,10 +568,12 @@ def encoder(code):
     while row < n and col < m: # and count < 20:
         count += 1
         assert count < m*n, "woah"
-        print()
-        print("row=%d, col=%d"%(row, col))
+        if verbose:
+            print()
+            print("row=%d, col=%d"%(row, col))
         H = stack(code)
-        print(H, H.shape)
+        if verbose:
+            print(H, H.shape)
         assert H.shape == (n, m)
         for j in range(row, n):
             if H[j, col]:
@@ -571,14 +583,16 @@ def encoder(code):
         if j > row:
             item = syntax.SWAP(j, row)
             op = space.SWAP(j, row)
-            print("SWAP(%d,%d)"%(j, row))
+            if verbose:
+                print("SWAP(%d,%d)"%(j, row))
         else:
             idxs = list(range(n))
             for j in idxs[:row] + idxs[row+1:]:
                 if H[j, col]:
                     item = syntax.CX(row, j)
                     op = space.CX(row, j)
-                    print("CX(%d,%d)"%(row, j))
+                    if verbose:
+                        print("CX(%d,%d)"%(row, j))
                     break
             else:
                 col += 1
@@ -587,17 +601,9 @@ def encoder(code):
         spec.append(item)
         E = code.get_encoder()
         E = op * E
-        #E = space.CX(i, j)*E # col j += col i
-        #E = E * space.CX(i, j) # FAIL
-        assert code.k == 1
         code = QCode.from_encoder(E, k=code.k)
-        assert code.k == 1
 
     H = stack(code)
-    print(H)
-
-    #spec = list(reversed(spec))
-
     css = code.to_css()
     for i in range(css.mx):
         spec.append(syntax.RX(i))
@@ -606,52 +612,56 @@ def encoder(code):
         src.append(css.mx+i)
     for i in range(css.mz):
         spec.append(syntax.RZ(css.mx+css.k+i))
-    print(spec)
-
     spec = reduce(mul, spec)
-    print(spec)
-
-    #return
-
     E = spec*Module(src)
-    E = E.op
 
-    print(E.Ax)
-    print(E.Az)
+    return spec, E
 
-    dode = E.to_code()
-    print(dode.longstr())
-    dode.bz_distance()
-    print(dode)
-    #assert dode.is_equiv(code)
-
-    from qhap.circuit import RX, RZ, CX, TICK
-    from qhap.layout import to_svg
-    #c = CX(3,6)*CX(3,4)*CX(2,6)*CX(2,5)*CX(2,4)*\
-    #    CX(1,6)*CX(1,5)*CX(0,5)*CX(0,4)*RZ(6)*RZ(5)*RZ(4)*RX(2)*RX(1)*RX(0)
-    circuit = eval(str(spec))*TICK()
-    flow = circuit.z_flow(0,6)
-    svg = to_svg(circuit, flow)
-    f = open("encode.svg", "w").write(svg)
-    import os
-    cmd = 'rsvg-convert -f pdf -o encode.pdf encode.svg'
-    print(cmd)
-    rval = os.system(cmd)
-    assert rval == 0
-
-    code = QCode.fromstr(
-    """
-    XIIXIXX
-    IXIXXXI
-    IIXIXXX
-    ZIZZZII
-    ZZZIIZI
-    IZZZIIZ
-    """)
-    print(code)
-    print(code.longstr())
-
-    assert code.is_equiv(orig)
+#    #print(E.Ax)
+#    #print(E.Az)
+#
+#    for item in E.walk():
+#        print(item)
+#
+#    items = list(item.op.Ax for item in E.walk())
+#    op = reduce(mul, items)
+#    print(op)
+#
+#    return op
+#
+#    dode = E.to_code()
+#    print(dode.longstr())
+#    dode.bz_distance()
+#    print(dode)
+#    #assert dode.is_equiv(code)
+#
+#    from qhap.circuit import RX, RZ, CX, TICK
+#    from qhap.layout import to_svg
+#    #c = CX(3,6)*CX(3,4)*CX(2,6)*CX(2,5)*CX(2,4)*\
+#    #    CX(1,6)*CX(1,5)*CX(0,5)*CX(0,4)*RZ(6)*RZ(5)*RZ(4)*RX(2)*RX(1)*RX(0)
+#    circuit = eval(str(spec))*TICK()
+#    flow = circuit.z_flow(0,6)
+#    svg = to_svg(circuit, flow)
+#    f = open("encode.svg", "w").write(svg)
+#    import os
+#    cmd = 'rsvg-convert -f pdf -o encode.pdf encode.svg'
+#    print(cmd)
+#    rval = os.system(cmd)
+#    assert rval == 0
+#
+#    code = QCode.fromstr(
+#    """
+#    XIIXIXX
+#    IXIXXXI
+#    IIXIXXX
+#    ZIZZZII
+#    ZZZIIZI
+#    IZZZIIZ
+#    """)
+#    print(code)
+#    print(code.longstr())
+#
+#    assert code.is_equiv(orig)
 
 
 
@@ -659,15 +669,79 @@ def test_encoder():
 
     s = Syntax()
     MX, MZ, CX, RX, RZ = s.MX, s.MZ, s.CX, s.RX, s.RZ
-    spec = RX(1)
-    op = spec*Module([0])
-    op = op.op
-    assert Hom(2,1).RX(1) == op
 
-    code = construct.get_713()
-    print(code)
+    spec = RX(0)*RZ(2)
+    op = spec*Module([1])
+    rhs = op.op
 
-    E = encoder(code)
+    #lhs = Hom(3,2).RZ(2)*(Hom(1,0).RX(0) @ Hom(1,1).identity())
+    lhs = Hom(3,2).RX(2)*Hom(2,1).RZ(1) # hmm, Module scrambles the indexes..
+    assert eqop(lhs, rhs)
+
+    spec = CX(0,1)*CX(1,2)*CX(2,0)
+    circ = spec*Module([0,1,2])
+    lhs = circ.op
+
+    hom = Hom(3,3)
+    cx = hom.CX
+    rhs = cx(0,1)*cx(1,2)*cx(2,0)
+    assert eqop(lhs, rhs)
+
+    spec = [CX(0,3), CX(0,5), CX(0,6), CX(1,3), CX(1,4),
+    CX(1,5), CX(2,4), CX(2,5), CX(2,6), CX(3,0), CX(3,1),
+    CX(3,4), CX(3,6), RX(0), RX(1), RX(2), RZ(4), RZ(5), RZ(6)]
+    spec = CX(0,3)*CX(0,5)*CX(0,6)*CX(1,3)*CX(1,4)*CX(1,5)*CX(2,4)\
+        *CX(2,5)*CX(2,6)*CX(3,0)*CX(3,1)*CX(3,4)*CX(3,6)\
+        *RX(0)*RX(1)*RX(2)*RZ(4)*RZ(5)*RZ(6)
+
+    op = spec*Module([3])
+    E = op.op
+    code = (from_encoder(E))
+    code.bz_distance()
+    #print(code)
+    assert code.d == 3
+    #assert code.is_equiv(construct.get_713()) # got swapped...
+
+    op = Hom(1,1).identity()
+    n = 1
+    for i in [0,1,2]:
+        op = Hom(n+1,n).RX(i)*op
+        n += 1
+    for i in [4,5,6]:
+        op = Hom(n+1,n).RZ(i)*op
+        n += 1
+    hom = Hom(n,n)
+    for (i,j) in reversed([(0,3), (0,5), (0,6), (1,3), (1,4),
+        (1,5), (2,4), (2,5), (2,6), (3,0), (3,1), (3,4), (3,6)]):
+        op = hom.CX(i,j)*op
+
+    E = op.op
+    code = (from_encoder(E))
+    code.bz_distance()
+    #print(code)
+    assert code.is_equiv(construct.get_713())
+
+    # -------------------------------------------
+
+    for code in [
+        construct.get_422(),
+        construct.get_713(),
+        construct.get_10_2_3(),
+        construct.get_bring()
+    ]:
+
+        #code = code.to_css()
+        code.bz_distance()
+        spec, E = encoder(code)
+        print(spec)
+        dode = from_encoder(E)
+        dode.bz_distance()
+        print(dode)
+        assert dode.d == code.d
+
+    #assert code.is_equiv(construct.get_713())
+
+    # -------------------------------------------
 
 
 

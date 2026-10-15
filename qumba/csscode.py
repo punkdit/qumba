@@ -919,6 +919,10 @@ class CSSCode(object):
         css = code.to_css()
         return css
 
+    def get_encoder(self):
+        code = self.to_qcode()
+        return code.get_encoder()
+
     def x_distance(self, min_d=1):
         Lx = [v for v in lin.span(self.Lx) if v.sum()]
         dx = self.n

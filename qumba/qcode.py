@@ -418,6 +418,12 @@ class QCode(object):
     def to_qcode(self):
         return self
 
+    def bz_distance(self):
+        assert "Y" not in self.longstr()
+        code = self.to_css()
+        code.bz_distance()
+        self.d = code.d
+
     #@cache
     def get_graph(self):
         "encode into a pynauty Graph"
