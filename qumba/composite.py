@@ -7,6 +7,12 @@ and more...
 
 See previous: css.py 
 
+The Module interface sometimes needs to do a tensor
+product, not just a composition. 
+Possibly extend the Syntax interface?
+eg. methods return (op,tensorand) pair? 
+or something like that?
+
 """
 
 import time
@@ -448,7 +454,7 @@ class Module:
         and evaluating Syntax expressions.
     """
     # is this an Actegory ?
-    # We could take "hom" as a factory arg (for Hom)
+    # another idea: We could take "hom" as a factory arg (for Hom)
 
     def __init__(self, idxs=[]):
         self.alloc = {} # qubit idxs
@@ -570,6 +576,10 @@ class Module:
         op = Hom(n-1, n).MZ(idx)
         return op
 
+    def TICK(self):
+        n = len(self.alloc)
+        return Hom(n, n).identity()
+
 
 def stack(code):
     assert code.is_css()
@@ -657,7 +667,7 @@ def encoder(code, verbose=False):
 
 
 def render(spec, name):
-    from qhap.circuit import RX, RZ, CX, TICK
+    from qhap.circuit import RX, RZ, CX, TICK, MX, MZ
     from qhap.layout import to_svg
     circuit = eval(str(spec))*TICK()
     flow = None
@@ -757,6 +767,34 @@ def test_encoder():
 
     # -------------------------------------------
 
+
+def test_goto():
+
+    s = Syntax()
+    RZ, RX, CX = s.RZ, s.RX, s.CX
+    MZ, MX = s.MZ, s.MX
+    TICK = s.TICK
+    spec = []
+    for i in [0,4,5,6,7]:
+        spec.append(RZ(i))
+    for i in [1,2,3]:
+        spec.append(RX(i))
+    spec.append(TICK())
+    for (i,j) in "10 35 26 14 20 36 15 64 07 57 67".split():
+        spec.append(CX(int(i), int(j)))
+        spec.append(TICK())
+    spec.append(MZ(7))
+    spec.append(TICK())
+    print(spec)
+    spec = reduce(mul, reversed(spec))
+    print(spec)
+
+    module = Module()
+    comp = spec*module
+    #print(comp.op.Ax)
+    print(comp.deepstr())
+
+    render(spec, "goto_713")
 
 
 def test_syntax():
