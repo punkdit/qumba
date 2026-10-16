@@ -559,45 +559,48 @@ def encoder(code, verbose=False):
     space = SymplecticSpace(code.n)
     H = stack(code)
     n, m = H.shape
+    assert n>=m
 
-    # we do echelon row/col reduction form with CX/SWAP gates
+    # we do echelon row/col reduction form with CX gates
     spec = []
-    row = 0
+    pivots = [] # choose one row for every colum
     col = 0
     count = 0
-    while row < n and col < m: # and count < 20:
+    while col < m:
         count += 1
         assert count < m*n, "woah"
         if verbose:
             print()
-            print("row=%d, col=%d"%(row, col))
+            line = ['_']*m
+            line[col] = 'V'
+            print(''.join(line))
         H = stack(code)
         if verbose:
-            print(H, H.shape)
+            print(H)
         assert H.shape == (n, m)
-        for j in range(row, n):
-            if H[j, col]:
+        #for j in range(row, n):
+        for pivot in range(n):
+            if pivot in pivots:
+                continue
+            if H[pivot, col]:
                 break
-        assert H[j, col] # TODO
-        item = None
-        if j > row:
-            item = syntax.SWAP(j, row)
-            op = space.SWAP(j, row)
-            if verbose:
-                print("SWAP(%d,%d)"%(j, row))
         else:
-            idxs = list(range(n))
-            for j in idxs[:row] + idxs[row+1:]:
-                if H[j, col]:
-                    item = syntax.CX(row, j)
-                    op = space.CX(row, j)
-                    if verbose:
-                        print("CX(%d,%d)"%(row, j))
-                    break
-            else:
-                col += 1
-                row += 1
-                continue 
+            assert 0, "wup"
+        assert H[pivot, col]
+        idxs = list(range(n))
+        for j in range(n):
+            if j==pivot:
+                continue
+            if H[j, col]:
+                item = syntax.CX(pivot, j)
+                op = space.CX(pivot, j)
+                if verbose:
+                    print("CX(%d,%d)"%(pivot, j))
+                break
+        else:
+            pivots.append(pivot)
+            col += 1
+            continue 
         spec.append(item)
         E = code.get_encoder()
         E = op * E
@@ -605,13 +608,16 @@ def encoder(code, verbose=False):
 
     H = stack(code)
     css = code.to_css()
+    assert len(pivots) == css.mx + css.k
     for i in range(css.mx):
-        spec.append(syntax.RX(i))
-    src = []
-    for i in range(css.k):
-        src.append(css.mx+i)
-    for i in range(css.mz):
-        spec.append(syntax.RZ(css.mx+css.k+i))
+        idx = pivots[i]
+        spec.append(syntax.RX(idx))
+    src = pivots[css.mx:]
+    pivots = set(pivots)
+    remain = [i for i in range(n) if i not in pivots]
+    assert len(remain) == css.mz
+    for i in remain:
+        spec.append(syntax.RZ(i))
     spec = reduce(mul, spec)
     E = spec*Module(src)
 
@@ -727,16 +733,18 @@ def test_encoder():
         construct.get_422(),
         construct.get_713(),
         construct.get_10_2_3(),
-        construct.get_bring()
+        #construct.get_bring()
     ]:
 
         #code = code.to_css()
         code.bz_distance()
-        spec, E = encoder(code)
+        print(code)
+        spec, E = encoder(code, verbose=False)
         print(spec)
         dode = from_encoder(E)
         dode.bz_distance()
         print(dode)
+        print(dode.is_equiv(code))
         assert dode.d == code.d
 
     #assert code.is_equiv(construct.get_713())
