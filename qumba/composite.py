@@ -803,6 +803,7 @@ def test_goto():
     find_detectors(comp)
     #render(spec, "goto_713")
 
+
 def find_detectors(comp):
     assert isinstance(comp, Circuit)
     #print(comp.op.Ax)
@@ -814,37 +815,96 @@ def find_detectors(comp):
     ops = list(reversed(ops))
     edges = {}
     prev = None
-    for idx,op in enumerate(ops):
-        A = op.Ax
-        print("(%s<--%s)"%(A.tgt, A.src), end=' ')
+    rels = [op.Ax for op in ops] # or Az ?
+    for idx,A in enumerate(rels):
+        #print("idx =", idx)
+        #print("(%s<--%s)"%(A.tgt, A.src))
+        #print("edges:", list(edges.keys()))
+        # idx is the time index
+        # jdx is the qubit index
         if idx == 0:
             for jdx in range(A.src):
-                edges[idx,jdx] = [A, None]
+                edges[idx,jdx] = [A, None] # tgt,src
         else:
             assert prev.tgt == A.src
             for jdx in range(A.src):
-                key = (idx-1,jdx)
+                key = (idx,jdx) # previous timeslot
                 assert key in edges, (key, edges)
-                edge = edges[idx-1,jdx]
+                edge = edges[idx,jdx]
                 assert edge[0] is None
-                edge[0] = A
+                edge[0] = A # edge tgt is A
         for jdx in range(A.tgt):
-            key = idx,jdx
-            assert key not in edges
-            edges[key] = [None, A]
+            key = idx+1,jdx # the next time index
+            assert key not in edges, "%s in %s"%(key,edges)
+            edges[key] = [None, A] # tgt,src
+        #print("edges:", list(edges.keys()))
         prev = A
-    print()
+    #print()
     keys = list(edges.keys())
     keys.sort(key = lambda key:key[1])
     #print(keys)
     for key in keys:
         edge = edges[key]
-        if edge[0] is None:
-            print(key)
+        #if edge[0] is None:
+        #    print(key)
         #print(key, repr(edges[key]))
-    print()
-    print(len(edges))
+    cols = {key:i for (i,key) in enumerate(keys)}
+    n = len(edges)
+    rows = {}
+    m = 0
+    for A in rels:
+        rows[A] = m
+        m += A.rank
+    print(m, n)
+    lookup = {col:key for (col,key) in enumerate(keys)}
+    H = numpy.zeros((m,n), dtype=int)
+    #print(H)
+    src = {}
+    tgt = {}
+    for A in rels:
+        src[A] = [None]*A.src
+        tgt[A] = [None]*A.tgt
+    for col,key in enumerate(keys):
+        edge = edges[key]
+        A, B = edge # tgt, src
+        time, idx = key
+        #print("key =", key)
+        if A is not None:
+            #print(A)
+            src[A][idx] = col
+        if B is not None:
+            #print(B)
+            tgt[B][idx] = col
+    row = 0
+    for A in rels:
+        idxs = tgt[A] + src[A]
+        print(idxs)
+        H[row:row+A.rank, idxs] = A.A.A # triple A man!
+        row += A.rank
+    H = Matrix(H)
+    print(H)
+    K = H.kernel()
+    print("K =")
+    print(K)
+    print(lookup)
+        
+    
 
+def test_detectors():
+    s = Syntax()
+    MX, MZ, CX, RX, RZ = s.MX, s.MZ, s.CX, s.RX, s.RZ
+
+    spec = MX(0)*RX(0)
+    comp = spec*Module()
+
+    spec = MX(0)*CX(0,1)*RX(0)*RZ(1)
+    comp = spec*Module()
+
+    spec = CX(0,1)
+    comp = spec*Module([0,1])
+
+    find_detectors(comp)
+    
 
 
 def test_syntax():
