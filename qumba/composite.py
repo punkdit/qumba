@@ -455,6 +455,16 @@ class Module:
         for i in idxs:
             self.add(i)
 
+    def get_perm(self):
+        self.check()
+        alloc = self.alloc
+        n = len(alloc)
+        idxs = [None]*n
+        for i in range(n):
+            idxs[alloc[i]] = i
+        print(idxs)
+        return Hom(n, n).get_perm(idxs)
+
     @property
     def n(self):
         return len(self.alloc)
@@ -619,55 +629,29 @@ def encoder(code, verbose=False):
     for i in remain:
         spec.append(syntax.RZ(i))
     spec = reduce(mul, spec)
-    E = spec*Module(src)
+    module = Module(src)
+    E = spec*module
+    P = module.get_perm()
+    #print(P)
+    E = P*E
 
     return spec, E
 
-#    #print(E.Ax)
-#    #print(E.Az)
-#
-#    for item in E.walk():
-#        print(item)
-#
-#    items = list(item.op.Ax for item in E.walk())
-#    op = reduce(mul, items)
-#    print(op)
-#
-#    return op
-#
-#    dode = E.to_code()
-#    print(dode.longstr())
-#    dode.bz_distance()
-#    print(dode)
-#    #assert dode.is_equiv(code)
-#
-#    from qhap.circuit import RX, RZ, CX, TICK
-#    from qhap.layout import to_svg
-#    #c = CX(3,6)*CX(3,4)*CX(2,6)*CX(2,5)*CX(2,4)*\
-#    #    CX(1,6)*CX(1,5)*CX(0,5)*CX(0,4)*RZ(6)*RZ(5)*RZ(4)*RX(2)*RX(1)*RX(0)
-#    circuit = eval(str(spec))*TICK()
-#    flow = circuit.z_flow(0,6)
-#    svg = to_svg(circuit, flow)
-#    f = open("encode.svg", "w").write(svg)
-#    import os
-#    cmd = 'rsvg-convert -f pdf -o encode.pdf encode.svg'
-#    print(cmd)
-#    rval = os.system(cmd)
-#    assert rval == 0
-#
-#    code = QCode.fromstr(
-#    """
-#    XIIXIXX
-#    IXIXXXI
-#    IIXIXXX
-#    ZIZZZII
-#    ZZZIIZI
-#    IZZZIIZ
-#    """)
-#    print(code)
-#    print(code.longstr())
-#
-#    assert code.is_equiv(orig)
+
+def render(spec, name):
+    from qhap.circuit import RX, RZ, CX, TICK
+    from qhap.layout import to_svg
+    circuit = eval(str(spec))*TICK()
+    flow = None
+    #flow = circuit.z_flow(0,6)
+    svg = to_svg(circuit, flow)
+    f = open("%s.svg"%name, "w").write(svg)
+    import os
+    cmd = 'rsvg-convert -f pdf -o %s.pdf %s.svg'%(name, name)
+    print(cmd)
+    rval = os.system(cmd)
+    assert rval == 0
+
 
 
 
@@ -733,21 +717,26 @@ def test_encoder():
         construct.get_422(),
         construct.get_713(),
         construct.get_10_2_3(),
+        #construct.get_colour_488(5),
         #construct.get_bring()
+        CSSCode.random(7, 2, 4, distance=2),
     ]:
 
+        print()
         #code = code.to_css()
         code.bz_distance()
         print(code)
         spec, E = encoder(code, verbose=False)
         print(spec)
         dode = from_encoder(E)
+        dode = dode.get_dual()
         dode.bz_distance()
         print(dode)
-        print(dode.is_equiv(code))
+        assert (dode.is_equiv(code))
         assert dode.d == code.d
 
-    #assert code.is_equiv(construct.get_713())
+    #print(code.longstr())
+    #render(spec, "prep_%d_%d_%d"%(code.n, code.k, code.d))
 
     # -------------------------------------------
 
@@ -852,7 +841,7 @@ def get_random(size):
 def test_random():
     for trial in range(10):
         circ = get_random(10)
-        print(circ.deepstr())
+        #print(circ.deepstr())
 
 
 def eqop(A, B):
@@ -990,6 +979,7 @@ def test():
     test_hom()
     test_random()
     test_composite()
+    test_encoder()
 
 
 
