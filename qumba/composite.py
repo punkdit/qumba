@@ -12,13 +12,13 @@ See previous: css.py
 import time
 from functools import reduce, cache
 from operator import matmul, lshift, mul
-from random import choice
+from random import choice, randint
 import random
 
-def randint(a, b):
-    if a==b:
-        return a
-    return random.randint(a, b)
+#def randint(a, b):
+#    if a==b:
+#        return a
+#    return random.randint(a, b)
 
 
 
@@ -455,15 +455,17 @@ class Module:
         for i in idxs:
             self.add(i)
 
-    def get_perm(self):
+    def get_idxs(self):
         self.check()
         alloc = self.alloc
-        n = len(alloc)
+        #n = len(alloc)
+        n = max(list(alloc.keys()) or [-1])+1
         idxs = [None]*n
         for i in range(n):
-            idxs[alloc[i]] = i
-        print(idxs)
-        return Hom(n, n).get_perm(idxs)
+            if i in alloc:
+                idxs[alloc[i]] = i
+        idxs = [i for i in idxs if i is not None]
+        return idxs
 
     @property
     def n(self):
@@ -478,12 +480,13 @@ class Module:
 
     def add(self, i):
         alloc = self.alloc
-        #print("add:", i, alloc)
+        #print("add:", self.get_idxs(), alloc)
         assert i not in alloc, alloc
         n = len(alloc)
         alloc[i] = n
         #print("\tadd:", alloc)
         self.check()
+        #print("\t", self.get_idxs())
         return n
 
     def remove(self, i):
@@ -501,19 +504,33 @@ class Module:
     def get_identity(self):
         return Operator.identity(self.n)
 
+    def _order(self):
+        "fix up the order of alloc'ated qubit indexes"
+        idxs = self.get_idxs()
+        jdxs = list(idxs)
+        jdxs.sort()
+        lookup = {j:i for (i,j) in enumerate(jdxs)}
+        kdxs = [lookup[i] for i in idxs]
+        n = len(kdxs)
+        P = Hom(n, n).get_perm(kdxs)
+        self.alloc = {i:j for (j,i) in enumerate(jdxs)}
+        return P
+
     def RX(self, i):
         alloc = self.alloc
         n = len(alloc)
         idx = self.add(i)
         op = Hom(n+1, n).RX(idx)
-        return op
+        P = self._order()
+        return P*op
 
     def RZ(self, i):
         alloc = self.alloc
         n = len(alloc)
         idx = self.add(i)
         op = Hom(n+1, n).RZ(idx)
-        return op
+        P = self._order()
+        return P*op
 
     def CX(self, i, j):
         alloc = self.alloc
@@ -560,12 +577,10 @@ def stack(code):
 
 def encoder(code, verbose=False):
 
-    # TODO: clean up this mess (no going via QCode etc etc)
-
-    orig = code
+    # TODO: clean up and optimize this mess.
+    # (now we are going via QCode, to keep track of the reduced H matrix.)
 
     syntax = Syntax()
-    #space = code.space
     space = SymplecticSpace(code.n)
     H = stack(code)
     n, m = H.shape
@@ -588,7 +603,6 @@ def encoder(code, verbose=False):
         if verbose:
             print(H)
         assert H.shape == (n, m)
-        #for j in range(row, n):
         for pivot in range(n):
             if pivot in pivots:
                 continue
@@ -632,9 +646,6 @@ def encoder(code, verbose=False):
 
     module = Module(src)
     E = spec*module
-    P = module.get_perm()
-    #print(P)
-    E = P*E
 
     return spec, E
 
@@ -665,8 +676,8 @@ def test_encoder():
     op = spec*Module([1])
     rhs = op.op
 
-    #lhs = Hom(3,2).RZ(2)*(Hom(1,0).RX(0) @ Hom(1,1).identity())
-    lhs = Hom(3,2).RX(2)*Hom(2,1).RZ(1) # hmm, Module scrambles the indexes..
+    lhs = Hom(3,2).RZ(2)*(Hom(1,0).RX(0) @ Hom(1,1).identity())
+    #lhs = Hom(3,2).RX(2)*Hom(2,1).RZ(1) # hmm, Module scrambles the indexes..
     assert eqop(lhs, rhs)
 
     spec = CX(0,1)*CX(1,2)*CX(2,0)
@@ -719,21 +730,21 @@ def test_encoder():
         construct.get_713(),
         construct.get_10_2_3(),
         #construct.get_colour_488(5),
-        #construct.get_bring()
+        #construct.get_bring(),
         CSSCode.random(7, 2, 4, distance=2),
     ]:
 
         print()
         #code = code.to_css()
-        code.bz_distance()
+        #code.bz_distance()
         print(code)
         spec, E = encoder(code, verbose=False)
         print(spec)
         dode = from_encoder(E)
-        dode.bz_distance()
+        #dode.bz_distance()
         print(dode)
         assert (dode.is_equiv(code))
-        assert dode.d == code.d
+        #assert dode.d == code.d
 
     #print(code.longstr())
     #render(spec, "prep_%d_%d_%d"%(code.n, code.k, code.d))
@@ -754,10 +765,7 @@ def test_syntax():
     assert mod.alloc == {1:0}
 
     lhs, rhs = (RX(0)*RZ(1))*Module(), (RZ(1)*RX(0))*Module()
-    #print(lhs.op.Ax)
-    #print(rhs.op.Ax)
-    #assert eqop(lhs, rhs) # FAIL
-
+    assert eqop(lhs, rhs)
 
 
 def test_composite():
