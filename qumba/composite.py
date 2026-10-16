@@ -533,11 +533,17 @@ class Module:
         return P*op
 
     def CX(self, i, j):
+        # we can't add qubits here because we must return a unitary
+        #if i not in self.alloc:
+        #    self.add(i)
+        #if j not in self.alloc:
+        #    self.add(j)
         alloc = self.alloc
         n = len(alloc)
         idx = alloc[i]
         jdx = alloc[j]
         op = Hom(n, n).CX(idx, jdx)
+        #P = self._order()
         return op
 
     def SWAP(self, i, j):
