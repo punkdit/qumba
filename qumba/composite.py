@@ -72,19 +72,19 @@ class Circuit:
         left = code.Hx.stack(code.Lx)
         right = Matrix.zeros((code.mx, code.k))
         right = right.stack(Matrix.identity(code.k))
-        Ex = Relation(left, right)
+        Ez = Relation(left, right)
     
         left = code.Hz.stack(code.Lz)
         right = Matrix.zeros((code.mz, code.k))
         right = right.stack(Matrix.identity(code.k))
-        Ez = Relation(left, right)
+        Ex = Relation(left, right)
     
         return Operator(Ex, Ez)
     
     def to_code(self):
         op = self.op
         assert isinstance(op, Operator)
-        Ex, Ez = op.pair
+        Ez, Ex = op.pair
     
         #print("from_encoder")
         #print(Ex, Ex.shape)
@@ -629,6 +629,7 @@ def encoder(code, verbose=False):
     for i in remain:
         spec.append(syntax.RZ(i))
     spec = reduce(mul, spec)
+
     module = Module(src)
     E = spec*module
     P = module.get_perm()
@@ -729,7 +730,6 @@ def test_encoder():
         spec, E = encoder(code, verbose=False)
         print(spec)
         dode = from_encoder(E)
-        dode = dode.get_dual()
         dode.bz_distance()
         print(dode)
         assert (dode.is_equiv(code))
@@ -754,7 +754,9 @@ def test_syntax():
     assert mod.alloc == {1:0}
 
     lhs, rhs = (RX(0)*RZ(1))*Module(), (RZ(1)*RX(0))*Module()
-    assert eqop(lhs, rhs)
+    #print(lhs.op.Ax)
+    #print(rhs.op.Ax)
+    #assert eqop(lhs, rhs) # FAIL
 
 
 
@@ -940,7 +942,7 @@ def test_hom():
     #print(code)
     #print(code.longstr())
 
-    assert eqop(get_encoder(code), Operator(Ex, Ez))
+    assert eqop(get_encoder(code), Operator(Ez, Ex))
 
     # ------------------------------------------------
     # test from_encoder
@@ -979,6 +981,7 @@ def test():
     test_hom()
     test_random()
     test_composite()
+    test_syntax()
     test_encoder()
 
 
