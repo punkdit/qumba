@@ -211,9 +211,16 @@ class Operator(Circuit):
         return Operator(Rx, Rz)
 
     @classmethod
+    @cache
     def identity(cls, n):
         Rx = Relation.identity(n)
         return Operator(Rx, Rx)
+
+    def is_identity(self):
+        tgt, src = self.shape
+        if tgt != src:
+            return False
+        return self == Operator.identity(tgt)
 
     @classmethod
     def zero(cls, l, r):
@@ -768,6 +775,8 @@ def test_encoder():
     # -------------------------------------------
 
 
+
+
 def test_goto():
 
     s = Syntax()
@@ -791,10 +800,51 @@ def test_goto():
 
     module = Module()
     comp = spec*module
-    #print(comp.op.Ax)
-    print(comp.deepstr())
+    find_detectors(comp)
+    #render(spec, "goto_713")
 
-    render(spec, "goto_713")
+def find_detectors(comp):
+    assert isinstance(comp, Circuit)
+    #print(comp.op.Ax)
+    #print(comp.deepstr())
+    ops = list(comp.walk())
+    #print(len(ops))
+    ops = [op for op in ops if not op.is_identity()]
+    #print(len(ops))
+    ops = list(reversed(ops))
+    edges = {}
+    prev = None
+    for idx,op in enumerate(ops):
+        A = op.Ax
+        print("(%s<--%s)"%(A.tgt, A.src), end=' ')
+        if idx == 0:
+            for jdx in range(A.src):
+                edges[idx,jdx] = [A, None]
+        else:
+            assert prev.tgt == A.src
+            for jdx in range(A.src):
+                key = (idx-1,jdx)
+                assert key in edges, (key, edges)
+                edge = edges[idx-1,jdx]
+                assert edge[0] is None
+                edge[0] = A
+        for jdx in range(A.tgt):
+            key = idx,jdx
+            assert key not in edges
+            edges[key] = [None, A]
+        prev = A
+    print()
+    keys = list(edges.keys())
+    keys.sort(key = lambda key:key[1])
+    #print(keys)
+    for key in keys:
+        edge = edges[key]
+        if edge[0] is None:
+            print(key)
+        #print(key, repr(edges[key]))
+    print()
+    print(len(edges))
+
 
 
 def test_syntax():
