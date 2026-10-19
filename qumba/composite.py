@@ -19,14 +19,6 @@ import time
 from functools import reduce, cache
 from operator import matmul, lshift, mul
 from random import choice, randint
-import random
-
-#def randint(a, b):
-#    if a==b:
-#        return a
-#    return random.randint(a, b)
-
-
 
 import numpy
 
@@ -699,8 +691,8 @@ def test_encoder():
     op = spec*Module([1])
     rhs = op.op
 
+    # check that Module doesn't scramble the indexes
     lhs = Hom(3,2).RZ(2)*(Hom(1,0).RX(0) @ Hom(1,1).identity())
-    #lhs = Hom(3,2).RX(2)*Hom(2,1).RZ(1) # hmm, Module scrambles the indexes..
     assert eqop(lhs, rhs)
 
     spec = CX(0,1)*CX(1,2)*CX(2,0)
@@ -712,6 +704,8 @@ def test_encoder():
     rhs = cx(0,1)*cx(1,2)*cx(2,0)
     assert eqop(lhs, rhs)
 
+    # -------------------------------------------
+
     spec = [CX(0,3), CX(0,5), CX(0,6), CX(1,3), CX(1,4),
     CX(1,5), CX(2,4), CX(2,5), CX(2,6), CX(3,0), CX(3,1),
     CX(3,4), CX(3,6), RX(0), RX(1), RX(2), RZ(4), RZ(5), RZ(6)]
@@ -722,10 +716,9 @@ def test_encoder():
     op = spec*Module([3])
     E = op.op
     code = (from_encoder(E))
-    code.bz_distance()
-    #print(code)
-    assert code.d == 3
-    #assert code.is_equiv(construct.get_713()) # got swapped...
+    assert code.is_equiv(construct.get_713()) 
+
+    # -------------------------------------------
 
     op = Hom(1,1).identity()
     n = 1
