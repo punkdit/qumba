@@ -580,6 +580,93 @@ class Module:
         return Hom(n, n).identity()
 
 
+def from_stim(data):
+
+    lines = data.split("\n")
+    gates = []
+    rlook = {}
+    mlook = {}
+    for idx,line in enumerate(lines):
+        flds = line.strip().split()
+        gate = tuple([flds[0]] + [int(fld) for fld in flds[1:]])
+        gates.append(gate)
+
+    for idx,gate in enumerate(gates):
+        if gate[0] == "R":
+            j = gate[1]
+            assert j not in rlook
+            rlook[j] = idx
+        if gate[0] == "M":
+            j = gate[1]
+            assert j not in mlook
+            mlook[j] = idx
+
+    print(mlook)
+    for idx,gate in enumerate(gates):
+        if gate[0] == "CX":
+            _, i, j = gate
+            if i in rlook:
+                del rlook[i]
+            if j in rlook:
+                del rlook[j]
+        if gate[0] == "H":
+            _, i = gate
+            if i in rlook:
+                j = rlook[i]
+                assert gates[j] == ("R", i)
+                gates[j] = ("RX", i)
+                del rlook[i]
+            elif i in mlook:
+                j = mlook[i]
+                assert gates[j] == ("M", i)
+                gates[j] = ("MX", i)
+                del mlook[i]
+
+    #print(gates)
+    idx = 0
+    while idx < len(gates):
+        gate = gates[idx]
+        op = gate[0]
+        if op == "H":
+            gates.pop(idx)
+            continue
+        if op == "R":
+            gates[idx] = ("RZ", gate[1])
+        if op == "M":
+            gates[idx] = ("MZ", gate[1])
+        idx += 1
+    #print(gates)
+
+    tick = False
+    idx = 0
+    while idx < len(gates):
+        gate = gates[idx]
+        op = gate[0]
+        if op == "CX":
+            tick = True
+        if op[0] == "M":
+            if tick:
+                gates.insert(idx, ("TICK",))
+            tick = False
+        if tick:
+            gates.insert(idx, ("TICK",))
+            idx += 1
+        idx += 1
+
+    c = Syntax()
+    spec = []
+    for gate in gates:
+        op = gate[0]
+        args = gate[1:]
+        s = getattr(c, op)(*args)
+        spec.append(s)
+    spec = list(reversed(spec))
+    spec = reduce(mul, spec)
+    return spec
+
+
+
+
 def stack(code):
     assert code.is_css()
     assert "Y" not in code.longstr()
@@ -769,34 +856,6 @@ def test_encoder():
 
 
 
-
-def test_goto():
-
-    s = Syntax()
-    RZ, RX, CX = s.RZ, s.RX, s.CX
-    MZ, MX = s.MZ, s.MX
-    TICK = s.TICK
-    spec = []
-    for i in [0,4,5,6,7]:
-        spec.append(RZ(i))
-    for i in [1,2,3]:
-        spec.append(RX(i))
-    spec.append(TICK())
-    for (i,j) in "10 35 26 14 20 36 15 64 07 57 67".split():
-        spec.append(CX(int(i), int(j)))
-        spec.append(TICK())
-    spec.append(MZ(7))
-    spec.append(TICK())
-    print(spec)
-    spec = reduce(mul, reversed(spec))
-    print(spec)
-
-    module = Module()
-    comp = spec*module
-    find_detectors(comp)
-    #render(spec, "goto_713")
-
-
 def find_detectors(comp):
     assert isinstance(comp, Circuit)
     #print(comp.op.Ax)
@@ -848,7 +907,7 @@ def find_detectors(comp):
     for A in rels:
         rows[A] = m
         m += A.rank
-    print(m, n)
+    #print(m, n)
     lookup = {col:key for (col,key) in enumerate(keys)}
     H = numpy.zeros((m,n), dtype=int)
     #print(H)
@@ -871,17 +930,45 @@ def find_detectors(comp):
     row = 0
     for A in rels:
         idxs = tgt[A] + src[A]
-        print(idxs)
+        #print(idxs)
         H[row:row+A.rank, idxs] = A.A.A # triple A man!
         row += A.rank
     H = Matrix(H)
-    print(H)
+    print("H =", H.shape)
     K = H.kernel()
     print("K =")
-    print(K)
-    print(lookup)
+    print(K.shape)
+    print(len(lookup))
         
     
+
+def test_goto():
+
+    s = Syntax()
+    RZ, RX, CX = s.RZ, s.RX, s.CX
+    MZ, MX = s.MZ, s.MX
+    TICK = s.TICK
+    spec = []
+    for i in [0,4,5,6,7]:
+        spec.append(RZ(i))
+    for i in [1,2,3]:
+        spec.append(RX(i))
+    spec.append(TICK())
+    for (i,j) in "10 35 26 14 20 36 15 64 07 57 67".split():
+        spec.append(CX(int(i), int(j)))
+        spec.append(TICK())
+    spec.append(MZ(7))
+    spec.append(TICK())
+    print(spec)
+    spec = reduce(mul, reversed(spec))
+    print(spec)
+
+    module = Module()
+    comp = spec*module
+    find_detectors(comp)
+    #render(spec, "goto_713")
+
+
 
 def test_detectors():
     s = Syntax()
@@ -895,6 +982,15 @@ def test_detectors():
 
     spec = CX(0,1)
     comp = spec*Module([0,1])
+
+    find_detectors(comp)
+
+
+def load_stim():
+    name = argv.next() or "zero_prep_20_2_6.stim"
+    data = open(name).read()
+    spec = from_stim(data)
+    comp = spec*Module()
 
     find_detectors(comp)
     
@@ -1168,5 +1264,4 @@ if __name__ == "__main__":
 
     t = time() - start_time
     print("OK! finished in %.3f seconds\n"%t)
-
 
