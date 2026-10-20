@@ -7,9 +7,9 @@ and more...
 
 See previous: css.py 
 
-The Module interface sometimes needs to do a tensor
+The Module _interface sometimes needs to do a tensor
 product, not just a composition. 
-Possibly extend the Syntax interface?
+Possibly extend the Syntax _interface?
 eg. methods return (op,tensorand) pair? 
 or something like that?
 
@@ -22,7 +22,7 @@ from random import choice, randint
 
 import numpy
 
-from qumba.syntax import Syntax
+#from qumba.syntax import Syntax # ugh... the API doesn't fit very well...
 from qumba.matrix import Matrix, pullback
 from qumba.rel import Relation # linear relations
 from qumba.csscode import CSSCode
@@ -32,6 +32,67 @@ from qumba import construct
 from qumba.argv import argv
 from qumba.util import choose
 from qumba.smap import SMap
+
+
+# ----------------------------------------------------------------------------
+# Another attempt at a Syntax class 
+
+class Atom:
+    def __init__(self, name, *args):
+        assert type(name) is str, "what's this: %r"%(name,)
+        self.name = name
+        self.args = args
+        self.key = (name, args)
+        self.atoms = [self]
+    def __str__(self):
+        s = "%s%s"%(self.name, self.args)
+        s = s.replace(",)", ")")
+        s = s.replace(" ", "")
+        return s
+    __repr__ = __str__
+    def __mul__(self, other):
+        assert isinstance(other, Atom)
+        return Molecule(self.atoms + other.atoms) # algebraic order of atoms
+    def __len__(self):
+        return len(self.atoms)
+    def __getitem__(self, idx):
+        return self.atoms[idx]
+# use object identity ... 
+#    def __eq__(self, other):
+#        assert isinstance(other, Atom)
+#        return self.key == other.key
+#    def __hash__(self):
+#        return hash(self.key)
+
+
+class Molecule(Atom):
+    def __init__(self, atoms):
+        self.atoms = list(atoms)
+    def __str__(self):
+        return "*".join(str(atom) for atom in self.atoms)
+    def __eq__(self, other):
+        assert 0, "um?"
+        return self.atoms == other.atoms
+
+
+class Method:
+    def __init__(self, name):
+        assert type(name) is str
+        self.name = name
+
+    def __call__(self, *arg, **kw):
+        assert not kw, "um...?"
+        return Atom(self.name, *arg)
+
+
+class Syntax:
+    def __getattr__(self, name):
+        return Method(name)
+
+
+# ----------------------------------------------------------------------------
+
+
 
 
 class Circuit:
@@ -136,7 +197,7 @@ from_encoder = Circuit.to_code
 
 
 class Operator(Circuit):
-    "The atomic Operator's in a Composite Circuit"
+    "The _atomic Operator's in a Composite Circuit"
     def __init__(self, Ax, Az=None, check=True):
         if isinstance(Ax, Circuit):
             Ax = Ax.op.Ax
@@ -151,10 +212,11 @@ class Operator(Circuit):
         self.pair = (Ax, Az)
         if check:
             assert Ax.dual == Az
+        self.atom = None # my Syntax
         Circuit.__init__(self, self, Ax.tgt, Ax.src) # i am my own Operator
 
     @property
-    @cache
+    #@cache need my own atom
     def reverse(self):
         Ax, Az = self.Ax, self.Az
         return Operator(Ax.reverse, Az.reverse)
@@ -164,6 +226,11 @@ class Operator(Circuit):
     def dual(self):
         Ax, Az = self.Ax, self.Az
         return Operator(Az, Ax)
+
+    def set(self, atom):
+        assert type(atom) is Atom
+        assert self.atom is None, "already got atom %r"%(self.atom,)
+        self.atom = atom
 
     def walk(self):
         yield self
@@ -203,7 +270,7 @@ class Operator(Circuit):
         return Operator(Rx, Rz)
 
     @classmethod
-    @cache
+    #@cache # don't cache because i need my own atom
     def identity(cls, n):
         Rx = Relation.identity(n)
         return Operator(Rx, Rx)
@@ -459,6 +526,7 @@ class Module:
         self.alloc = {} # qubit idxs
         for i in idxs:
             self.add(i)
+        #self.lookup = None
 
     def get_idxs(self):
         self.check()
@@ -506,9 +574,6 @@ class Module:
                 alloc[key] = jdx-1
         self.check()
 
-    def get_identity(self):
-        return Operator.identity(self.n)
-
     def _order(self):
         "fix up the order of alloc'ated qubit indexes"
         idxs = self.get_idxs()
@@ -521,13 +586,48 @@ class Module:
         self.alloc = {i:j for (j,i) in enumerate(jdxs)}
         return P
 
+    def interpret(self, syntax):
+#        print("Module.interpret")
+#        print(syntax.atoms)
+        #assert self.lookup is None, "remove me?"
+        #lookup = {}
+        #op = self.identity()
+        op = None
+        #for item in reversed(list(syntax)):
+        #for (name, arg, kw) in reversed(syntax.atoms):
+        for atom in reversed(syntax.atoms):
+            meth = getattr(self, atom.name)
+            lhs = meth(*atom.args)
+            assert type(lhs) is Operator, "must be atom Operator, not %r"%type(lhs)
+            #assert atom not in lookup, "do not reuse Syntax: %s"%atom
+            #lookup[atom] = lhs
+            #assert lhs not in lookup
+            #key = id(lhs)
+            #assert key not in lookup, str(key)
+            #lookup[key] = atom
+            lhs.set(atom)
+#            print("\t", atom)
+            if op is None:
+                op = lhs
+            else:
+                op = lhs*op
+        #self.lookup = lookup
+        return op
+
+    def get_identity(self):
+        assert 0, "don't use __mul__, use interpret"
+
+    def identity(self):
+        return Operator.identity(self.n)
+
     def RX(self, i):
         alloc = self.alloc
         n = len(alloc)
         idx = self.add(i)
         op = Hom(n+1, n).RX(idx)
         P = self._order()
-        return P*op
+        op = (P*op).op
+        return op
 
     def RZ(self, i):
         alloc = self.alloc
@@ -535,7 +635,8 @@ class Module:
         idx = self.add(i)
         op = Hom(n+1, n).RZ(idx)
         P = self._order()
-        return P*op
+        op = (P*op).op
+        return op
 
     def CX(self, i, j):
         # we can't add qubits here because we must return a unitary
@@ -545,6 +646,8 @@ class Module:
         #    self.add(j)
         alloc = self.alloc
         n = len(alloc)
+        assert i in alloc, "add %d to Module constructor?"%i
+        assert j in alloc, "add %d to Module constructor?"%j
         idx = alloc[i]
         jdx = alloc[j]
         op = Hom(n, n).CX(idx, jdx)
@@ -747,7 +850,8 @@ def encoder(code, verbose=False):
     spec = reduce(mul, spec)
 
     module = Module(src)
-    E = spec*module
+    #E = spec*module
+    E = module.interpret(spec)
 
     return spec, E
 
@@ -775,7 +879,7 @@ def test_encoder():
     MX, MZ, CX, RX, RZ = s.MX, s.MZ, s.CX, s.RX, s.RZ
 
     spec = RX(0)*RZ(2)
-    op = spec*Module([1])
+    op = Module([1]).interpret(spec)
     rhs = op.op
 
     # check that Module doesn't scramble the indexes
@@ -783,7 +887,7 @@ def test_encoder():
     assert eqop(lhs, rhs)
 
     spec = CX(0,1)*CX(1,2)*CX(2,0)
-    circ = spec*Module([0,1,2])
+    circ = Module([0,1,2]).interpret(spec)
     lhs = circ.op
 
     hom = Hom(3,3)
@@ -800,7 +904,7 @@ def test_encoder():
         *CX(2,5)*CX(2,6)*CX(3,0)*CX(3,1)*CX(3,4)*CX(3,6)\
         *RX(0)*RX(1)*RX(2)*RZ(4)*RZ(5)*RZ(6)
 
-    op = spec*Module([3])
+    op = Module([3]).interpret(spec)
     E = op.op
     code = (from_encoder(E))
     assert code.is_equiv(construct.get_713()) 
@@ -856,24 +960,35 @@ def test_encoder():
 
 
 
-def find_detectors(comp):
+def find_detectors(syntax, src=[], dual=False):
+    print("find_detectors(%s)"%syntax)
+    module = Module(src)
+    #comp = syntax*Module(src)
+    comp = module.interpret(syntax)
     assert isinstance(comp, Circuit)
-    #print(comp.op.Ax)
-    #print(comp.deepstr())
     ops = list(comp.walk())
     #print(len(ops))
-    ops = [op for op in ops if not op.is_identity()]
+    for op in ops:
+        #print(op, op.atom)
+        assert op.atom is not None
+        assert op.atom in syntax # XXX remove (slow)
+        #print(module.lookup.get(id(op)))
+    ops = [op for op in ops if not op.is_identity()] # get rid of the TICK's
     #print(len(ops))
-    ops = list(reversed(ops))
+    ops = list(reversed(ops)) # <------ backwards <----
+    # edges: (idx,jdx) --> [tgt:Relation, src:Relation]
+    # idx is the time index
+    # jdx is the qubit index
     edges = {}
     prev = None
-    rels = [op.Ax for op in ops] # or Az ?
+    if dual:
+        rels = [op.Az for op in ops]
+    else:
+        rels = [op.Ax for op in ops]
     for idx,A in enumerate(rels):
         #print("idx =", idx)
         #print("(%s<--%s)"%(A.tgt, A.src))
         #print("edges:", list(edges.keys()))
-        # idx is the time index
-        # jdx is the qubit index
         if idx == 0:
             for jdx in range(A.src):
                 edges[idx,jdx] = [A, None] # tgt,src
@@ -893,22 +1008,12 @@ def find_detectors(comp):
         prev = A
     #print()
     keys = list(edges.keys())
-    keys.sort(key = lambda key:key[1])
-    #print(keys)
-    for key in keys:
-        edge = edges[key]
-        #if edge[0] is None:
-        #    print(key)
-        #print(key, repr(edges[key]))
-    cols = {key:i for (i,key) in enumerate(keys)}
+    keys.sort(key = lambda key:key[1]) # sort by qubit index? do we care?
+    #keys.sort() # do we care
+    print(keys)
+    #lookup = {key:i for (i,key) in enumerate(keys)}
+    m = sum(A.rank for A in rels)
     n = len(edges)
-    rows = {}
-    m = 0
-    for A in rels:
-        rows[A] = m
-        m += A.rank
-    #print(m, n)
-    lookup = {col:key for (col,key) in enumerate(keys)}
     H = numpy.zeros((m,n), dtype=int)
     #print(H)
     src = {}
@@ -931,16 +1036,44 @@ def find_detectors(comp):
     for A in rels:
         idxs = tgt[A] + src[A]
         #print(idxs)
-        H[row:row+A.rank, idxs] = A.A.A # triple A man!
+        H[row:row+A.rank, idxs] = A.A.A # triple A !
         row += A.rank
     H = Matrix(H)
     print("H =", H.shape)
     K = H.kernel()
-    print("K =")
-    print(K.shape)
-    print(len(lookup))
-        
+    print("K =", K.shape)
+    print(K)
+    for i in range(len(K)):
+        for j in range(n):
+            if K[i,j]:
+                idx, jdx = keys[j]
+                if idx < len(ops):
+                    op = ops[idx]
+                    atom = op.atom
+                    if jdx in atom.args:
+                        print(op.atom, end=' ')
+        print()
+    print()
     
+
+def test_simple_detectors():
+    s = Syntax()
+    MX, MZ, CX, RX, RZ, TICK = s.MX, s.MZ, s.CX, s.RX, s.RZ, s.TICK
+
+    syntax = MX(0)*TICK()*RX(0)
+    find_detectors(syntax, [])
+    find_detectors(syntax, [], dual=True)
+
+    syntax = MX(0)*TICK()*CX(0,1)*TICK()*RX(0)*RZ(1)
+    find_detectors(syntax, [])
+    find_detectors(syntax, [], dual=True)
+
+    syntax = CX(0,1)
+    find_detectors(syntax, [0,1])
+    find_detectors(syntax, [0,1], dual=True)
+
+    #test_goto()
+
 
 def test_goto():
 
@@ -959,41 +1092,14 @@ def test_goto():
         spec.append(TICK())
     spec.append(MZ(7))
     spec.append(TICK())
-    print(spec)
-    spec = reduce(mul, reversed(spec))
-    print(spec)
+    #print(spec)
+    syntax = reduce(mul, reversed(spec))
+    #print(syntax)
 
-    module = Module()
-    comp = spec*module
-    find_detectors(comp)
+    find_detectors(syntax)
+    find_detectors(syntax, dual=True)
     #render(spec, "goto_713")
 
-
-
-def test_detectors():
-    s = Syntax()
-    MX, MZ, CX, RX, RZ = s.MX, s.MZ, s.CX, s.RX, s.RZ
-
-    spec = MX(0)*RX(0)
-    comp = spec*Module()
-
-    spec = MX(0)*CX(0,1)*RX(0)*RZ(1)
-    comp = spec*Module()
-
-    spec = CX(0,1)
-    comp = spec*Module([0,1])
-
-    find_detectors(comp)
-
-
-def load_stim():
-    name = argv.next() or "zero_prep_20_2_6.stim"
-    data = open(name).read()
-    spec = from_stim(data)
-    comp = spec*Module()
-
-    find_detectors(comp)
-    
 
 def test_iceberg():
     # See https://arxiv.org/abs/2504.21172 Fig 3.
@@ -1012,11 +1118,26 @@ def test_iceberg():
         syntax = (TICK()) * syntax
 
     syntax = MZ(n)*MX(n+1)*syntax
+    #print(syntax)
+
+    #render(syntax, "iceberg")
+
+    src = list(range(n))
+    find_detectors(syntax, src)
+    find_detectors(syntax, src, dual=True)
+
+
+def load_stim():
+    name = argv.next() or "zero_prep_20_2_6.stim"
+    data = open(name).read()
+    spec = from_stim(data)
+    find_detectors(spec)
+
+def test_detectors():
+    test_simple_detectors()
+    test_goto()
+    test_iceberg()
     
-    print(syntax)
-
-    render(syntax, "iceberg")
-
 
 def test_syntax():
     s = Syntax()

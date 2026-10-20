@@ -36,6 +36,11 @@ class Term:
         if isinstance(item, QCode):
             return (self * item.space) * item
 
+        #from qumba.composite import Module
+        #print(item.__class__)
+        #if isinstance(item, Module):
+        #    return item.interp(self)
+
         if hasattr(item, "target") and item.target is not None:
             # this is so we can hit operators... good idea?
             op = item # we already are an op
