@@ -995,6 +995,28 @@ def load_stim():
     find_detectors(comp)
     
 
+def test_iceberg():
+    # See https://arxiv.org/abs/2504.21172 Fig 3.
+    n = 20
+    s = Syntax()
+    MX, MZ, CX, RX, RZ = s.MX, s.MZ, s.CX, s.RX, s.RZ
+    TICK = s.TICK
+
+    syntax = TICK()*RZ(n)*RX(n+1) # ancilla
+    for ij in "01 10 23 45 32 54 67 89 76 98 10,11 12,13 11,10 13,12 14,15 16,17 15,14 17,16 18,19 19,18".split():
+        if "," in ij:
+            ij = ij.split(",")
+        i,j = ij
+        syntax = (CX(int(i), int(n))) * syntax
+        syntax = (CX(int(n+1), int(j))) * syntax
+        syntax = (TICK()) * syntax
+
+    syntax = MZ(n)*MX(n+1)*syntax
+    
+    print(syntax)
+
+    render(syntax, "iceberg")
+
 
 def test_syntax():
     s = Syntax()
