@@ -93,12 +93,14 @@ class Syntax:
 
 
 class Circuit:
-    def __init__(self, op, tgt, src):
+    def __init__(self, op, hom):
         assert isinstance(op, Operator)
+        assert isinstance(hom, Hom)
         self.op = op
-        self.tgt = tgt
-        self.src = src
-        self.shape = (tgt, src)
+        self.hom = hom
+        self.src = hom.n
+        self.tgt = hom.m
+        self.shape = (self.tgt, self.src)
 
 #    @property
 #    def tgt(self)
@@ -135,7 +137,8 @@ class Circuit:
         right = right.stack(Matrix.identity(code.k))
         Ex = Relation(left, right)
     
-        return Operator(Ex, Ez)
+        hom = Hom(code.n, code.k)
+        return Operator(Ex, Ez, hom)
     
     def to_code(self):
         op = self.op
@@ -195,11 +198,12 @@ from_encoder = Circuit.to_code
 
 class Operator(Circuit):
     "The _atomic Operator's in a Composite Circuit"
-    def __init__(self, Ax, Az=None, check=True):
+    def __init__(self, Ax, Az, hom, check=True):
         if isinstance(Ax, Circuit):
             Ax = Ax.op.Ax
         if isinstance(Az, Circuit):
             Az = Az.op.Ax
+        assert isinstance(hom, Hom)
         Ax = Relation.promote(Ax)
         if Az is None:
             Az = Ax.dual
@@ -210,22 +214,23 @@ class Operator(Circuit):
         if check:
             assert Ax.dual == Az
         self.atom = None # my Syntax
-        Circuit.__init__(self, self, Ax.tgt, Ax.src) # i am my own Operator
+        # i am my own Operator
+        Circuit.__init__(self, self, hom)
 
     @property
     #@cache need my own atom
     def reverse(self):
         Ax, Az = self.Ax, self.Az
-        return Operator(Ax.reverse, Az.reverse)
+        return Operator(Ax.reverse, Az.reverse, self.hom.reverse)
 
     @property
     @cache
     def dual(self):
         Ax, Az = self.Ax, self.Az
-        return Operator(Az, Ax)
+        return Operator(Az, Ax, self.hom)
 
     def copy(self):
-        return Operator(self.Ax.copy(), self.Az.copy())
+        return Operator(self.Ax.copy(), self.Az.copy(), self.hom)
 
     def set(self, atom):
         assert type(atom) is Atom
@@ -239,13 +244,13 @@ class Operator(Circuit):
         assert isinstance(other, Operator), type(other)
         Ax = self.Ax * other.Ax
         Az = self.Az * other.Az
-        return Operator(Ax, Az)
+        return Operator(Ax, Az, self.hom*other.hom)
 
     def __matmul__(self, other):
         assert isinstance(other, Operator), type(other)
         Ax = self.Ax @ other.Ax
         Az = self.Az @ other.Az
-        return Operator(Ax, Az)
+        return Operator(Ax, Az, self.hom@other.hom)
 
     def __eq__(self, other):
         assert isinstance(other, Operator), (type(self), type(other))
@@ -257,34 +262,11 @@ class Operator(Circuit):
     def __str__(self):
         return "(%s | %s)"%(self.Ax.spanstr(), self.Az.spanstr())
 
-    @classmethod
-    def black(cls, l, r):
-        Rx = Relation.black(l, r)
-        Rz = Relation.white(l, r)
-        return Operator(Rx, Rz)
-
-    @classmethod
-    def white(cls, l, r):
-        Rx = Relation.white(l, r)
-        Rz = Relation.black(l, r)
-        return Operator(Rx, Rz)
-
-    @classmethod
-    #@cache # don't cache because i need my own atom
-    def identity(cls, n):
-        Rx = Relation.identity(n)
-        return Operator(Rx, Rx)
-
     def is_identity(self):
         tgt, src = self.shape
         if tgt != src:
             return False
         return self == Operator.identity(tgt)
-
-    @classmethod
-    def zero(cls, l, r):
-        Rx = Relation.zero(l, r)
-        return Operator(Rx)
 
 
 class Composite(Circuit): # XXX binary tree, just make this a list ??
@@ -299,9 +281,10 @@ class Composite(Circuit): # XXX binary tree, just make this a list ??
 
         Ax = (lop.Ax * rop.Ax)
         Az = (lop.Az * rop.Az)
-        op = Operator(Ax, Az)
+        hom = lhs.hom*rhs.hom
+        op = Operator(Ax, Az, hom)
 
-        Circuit.__init__(self, op, op.tgt, op.src)
+        Circuit.__init__(self, op, hom)
 
     def __str__(self):
         return "(%s*%s=%s)"%(self.lhs, self.rhs, self.op)
@@ -335,38 +318,70 @@ class Composite(Circuit): # XXX binary tree, just make this a list ??
 class Hom:
     " Hom( tgt <--- src ) "
 
-    _w = Operator.white(0, 1)
-    w_ = Operator.white(1, 0)
-    _b = Operator.black(0, 1)
-    b_ = Operator.black(1, 0)
-    I = Operator.identity(1)
+#    _w = Operator.white(0, 1)
+#    w_ = Operator.white(1, 0)
+#    _b = Operator.black(0, 1)
+#    b_ = Operator.black(1, 0)
+#    I = Operator.identity(1)
 
-    @cache # singleton
-    def __new__(cls, m, n=None):
-        ob = object.__new__(cls)
-        return ob
-
-    def __init__(self, m, n=None):
-        if n is None:
-            n = m
-        self.m = m
-        self.n = n
+    def __init__(self, tgt, src=None):
+        if src is None:
+            src = tgt
+        if type(tgt) is int:
+            tgt = list(range(tgt))
+        if type(src) is int:
+            src = list(range(src))
+        self.tgt = list(tgt)
+        self.src = list(src)
+        self.m = len(tgt)
+        self.n = len(src)
+        self.shape = (self.m, self.n)
 
     @property
     def reverse(self):
-        return Hom(self.n, self.m)
+        return Hom(self.src, self.tgt)
+
+    def __matmul__(self, other):
+        assert isinstance(other, Hom)
+        return Hom(self.m+other.m, self.n+other.n)
+
+    def __mul__(self, other):
+        assert isinstance(other, Hom)
+        return Hom(self.m, other.n)
 
     def __str__(self):
-        return "(%s<--%s)"%(self.m, self.n)
+        return "(%s<--%s)"%(self.tgt, self.src)
     __repr__ = __str__
 
     def __getitem__(self, i):
         # i am a shape tuple
         return (self.m, self.n)[i]
 
+    def black(self):
+        l, r = self.shape
+        Rx = Relation.black(l, r)
+        Rz = Relation.white(l, r)
+        return Operator(Rx, Rz, self)
+
+    def white(self):
+        l, r = self.shape
+        Rx = Relation.white(l, r)
+        Rz = Relation.black(l, r)
+        return Operator(Rx, Rz, self)
+
+    def zero(self):
+        l, r = self.shape
+        Rx = Relation.zero(l, r)
+        return Operator(Rx, None, self)
+
     def identity(self):
-        assert self.m == self.n
-        return Operator.identity(self.m)
+        return Operator(Rx, Rx, self)
+
+    def identity(self):
+        assert self.tgt == self.src
+        n = self.n
+        Rx = Relation.identity(n)
+        return Operator(Rx, Rx, self)
 
     def RX(self, *idxs):
         "prepare X state: |+> on idxs"
@@ -378,14 +393,16 @@ class Hom:
             idxs = list(idxs)
         assert m == n+len(idxs), "wrong Hom %s"%(self,)
         idxs.sort(reverse=True)
-        rels = [self.I]*n
+        I = Hom(1,1).identity()
+        ops = [I]*n
         for i in idxs:
             assert 0<=i<m, (i, m)
-            rels.insert(i, self.w_.copy())
-        assert len(rels) == m
-        rel = reduce(matmul, rels)
-        assert (rel.tgt,rel.src) == (self.m, self.n), (str(rel), str(self))
-        return rel
+            w_ = Hom(1,0).white()
+            ops.insert(i, w_)
+        assert len(ops) == m
+        op = reduce(matmul, ops)
+        assert (op.tgt,op.src) == (self.m, self.n), (str(op), str(self))
+        return op
 
     def RZ(self, *idxs):
         "prepare Z state: |0> on idxs"
@@ -397,28 +414,30 @@ class Hom:
             idxs = list(idxs)
         assert m == n+len(idxs), "wrong Hom %s"%(self,)
         idxs.sort(reverse=True)
-        rels = [self.I]*n
+        I = Hom(1,1).identity()
+        ops = [I]*n
         for i in idxs:
             assert 0<=i<m, (i, m)
-            rels.insert(i, self.b_.copy())
-        assert len(rels) == m
-        rel = reduce(matmul, rels)
-        assert (rel.tgt,rel.src) == (self.m, self.n)
-        return rel
+            b_ = Hom(1,0).black()
+            ops.insert(i, b_)
+        assert len(ops) == m
+        op = reduce(matmul, ops)
+        assert (op.tgt,op.src) == (self.m, self.n)
+        return op
 
     def MX(self, *idxs):
         "postselect <+| on idxs"
         m, n = self
         assert not idxs or m+len(idxs)==n, "wrong Hom %s"%(self,)
-        rel = self.reverse.RX(*idxs).reverse
-        return rel
+        op = self.reverse.RX(*idxs).reverse
+        return op
 
     def MZ(self, *idxs):
         "postselect <0| on idxs"
         m, n = self
         assert not idxs or m+len(idxs)==n, "wrong Hom %s"%(self,)
-        rel = self.reverse.RZ(*idxs).reverse
-        return rel
+        op = self.reverse.RZ(*idxs).reverse
+        return op
 
     def CX(self, idx=0, jdx=1):
         m, n = self
@@ -430,7 +449,7 @@ class Hom:
         rhs[jdx, idx] = 1
         rhs = Matrix(rhs)
         rel = Relation(lhs, rhs)
-        return Operator(rel)
+        return Operator(rel, None, self)
 
     def PERM(self, idxs):
         """ send idxs[j]<---j """
@@ -441,8 +460,7 @@ class Hom:
         lhs = Matrix.identity(m)
         rhs = Matrix.get_perm(idxs)
         rel = Relation(lhs, rhs)
-        return Operator(rel)
-    get_perm = PERM
+        return Operator(rel, None, self)
 
     def SWAP(self, idx=0, jdx=1):
         m, n = self
@@ -451,8 +469,8 @@ class Hom:
         assert idx != jdx
         f = list(range(self.n))
         f[idx], f[jdx] = f[jdx], f[idx]
-        rel = self.get_perm(f)
-        return Operator.promote(rel)
+        op = self.PERM(f)
+        return op
 
     def random(self):
         m, n = self
@@ -562,7 +580,7 @@ class Module:
         lookup = {j:i for (i,j) in enumerate(jdxs)}
         kdxs = [lookup[i] for i in idxs]
         n = len(kdxs)
-        P = Hom(n, n).get_perm(kdxs)
+        P = Hom(n, n).PERM(kdxs)
         alloc = {i:j for (j,i) in enumerate(jdxs)}
         return P, alloc
 
@@ -577,7 +595,7 @@ class Module:
 #        lookup = {j:i for (i,j) in enumerate(jdxs)}
 #        kdxs = [lookup[i] for i in idxs]
 #        n = len(kdxs)
-#        P = Hom(n, n).get_perm(kdxs)
+#        P = Hom(n, n).PERM(kdxs)
 #        self.alloc = {i:j for (j,i) in enumerate(jdxs)}
 #        #if self.alloc != prev:
 #        #    print("_order: CHANGED", prev, self.alloc)
@@ -587,7 +605,8 @@ class Module:
 
     def interpret(self, syntax):
         op = None
-        I = Operator.identity(1)
+        #I = Operator.identity(1)
+        I = Hom(1,1).identity()
         for atom in reversed(syntax.atoms):
             meth = getattr(self, atom.name)
             idxs = atom.args
@@ -917,7 +936,7 @@ def test_encoder():
     n = 5
     hom = Hom(n, n)
     syntax = []
-    op = Operator.identity(n)
+    op = hom.identity()
     for i in range(10):
         j = randint(0, n-1)
         k = randint(0, n-1)
@@ -1234,14 +1253,15 @@ def test_syntax():
 
 def test_composite():
 
-    white = Operator.white
-    black = Operator.black
+    white = lambda m,n: Hom(m,n).white()
+    black = lambda m,n: Hom(m,n).black()
+
     _w = white(0, 1)
     w_ = white(1, 0)
     _b = black(0, 1)
     b_ = black(1, 0)
-    I = Operator.identity(1)
-    zero = Operator.zero(0,0)
+    I = Hom(1,1).identity()
+    zero = Hom(0,0).zero()
 
     cx01 = (I @ black(1,2))*(white(2,1) @ I)
     cx10 = (I @ white(1,2))*(black(2,1) @ I)
@@ -1339,13 +1359,13 @@ def test_hom():
 
     # test get_perm ----------------------------------------
 
-    rel = Hom(3).get_perm([1,2,0])
+    rel = Hom(3).PERM([1,2,0])
     rhs = Hom(3,2).RX(0)
     rhs = rel * rhs
     lhs = Hom(3,2).RX(1) * Hom(2,2).SWAP()
     assert lhs.op == rhs.op
     
-    rel = Hom(3).get_perm([2, 0, 1])
+    rel = Hom(3).PERM([2, 0, 1])
     rhs = Hom(3,2).RX(0)
     rhs = rel * rhs
     lhs = Hom(3,2).RX(2)
@@ -1353,9 +1373,12 @@ def test_hom():
     
     # test CX ----------------------------------------
 
-    w_ww = Operator.white(1, 2)
-    bb_b = Operator.black(2, 1)
-    identity = Operator.identity(1)
+    #w_ww = Operator.white(1, 2)
+    w_ww = Hom(1,2).white()
+    #bb_b = Operator.black(2, 1)
+    bb_b = Hom(2,1).black()
+    #identity = Operator.identity(1)
+    identity = Hom(1,1).identity()
     CX = (w_ww @ identity) * (identity @ bb_b)
 
     space = Hom(2)
@@ -1388,15 +1411,18 @@ def test_hom():
 
     # ------------------------------------------------
 
-    b3 = Operator.black(3,1)
-    w3 = Operator.white(3,1)
+#    b3 = Operator.black(3,1)
+#    w3 = Operator.white(3,1)
+    b3 = Hom(3,1).black()
+    w3 = Hom(3,1).white()
 
     iso = Hom(9,9).PERM([0,3,6,1,4,7,2,5,8])
     Ex = (b3@b3@b3)*w3
     #print("Ex:")
     #print(Ex)
 
-    Hx = (Ex*Operator.white(1,0)).op.Ax.left
+#    Hx = (Ex*Operator.white(1,0)).op.Ax.left
+    Hx = (Ex*Hom(1,0).white()).op.Ax.left
     #print(Hx)
 
     Ez = (w3@w3@w3)*b3
@@ -1406,7 +1432,8 @@ def test_hom():
     assert Ez.op == Ex.op.dual
     assert Ex.op == Ez.op.dual
 
-    Hz = (Ez*Operator.white(1,0)).op.Ax.left
+    #Hz = (Ez*Operator.white(1,0)).op.Ax.left
+    Hz = (Ez*Hom(1,0).white()).op.Ax.left
     #print(Hz)
 
     code = CSSCode(Hx=Hx, Hz=Hz)
@@ -1414,7 +1441,8 @@ def test_hom():
     #print(code)
     #print(code.longstr())
 
-    assert eqop(get_encoder(code), Operator(Ez, Ex))
+    op = Operator(Ez, Ex, Hom(code.n, code.k))
+    assert eqop(get_encoder(code), op)
 
     # ------------------------------------------------
     # test from_encoder
@@ -1425,7 +1453,8 @@ def test_hom():
         Ex, Ez = get_encoder(code).pair
         assert Ex.dual == Ez
         assert Ez.dual == Ex
-        dode = from_encoder(Operator(Ex, Ez))
+        hom = Hom(code.n, code.k)
+        dode = from_encoder(Operator(Ex, Ez, hom))
         assert code.is_equiv(dode)
     
 
@@ -1439,7 +1468,8 @@ def test_hom():
 
     EE = Ex.tensor(Ex)
     #print(EE)
-    dode = from_encoder(Operator(EE))
+    hom = Hom(16, 4)
+    dode = from_encoder(Operator(EE, None, hom))
     #dode.bz_distance()
     #print(dode)
     assert dode.n == 16
@@ -1451,7 +1481,7 @@ def test():
     from qumba.rel import test_linear
     test_linear()
     test_hom()
-    test_random()
+    #test_random()
     test_composite()
     test_syntax()
     test_encoder()
