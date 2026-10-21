@@ -5,7 +5,8 @@ Use linear relations for CSS _circuits (aka phase-free ZX-calculus).
 Keep track of how we compose operators using Composite objects.
 and more...
 
-See previous: css.py 
+See previous: css.py
+Other attempt: witness.py
 
 test_encoder: works
 test_simple_detectors: fail
@@ -19,7 +20,6 @@ from random import choice, randint
 
 import numpy
 
-#from qumba.syntax import Syntax # ugh... the API doesn't fit _very well...
 from qumba.matrix import Matrix, pullback
 from qumba.rel import Relation # linear relations
 from qumba.csscode import CSSCode
@@ -287,33 +287,7 @@ class Operator(Circuit):
         return Operator(Rx)
 
 
-def witness(lhs, rhs):
-    """
-        compose Relation's and return the detector and witness
-    """
-    assert isinstance(lhs, Relation)
-    assert isinstance(rhs, Relation)
-
-    assert lhs.src == rhs.tgt, (lhs.src, rhs.tgt)
-    l, r = pullback(lhs.right.t, rhs.left.t)
-
-    left = lhs.left.t * l
-    right = rhs.right.t * r
-
-    f = left.stack(right)
-    k = f.kernel().t # find the detect'ing regions
-
-    ll = lhs.right.t * l
-    rr = rhs.left.t * r
-    assert ll==rr
-    d = (ll*k).t
-    op = Relation(left.t, right.t)
-    w = None # TODO the detector is the kernel of the witness
-    return d, w, op
-    
-
-
-class Composite(Circuit):
+class Composite(Circuit): # XXX binary tree, just make this a list ??
     def __init__(self, lhs, rhs):
         lhs = Circuit.promote(lhs)
         rhs = Circuit.promote(rhs)
@@ -323,26 +297,19 @@ class Composite(Circuit):
         rop = rhs.op
         #op = lop.mul(rop.op)
 
-        dz, wx, Ax = witness(lop.Ax, rop.Ax) # XXX get rid of witness call TODO
-        dx, wz, Az = witness(lop.Az, rop.Az) # XXX get rid of witness call TODO
+        Ax = (lop.Ax * rop.Ax)
+        Az = (lop.Az * rop.Az)
         op = Operator(Ax, Az)
 
         Circuit.__init__(self, op, op.tgt, op.src)
 
-        self.dx = dx
-        self.wx = wx
-        self.dz = dz
-        self.wz = wz
-
     def __str__(self):
-        return "(%s*%s=%s, (%d|%d))"%(self.lhs, self.rhs, self.op, 
-            len(self.dx), len(self.dz))
+        return "(%s*%s=%s)"%(self.lhs, self.rhs, self.op)
 
     def deepstr(self, depth=0):
         lhs = self.lhs.deepstr(depth+1)
         rhs = self.rhs.deepstr(depth+1)
-        d = "(%d|%d)"%(len(self.dx), len(self.dz))
-        lines = [self.op.deepstr(depth) + d + "=", lhs + "*", rhs]
+        lines = [self.op.deepstr(depth) + "=", lhs + "*", rhs]
         return '\n'.join(lines)
 
     def __matmul__(self, other):
@@ -1256,10 +1223,12 @@ def test_syntax():
     assert str(spec) == "MX(0)*CX(0,1)*RX(0)*RZ(1)"
 
     mod = Module()
-    op = spec * mod
+    op = mod.interpret(spec)
     assert mod.alloc == {1:0}
 
-    lhs, rhs = (RX(0)*RZ(1))*Module(), (RZ(1)*RX(0))*Module()
+    lhs, rhs = (RX(0)*RZ(1)), (RZ(1)*RX(0))
+    lhs = Module().interpret(lhs)
+    rhs = Module().interpret(rhs)
     assert eqop(lhs, rhs)
 
 

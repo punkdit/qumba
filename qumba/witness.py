@@ -6,6 +6,7 @@ Keep track of how we compose operators using Composite objects.
 and more...
 
 See previous: css.py 
+See also: composite.py
 
 test_encoder: works
 test_simple_detectors: fail
