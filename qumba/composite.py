@@ -22,7 +22,7 @@ from random import choice, randint
 
 import numpy
 
-#from qumba.syntax import Syntax # ugh... the API doesn't fit very well...
+#from qumba.syntax import Syntax # ugh... the API doesn't fit _very well...
 from qumba.matrix import Matrix, pullback
 from qumba.rel import Relation # linear relations
 from qumba.csscode import CSSCode
@@ -522,6 +522,9 @@ class Module:
     # is this an Actegory ?
     # another idea: We could take "hom" as a factory arg (for Hom)
 
+    # XXX dynamically allocating qubit indexes is a pain in the butt. XXX
+    # XXX just pre-allocate the "train track" indexes !               XXX
+
     def __init__(self, idxs=[]):
         self.alloc = {} # qubit idxs
         for i in idxs:
@@ -587,14 +590,7 @@ class Module:
         return P
 
     def interpret(self, syntax):
-#        print("Module.interpret")
-#        print(syntax.atoms)
-        #assert self.lookup is None, "remove me?"
-        #lookup = {}
-        #op = self.identity()
         op = None
-        #for item in reversed(list(syntax)):
-        #for (name, arg, kw) in reversed(syntax.atoms):
         for atom in reversed(syntax.atoms):
             meth = getattr(self, atom.name)
             lhs = meth(*atom.args)
@@ -639,12 +635,14 @@ class Module:
         return op
 
     def CX(self, i, j):
-        # we can't add qubits here because we must return a unitary
-        #if i not in self.alloc:
-        #    self.add(i)
-        #if j not in self.alloc:
-        #    self.add(j)
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # NOTE: we can't add qubits here because we must return a unitary !!!
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         alloc = self.alloc
+        #if i not in alloc:
+        #    self.add(i) # NO !
+        #if j not in alloc:
+        #    self.add(j) # NO !
         n = len(alloc)
         assert i in alloc, "add %d to Module constructor?"%i
         assert j in alloc, "add %d to Module constructor?"%j
@@ -652,6 +650,7 @@ class Module:
         jdx = alloc[j]
         op = Hom(n, n).CX(idx, jdx)
         #P = self._order()
+        #op = (P*op).op
         return op
 
     def SWAP(self, i, j):
@@ -960,8 +959,9 @@ def test_encoder():
 
 
 
-def find_detectors(syntax, src=[], dual=False):
-    print("find_detectors(%s)"%syntax)
+def find_detectors(syntax, src=[], dual=False, verbose=False):
+    if verbose:
+        print("find_detectors(%s)"%syntax, "z_flow" if dual else "x_flow")
     module = Module(src)
     #comp = syntax*Module(src)
     comp = module.interpret(syntax)
@@ -1010,7 +1010,7 @@ def find_detectors(syntax, src=[], dual=False):
     keys = list(edges.keys())
     keys.sort(key = lambda key:key[1]) # sort by qubit index? do we care?
     #keys.sort() # do we care
-    print(keys)
+    #print(keys)
     #lookup = {key:i for (i,key) in enumerate(keys)}
     m = sum(A.rank for A in rels)
     n = len(edges)
@@ -1039,38 +1039,66 @@ def find_detectors(syntax, src=[], dual=False):
         H[row:row+A.rank, idxs] = A.A.A # triple A !
         row += A.rank
     H = Matrix(H)
-    print("H =", H.shape)
     K = H.kernel()
-    print("K =", K.shape)
-    print(K)
+    if verbose:
+        print("H =", H.shape)
+        print("K =", K.shape)
+        print(K)
+    flows = []
     for i in range(len(K)):
+        flow = []
         for j in range(n):
-            if K[i,j]:
-                idx, jdx = keys[j]
-                if idx < len(ops):
-                    op = ops[idx]
-                    atom = op.atom
-                    if jdx in atom.args:
-                        print(op.atom, end=' ')
-        print()
-    print()
+            if K[i,j] == 0:
+                continue
+            idx, jdx = keys[j]
+            assert idx <= len(ops)
+            if idx < len(ops):
+                op = ops[idx]
+                atom = op.atom
+                if jdx in atom.args:
+                    #print("%s:%s"%(op.atom,jdx), end=' ')
+                    flow.append((op.atom, jdx))
+            else:
+                flow.append((None, jdx)) # output
+                #print("%s<--" % jdx, end=' ')
+        flows.append(flow)
+        #print()
+    #print()
+    return flows
     
 
 def test_simple_detectors():
+    print("="*79)
+    print()
+
     s = Syntax()
     MX, MZ, CX, RX, RZ, TICK = s.MX, s.MZ, s.CX, s.RX, s.RZ, s.TICK
 
     syntax = MX(0)*TICK()*RX(0)
-    find_detectors(syntax, [])
-    find_detectors(syntax, [], dual=True)
-
-    syntax = MX(0)*TICK()*CX(0,1)*TICK()*RX(0)*RZ(1)
-    find_detectors(syntax, [])
-    find_detectors(syntax, [], dual=True)
+    flows = find_detectors(syntax, []) # x_flow 
+    flows = find_detectors(syntax, [], dual=True) # z_flow
 
     syntax = CX(0,1)
-    find_detectors(syntax, [0,1])
-    find_detectors(syntax, [0,1], dual=True)
+    flows = find_detectors(syntax, [0,1])
+    assert len(flows) == 2
+
+    flows = find_detectors(syntax, [0,1], dual=True)
+    assert len(flows) == 2
+
+    syntax = MX(0)*TICK()*CX(0,1)*TICK()*RX(0)*RZ(1)
+    flows = find_detectors(syntax, [])
+    assert len(flows) == 1
+
+    flows = find_detectors(syntax, [], dual=True)
+    assert len(flows) == 0
+
+    syntax = MX(0)*CX(0,1)*CX(0,1)*RZ(0)
+    flows = find_detectors(syntax, [])
+    assert len(flows) == 1
+
+    flows = find_detectors(syntax, [], dual=True)
+    assert len(flows) == 1
+    
 
     #test_goto()
 
