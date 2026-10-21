@@ -878,9 +878,9 @@ def test_encoder():
 
 
 
-def find_detectors(syntax, src=[], dual=False, verbose=False):
+def get_flow(syntax, src=[], dual=False, verbose=False):
     if verbose:
-        print("find_detectors(%s)"%syntax, "z_flow" if dual else "x_flow")
+        print("get_flow(%s)"%syntax, "z_flow" if dual else "x_flow")
     module = Module(src)
     composite = module.interpret(syntax, verbose=verbose)
     assert isinstance(composite, Circuit)
@@ -980,41 +980,41 @@ def test_simple_detectors():
     MX, MZ, CX, RX, RZ, TICK = s.MX, s.MZ, s.CX, s.RX, s.RZ, s.TICK
 
     syntax = MX(0)*TICK()*RX(0)
-    flows = find_detectors(syntax, [], verbose=verbose) # x_flow 
+    flows = get_flow(syntax, [], verbose=verbose) # x_flow 
     assert len(flows) == 1
-    flows = find_detectors(syntax, [], dual=True, verbose=verbose) # z_flow
+    flows = get_flow(syntax, [], dual=True, verbose=verbose) # z_flow
     assert len(flows) == 0
 
     syntax = MX(0)*TICK()*RZ(0)
-    flows = find_detectors(syntax, [], verbose=verbose)
+    flows = get_flow(syntax, [], verbose=verbose)
     assert len(flows) == 0
-    flows = find_detectors(syntax, [], dual=True, verbose=verbose)
+    flows = get_flow(syntax, [], dual=True, verbose=verbose)
     assert len(flows) == 0
 
     syntax = CX(0,1)
-    flows = find_detectors(syntax, [0,1], verbose=verbose)
+    flows = get_flow(syntax, [0,1], verbose=verbose)
     assert len(flows) == 2
 
-    flows = find_detectors(syntax, [0,1], dual=True, verbose=verbose)
+    flows = get_flow(syntax, [0,1], dual=True, verbose=verbose)
     assert len(flows) == 2
 
     syntax = MX(0)*TICK()*CX(0,1)*TICK()*RX(0)*RZ(1)
-    flows = find_detectors(syntax, [], verbose=verbose)
+    flows = get_flow(syntax, [], verbose=verbose)
     assert len(flows) == 1
 
-    flows = find_detectors(syntax, [], dual=True, verbose=verbose)
+    flows = get_flow(syntax, [], dual=True, verbose=verbose)
     assert len(flows) == 0
 
     syntax = CX(0,1)*CX(0,1)
-    flows = find_detectors(syntax, [0,1], verbose=verbose)
+    flows = get_flow(syntax, [0,1], verbose=verbose)
     assert len(flows) == 2
     assert flows == [[(0, 0), (1, 0), (1, 1), (2, 0)], [(0, 1), (1, 1), (2, 1)]]
 
     syntax = MX(0)*CX(0,1)*CX(0,1)*RZ(0)
-    flows = find_detectors(syntax, [1], verbose=verbose)
+    flows = get_flow(syntax, [1], verbose=verbose)
     assert len(flows) == 1
 
-    flows = find_detectors(syntax, [1], dual=True, verbose=verbose)
+    flows = get_flow(syntax, [1], dual=True, verbose=verbose)
     assert len(flows) == 1
     
 
@@ -1042,10 +1042,10 @@ def test_goto():
     syntax = reduce(mul, reversed(spec))
     #print(syntax)
 
-    flows = find_detectors(syntax)
+    flows = get_flow(syntax)
     assert len(flows) == 3
 
-    flows = find_detectors(syntax, dual=True)
+    flows = get_flow(syntax, dual=True)
     assert len(flows) == 5
     #render(spec, "goto_713")
 
@@ -1072,15 +1072,15 @@ def test_iceberg():
     #render(syntax, "iceberg")
 
     src = list(range(n))
-    find_detectors(syntax, src)
-    find_detectors(syntax, src, dual=True)
+    get_flow(syntax, src)
+    get_flow(syntax, src, dual=True)
 
 
 def load_stim():
     name = argv.next() or "zero_prep_20_2_6.stim"
     data = open(name).read()
     spec = from_stim(data)
-    find_detectors(spec)
+    get_flow(spec)
 
 def test_detectors():
     test_simple_detectors()
