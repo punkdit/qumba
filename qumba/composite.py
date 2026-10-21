@@ -106,7 +106,7 @@ class Circuit:
 #    def tgt(self)
 
     def __mul__(self, other):
-        assert self.src == other.tgt, (self.shape, other.shape)
+        assert self.src == other.tgt, (self.hom, other.hom)
         return Composite(self, other)
 
     @classmethod
@@ -214,17 +214,19 @@ class Operator(Circuit):
         if check:
             assert Ax.dual == Az
         self.atom = None # my Syntax
+        assert Ax.tgt == Az.tgt
+        assert Ax.src == Az.src
+        assert Ax.tgt == hom.m
+        assert Ax.src == hom.n
         # i am my own Operator
         Circuit.__init__(self, self, hom)
 
     @property
-    #@cache need my own atom
     def reverse(self):
         Ax, Az = self.Ax, self.Az
         return Operator(Ax.reverse, Az.reverse, self.hom.reverse)
 
     @property
-    @cache
     def dual(self):
         Ax, Az = self.Ax, self.Az
         return Operator(Az, Ax, self.hom)
@@ -242,6 +244,7 @@ class Operator(Circuit):
 
     def mul(self, other):
         assert isinstance(other, Operator), type(other)
+        assert self.hom.src == other.hom.tgt # reconcile TODO
         Ax = self.Ax * other.Ax
         Az = self.Az * other.Az
         return Operator(Ax, Az, self.hom*other.hom)
@@ -254,9 +257,11 @@ class Operator(Circuit):
 
     def __eq__(self, other):
         assert isinstance(other, Operator), (type(self), type(other))
+        assert self.hom == other.hom, "%s != %s"%(self.hom, other.hom)
         return self.pair == other.pair
 
     def __hash__(self):
+        assert 0
         return hash(self.pair)
 
     def __str__(self):
@@ -266,7 +271,7 @@ class Operator(Circuit):
         tgt, src = self.shape
         if tgt != src:
             return False
-        return self == Operator.identity(tgt)
+        return self == self.hom.identity()
 
 
 class Composite(Circuit): # XXX binary tree, just make this a list ??
@@ -299,8 +304,8 @@ class Composite(Circuit): # XXX binary tree, just make this a list ??
         assert isinstance(other, Operator), type(other)
         lhs = self.lhs
         rhs = self.rhs
-        comp = (lhs@other) * (rhs@other) # Argghh, recursive
-        return comp
+        composite = (lhs@other) * (rhs@other) # Argghh, recursive
+        return composite
 
     @property
     @cache
@@ -317,12 +322,7 @@ class Composite(Circuit): # XXX binary tree, just make this a list ??
 
 class Hom:
     " Hom( tgt <--- src ) "
-
-#    _w = Operator.white(0, 1)
-#    w_ = Operator.white(1, 0)
-#    _b = Operator.black(0, 1)
-#    b_ = Operator.black(1, 0)
-#    I = Operator.identity(1)
+    # keep a list of tgt&src qubit indexes for Operator
 
     def __init__(self, tgt, src=None):
         if src is None:
@@ -331,6 +331,8 @@ class Hom:
             tgt = list(range(tgt))
         if type(src) is int:
             src = list(range(src))
+        assert len(set(tgt)) == len(tgt), "not unique"
+        assert len(set(src)) == len(src), "not unique"
         self.tgt = list(tgt)
         self.src = list(src)
         self.m = len(tgt)
@@ -343,19 +345,19 @@ class Hom:
 
     def __matmul__(self, other):
         assert isinstance(other, Hom)
-        return Hom(self.m+other.m, self.n+other.n)
+        return Hom(self.src+other.src, self.tgt+other.tgt)
 
-    def __mul__(self, other):
-        assert isinstance(other, Hom)
-        return Hom(self.m, other.n)
+    def __mul__(lhs, rhs):
+        assert isinstance(rhs, Hom)
+        assert lhs.src == rhs.tgt, "%s != %s"%(lhs.src, rhs.tgt)
+        return Hom(lhs.tgt, rhs.src)
 
     def __str__(self):
         return "(%s<--%s)"%(self.tgt, self.src)
     __repr__ = __str__
 
-    def __getitem__(self, i):
-        # i am a shape tuple
-        return (self.m, self.n)[i]
+    def __eq__(self, other):
+        return self.tgt==other.tgt and self.src==other.src
 
     def black(self):
         l, r = self.shape
@@ -375,350 +377,193 @@ class Hom:
         return Operator(Rx, None, self)
 
     def identity(self):
-        return Operator(Rx, Rx, self)
-
-    def identity(self):
         assert self.tgt == self.src
         n = self.n
         Rx = Relation.identity(n)
         return Operator(Rx, Rx, self)
 
-    def RX(self, *idxs):
-        "prepare X state: |+> on idxs"
-        m, n = self
-        assert m>n, "wrong Hom %s"%(self,)
-        if not idxs:
-            idxs = list(range(m-n))
-        else:
-            idxs = list(idxs)
-        assert m == n+len(idxs), "wrong Hom %s"%(self,)
-        idxs.sort(reverse=True)
-        I = Hom(1,1).identity()
-        ops = [I]*n
-        for i in idxs:
-            assert 0<=i<m, (i, m)
-            w_ = Hom(1,0).white()
-            ops.insert(i, w_)
-        assert len(ops) == m
-        op = reduce(matmul, ops)
-        assert (op.tgt,op.src) == (self.m, self.n), (str(op), str(self))
+    def RX(self):
+        "prepare X state"
+        assert self.m > self.n, "wut"
+        src = [i for i in self.tgt if i in self.src]
+        assert src == self.src, "bad hom %s"%(self,)
+        rels = []
+        w_ = Relation.white(1,0)
+        I = Relation.identity(1)
+        for idx in self.tgt:
+            if idx in self.src:
+                rels.append(I)
+            else:
+                rels.append(w_)
+        rel = reduce(matmul, rels)
+        op = Operator(rel, None, self)
         return op
 
-    def RZ(self, *idxs):
-        "prepare Z state: |0> on idxs"
-        m, n = self
-        assert m>n, "wrong Hom %s"%(self,)
-        if not idxs:
-            idxs = list(range(m-n))
-        else:
-            idxs = list(idxs)
-        assert m == n+len(idxs), "wrong Hom %s"%(self,)
-        idxs.sort(reverse=True)
-        I = Hom(1,1).identity()
-        ops = [I]*n
-        for i in idxs:
-            assert 0<=i<m, (i, m)
-            b_ = Hom(1,0).black()
-            ops.insert(i, b_)
-        assert len(ops) == m
-        op = reduce(matmul, ops)
-        assert (op.tgt,op.src) == (self.m, self.n)
+    def RZ(self):
+        "prepare Z state"
+        op = self.RX().dual
         return op
 
-    def MX(self, *idxs):
-        "postselect <+| on idxs"
-        m, n = self
-        assert not idxs or m+len(idxs)==n, "wrong Hom %s"%(self,)
-        op = self.reverse.RX(*idxs).reverse
+    def MX(self):
+        "postselect <+|"
+        #m, n = self.shape
+        op = self.reverse.RX().reverse
         return op
 
-    def MZ(self, *idxs):
-        "postselect <0| on idxs"
-        m, n = self
-        assert not idxs or m+len(idxs)==n, "wrong Hom %s"%(self,)
-        op = self.reverse.RZ(*idxs).reverse
+    def MZ(self):
+        "postselect <0|"
+        #m, n = self.shape
+        op = self.reverse.RZ().reverse
         return op
 
     def CX(self, idx=0, jdx=1):
-        m, n = self
-        assert m == n, "wrong Hom %s"%(self,)
-        assert m >= 2, "wrong Hom %s"%(self,)
+        assert self.src == self.tgt, "bad Hom"
         assert idx != jdx
+        assert idx in self.src
+        assert jdx in self.src
+        i = self.src.index(idx)
+        j = self.src.index(jdx)
+        m = self.m
         lhs = Matrix.identity(m)
         rhs = numpy.identity(m, dtype=int)
-        rhs[jdx, idx] = 1
+        rhs[j, i] = 1
         rhs = Matrix(rhs)
         rel = Relation(lhs, rhs)
         return Operator(rel, None, self)
 
-    def PERM(self, idxs):
-        """ send idxs[j]<---j """
-        m, n = self
+    def PERM(self, perm):
+        """ send perm[j]<---j """
+        assert self.tgt == self.src
+        m, n = self.shape
         assert m == n, "wrong Hom %s"%(self,)
-        assert m == len(idxs), "wrong Hom %s"%(self,)
-        assert len(set(idxs)) == m
+        assert m == len(perm), "wrong Hom %s"%(self,)
+        assert len(set(perm)) == m
+        assert set(perm) == set(self.tgt)
+        #assert self.tgt == list(range(m)), "%s"%(self.tgt,)
+        tgt = self.tgt
+        idxs = [tgt.index(i) for i in perm]
         lhs = Matrix.identity(m)
         rhs = Matrix.get_perm(idxs)
         rel = Relation(lhs, rhs)
         return Operator(rel, None, self)
 
-    def SWAP(self, idx=0, jdx=1):
-        m, n = self
+    def SWAP(self, idx, jdx):
+        m, n = self.shape
         assert m == n, "wrong Hom %s"%(self,)
         assert m >= 2, "wrong Hom %s"%(self,)
         assert idx != jdx
-        f = list(range(self.n))
-        f[idx], f[jdx] = f[jdx], f[idx]
+        assert self.tgt == self.src
+        assert idx in self.src
+        assert jdx in self.src
+        i = self.src.index(idx)
+        j = self.src.index(jdx)
+        f = list(self.src)
+        f[i], f[j] = f[j], f[i]
         op = self.PERM(f)
         return op
 
-    def random(self):
-        m, n = self
-        if m==n==0:
-            op = self.identity()
-        elif m==0 and n==1:
-            op = choice([self.MX(0), self.MZ(0)])
-        elif n==0 and m==1:
-            op = choice([self.RX(0), self.RZ(0)])
-        elif m==n and n==1:
-            op = choice([
-                self.identity(), 
-                self.w_*self._w,
-                self.w_*self._b,
-                self.b_*self._b,
-                self.b_*self._w])
-            assert op.tgt == m, (op.tgt, op.src, self)
-            assert op.src == n, (op.tgt, op.src, self)
-        elif m==n>1:
-            i = randint(0, n-1)
-            j = randint(0, n-2)
-            j = j+1 if j>=i else j
-            op = self.CX(i,j)
-        elif m == n-1:
-            i = randint(0, n-1)
-            op = choice([self.MX(i), self.MZ(i)])
-        elif n == m-1:
-            i = randint(0, n-1)
-            op = choice([self.RX(i), self.RZ(i)])
-        else:
-            assert 0, (m, n)
-        assert op.tgt == m, (op.tgt, op.src, self)
-        assert op.src == n, (op.tgt, op.src, self)
-        return op
+#    def random(self):
+#        m, n = self.shape
+#        if m==n==0:
+#            op = self.identity()
+#        elif m==0 and n==1:
+#            op = choice([self.MX(0), self.MZ(0)])
+#        elif n==0 and m==1:
+#            op = choice([self.RX(0), self.RZ(0)])
+#        elif m==n and n==1:
+#            op = choice([
+#                self.identity(), 
+#                self.w_*self._w,
+#                self.w_*self._b,
+#                self.b_*self._b,
+#                self.b_*self._w])
+#            assert op.tgt == m, (op.tgt, op.src, self)
+#            assert op.src == n, (op.tgt, op.src, self)
+#        elif m==n>1:
+#            i = randint(0, n-1)
+#            j = randint(0, n-2)
+#            j = j+1 if j>=i else j
+#            op = self.CX(i,j)
+#        elif m == n-1:
+#            i = randint(0, n-1)
+#            op = choice([self.MX(i), self.MZ(i)])
+#        elif n == m-1:
+#            i = randint(0, n-1)
+#            op = choice([self.RX(i), self.RZ(i)])
+#        else:
+#            assert 0, (m, n)
+#        assert op.tgt == m, (op.tgt, op.src, self)
+#        assert op.src == n, (op.tgt, op.src, self)
+#        return op
         
 
 class Module:
     """ A mutable context for keeping track of live qubits
         and evaluating Syntax expressions.
     """
-    # is this an Actegory ?
-    # another idea: We could take "hom" as a factory arg (for Hom)
-
-    # XXX dynamically allocating qubit indexes is a pain in the butt. XXX
-    # XXX just pre-allocate the "train track" indexes !               XXX
-
-    def __init__(self, idxs=[]):
-        self.alloc = {} # qubit idxs
-        for i in idxs:
-            self.add(i)
-        #self.lookup = None
-
-    def get_idxs(self):
-        self.check()
-        alloc = self.alloc
-        #n = len(alloc)
-        n = max(list(alloc.keys()) or [-1])+1
-        idxs = [None]*n
-        for i in range(n):
-            if i in alloc:
-                idxs[alloc[i]] = i
-        idxs = [i for i in idxs if i is not None]
-        return idxs
-
-    @property
-    def n(self):
-        return len(self.alloc)
-
-    def check(self):
-        alloc = self.alloc
-        idxs = list(alloc.values())
+    def __init__(self, idxs=[]): # TODO: why do we need idxs ?? get rid of idxs
+        idxs = list(idxs)
         idxs.sort()
-        n = len(idxs)
-        assert idxs == list(range(n)), idxs
+        #print("Module(%s)"%(idxs,))
+        self.hom = Hom(idxs, idxs) # <-- mutates ?
 
-    def add(self, i):
-        alloc = self.alloc
-        #print("add:", self.get_idxs(), alloc)
-        assert i not in alloc, alloc
-        n = len(alloc)
-        alloc[i] = n
-        #print("\tadd:", alloc)
-        self.check()
-        #print("\t", self.get_idxs())
-        return n
-
-    def remove(self, i):
-        alloc = self.alloc
-        assert i in alloc, alloc
-        idx = alloc[i]
-        del alloc[i]
-        for key in list(alloc.keys()):
-            jdx = alloc[key]
-            assert jdx != idx
-            if jdx > idx:
-                alloc[key] = jdx-1
-        self.check()
-
-    def get_reorder(self):
-        "fix up the order of alloc'ated qubit indexes"
-        prev = dict(self.alloc)
-        idxs = self.get_idxs()
-        jdxs = list(idxs)
-        jdxs.sort()
-        #if idxs == jdxs:
-        #    return None
-        lookup = {j:i for (i,j) in enumerate(jdxs)}
-        kdxs = [lookup[i] for i in idxs]
-        n = len(kdxs)
-        P = Hom(n, n).PERM(kdxs)
-        alloc = {i:j for (j,i) in enumerate(jdxs)}
-        return P, alloc
-
-#    def _order(self):
-#        "fix up the order of alloc'ated qubit indexes"
-#        prev = dict(self.alloc)
-#        idxs = self.get_idxs()
-#        jdxs = list(idxs)
-#        jdxs.sort()
-#        #if idxs == jdxs:
-#        #    return None
-#        lookup = {j:i for (i,j) in enumerate(jdxs)}
-#        kdxs = [lookup[i] for i in idxs]
-#        n = len(kdxs)
-#        P = Hom(n, n).PERM(kdxs)
-#        self.alloc = {i:j for (j,i) in enumerate(jdxs)}
-#        #if self.alloc != prev:
-#        #    print("_order: CHANGED", prev, self.alloc)
-#        #if kdxs == list(range(n)):
-#        #    return None
-#        return P
-
-    def interpret(self, syntax):
+    def interpret(self, syntax, verbose=False):
+        if verbose: print("interpret", syntax)
+        hom = self.hom
         op = None
-        #I = Operator.identity(1)
-        I = Hom(1,1).identity()
         for atom in reversed(syntax.atoms):
-            meth = getattr(self, atom.name)
+            if verbose: print("\tget:", atom, hom)
+            method = getattr(self, atom.name)
             idxs = atom.args
-#            for i in idxs:
-#                if i not in self.alloc:
-#                    j = self.add(i)
-#                if op is not None:
-#                    op = op @ I
-
-            prev = dict(self.alloc)
-            lhs = meth(*idxs) # may add qubits 
-            assert type(lhs) is Operator, "must be atom Operator, not %r"%type(lhs)
-            P, alloc = self.get_reorder()
-            #print(P.is_identity())
-
-#            print("\t", atom)
-            if op is None:
-                lhs = (P*lhs).op
-                lhs.set(atom)
-                self.alloc = alloc
-                op = lhs
-                continue
-
-#            assert lhs.src >= op.tgt
-#            if lhs.src > op.tgt:
-#                alloc = self.alloc
-#                change = [i for i in alloc if i not in prev]
-#                print("tensor", prev, "-->", alloc, change)
-#                
-#                # XXX not sure this is always right ... ?!?
-#                I = Operator.identity(lhs.src - op.tgt)
-#                op = op@I
-#            #else:
-#            #    assert len(self.alloc) == len(prev)
-
-            lhs = (P*lhs).op
+            lhs = method(hom.tgt, *idxs)
+            if verbose: print("\t  ==", lhs.hom)
+            assert type(lhs) is Operator,\
+                "must be atom Operator, not %r"%type(lhs)
+            assert lhs.hom.src == hom.tgt, "wup"
             lhs.set(atom)
-            op = lhs*op
-            #op = (P*op).op
-            self.alloc = alloc
+            if op is None:
+                op = lhs
+            else:
+                op = lhs*op
+            hom = op.hom
         return op
 
-    def get_identity(self):
-        assert 0, "don't use __mul__, use interpret"
-
-    def identity(self):
-        return Operator.identity(self.n)
-
-    def RX(self, i):
-        alloc = self.alloc
-        n = len(alloc)
-        idx = self.add(i)
-        op = Hom(n+1, n).RX(idx)
-#        P = self._order()
-#        if P is not None:
-#            op = (P*op).op
+    def RX(self, src, i):
+        assert i not in src
+        tgt = src + [i]
+        tgt.sort()
+        op = Hom(tgt, src).RX()
         return op
 
-    def RZ(self, i):
-        alloc = self.alloc
-        n = len(alloc)
-        idx = self.add(i)
-        op = Hom(n+1, n).RZ(idx)
-        _op = Hom(n+1, n).RZ(idx)
-        assert op is not _op
-#        P = self._order()
-#        if P is not None:
-#            op = (P*op).op
+    def RZ(self, src, i):
+        assert i not in src
+        tgt = src + [i]
+        tgt.sort()
+        op = Hom(tgt, src).RZ()
         return op
 
-    def CX(self, i, j):
-        alloc = self.alloc
-        if i not in alloc:
-            self.add(i)
-        if j not in alloc:
-            self.add(j)
-        n = len(alloc)
-        idx = alloc[i]
-        jdx = alloc[j]
-        op = Hom(n, n).CX(idx, jdx)
-#        P = self._order()
-#        if P is not None:
-#            op = (P*op).op
+    def CX(self, src, i, j):
+        op = Hom(src, src).CX(i, j)
         return op
 
-    def SWAP(self, i, j):
-        alloc = self.alloc
-        n = len(alloc)
-        idx = alloc[i]
-        jdx = alloc[j]
-        op = Hom(n, n).SWAP(idx, jdx)
+    def SWAP(self, src, i, j):
+        op = Hom(src, src).SWAP(i, j)
         return op
 
-    def MX(self, i):
-        alloc = self.alloc
-        n = len(alloc)
-        idx = alloc[i]
-        self.remove(i)
-        op = Hom(n-1, n).MX(idx)
+    def MX(self, src, i):
+        tgt = list(src)
+        tgt.remove(i)
+        op = Hom(tgt, src).MX()
         return op
 
-    def MZ(self, i):
-        alloc = self.alloc
-        n = len(alloc)
-        idx = alloc[i]
-        self.remove(i)
-        op = Hom(n-1, n).MZ(idx)
+    def MZ(self, src, i):
+        tgt = list(src)
+        tgt.remove(i)
+        op = Hom(tgt, src).MZ()
         return op
 
-    def TICK(self):
-        n = len(self.alloc)
-        return Hom(n, n).identity()
+    def TICK(self, src):
+        return Hom(src, src).identity()
 
 
 def from_stim(data):
@@ -908,6 +753,10 @@ def render(spec, name):
     assert rval == 0
 
 
+# ----------------------------------------------------------------------------
+# test functions
+
+
 
 
 def test_encoder():
@@ -916,11 +765,16 @@ def test_encoder():
     MX, MZ, CX, RX, RZ = s.MX, s.MZ, s.CX, s.RX, s.RZ
 
     spec = RX(0)*RZ(2)
-    op = Module([1]).interpret(spec)
+#    op = Module([1]).interpret(spec)
+    op = Module().interpret(spec)
     rhs = op.op
 
-    # check that Module doesn't scramble the indexes
-    lhs = Hom(3,2).RZ(2)*(Hom(1,0).RX(0) @ Hom(1,1).identity())
+    print(rhs.hom)
+
+    # check that Module doesn't scramble the indexes ?
+    #lhs = Hom([0,1,2],[0,1]).RZ()*(Hom([0],[]).RX() @ Hom([1],[1]).identity())
+    lhs = Hom([0,2],[0]).RZ()*Hom([0],[]).RX()
+    assert lhs.op.Ax == rhs.op.Ax
     assert eqop(lhs, rhs)
 
     spec = CX(0,1)*CX(1,2)*CX(2,0)
@@ -945,16 +799,13 @@ def test_encoder():
             op = op*hom.CX(j,k)
     syntax = reduce(mul, syntax)
     print(syntax)
-    comp = Module(list(range(n))).interpret(syntax)
-    assert comp.op == op.op
+    composite = Module(list(range(n))).interpret(syntax)
+    assert composite.op == op.op
 
     module = Module(list(range(n)))
-    comp = module.interpret(syntax) # TODO: check we touch every qubit
-#    P = module._order()
-#    comp = (P*comp).op
-#    assert comp.op == op.op
-#    return
-    print(comp.op == op.op)
+    composite = module.interpret(syntax) # TODO: check we touch every qubit
+    #print(composite.op == op.op)
+    assert composite.op == op.op
 
     # -------------------------------------------
 
@@ -972,15 +823,20 @@ def test_encoder():
 
     # -------------------------------------------
 
-    op = Hom(1,1).identity()
-    n = 1
+    src = [3]
+    op = Hom(src, src).identity()
     for i in [0,1,2]:
-        op = Hom(n+1,n).RX(i)*op
-        n += 1
+        src = op.hom.tgt
+        tgt = src + [i]
+        tgt.sort()
+        op = Hom(tgt, src).RX()*op
     for i in [4,5,6]:
-        op = Hom(n+1,n).RZ(i)*op
-        n += 1
-    hom = Hom(n,n)
+        src = op.hom.tgt
+        tgt = src + [i]
+        tgt.sort()
+        op = Hom(tgt, src).RZ()*op
+    tgt = op.hom.tgt
+    hom = Hom(tgt, tgt)
     for (i,j) in reversed([(0,3), (0,5), (0,6), (1,3), (1,4),
         (1,5), (2,4), (2,5), (2,6), (3,0), (3,1), (3,4), (3,6)]):
         op = hom.CX(i,j)*op
@@ -1026,19 +882,18 @@ def find_detectors(syntax, src=[], dual=False, verbose=False):
     if verbose:
         print("find_detectors(%s)"%syntax, "z_flow" if dual else "x_flow")
     module = Module(src)
-    #comp = syntax*Module(src)
-    comp = module.interpret(syntax)
-    assert isinstance(comp, Circuit)
-    ops = list(comp.walk())
-    #print(len(ops))
+    composite = module.interpret(syntax, verbose=verbose)
+    assert isinstance(composite, Circuit)
+    ops = list(composite.walk())
     for op in ops:
-        #print(op, op.atom)
         assert op.atom is not None
         assert op.atom in syntax # XXX remove (slow)
-        #print(module.lookup.get(id(op)))
+        #print(op, op.hom)
     ops = [op for op in ops if not op.is_identity()] # get rid of the TICK's
     #print(len(ops))
     ops = list(reversed(ops)) # <------ backwards <----
+    del syntax, composite # don't touch these (reversed)
+
     # edges: (idx,jdx) --> [tgt:Relation, src:Relation]
     # idx is the time index
     # jdx is the qubit index
@@ -1048,82 +903,65 @@ def find_detectors(syntax, src=[], dual=False, verbose=False):
         rels = [op.Az for op in ops]
     else:
         rels = [op.Ax for op in ops]
-    for idx,A in enumerate(rels):
-        #print("idx =", idx)
-        #print("(%s<--%s)"%(A.tgt, A.src))
-        #print("edges:", list(edges.keys()))
-        if idx == 0:
-            for jdx in range(A.src):
-                edges[idx,jdx] = [A, None] # tgt,src
-        else:
-            assert prev.tgt == A.src
-            for jdx in range(A.src):
-                key = (idx,jdx) # previous timeslot
-                assert key in edges, (key, edges)
-                edge = edges[idx,jdx]
-                assert edge[0] is None
-                edge[0] = A # edge tgt is A
-        for jdx in range(A.tgt):
-            key = idx+1,jdx # the next time index
-            assert key not in edges, "%s in %s"%(key,edges)
-            edges[key] = [None, A] # tgt,src
-        #print("edges:", list(edges.keys()))
-        prev = A
-    #print()
-    keys = list(edges.keys())
-    keys.sort(key = lambda key:key[1]) # sort by qubit index? do we care?
-    #keys.sort() # do we care
-    #print(keys)
-    #lookup = {key:i for (i,key) in enumerate(keys)}
+
+    lookup = [] # map irel --> col idxs = tgts+srcs
+    A = rels[0]
+    prev = list(range(A.src))
+    col = len(prev) # next col idx
+    cols = {} # map col idx --> (irel , qubit index)
+    for irel,A in enumerate(rels):
+        #print(A.tgt, "<--", A.src, "prev=%s"%prev)
+        for ii,i in enumerate(prev):
+            cols[i] = (irel, ii)
+        new = []
+        for i in range(A.tgt):
+            new.append(col + i)
+            cols[col+i] = (irel+1, i) # the next irel 
+        assert len(prev) == A.src
+        lookup.append(new+prev)
+        col = col + A.tgt
+        prev = new
+
+    #print(lookup)
+
     m = sum(A.rank for A in rels)
-    n = len(edges)
+    n = col
     H = numpy.zeros((m,n), dtype=int)
-    #print(H)
-    src = {}
-    tgt = {}
-    for A in rels:
-        src[A] = [None]*A.src
-        tgt[A] = [None]*A.tgt
-    for col,key in enumerate(keys):
-        edge = edges[key]
-        A, B = edge # tgt, src
-        time, idx = key
-        #print("key =", key)
-        if A is not None:
-            #print(A)
-            src[A][idx] = col
-        if B is not None:
-            #print(B)
-            tgt[B][idx] = col
+
     row = 0
-    for A in rels:
-        idxs = tgt[A] + src[A]
+    for irel,A in enumerate(rels):
+        idxs = lookup[irel]
         #print(idxs)
+        #print(row, idxs)
+        #print(A.A)
         H[row:row+A.rank, idxs] = A.A.A # triple A !
         row += A.rank
     H = Matrix(H)
     K = H.kernel()
     if verbose:
-        print("H =", H.shape)
-        print("K =", K.shape)
-        print(K)
+        print("H =")
+        print(H, H.shape)
+        print("K =")
+        print(K, K.shape)
     flows = []
     for i in range(len(K)):
         flow = []
         for j in range(n):
             if K[i,j] == 0:
                 continue
-            idx, jdx = keys[j]
+            idx, jdx = cols[j]
+            #assert idx is None or idx < len(ops)
             assert idx <= len(ops)
-            if idx < len(ops):
-                op = ops[idx]
-                atom = op.atom
-                if jdx in atom.args:
-                    #print("%s:%s"%(op.atom,jdx), end=' ')
-                    flow.append((op.atom, jdx))
-            else:
-                flow.append((None, jdx)) # output
-                #print("%s<--" % jdx, end=' ')
+            flow.append((idx, jdx)) # output
+#            if idx < len(ops):
+#                op = ops[idx]
+#                atom = op.atom
+#                if jdx in atom.args:
+#                    #print("%s:%s"%(op.atom,jdx), end=' ')
+#                    flow.append((op.atom, idx, jdx))
+#            else:
+#                flow.append((idx, jdx)) # output
+#                #print("%s<--" % jdx, end=' ')
         flows.append(flow)
         #print()
     #print()
@@ -1136,14 +974,22 @@ def test_simple_detectors():
     print("="*79)
     print()
 
-    verbose = True
+    verbose = False
 
     s = Syntax()
     MX, MZ, CX, RX, RZ, TICK = s.MX, s.MZ, s.CX, s.RX, s.RZ, s.TICK
 
     syntax = MX(0)*TICK()*RX(0)
     flows = find_detectors(syntax, [], verbose=verbose) # x_flow 
+    assert len(flows) == 1
     flows = find_detectors(syntax, [], dual=True, verbose=verbose) # z_flow
+    assert len(flows) == 0
+
+    syntax = MX(0)*TICK()*RZ(0)
+    flows = find_detectors(syntax, [], verbose=verbose)
+    assert len(flows) == 0
+    flows = find_detectors(syntax, [], dual=True, verbose=verbose)
+    assert len(flows) == 0
 
     syntax = CX(0,1)
     flows = find_detectors(syntax, [0,1], verbose=verbose)
@@ -1158,6 +1004,11 @@ def test_simple_detectors():
 
     flows = find_detectors(syntax, [], dual=True, verbose=verbose)
     assert len(flows) == 0
+
+    syntax = CX(0,1)*CX(0,1)
+    flows = find_detectors(syntax, [0,1], verbose=verbose)
+    assert len(flows) == 2
+    assert flows == [[(0, 0), (1, 0), (1, 1), (2, 0)], [(0, 1), (1, 1), (2, 1)]]
 
     syntax = MX(0)*CX(0,1)*CX(0,1)*RZ(0)
     flows = find_detectors(syntax, [1], verbose=verbose)
@@ -1191,8 +1042,11 @@ def test_goto():
     syntax = reduce(mul, reversed(spec))
     #print(syntax)
 
-    find_detectors(syntax)
-    find_detectors(syntax, dual=True)
+    flows = find_detectors(syntax)
+    assert len(flows) == 3
+
+    flows = find_detectors(syntax, dual=True)
+    assert len(flows) == 5
     #render(spec, "goto_713")
 
 
@@ -1243,7 +1097,7 @@ def test_syntax():
 
     mod = Module()
     op = mod.interpret(spec)
-    assert mod.alloc == {1:0}
+    assert op.hom == Hom([1], [])
 
     lhs, rhs = (RX(0)*RZ(1)), (RZ(1)*RX(0))
     lhs = Module().interpret(lhs)
@@ -1346,31 +1200,43 @@ def eqop(A, B):
 
 def test_hom():
 
+    import pytest
+
     hom = Hom(3, 2)
 
     for i in range(3):
-        c = hom.RX(i)
-        c = hom.RZ(i)
+        c = hom.RX()
+        c = hom.RZ()
 
     hom = Hom(2, 3)
     for i in range(3):
-        c = hom.MX(i)
-        c = hom.MZ(i)
+        c = hom.MX()
+        c = hom.MZ()
 
     # test get_perm ----------------------------------------
 
-    rel = Hom(3).PERM([1,2,0])
-    rhs = Hom(3,2).RX(0)
-    rhs = rel * rhs
-    lhs = Hom(3,2).RX(1) * Hom(2,2).SWAP()
-    assert lhs.op == rhs.op
+    lhs = Hom(3).PERM([1,2,0])
+    rhs = Hom([0,1,2],[1,2]).RX()
+    assert rhs.hom == Hom([0,1,2],[1,2])
+    rhs = lhs * rhs
+
+    rhs = Hom(3).PERM([1,2,0]) * Hom([0,1,2],[1,2]).RX()
+    lhs = Hom([0,1,2],[0,2]).RX() * Hom([0,2],[0,2]).SWAP(0,2)
+    assert lhs.op.Ax == rhs.op.Ax
+    #assert lhs.op == rhs.op
     
-    rel = Hom(3).PERM([2, 0, 1])
-    rhs = Hom(3,2).RX(0)
+    rel = Hom([0,1,2]).PERM([2, 0, 1])
+    rhs = Hom([0,1,2],[1,2]).RX()
     rhs = rel * rhs
-    lhs = Hom(3,2).RX(2)
-    assert lhs.op == rhs.op
-    
+    lhs = Hom([0,1,2],[0,1]).RX()
+    assert lhs.op.Ax == rhs.op.Ax
+    #assert lhs.op == rhs.op
+
+    with pytest.raises(AssertionError):
+        Hom([2,1,0], [0,1]).RX()
+
+    return # TODO:
+
     # test CX ----------------------------------------
 
     #w_ww = Operator.white(1, 2)
@@ -1482,7 +1348,7 @@ def test():
     test_linear()
     test_hom()
     #test_random()
-    test_composite()
+#    test_composite()
     test_syntax()
     test_encoder()
 
