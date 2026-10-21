@@ -7,11 +7,8 @@ and more...
 
 See previous: css.py 
 
-The Module _interface sometimes needs to do a tensor
-product, not just a composition. 
-Possibly extend the Syntax _interface?
-eg. methods return (op,tensorand) pair? 
-or something like that?
+test_encoder: works
+test_simple_detectors: fail
 
 """
 
