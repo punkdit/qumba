@@ -227,9 +227,12 @@ class Operator(Circuit):
         Ax, Az = self.Ax, self.Az
         return Operator(Az, Ax)
 
+    def copy(self):
+        return Operator(self.Ax.copy(), self.Az.copy())
+
     def set(self, atom):
         assert type(atom) is Atom
-        assert self.atom is None, "already got atom %r"%(self.atom,)
+        assert self.atom is None, "%s already got atom %r"%(self, self.atom,)
         self.atom = atom
 
     def walk(self):
@@ -323,8 +326,8 @@ class Composite(Circuit):
         rop = rhs.op
         #op = lop.mul(rop.op)
 
-        dz, wx, Ax = witness(lop.Ax, rop.Ax)
-        dx, wz, Az = witness(lop.Az, rop.Az)
+        dz, wx, Ax = witness(lop.Ax, rop.Ax) # XXX get rid of witness call TODO
+        dx, wz, Az = witness(lop.Az, rop.Az) # XXX get rid of witness call TODO
         op = Operator(Ax, Az)
 
         Circuit.__init__(self, op, op.tgt, op.src)
@@ -344,6 +347,13 @@ class Composite(Circuit):
         d = "(%d|%d)"%(len(self.dx), len(self.dz))
         lines = [self.op.deepstr(depth) + d + "=", lhs + "*", rhs]
         return '\n'.join(lines)
+
+    def __matmul__(self, other):
+        assert isinstance(other, Operator), type(other)
+        lhs = self.lhs
+        rhs = self.rhs
+        comp = (lhs@other) * (rhs@other) # Argghh, recursive
+        return comp
 
     @property
     @cache
@@ -407,7 +417,7 @@ class Hom:
         rels = [self.I]*n
         for i in idxs:
             assert 0<=i<m, (i, m)
-            rels.insert(i, self.w_)
+            rels.insert(i, self.w_.copy())
         assert len(rels) == m
         rel = reduce(matmul, rels)
         assert (rel.tgt,rel.src) == (self.m, self.n), (str(rel), str(self))
@@ -426,7 +436,7 @@ class Hom:
         rels = [self.I]*n
         for i in idxs:
             assert 0<=i<m, (i, m)
-            rels.insert(i, self.b_)
+            rels.insert(i, self.b_.copy())
         assert len(rels) == m
         rel = reduce(matmul, rels)
         assert (rel.tgt,rel.src) == (self.m, self.n)
@@ -577,37 +587,83 @@ class Module:
                 alloc[key] = jdx-1
         self.check()
 
-    def _order(self):
+    def get_reorder(self):
         "fix up the order of alloc'ated qubit indexes"
+        prev = dict(self.alloc)
         idxs = self.get_idxs()
         jdxs = list(idxs)
         jdxs.sort()
+        #if idxs == jdxs:
+        #    return None
         lookup = {j:i for (i,j) in enumerate(jdxs)}
         kdxs = [lookup[i] for i in idxs]
         n = len(kdxs)
         P = Hom(n, n).get_perm(kdxs)
-        self.alloc = {i:j for (j,i) in enumerate(jdxs)}
-        return P
+        alloc = {i:j for (j,i) in enumerate(jdxs)}
+        return P, alloc
+
+#    def _order(self):
+#        "fix up the order of alloc'ated qubit indexes"
+#        prev = dict(self.alloc)
+#        idxs = self.get_idxs()
+#        jdxs = list(idxs)
+#        jdxs.sort()
+#        #if idxs == jdxs:
+#        #    return None
+#        lookup = {j:i for (i,j) in enumerate(jdxs)}
+#        kdxs = [lookup[i] for i in idxs]
+#        n = len(kdxs)
+#        P = Hom(n, n).get_perm(kdxs)
+#        self.alloc = {i:j for (j,i) in enumerate(jdxs)}
+#        #if self.alloc != prev:
+#        #    print("_order: CHANGED", prev, self.alloc)
+#        #if kdxs == list(range(n)):
+#        #    return None
+#        return P
 
     def interpret(self, syntax):
         op = None
+        I = Operator.identity(1)
         for atom in reversed(syntax.atoms):
             meth = getattr(self, atom.name)
-            lhs = meth(*atom.args)
+            idxs = atom.args
+#            for i in idxs:
+#                if i not in self.alloc:
+#                    j = self.add(i)
+#                if op is not None:
+#                    op = op @ I
+
+            prev = dict(self.alloc)
+            lhs = meth(*idxs) # may add qubits 
             assert type(lhs) is Operator, "must be atom Operator, not %r"%type(lhs)
-            #assert atom not in lookup, "do not reuse Syntax: %s"%atom
-            #lookup[atom] = lhs
-            #assert lhs not in lookup
-            #key = id(lhs)
-            #assert key not in lookup, str(key)
-            #lookup[key] = atom
-            lhs.set(atom)
+            P, alloc = self.get_reorder()
+            #print(P.is_identity())
+
 #            print("\t", atom)
             if op is None:
+                lhs = (P*lhs).op
+                lhs.set(atom)
+                self.alloc = alloc
                 op = lhs
-            else:
-                op = lhs*op
-        #self.lookup = lookup
+                continue
+
+#            assert lhs.src >= op.tgt
+#            if lhs.src > op.tgt:
+#                alloc = self.alloc
+#                change = [i for i in alloc if i not in prev]
+#                print("tensor", prev, "-->", alloc, change)
+#                
+#                # XXX not sure this is always right ... ?!?
+#                I = Operator.identity(lhs.src - op.tgt)
+#                op = op@I
+#            #else:
+#            #    assert len(self.alloc) == len(prev)
+
+            lhs = (P*lhs).op
+            lhs.set(atom)
+            op = lhs*op
+            #op = (P*op).op
+            self.alloc = alloc
         return op
 
     def get_identity(self):
@@ -621,8 +677,9 @@ class Module:
         n = len(alloc)
         idx = self.add(i)
         op = Hom(n+1, n).RX(idx)
-        P = self._order()
-        op = (P*op).op
+#        P = self._order()
+#        if P is not None:
+#            op = (P*op).op
         return op
 
     def RZ(self, i):
@@ -630,27 +687,26 @@ class Module:
         n = len(alloc)
         idx = self.add(i)
         op = Hom(n+1, n).RZ(idx)
-        P = self._order()
-        op = (P*op).op
+        _op = Hom(n+1, n).RZ(idx)
+        assert op is not _op
+#        P = self._order()
+#        if P is not None:
+#            op = (P*op).op
         return op
 
     def CX(self, i, j):
-        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # NOTE: we can't add qubits here because we must return a unitary !!!
-        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         alloc = self.alloc
-        #if i not in alloc:
-        #    self.add(i) # NO !
-        #if j not in alloc:
-        #    self.add(j) # NO !
+        if i not in alloc:
+            self.add(i)
+        if j not in alloc:
+            self.add(j)
         n = len(alloc)
-        assert i in alloc, "add %d to Module constructor?"%i
-        assert j in alloc, "add %d to Module constructor?"%j
         idx = alloc[i]
         jdx = alloc[j]
         op = Hom(n, n).CX(idx, jdx)
-        #P = self._order()
-        #op = (P*op).op
+#        P = self._order()
+#        if P is not None:
+#            op = (P*op).op
         return op
 
     def SWAP(self, i, j):
@@ -849,7 +905,6 @@ def encoder(code, verbose=False):
     spec = reduce(mul, spec)
 
     module = Module(src)
-    #E = spec*module
     E = module.interpret(spec)
 
     return spec, E
@@ -895,6 +950,30 @@ def test_encoder():
     assert eqop(lhs, rhs)
 
     # -------------------------------------------
+    n = 5
+    hom = Hom(n, n)
+    syntax = []
+    op = Operator.identity(n)
+    for i in range(10):
+        j = randint(0, n-1)
+        k = randint(0, n-1)
+        if j!=k:
+            syntax.append(CX(j,k))
+            op = op*hom.CX(j,k)
+    syntax = reduce(mul, syntax)
+    print(syntax)
+    comp = Module(list(range(n))).interpret(syntax)
+    assert comp.op == op.op
+
+    module = Module(list(range(n)))
+    comp = module.interpret(syntax) # TODO: check we touch every qubit
+#    P = module._order()
+#    comp = (P*comp).op
+#    assert comp.op == op.op
+#    return
+    print(comp.op == op.op)
+
+    # -------------------------------------------
 
     spec = [CX(0,3), CX(0,5), CX(0,6), CX(1,3), CX(1,4),
     CX(1,5), CX(2,4), CX(2,5), CX(2,6), CX(3,0), CX(3,1),
@@ -938,6 +1017,7 @@ def test_encoder():
         #construct.get_colour_488(5),
         #construct.get_bring(),
         CSSCode.random(7, 2, 4, distance=2),
+        CSSCode.random(11, 4, 4, distance=2),
     ]:
 
         print()
@@ -947,7 +1027,7 @@ def test_encoder():
         spec, E = encoder(code, verbose=False)
         print(spec)
         dode = from_encoder(E)
-        #dode.bz_distance()
+        dode.bz_distance()
         print(dode)
         assert (dode.is_equiv(code))
         #assert dode.d == code.d
@@ -1064,6 +1144,8 @@ def find_detectors(syntax, src=[], dual=False, verbose=False):
         flows.append(flow)
         #print()
     #print()
+    if verbose:
+        print(flows)
     return flows
     
 
@@ -1071,32 +1153,34 @@ def test_simple_detectors():
     print("="*79)
     print()
 
+    verbose = True
+
     s = Syntax()
     MX, MZ, CX, RX, RZ, TICK = s.MX, s.MZ, s.CX, s.RX, s.RZ, s.TICK
 
     syntax = MX(0)*TICK()*RX(0)
-    flows = find_detectors(syntax, []) # x_flow 
-    flows = find_detectors(syntax, [], dual=True) # z_flow
+    flows = find_detectors(syntax, [], verbose=verbose) # x_flow 
+    flows = find_detectors(syntax, [], dual=True, verbose=verbose) # z_flow
 
     syntax = CX(0,1)
-    flows = find_detectors(syntax, [0,1])
+    flows = find_detectors(syntax, [0,1], verbose=verbose)
     assert len(flows) == 2
 
-    flows = find_detectors(syntax, [0,1], dual=True)
+    flows = find_detectors(syntax, [0,1], dual=True, verbose=verbose)
     assert len(flows) == 2
 
     syntax = MX(0)*TICK()*CX(0,1)*TICK()*RX(0)*RZ(1)
-    flows = find_detectors(syntax, [])
+    flows = find_detectors(syntax, [], verbose=verbose)
     assert len(flows) == 1
 
-    flows = find_detectors(syntax, [], dual=True)
+    flows = find_detectors(syntax, [], dual=True, verbose=verbose)
     assert len(flows) == 0
 
     syntax = MX(0)*CX(0,1)*CX(0,1)*RZ(0)
-    flows = find_detectors(syntax, [])
+    flows = find_detectors(syntax, [1], verbose=verbose)
     assert len(flows) == 1
 
-    flows = find_detectors(syntax, [], dual=True)
+    flows = find_detectors(syntax, [1], dual=True, verbose=verbose)
     assert len(flows) == 1
     
 

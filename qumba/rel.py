@@ -74,6 +74,9 @@ class Relation:
         self.shape = (rank, self.tgt, self.src)
         self.p = p
 
+    def copy(self):
+        return Relation(self.left, self.right, self.p)
+
     @property
     def nf(self): # normal form
         return self.__class__(self.left, self.right)
