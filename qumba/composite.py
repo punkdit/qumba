@@ -54,22 +54,24 @@ class Atom:
         return len(self.atoms)
     def __getitem__(self, idx):
         return self.atoms[idx]
-# use object identity ... 
-#    def __eq__(self, other):
-#        assert isinstance(other, Atom)
-#        return self.key == other.key
-#    def __hash__(self):
-#        return hash(self.key)
+    # NO: use object identity ... 
+    #    def __eq__(self, other):
+    #        assert isinstance(other, Atom)
+    #        return self.key == other.key
+    #    def __hash__(self):
+    #        return hash(self.key)
 
 
 class Molecule(Atom):
     def __init__(self, atoms):
+        atoms = list(atoms)
+        assert len(set(atoms)) == len(atoms), "non unique objects"
         self.atoms = list(atoms)
     def __str__(self):
         return "*".join(str(atom) for atom in self.atoms)
-    def __eq__(self, other):
-        assert 0, "um?"
-        return self.atoms == other.atoms
+    #def __eq__(self, other):
+    #    assert 0, "um?"
+    #    return self.atoms == other.atoms
 
 
 class Method:
@@ -88,8 +90,6 @@ class Syntax:
 
 
 # ----------------------------------------------------------------------------
-
-
 
 
 class Circuit:
@@ -130,39 +130,39 @@ class Circuit:
         left = code.Hx.stack(code.Lx)
         right = Matrix.zeros((code.mx, code.k))
         right = right.stack(Matrix.identity(code.k))
-        Ez = Relation(left, right)
+        Rz = Relation(left, right)
     
         left = code.Hz.stack(code.Lz)
         right = Matrix.zeros((code.mz, code.k))
         right = right.stack(Matrix.identity(code.k))
-        Ex = Relation(left, right)
+        Rx = Relation(left, right)
     
         hom = Hom(code.n, code.k)
-        return Operator(Ex, Ez, hom)
+        return Operator(Rx, Rz, hom)
     
     def to_code(self):
         op = self.op
         assert isinstance(op, Operator)
-        Ez, Ex = op.pair
+        Rz, Rx = op.pair
     
         #print("from_encoder")
-        #print(Ex, Ex.shape)
-        assert isinstance(Ex, Relation)
-        k = Ex.src
-        assert Ez.src == k
+        #print(Rx, Rx.shape)
+        assert isinstance(Rx, Relation)
+        k = Rx.src
+        assert Rz.src == k
     
         #if k==0:
-        #    print(Ex)
+        #    print(Rx)
     
         w = Relation.white(1,0)
         if k:
             op = reduce(matmul, [w]*k)
             #print(op, op.shape)
-            Hx = (Ex*op).left
-            Hz = (Ez*op).left
+            Hx = (Rx*op).left
+            Hz = (Rz*op).left
         else:
-            Hx = Ex.left
-            Hz = Ez.left
+            Hx = Rx.left
+            Hz = Rz.left
     
         mx, n = Hx.shape
         #print("Hx =")
@@ -174,7 +174,7 @@ class Circuit:
         #print(Hz, Hz.shape)
     
         op = Relation(Matrix.identity(k), Matrix.zeros((k,0)))
-        HLx = (Ex*op).left
+        HLx = (Rx*op).left
         HHLx = Hx.stack(HLx).linear_independent()
         assert HHLx[:mx, :] == Hx
         Lx = HHLx[mx:, :]
@@ -183,7 +183,7 @@ class Circuit:
         #print(Lx, Lx.shape)
     
         op = Relation(Matrix.identity(k), Matrix.zeros((k,0)))
-        HLz = (Ez*op).left
+        HLz = (Rz*op).left
         HHLz = Hz.stack(HLz).linear_independent()
         assert HHLz[:mz, :] == Hz
         Lz = HHLz[mz:, :]
@@ -198,46 +198,50 @@ from_encoder = Circuit.to_code
 
 class Operator(Circuit):
     "The _atomic Operator's in a Composite Circuit"
-    def __init__(self, Ax, Az, hom, check=True):
-        if isinstance(Ax, Circuit):
-            Ax = Ax.op.Ax
-        if isinstance(Az, Circuit):
-            Az = Az.op.Ax
+    def __init__(self, Rx, Rz, hom, check=True):
+        if isinstance(Rx, Circuit):
+            Rx = Rx.op.Rx
+        if isinstance(Rz, Circuit):
+            Rz = Rz.op.Rx
         assert isinstance(hom, Hom)
-        Ax = Relation.promote(Ax)
-        if Az is None:
-            Az = Ax.dual
-        Az = Relation.promote(Az)
-        self.Ax = Ax
-        self.Az = Az
-        self.pair = (Ax, Az)
+        Rx = Relation.promote(Rx)
+        if Rz is None:
+            Rz = Rx.dual
+        Rz = Relation.promote(Rz)
+        self.Rx = Rx
+        self.Rz = Rz
+        self.pair = (Rx, Rz)
         if check:
-            assert Ax.dual == Az
-        self.atom = None # my Syntax
-        assert Ax.tgt == Az.tgt
-        assert Ax.src == Az.src
-        assert Ax.tgt == hom.m
-        assert Ax.src == hom.n
+            assert Rx.dual == Rz
+        self.info = None
+        assert Rx.tgt == Rz.tgt
+        assert Rx.src == Rz.src
+        assert Rx.tgt == hom.m
+        assert Rx.src == hom.n
         # i am my own Operator
         Circuit.__init__(self, self, hom)
 
     @property
     def reverse(self):
-        Ax, Az = self.Ax, self.Az
-        return Operator(Ax.reverse, Az.reverse, self.hom.reverse)
+        Rx, Rz = self.Rx, self.Rz
+        return Operator(Rx.reverse, Rz.reverse, self.hom.reverse)
 
     @property
     def dual(self):
-        Ax, Az = self.Ax, self.Az
-        return Operator(Az, Ax, self.hom)
+        Rx, Rz = self.Rx, self.Rz
+        return Operator(Rz, Rx, self.hom)
 
     def copy(self):
-        return Operator(self.Ax.copy(), self.Az.copy(), self.hom)
+        return Operator(self.Rx.copy(), self.Rz.copy(), self.hom)
 
-    def set(self, atom):
-        assert type(atom) is Atom
-        assert self.atom is None, "%s already got atom %r"%(self, self.atom,)
-        self.atom = atom
+    #def set(self, atom):
+        #assert type(atom) is Atom
+        #assert self.atom is None, "%s already got atom %r"%(self, self.atom,)
+        #self.atom = atom
+
+    def set(self, *info):
+        assert self.info is None, "%s already got info %r"%(self, self.info,)
+        self.info = info
 
     def walk(self):
         yield self
@@ -245,15 +249,15 @@ class Operator(Circuit):
     def mul(self, other):
         assert isinstance(other, Operator), type(other)
         assert self.hom.src == other.hom.tgt # reconcile TODO
-        Ax = self.Ax * other.Ax
-        Az = self.Az * other.Az
-        return Operator(Ax, Az, self.hom*other.hom)
+        Rx = self.Rx * other.Rx
+        Rz = self.Rz * other.Rz
+        return Operator(Rx, Rz, self.hom*other.hom)
 
     def __matmul__(self, other):
         assert isinstance(other, Operator), type(other)
-        Ax = self.Ax @ other.Ax
-        Az = self.Az @ other.Az
-        return Operator(Ax, Az, self.hom@other.hom)
+        Rx = self.Rx @ other.Rx
+        Rz = self.Rz @ other.Rz
+        return Operator(Rx, Rz, self.hom@other.hom)
 
     def __eq__(self, other):
         assert isinstance(other, Operator), (type(self), type(other))
@@ -265,7 +269,7 @@ class Operator(Circuit):
         return hash(self.pair)
 
     def __str__(self):
-        return "(%s | %s)"%(self.Ax.spanstr(), self.Az.spanstr())
+        return "(%s | %s)"%(self.Rx.spanstr(), self.Rz.spanstr())
 
     def is_identity(self):
         tgt, src = self.shape
@@ -284,10 +288,10 @@ class Composite(Circuit): # XXX binary tree, just make this a list ??
         rop = rhs.op
         #op = lop.mul(rop.op)
 
-        Ax = (lop.Ax * rop.Ax)
-        Az = (lop.Az * rop.Az)
+        Rx = (lop.Rx * rop.Rx)
+        Rz = (lop.Rz * rop.Rz)
         hom = lhs.hom*rhs.hom
-        op = Operator(Ax, Az, hom)
+        op = Operator(Rx, Rz, hom)
 
         Circuit.__init__(self, op, hom)
 
@@ -520,7 +524,7 @@ class Module:
             assert type(lhs) is Operator,\
                 "must be atom Operator, not %r"%type(lhs)
             assert lhs.hom.src == hom.tgt, "wup"
-            lhs.set(atom)
+            lhs.set(atom, lhs.hom)
             if op is None:
                 op = lhs
             else:
@@ -753,6 +757,158 @@ def render(spec, name):
     assert rval == 0
 
 
+OUTPUT = "OUTPUT"
+INPUT = "INPUT"
+
+class Flow:
+    def __init__(self, syntax, src=[], dual=False, detectors=False, verbose=False):
+        if verbose:
+            print("\nget_flow(%s)"%syntax, src, "z_flow" if dual else "x_flow")
+        module = Module(src)
+        composite = module.interpret(syntax, verbose=verbose)
+        assert isinstance(composite, Circuit)
+        ops = list(composite.walk())
+        for op in ops:
+            assert op.info is not None
+            assert op.info[0] in syntax # XXX remove (slow)
+            #print(op, op.hom)
+        ops = [op for op in ops if not op.is_identity()] # get rid of the TICK's
+        #print(len(ops))
+        ops = list(reversed(ops)) # <------ backwards <----
+        del syntax, composite # don't touch these (reversed)
+    
+        if dual:
+            rels = [op.Rz for op in ops]
+        else:
+            rels = [op.Rx for op in ops]
+    
+        lookup = [] # irel index --> col idxs = tgts+srcs
+        R = rels[0]
+        assert len(src) == R.src
+        prev = list(range(R.src))
+        init = list(prev)
+        n = len(prev) # next col idx
+        m = 0
+        cols = {} # map col idx --> (irel , qubit index)
+        for irel,R in enumerate(rels):
+            if verbose:
+                print(R.tgt, "<--", R.src, "prev=%s"%prev)
+            for ii,i in enumerate(prev):
+                cols[i] = (irel, ii)
+            new = []
+            for i in range(R.tgt):
+                new.append(n + i)
+                cols[n+i] = (irel+1, i) # the next irel 
+            assert len(prev) == R.src
+            # these are tgt indexes + src indexes
+            # so we can paste Relation's directly into H below
+            idxs = new+prev 
+            #jdxs = list(range(m, m+R.rank))
+            lookup.append((m, idxs))
+            n += R.tgt
+            m += R.rank
+            prev = new
+    
+        #print(lookup)
+    
+        # now ready to build the check matrix
+        H = numpy.zeros((m,n), dtype=int)
+        for irel,R in enumerate(rels):
+            row,idxs = lookup[irel]
+            H[row:row+R.rank, idxs] = R.A.A # <-- paste the Relation into H
+
+        H = Matrix(H)
+        K = H.kernel()
+        if verbose:
+            print("H =")
+            print(H, H.shape)
+            print("K =")
+            print(K, K.shape)
+
+        flows = []
+        for i in range(len(K)):
+            flow = []
+            for j in range(n):
+                if K[i,j] == 0:
+                    continue
+                idx, jdx = cols[j]
+                #assert idx is None or idx < len(ops)
+                assert idx <= len(ops)
+                flow.append((idx, jdx)) # output
+            flows.append(flow)
+            #print()
+        #print()
+        if verbose:
+            print(flows)
+        #return flows
+        self.flows = flows
+        self.ops = ops
+        self.init = init
+
+    def get_iflow(self, i):
+        ops = self.ops
+        #print("ops:", len(ops))
+        flow = self.flows[i]
+        iflow = []
+        init = list(self.init)
+        for (idx,jdx) in flow:
+            assert idx <= len(ops)
+            #iflow.append((idx, jdx)) # output
+            #if jdx in init:
+            if idx == 0:
+                iflow.append((INPUT, idx, jdx))
+            if idx < len(ops):
+                op = ops[idx]
+                atom, hom = op.info
+                #if (idx,jdx) == (1,2):
+                #if idx <= 1:
+                #    print(atom, hom, idx, jdx)
+                assert jdx < len(hom.src)
+                j = hom.src[jdx] # look at atom src (input)
+                #if jdx in atom.args:
+                #if jdx in hom.src:
+                if j in atom.args: # this flow is *input* to this atom
+                    #print("%s:%s"%(op.atom,jdx), end=' ')
+                    iflow.append((atom, idx, jdx))
+            else:
+                assert idx == len(ops)
+                iflow.append((OUTPUT, idx, jdx)) # output
+                #print("%s<--" % jdx, end=' ')
+        return iflow
+
+    def get_oflow(self, i):
+        ops = self.ops
+        #print("ops:", len(ops))
+        flow = self.flows[i]
+        oflow = []
+        init = list(self.init)
+        for (idx,jdx) in flow:
+            assert idx <= len(ops)
+            #oflow.append((idx, jdx)) # output
+            #if jdx in init:
+            if idx == 0:
+                oflow.append((INPUT, idx, jdx))
+            elif 0 < idx < len(ops):
+                op = ops[idx-1]
+                atom, hom = op.info
+                assert jdx < len(hom.tgt)
+                j = hom.tgt[jdx] # look at atom tgt (output)
+                if j in atom.args: # this flow is *output* of this atom
+                    oflow.append((atom, idx, jdx))
+            else:
+                assert idx == len(ops)
+                oflow.append((OUTPUT, idx, jdx)) # output
+                #print("%s<--" % jdx, end=' ')
+        return oflow
+
+    def __getitem__(self, i):
+        return self.flows[i]
+
+    def __len__(self):
+        return len(self.flows)
+    
+
+
 # ----------------------------------------------------------------------------
 # test functions
 
@@ -774,7 +930,7 @@ def test_encoder():
     # check that Module doesn't scramble the indexes ?
     #lhs = Hom([0,1,2],[0,1]).RZ()*(Hom([0],[]).RX() @ Hom([1],[1]).identity())
     lhs = Hom([0,2],[0]).RZ()*Hom([0],[]).RX()
-    assert lhs.op.Ax == rhs.op.Ax
+    assert lhs.op.Rx == rhs.op.Rx
     assert eqop(lhs, rhs)
 
     spec = CX(0,1)*CX(1,2)*CX(2,0)
@@ -876,149 +1032,84 @@ def test_encoder():
 
     # -------------------------------------------
 
-
-
-def get_flow(syntax, src=[], dual=False, verbose=False):
-    if verbose:
-        print("get_flow(%s)"%syntax, "z_flow" if dual else "x_flow")
-    module = Module(src)
-    composite = module.interpret(syntax, verbose=verbose)
-    assert isinstance(composite, Circuit)
-    ops = list(composite.walk())
-    for op in ops:
-        assert op.atom is not None
-        assert op.atom in syntax # XXX remove (slow)
-        #print(op, op.hom)
-    ops = [op for op in ops if not op.is_identity()] # get rid of the TICK's
-    #print(len(ops))
-    ops = list(reversed(ops)) # <------ backwards <----
-    del syntax, composite # don't touch these (reversed)
-
-    # edges: (idx,jdx) --> [tgt:Relation, src:Relation]
-    # idx is the time index
-    # jdx is the qubit index
-    edges = {}
-    prev = None
-    if dual:
-        rels = [op.Az for op in ops]
-    else:
-        rels = [op.Ax for op in ops]
-
-    lookup = [] # map irel --> col idxs = tgts+srcs
-    A = rels[0]
-    prev = list(range(A.src))
-    col = len(prev) # next col idx
-    cols = {} # map col idx --> (irel , qubit index)
-    for irel,A in enumerate(rels):
-        #print(A.tgt, "<--", A.src, "prev=%s"%prev)
-        for ii,i in enumerate(prev):
-            cols[i] = (irel, ii)
-        new = []
-        for i in range(A.tgt):
-            new.append(col + i)
-            cols[col+i] = (irel+1, i) # the next irel 
-        assert len(prev) == A.src
-        lookup.append(new+prev)
-        col = col + A.tgt
-        prev = new
-
-    #print(lookup)
-
-    m = sum(A.rank for A in rels)
-    n = col
-    H = numpy.zeros((m,n), dtype=int)
-
-    row = 0
-    for irel,A in enumerate(rels):
-        idxs = lookup[irel]
-        #print(idxs)
-        #print(row, idxs)
-        #print(A.A)
-        H[row:row+A.rank, idxs] = A.A.A # triple A !
-        row += A.rank
-    H = Matrix(H)
-    K = H.kernel()
-    if verbose:
-        print("H =")
-        print(H, H.shape)
-        print("K =")
-        print(K, K.shape)
-    flows = []
-    for i in range(len(K)):
-        flow = []
-        for j in range(n):
-            if K[i,j] == 0:
-                continue
-            idx, jdx = cols[j]
-            #assert idx is None or idx < len(ops)
-            assert idx <= len(ops)
-            flow.append((idx, jdx)) # output
-#            if idx < len(ops):
-#                op = ops[idx]
-#                atom = op.atom
-#                if jdx in atom.args:
-#                    #print("%s:%s"%(op.atom,jdx), end=' ')
-#                    flow.append((op.atom, idx, jdx))
-#            else:
-#                flow.append((idx, jdx)) # output
-#                #print("%s<--" % jdx, end=' ')
-        flows.append(flow)
-        #print()
-    #print()
-    if verbose:
-        print(flows)
-    return flows
-    
-
 def test_simple_detectors():
     print("="*79)
     print()
 
-    verbose = False
+    verbose = True
 
     s = Syntax()
     MX, MZ, CX, RX, RZ, TICK = s.MX, s.MZ, s.CX, s.RX, s.RZ, s.TICK
 
+    #syntax = CX(0,1)
+    #flow = Flow(syntax, [0,1], verbose=True)
+    #assert len(flow) == 2
+
+
+    syntax = CX(1,2)*CX(0,1)
+    flow = Flow(syntax, [0,1,2], verbose=False)
+    assert len(flow) == 3
+
+    flow = Flow(MZ(0)*RZ(0))
+    assert len(flow)==0
+
+    src = [0,1]
+    syntax = MZ(2)*MX(3)*CX(3,2)*CX(1,2)*CX(0,2)*CX(3,2)*RZ(2)*RX(3)
+    flow = Flow(syntax, src, verbose=True)
+    print(len(flow))
+    #for i in range(len(flow)):
+    for i in [0,1]:
+        print(flow[i])
+        print("\t", flow.get_iflow(i))
+        print("\t", flow.get_oflow(i))
+    print()
+
+    flow = Flow(syntax, src, dual=True, verbose=False)
+    print(len(flow))
+
+    #return
+
     syntax = MX(0)*TICK()*RX(0)
-    flows = get_flow(syntax, [], verbose=verbose) # x_flow 
-    assert len(flows) == 1
-    flows = get_flow(syntax, [], dual=True, verbose=verbose) # z_flow
-    assert len(flows) == 0
+    flow = Flow(syntax, [], verbose=verbose) # x_flow 
+    assert len(flow) == 1
+    flow = Flow(syntax, [], dual=True, verbose=verbose) # z_flow
+    assert len(flow) == 0
+
+    syntax = MX(0)*RX(0)*MX(0)*TICK()*RX(0)
+    flow = Flow(syntax, [], verbose=verbose) # x_flow 
+    assert len(flow) == 2
 
     syntax = MX(0)*TICK()*RZ(0)
-    flows = get_flow(syntax, [], verbose=verbose)
-    assert len(flows) == 0
-    flows = get_flow(syntax, [], dual=True, verbose=verbose)
-    assert len(flows) == 0
+    flow = Flow(syntax, [], verbose=verbose)
+    assert len(flow) == 0
+    flow = Flow(syntax, [], dual=True, verbose=verbose)
+    assert len(flow) == 0
 
     syntax = CX(0,1)
-    flows = get_flow(syntax, [0,1], verbose=verbose)
-    assert len(flows) == 2
-
-    flows = get_flow(syntax, [0,1], dual=True, verbose=verbose)
-    assert len(flows) == 2
+    flow = Flow(syntax, [0,1], dual=True, verbose=verbose)
+    assert len(flow) == 2
 
     syntax = MX(0)*TICK()*CX(0,1)*TICK()*RX(0)*RZ(1)
-    flows = get_flow(syntax, [], verbose=verbose)
-    assert len(flows) == 1
+    flow = Flow(syntax, [], verbose=verbose)
+    assert len(flow) == 1
 
-    flows = get_flow(syntax, [], dual=True, verbose=verbose)
-    assert len(flows) == 0
+    flow = Flow(syntax, [], dual=True, verbose=verbose)
+    assert len(flow) == 0
 
     syntax = CX(0,1)*CX(0,1)
-    flows = get_flow(syntax, [0,1], verbose=verbose)
-    assert len(flows) == 2
-    assert flows == [[(0, 0), (1, 0), (1, 1), (2, 0)], [(0, 1), (1, 1), (2, 1)]]
+    flow = Flow(syntax, [0,1], verbose=verbose)
+    assert len(flow) == 2
+    assert list(flow) == [[(0, 0), (1, 0), (1, 1), (2, 0)], [(0, 1), (1, 1), (2, 1)]]
 
     syntax = MX(0)*CX(0,1)*CX(0,1)*RZ(0)
-    flows = get_flow(syntax, [1], verbose=verbose)
-    assert len(flows) == 1
+    flow = Flow(syntax, [1], verbose=verbose)
+    assert len(flow) == 1
 
-    flows = get_flow(syntax, [1], dual=True, verbose=verbose)
-    assert len(flows) == 1
+    flow = Flow(syntax, [1], dual=True, verbose=verbose)
+    assert len(flow) == 1
     
 
-    #test_goto()
+    test_goto()
 
 
 def test_goto():
@@ -1042,11 +1133,13 @@ def test_goto():
     syntax = reduce(mul, reversed(spec))
     #print(syntax)
 
-    flows = get_flow(syntax)
-    assert len(flows) == 3
+    flow = Flow(syntax)
+    assert len(flow) == 3
+    #for i in range(len(flow)):
+    #    print(i, flow.get(i))
 
-    flows = get_flow(syntax, dual=True)
-    assert len(flows) == 5
+    flow = Flow(syntax, dual=True)
+    assert len(flow) == 5
     #render(spec, "goto_713")
 
 
@@ -1072,15 +1165,15 @@ def test_iceberg():
     #render(syntax, "iceberg")
 
     src = list(range(n))
-    get_flow(syntax, src)
-    get_flow(syntax, src, dual=True)
+    Flow(syntax, src)
+    Flow(syntax, src, dual=True)
 
 
 def load_stim():
     name = argv.next() or "zero_prep_20_2_6.stim"
     data = open(name).read()
     spec = from_stim(data)
-    get_flow(spec)
+    Flow(spec)
 
 def test_detectors():
     test_simple_detectors()
@@ -1222,14 +1315,14 @@ def test_hom():
 
     rhs = Hom(3).PERM([1,2,0]) * Hom([0,1,2],[1,2]).RX()
     lhs = Hom([0,1,2],[0,2]).RX() * Hom([0,2],[0,2]).SWAP(0,2)
-    assert lhs.op.Ax == rhs.op.Ax
+    assert lhs.op.Rx == rhs.op.Rx
     #assert lhs.op == rhs.op
     
     rel = Hom([0,1,2]).PERM([2, 0, 1])
     rhs = Hom([0,1,2],[1,2]).RX()
     rhs = rel * rhs
     lhs = Hom([0,1,2],[0,1]).RX()
-    assert lhs.op.Ax == rhs.op.Ax
+    assert lhs.op.Rx == rhs.op.Rx
     #assert lhs.op == rhs.op
 
     with pytest.raises(AssertionError):
@@ -1283,23 +1376,23 @@ def test_hom():
     w3 = Hom(3,1).white()
 
     iso = Hom(9,9).PERM([0,3,6,1,4,7,2,5,8])
-    Ex = (b3@b3@b3)*w3
-    #print("Ex:")
-    #print(Ex)
+    Rx = (b3@b3@b3)*w3
+    #print("Rx:")
+    #print(Rx)
 
-#    Hx = (Ex*Operator.white(1,0)).op.Ax.left
-    Hx = (Ex*Hom(1,0).white()).op.Ax.left
+#    Hx = (Rx*Operator.white(1,0)).op.Rx.left
+    Hx = (Rx*Hom(1,0).white()).op.Rx.left
     #print(Hx)
 
-    Ez = (w3@w3@w3)*b3
-    #print("Ez:")
-    #print(Ez)
+    Rz = (w3@w3@w3)*b3
+    #print("Rz:")
+    #print(Rz)
 
-    assert Ez.op == Ex.op.dual
-    assert Ex.op == Ez.op.dual
+    assert Rz.op == Rx.op.dual
+    assert Rx.op == Rz.op.dual
 
-    #Hz = (Ez*Operator.white(1,0)).op.Ax.left
-    Hz = (Ez*Hom(1,0).white()).op.Ax.left
+    #Hz = (Rz*Operator.white(1,0)).op.Rx.left
+    Hz = (Rz*Hom(1,0).white()).op.Rx.left
     #print(Hz)
 
     code = CSSCode(Hx=Hx, Hz=Hz)
@@ -1307,7 +1400,7 @@ def test_hom():
     #print(code)
     #print(code.longstr())
 
-    op = Operator(Ez, Ex, Hom(code.n, code.k))
+    op = Operator(Rz, Rx, Hom(code.n, code.k))
     assert eqop(get_encoder(code), op)
 
     # ------------------------------------------------
@@ -1316,23 +1409,23 @@ def test_hom():
     for trial in range(10):
 
         code = CSSCode.random(20, 5, 5)
-        Ex, Ez = get_encoder(code).pair
-        assert Ex.dual == Ez
-        assert Ez.dual == Ex
+        Rx, Rz = get_encoder(code).pair
+        assert Rx.dual == Rz
+        assert Rz.dual == Rx
         hom = Hom(code.n, code.k)
-        dode = from_encoder(Operator(Ex, Ez, hom))
+        dode = from_encoder(Operator(Rx, Rz, hom))
         assert code.is_equiv(dode)
     
 
     # ------------------------------------------------
 
     code = construct.get_422().to_css()
-    Ex = get_encoder(code).pair[0]
-    left = Ex.left
+    Rx = get_encoder(code).pair[0]
+    left = Rx.left
     #print(left)
     #print(left @ left)
 
-    EE = Ex.tensor(Ex)
+    EE = Rx.tensor(Rx)
     #print(EE)
     hom = Hom(16, 4)
     dode = from_encoder(Operator(EE, None, hom))
