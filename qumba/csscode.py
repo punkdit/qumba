@@ -852,12 +852,12 @@ class CSSCode(object):
         code = cls(build=build, check=check, **kw)
         return code
 
-    def longstr(self):
+    def longstr(self, logops=True):
         assert isinstance(self.Lz, Matrix)
         assert isinstance(self.Lx, Matrix)
 
         lines = [ "Hx =", shortstr(self.Hx), "Hz =", shortstr(self.Hz), ]
-        if len(self.Lx):
+        if len(self.Lx) and logops:
             lines += ["Lx =", shortstr(self.Lx), "Lz =", shortstr(self.Lz)]
         return '\n'.join(lines)
 

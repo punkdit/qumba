@@ -374,6 +374,111 @@ def reed_muller(r=1, m=4):
         return code
 
 
+def show(code):
+    css = code.to_css()
+    css.bz_distance()
+    return str(css)
+
+def test_rm():
+
+    if 0:
+        left = get_832()
+        print(left.longstr())
+        right = get_832().apply_H()
+    
+        print(show(left), "+", show(right))
+        #return
+    
+        dode = left+right
+        dode = dode.to_css()
+        dode.bz_distance()
+        #print(dode)
+        #print(dode.longstr(False))
+    
+    #    for dode in [get_832(), get_832().apply_H()]:
+    #        dode = dode.to_css()
+    #        print(dode.longstr(False))
+    #    #return
+    #    print()
+    
+        code = reed_muller(1, 4) # [[16,6,4]]
+        css = code.to_css()
+        css.bz_distance()
+    
+        #print(css.longstr(False))
+    
+        send = css
+        for i in range(8):
+            send = send.CX(8+i, i)
+            send.bz_distance()
+            print(send)
+        send.bz_distance()
+        print(send)
+        print(send.longstr())
+        print(send.is_equiv(dode))
+    
+        return
+
+    code = reed_muller(2, 6)
+    print(code)
+    #print(code.longstr())
+    assert (code.is_selfdual())
+    return
+
+    n = 32
+    dode = code
+    for i in range(n):
+        dode = dode.CX(i, i+n)
+    css = dode.to_css()
+    css.bz_distance()
+    print(css)
+    Hx = css.Hx
+    Hz = css.Hz
+    print(css.longstr(False))
+
+    Hx0 = Hx[:, :n].row_reduce()
+    Hx1 = Hx[:, n:].row_reduce()
+    Hz0 = Hz[:, :n].row_reduce()
+    Hz1 = Hz[:, n:].row_reduce()
+
+    def dump(css):
+        #from qumba.triorthogonal import is_morthogonal
+        #A = Hx.A
+        #assert (is_morthogonal(A, 2))
+        #assert (is_morthogonal(A, 3))
+        #assert not (is_morthogonal(A, 4))
+    
+        from qumba.gcolor import dump_transverse
+        dump_transverse(css.Hx.A, css.Lx.A, 3)
+
+
+    left = CSSCode(Hx=Hx0, Hz=Hz0)
+    print(show(left))
+    #dump(left)
+    right = CSSCode(Hx=Hx1, Hz=Hz1)
+    print(show(right))
+    #dump(right)
+
+    n = 16
+    code = right
+    for i in range(n):
+        code = code.CX(i, i+n)
+    print(show(code))
+    print(code.longstr(False))
+
+    return
+
+    for m in range(4, 7):
+      for r in [1,2,3]:
+        code = reed_muller(r, m)
+        if code is None:
+            continue
+        css = code.to_css()
+        css.bz_distance()
+        print((r,m), css)
+
+
+
 def get_15_1_3():
     code = QCode.fromstr("""
     X.X.X.X.X.X.X.X
