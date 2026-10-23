@@ -760,6 +760,18 @@ def render(spec, name):
 OUTPUT = "OUTPUT"
 INPUT = "INPUT"
 
+
+class Item:
+    def __init__(self, atom, idx, tgt=None, src=None):
+        self.atom = atom
+        self.idx = idx
+        self.tgt = tgt
+        self.src = src
+    def __str__(self):
+        return str((self.atom, self.idx, self.tgt, self.src))
+    __repr__ = __str__
+
+
 class Flow:
     def __init__(self, syntax, src=[], dual=False, detectors=False, verbose=False):
         if verbose:
@@ -855,8 +867,9 @@ class Flow:
             assert idx <= len(ops)
             #iflow.append((idx, jdx)) # output
             #if jdx in init:
-            if idx == 0:
-                iflow.append((INPUT, idx, jdx))
+            #if idx == 0:
+                #iflow.append((INPUT, idx, jdx))
+            item = None
             if idx < len(ops):
                 op = ops[idx]
                 atom, hom = op.info
@@ -869,11 +882,15 @@ class Flow:
                 #if jdx in hom.src:
                 if j in atom.args: # this flow is *input* to this atom
                     #print("%s:%s"%(op.atom,jdx), end=' ')
-                    iflow.append((atom, idx, jdx))
+                    #iflow.append((atom, idx, jdx))
+                    item = Item(atom, idx, None, jdx)
             else:
                 assert idx == len(ops)
-                iflow.append((OUTPUT, idx, jdx)) # output
+                #iflow.append((OUTPUT, idx, jdx)) # output
+                item = Item(OUTPUT, idx, None, jdx)
                 #print("%s<--" % jdx, end=' ')
+            if item is not None:
+                iflow.append(item)
         return iflow
 
     def get_oflow(self, i):
@@ -886,20 +903,30 @@ class Flow:
             assert idx <= len(ops)
             #oflow.append((idx, jdx)) # output
             #if jdx in init:
+            item = None
             if idx == 0:
-                oflow.append((INPUT, idx, jdx))
+                #oflow.append((INPUT, idx, jdx))
+                item = Item(INPUT, idx, jdx, None)
             elif 0 < idx < len(ops):
                 op = ops[idx-1]
                 atom, hom = op.info
                 assert jdx < len(hom.tgt)
                 j = hom.tgt[jdx] # look at atom tgt (output)
                 if j in atom.args: # this flow is *output* of this atom
-                    oflow.append((atom, idx, jdx))
-            else:
-                assert idx == len(ops)
-                oflow.append((OUTPUT, idx, jdx)) # output
-                #print("%s<--" % jdx, end=' ')
+                    #oflow.append((atom, idx, jdx))
+                    item = Item(atom, idx, jdx, None)
+            #else:
+            #    assert idx == len(ops)
+            #    oflow.append((OUTPUT, idx, jdx)) # output
+            #    #print("%s<--" % jdx, end=' ')
+            if item is not None:
+                oflow.append(item)
         return oflow
+
+    def get_flow(self, i):
+        flow = self.get_iflow(i) + self.get_oflow(i)
+        flow.sort(key = lambda item: -item.idx)
+        return flow
 
     def __getitem__(self, i):
         return self.flows[i]
@@ -965,9 +992,6 @@ def test_encoder():
 
     # -------------------------------------------
 
-    spec = [CX(0,3), CX(0,5), CX(0,6), CX(1,3), CX(1,4),
-    CX(1,5), CX(2,4), CX(2,5), CX(2,6), CX(3,0), CX(3,1),
-    CX(3,4), CX(3,6), RX(0), RX(1), RX(2), RZ(4), RZ(5), RZ(6)]
     spec = CX(0,3)*CX(0,5)*CX(0,6)*CX(1,3)*CX(1,4)*CX(1,5)*CX(2,4)\
         *CX(2,5)*CX(2,6)*CX(3,0)*CX(3,1)*CX(3,4)*CX(3,6)\
         *RX(0)*RX(1)*RX(2)*RZ(4)*RZ(5)*RZ(6)
@@ -1032,7 +1056,8 @@ def test_encoder():
 
     # -------------------------------------------
 
-def test_simple_detectors():
+
+def test_detectors():
     print("="*79)
     print()
 
@@ -1060,14 +1085,15 @@ def test_simple_detectors():
     #for i in range(len(flow)):
     for i in [0,1]:
         print(flow[i])
-        print("\t", flow.get_iflow(i))
-        print("\t", flow.get_oflow(i))
+        print("\t", flow.get_flow(i))
+        #print("\t", flow.get_iflow(i))
+        #print("\t", flow.get_oflow(i))
     print()
 
     flow = Flow(syntax, src, dual=True, verbose=False)
     print(len(flow))
 
-    #return
+    return
 
     syntax = MX(0)*TICK()*RX(0)
     flow = Flow(syntax, [], verbose=verbose) # x_flow 
@@ -1169,16 +1195,16 @@ def test_iceberg():
     Flow(syntax, src, dual=True)
 
 
-def load_stim():
+def test_prep():
     name = argv.next() or "zero_prep_20_2_6.stim"
     data = open(name).read()
     spec = from_stim(data)
     Flow(spec)
 
-def test_detectors():
+def test_all_detectors():
     test_simple_detectors()
-    test_goto()
     test_iceberg()
+    test_prep()
     
 
 def test_syntax():
