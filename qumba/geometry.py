@@ -381,6 +381,82 @@ def main():
 
 
 
+def main_qhap():
+
+    from qhap.code.csscode import CSSCode, Matrix
+    from qhap.builders import build_css_bare_syndrome
+    from qhap.circuit import HeliosNoiseModel, IonNoiseModel
+    #from qhap.db import CodeDB
+    from qhap.sat import find_bare_schedule, get_distance
+    from qhap.schedular import IonSchedular
+    from qhap.sweep import decode_circuit
+
+    start_idx = argv.get("start_idx", 1)
+    stop_idx = argv.get("stop_idx", None)
+    shape = argv.get("shape", (5,5))
+    index = argv.get("index", 1000)
+    n_max = argv.get("n_max", 1215)
+    if argv.build_db or shape not in lins_db.db:
+        print("lins_db.build_db...", end='', flush=True)
+        lins_db.build_db(shape, index)
+        print(" done")
+    if argv.idx:
+        build(shape, argv.idx)
+        return
+    print("shape =", shape)
+    n = len(lins_db.db[shape])
+    print("lins_db:", n)
+
+    idx = start_idx
+
+    best = {}
+    while idx < n and (stop_idx is None or idx < stop_idx):
+        code = build(shape, idx)
+        idx += 1
+
+        if code is None or code.k == 0:
+            #print(code)
+            print("/", end='', flush=True)
+            continue
+    
+        print("idx=%d"%idx)
+
+        hx = str(code.Hx)
+        hz = str(code.Hz)
+
+        css = CSSCode(Matrix.parse(hx), Matrix.parse(hz))
+        print(css)
+        print(css.get_distance())
+        
+        result, x_checks = find_bare_schedule(css, "X")
+        assert result == 'sat'
+        print(x_checks)
+
+        result, z_checks = find_bare_schedule(css, "Z")
+        assert result == 'sat'
+        print(z_checks)
+
+        logicals = []
+        for lx in css.Lx:
+            logicals.append( ('X', tuple(idx for idx in range(css.n) if lx[idx])))
+        for lz in css.Lz:
+            logicals.append( ('Z', tuple(idx for idx in range(css.n) if lx[idx])))
+        print(logicals)
+
+        assert css.d is not None
+        circuit = build_css_bare_syndrome(x_checks+z_checks, logicals, css.n, basis="Z", rounds=css.d)
+        #print(circuit)
+
+        p = 1e-4
+        circuit = circuit.to_stim(p=p)
+
+        record = decode_circuit(
+            circuit, label="Z memory", p=p, shots=1000, seed=0, decoder="frontier")
+        print(record)
+
+
+        break
+
 
 
 if __name__ == "__main__":

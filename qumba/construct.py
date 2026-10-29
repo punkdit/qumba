@@ -3,7 +3,7 @@
 from random import shuffle
 from functools import reduce, lru_cache
 cache = lru_cache(None)
-from operator import add
+from operator import add, mul
 
 import numpy
 
@@ -1769,6 +1769,23 @@ def test_hexacode():
     print(code.get_autos())
 
 
+def get_projector(code):
+    from qhap.sim.lazy import Space
+    code = code.to_css()
+    n = code.n
+    space = Space(n)
+    m = code.mx + code.mz
+    s = (code.to_qcode().longstr(False,False)).replace(".", "I")
+    #print(s)
+    ops = s.split()[2:]
+    #print(ops)
+    I = space.I()
+    ops = [I+space.pauli(op) for op in ops]
+    P = ((1/2)**m)*reduce(mul, ops)
+    assert P*P == P
+    return P
+
+
 def test_tesseract():
 
     c0 = get_832()
@@ -1777,10 +1794,64 @@ def test_tesseract():
     for i in range(8):
         code = code.CX(i, 8+i)
     code = code.to_css()
-    #code.bz_distance()
-    code.distance_z3()
+    code.bz_distance()
     print(code)
-    print(code.longstr())
+    #print(code.longstr())
+
+    #code = get_832().to_css()
+
+    P0 = get_projector(c0)
+    P1 = get_projector(c1)
+    P = get_projector(code)
+
+    from qhap.sim import lazy
+    lazy.EPSILON = 1e-4
+    from qhap.sim.lazy import Space, X, Z, H, T
+    n = code.n
+    space = Space(n)
+
+    G = reduce(mul, [space.CX(i,i+8) for i in range(8)])
+
+    P01 = G*(P0@P1)
+    print(P01*P01==P01)
+
+    print(G*P*G == (P0@P1))
+
+    return
+
+    Z4 = T
+    X4 = H*T*H
+
+#    G = space.I()
+#    n = 8
+#    for i in range(n):
+#        if i%2==0:
+#            G *= space.tensor(Z4, [i])
+#        else:
+#            G *= space.tensor(Z4.d, [i])
+#    assert (G*P == P*G)
+#
+#    return
+
+    #code = get_422()
+    #code = get_10_2_3()
+
+    G = space.I()
+    n = 8
+    for i in range(n):
+        j = n+i
+        G *= space.CX(i, j)
+        if i%2==0:
+            G *= space.tensor(Z4, [i])
+            #G *= space.tensor(X4.d, [j])
+        else:
+            G *= space.tensor(Z4.d, [i])
+            #G *= space.tensor(X4, [j])
+        G *= space.CX(i, j)
+
+    print(G*P == P*G)
+
+    return
 
     Hx = code.Hx
     print(Hx.get_wenum())
@@ -1794,7 +1865,7 @@ def test_tesseract():
     HLx = Hx.concatenate(code.Lx)
     print(HLx.get_wenum())
 
-#    return
+    return
 
     N, perms = code.get_autos()
     print(N) # 322560 

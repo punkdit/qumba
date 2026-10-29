@@ -5,11 +5,6 @@ Use linear relations for CSS _circuits (aka phase-free ZX-calculus).
 Keep track of how we compose operators using Composite objects.
 and more...
 
-See previous: css.py
-Other attempt: witness.py
-
-test_encoder: works
-test_simple_detectors: fail
 
 """
 
@@ -1093,8 +1088,6 @@ def test_detectors():
     flow = Flow(syntax, src, dual=True, verbose=False)
     print(len(flow))
 
-    return
-
     syntax = MX(0)*TICK()*RX(0)
     flow = Flow(syntax, [], verbose=verbose) # x_flow 
     assert len(flow) == 1
@@ -1354,7 +1347,7 @@ def test_hom():
     with pytest.raises(AssertionError):
         Hom([2,1,0], [0,1]).RX()
 
-    return # TODO:
+    #return # TODO:
 
     # test CX ----------------------------------------
 

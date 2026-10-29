@@ -305,13 +305,13 @@ class QCode(object):
             else '%d<=d<=%d'%(self.d_lower_bound, self.d_upper_bound))
         return "[[%s, %s, %s]]"%(self.n, self.k, d)
 
-    def longstr(self, showt = False):
+    def longstr(self, showt = False, logops=True):
         s = "H =\n%s"%strop(self.H)
         T = self.T
         if showt and T is not None and len(T):
             s += "\nT =\n%s"%strop(T)
         L = self.L
-        if L is not None and len(L):
+        if L is not None and len(L) and logops:
             s += "\nL =\n%s"%strop(L)
         return s
 
