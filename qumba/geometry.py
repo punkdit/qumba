@@ -392,10 +392,13 @@ def main_qhap():
     from qhap.sweep import decode_circuit
 
 
-
+    gate_zones = argv.get("gate_zones", 4)
+    error_rate = argv.get("error_rate", 1e-3)
+    workers = argv.get("workers", 4)
+    shots = argv.get("shots", 10000)
 
     start_idx = argv.get("start_idx", 1)
-    stop_idx = argv.get("stop_idx", None)
+    stop_idx = argv.get("stop_idx", 7)
     shape = argv.get("shape", (5,5))
     index = argv.get("index", 1000)
     n_max = argv.get("n_max", 1215)
@@ -412,7 +415,7 @@ def main_qhap():
 
     idx = start_idx
 
-    best = {}
+    found = []
     while idx < n and (stop_idx is None or idx < stop_idx):
         code = build(shape, idx)
         idx += 1
@@ -422,14 +425,14 @@ def main_qhap():
             print("/", end='', flush=True)
             continue
     
-        print("idx=%d"%idx, end=' ', flush=True)
+        print("\nidx=%d"%idx, end=' ', flush=True)
 
         hx = str(code.Hx)
         hz = str(code.Hz)
 
         css = CSSCode(Matrix.parse(hx), Matrix.parse(hz))
         d = css.get_distance()
-        print("[[%d, %d, %d]]"%(css.n, css.k, css.d), end=' ', flush=True)
+        print("[[%d, %d, %d]]"%(css.n, css.k, css.d))
         
         result, x_checks = find_bare_schedule(css, "X")
         assert result == 'sat'
@@ -447,31 +450,45 @@ def main_qhap():
         #print(logicals)
 
         assert css.d is not None
+        found.append( (css, x_checks+z_checks, logicals) )
 
-
+    data = []
+    for (css,checks,logicals) in found:
         #print(circuit)
+        print("[[%d, %d, %d]]"%(css.n, css.k, css.d))
 
-        gate_zones = 8
-        p = 1e-3
-
-        schedular = IonSchedular(gate_zones)
-        noise = IonNoiseModel(p)
-
-        for basis in "XZ":
-            circuit = build_css_bare_syndrome(x_checks+z_checks, logicals, css.n, basis=basis, rounds=css.d)
-            #circuit = circuit.to_stim(p=p)
+        results = []
+        for gate_zones in [2, 4, 6, 8]:
+            schedular = IonSchedular(gate_zones)
+            noise = IonNoiseModel(error_rate)
+    
+            basis = "X"
+    
+            circuit = build_css_bare_syndrome(checks, logicals, 
+                css.n, basis=basis, rounds=css.d)
+            #circuit = circuit.to_stim(p=error_rate)
             circuit = schedular(circuit)
             circuit = noise(circuit)
             circuit = circuit.to_stim()
     
-            record = decode_circuit(circuit, label=basis+" memory", p=p, shots=10000, seed=1, decoder="frontier")
+            record = decode_circuit(circuit, label=basis+" memory", 
+                p=error_rate, shots=shots, seed=1, 
+                decoder="frontier", workers=workers)
             #print(record)
-            print("%s failures: %s/%s" % (basis, record["failures"], record["shots"]), end=' ', flush=True)
+    
+            top, bot = record["failures"], record["shots"]
+            value = top/bot
+            print(basis+"-CHECK", 
+                "%.6f"%value, "%.6f"%(value/css.k), )
+            results.append(value/css.k)
 
+        print(results)
+        data.append(results)
         print()
     
         #break
 
+    print(data)
 
 
 if __name__ == "__main__":
