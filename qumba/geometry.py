@@ -391,6 +391,9 @@ def main_qhap():
     from qhap.schedular import IonSchedular
     from qhap.sweep import decode_circuit
 
+
+
+
     start_idx = argv.get("start_idx", 1)
     stop_idx = argv.get("stop_idx", None)
     shape = argv.get("shape", (5,5))
@@ -419,43 +422,55 @@ def main_qhap():
             print("/", end='', flush=True)
             continue
     
-        print("idx=%d"%idx)
+        print("idx=%d"%idx, end=' ', flush=True)
 
         hx = str(code.Hx)
         hz = str(code.Hz)
 
         css = CSSCode(Matrix.parse(hx), Matrix.parse(hz))
-        print(css)
-        print(css.get_distance())
+        d = css.get_distance()
+        print("[[%d, %d, %d]]"%(css.n, css.k, css.d), end=' ', flush=True)
         
         result, x_checks = find_bare_schedule(css, "X")
         assert result == 'sat'
-        print(x_checks)
+        #print(x_checks)
 
         result, z_checks = find_bare_schedule(css, "Z")
         assert result == 'sat'
-        print(z_checks)
+        #print(z_checks)
 
         logicals = []
         for lx in css.Lx:
             logicals.append( ('X', tuple(idx for idx in range(css.n) if lx[idx])))
         for lz in css.Lz:
-            logicals.append( ('Z', tuple(idx for idx in range(css.n) if lx[idx])))
-        print(logicals)
+            logicals.append( ('Z', tuple(idx for idx in range(css.n) if lz[idx])))
+        #print(logicals)
 
         assert css.d is not None
-        circuit = build_css_bare_syndrome(x_checks+z_checks, logicals, css.n, basis="Z", rounds=css.d)
+
+
         #print(circuit)
 
-        p = 1e-4
-        circuit = circuit.to_stim(p=p)
+        gate_zones = 8
+        p = 1e-3
 
-        record = decode_circuit(
-            circuit, label="Z memory", p=p, shots=1000, seed=0, decoder="frontier")
-        print(record)
+        schedular = IonSchedular(gate_zones)
+        noise = IonNoiseModel(p)
 
+        for basis in "XZ":
+            circuit = build_css_bare_syndrome(x_checks+z_checks, logicals, css.n, basis=basis, rounds=css.d)
+            #circuit = circuit.to_stim(p=p)
+            circuit = schedular(circuit)
+            circuit = noise(circuit)
+            circuit = circuit.to_stim()
+    
+            record = decode_circuit(circuit, label=basis+" memory", p=p, shots=10000, seed=1, decoder="frontier")
+            #print(record)
+            print("%s failures: %s/%s" % (basis, record["failures"], record["shots"]), end=' ', flush=True)
 
-        break
+        print()
+    
+        #break
 
 
 
