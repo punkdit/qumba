@@ -288,7 +288,12 @@ def main():
         code = build(shape, idx)
         idx += 1
 
-        if code is None or code.k == 0:
+        if code is None:
+            #print(code)
+            print(".", end='', flush=True)
+            continue
+    
+        if code.k == 0:
             #print(code)
             print("/", end='', flush=True)
             continue
@@ -299,9 +304,9 @@ def main():
             print("code too big, bye")
             break
 
-        if code.k <= 2:
-            print()
-            continue
+        #if code.k <= 2:
+        #    print()
+        #    continue
 
         if code.n == argv.n:
             print(code.to_qcode().longstr())
@@ -340,7 +345,7 @@ def main():
 
         #print(code)
         if code.dx < 3 or code.dz < 3:
-            print()
+            print(code)
             continue
         #found.append(code)
         if argv.all:
@@ -458,7 +463,14 @@ def main_qhap():
         print("[[%d, %d, %d]]"%(css.n, css.k, css.d))
 
         results = []
-        for gate_zones in [2, 4, 6, 8]:
+        for gate_zones in [2, 4, 6, 8, 10]:
+            #if gate_zones == 2 and css.n>30 or gate_zones <=4 and css.n > 40:
+            #    results.append(None)
+            #    continue
+
+            if (gate_zones,css.n) != (4,80):
+                continue
+
             schedular = IonSchedular(gate_zones)
             noise = IonNoiseModel(error_rate)
     
@@ -480,7 +492,8 @@ def main_qhap():
             value = top/bot
             print(basis+"-CHECK", 
                 "%.6f"%value, "%.6f"%(value/css.k), )
-            results.append(value/css.k)
+            #results.append(value/css.k)
+            results.append(top)
 
         print(results)
         data.append(results)
@@ -489,6 +502,81 @@ def main_qhap():
         #break
 
     print(data)
+
+
+
+def sample_err(p, N, confidence=0.95):
+    from math import sqrt
+    from statistics import NormalDist
+    """Return (lower, upper) Wilson confidence bounds."""
+    if not 0 <= p <= 1:
+        raise ValueError("p must be between 0 and 1")
+    if N <= 0 or int(N) != N:
+        raise ValueError("N must be a positive integer")
+    if not 0 < confidence < 1:
+        raise ValueError("confidence must be between 0 and 1")
+
+    z = NormalDist().inv_cdf((1 + confidence) / 2)
+    denom = 1 + z**2 / N
+    center = (p + z**2 / (2 * N)) / denom
+    half = z * sqrt(p * (1 - p) / N + z**2 / (4 * N**2)) / denom
+    return [max(0.0, center - half), min(1.0, center + half)]
+
+
+def make_plot():
+
+    data = [
+        [124, 122, 82, 96, 100], 
+        [406, 179, 94, 88, 75], 
+        [None, 215, 139, 94, 80], 
+        [None, 671, 309, 131, 98], 
+        [None, None, 1465, 705, 384]]
+    gate_zones = [2, 4, 6, 8, 10]
+    shots = 10000
+    codes = [[15, 5, 3], [30, 8, 3], [40, 10, 4], [80, 18, 5], [150, 32, 6],]
+
+    from matplotlib import pyplot as plt
+
+    #geterr = lambda p,n: (p*(1-p)/n)**0.5 # too sloppy
+
+    for (idx,gz) in enumerate(gate_zones):
+        vals = []
+        yerr = []
+        for jdx,row in enumerate(data):
+            if row[idx] is None:
+                continue
+            n,k,d = codes[jdx]
+            p = row[idx] / shots / k
+            vals.append( (n, p) )
+            lo, hi = sample_err(p, shots*k)
+            yerr.append( [p-lo, hi-p] )
+        print(yerr)
+        yerr = numpy.array(yerr).transpose()
+        print(yerr)
+        #print(vals)
+
+        x = [val[0] for val in vals]
+        y = [val[1] for val in vals]
+        #print(x)
+        #print(y)
+        plt.errorbar(x, y, yerr=yerr, capsize=4, capthick=1,
+            label="%d gate zones"%gz,
+            )
+        print()
+
+    for xpos in x:
+        plt.axvline(xpos, color="gray", linestyle="--", linewidth=0.8, alpha=0.5)
+    plt.xticks(x)
+        
+    plt.legend(loc="upper right")
+    plt.xlabel("n qubits")
+    plt.ylabel("error / k")
+    plt.yscale("log")
+    plt.title("hyperbolic surface code throughput")
+    plt.savefig("throughput.pdf")
+    
+
+
 
 
 if __name__ == "__main__":
