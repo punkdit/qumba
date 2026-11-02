@@ -460,7 +460,7 @@ def qhap_threshold():
 
 
     gate_zones = argv.get("gate_zones", 4)
-    sweep = [5e-4, 1e-3, 2e-3]
+    sweep = [5e-4, 1e-3, 2e-3, 4e-3, 1e-2]
     workers = argv.get("workers", 4)
     shots = argv.get("shots", 10000)
 
@@ -486,8 +486,7 @@ def qhap_threshold():
     
             top, bot = record["failures"], record["shots"]
             value = top/bot
-            print(basis+"-CHECK", 
-                "%.6f"%value, "%.6f"%(value/css.k), )
+            print(basis+"-CHECK", "%.6f"%value, "%.6f"%(value/css.k), )
             #results.append(value/css.k)
             results.append(top)
 
@@ -498,7 +497,9 @@ def qhap_threshold():
     
         #break
 
-    print(data)
+    print("shots =", shots)
+    print("sweep =", sweep)
+    print("data = ", data)
 
 
 def qhap_transport():
