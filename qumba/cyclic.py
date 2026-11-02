@@ -293,7 +293,12 @@ def main_sd():
         code = QCode.build_css(H, H, cyclic=True)
         if code.k == 0 or code.d_upper_bound <= 2:
             continue
-        print(code)
+        print(code, end=' ', flush=True)
+        if code.k / code.n > 1/4:
+            code.bz_distance()
+            print(code)
+        else:
+            print()
         if argv.show:
             print(code.longstr())
 
@@ -369,21 +374,27 @@ def main_all_css():
 
 
 def main_css():
-    min_d = argv.get("min_d", 3)
     n = argv.get("n", 15)
-    count = 0
-    for code in unique(all_cyclic_css(n), min_d):
-        code = code.to_css()
-        code.bz_distance()
-        code = code.to_qcode()
-        print(code.cssname, "*" if code.is_selfdual() else " ")
-        if argv.store_db:
-            from qumba import db
-            db.add(code)
-        count += 1
-        if count%6 == 0:
-            break
-    print()
+    while n<200:
+        assert n%2
+        count = 0
+        found = set()
+        for code in all_cyclic_css(n):
+            code = code.to_css()
+            code.bz_distance()
+            name = str(code)
+            if name in found:
+                continue
+            found.add(name)
+            if code.d <= 2:
+                continue
+            print(name)
+            if argv.show:
+                print(code.to_qcode().longstr())
+            count += 1
+        print()
+        n += 2
+        
 
         
         

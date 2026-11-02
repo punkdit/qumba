@@ -455,7 +455,7 @@ def qhap_threshold():
     from qhap.circuit import HeliosNoiseModel, IonNoiseModel
     #from qhap.db import CodeDB
     from qhap.sat import find_bare_schedule, get_distance
-    from qhap.schedular import IonSchedular
+    from qhap.schedular import IonSchedular, GreedySchedular
     from qhap.sweep import decode_circuit
 
 
@@ -502,6 +502,67 @@ def qhap_threshold():
     print("data = ", data)
 
 
+
+def qhap_greedy():
+
+    from qhap.code.csscode import CSSCode, Matrix
+    from qhap.builders import build_css_bare_syndrome
+    from qhap.circuit import HeliosNoiseModel, IonNoiseModel
+    #from qhap.db import CodeDB
+    from qhap.sat import find_bare_schedule, get_distance
+    from qhap.schedular import IonSchedular, GreedySchedular
+    from qhap.sweep import decode_circuit
+
+
+    gate_zones = argv.get("gate_zones", 4)
+    sweep = [2e-4, 5e-4, 1e-3]
+    workers = argv.get("workers", 4)
+    shots = argv.get("shots", 10000)
+
+    found = build_codes()
+
+    data = []
+    for (css,checks,logicals) in found:
+        print("[[%d, %d, %d]]"%(css.n, css.k, css.d))
+        results = []
+        for error_rate in sweep:
+            #print(circuit)
+    
+            basis = "X"
+    
+            schedular = GreedySchedular()
+            noise = IonNoiseModel(error_rate)
+
+            circuit = build_css_bare_syndrome(checks, logicals, 
+                css.n, basis=basis, rounds=css.d)
+            circuit = schedular(circuit)
+            circuit = noise(circuit)
+            circuit = circuit.to_stim()
+    
+            ratio = (sweep[-1]/error_rate)**2
+            samples = int(round(shots*ratio))
+            record = decode_circuit(circuit, label=basis+" memory", 
+                p=error_rate, shots=samples, seed=1, 
+                decoder="frontier", workers=workers)
+            #print()
+            #print(record)
+    
+            top, bot = record["failures"], record["shots"]
+            value = top/bot
+            print(basis+"-CHECK", samples, "%.6f"%value, "%.6f"%(value/css.k), )
+            #results.append(value/css.k)
+            results.append((samples,top))
+
+        item = (css.n, css.k, css.d, results)
+        data.append(item)
+        print(item)
+        print()
+    
+        #break
+    print("sweep =", sweep)
+    print("data = ", data)
+
+
 def qhap_transport():
 
     from qhap.code.csscode import CSSCode, Matrix
@@ -509,7 +570,7 @@ def qhap_transport():
     from qhap.circuit import HeliosNoiseModel, IonNoiseModel
     #from qhap.db import CodeDB
     from qhap.sat import find_bare_schedule, get_distance
-    from qhap.schedular import IonSchedular
+    from qhap.schedular import IonSchedular, GreedySchedular
     from qhap.sweep import decode_circuit
 
 
