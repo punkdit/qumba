@@ -381,6 +381,10 @@ def main_css():
         found = set()
         for code in all_cyclic_css(n):
             code = code.to_css()
+            if code.mx != code.mz:
+                continue
+            if code.k / code.n < 1/3:
+                continue
             code.bz_distance()
             name = str(code)
             if name in found:

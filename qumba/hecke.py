@@ -140,6 +140,9 @@ found = set()
 def get_selfdual(G):
     print("\t", G, G.structure_description(), end=", ")
 
+    from bruhat.gap import Gap
+    gap = Gap()
+
     #print(G.perms)
     N = G.rank
     n = gap.Order(G, get=True)

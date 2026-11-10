@@ -270,6 +270,7 @@ def main():
     shape = argv.get("shape", (5,5))
     index = argv.get("index", 1000)
     n_max = argv.get("n_max", 1215)
+    k_min = argv.get("k_min", 0)
     if argv.build_db or shape not in lins_db.db:
         print("lins_db.build_db...", end='', flush=True)
         lins_db.build_db(shape, index)
@@ -290,12 +291,12 @@ def main():
 
         if code is None:
             #print(code)
-            print(".", end='', flush=True)
+            #print(".", end='', flush=True)
             continue
     
-        if code.k == 0:
+        if code.k <= k_min:
             #print(code)
-            print("/", end='', flush=True)
+            #print("/", end='', flush=True)
             continue
     
         print("idx=%d"%idx, code, end=' ', flush=True)
@@ -345,7 +346,8 @@ def main():
 
         #print(code)
         if code.dx < 3 or code.dz < 3:
-            print(code)
+            #print(code)
+            print("D")
             continue
         #found.append(code)
         if argv.all:
@@ -363,7 +365,7 @@ def main():
         #print("Hx weights:", Hxs.min(), "to", Hxs.max())
         #print("Hz weights:", Hzs.min(), "to", Hzs.max())
 
-        print("\t%s"%code)
+        print("\t%s"%code, "rate=%.2f"%(code.k/code.n))
         if argv.show:
             print(code.longstr())
 
@@ -390,10 +392,11 @@ def build_codes():
     from qhap.sat import find_bare_schedule, get_distance
 
     start_idx = argv.get("start_idx", 1)
-    stop_idx = argv.get("stop_idx", 7)
+    stop_idx = argv.get("stop_idx", None)
     shape = argv.get("shape", (5,5))
     index = argv.get("index", 1000)
     n_max = argv.get("n_max", 1215)
+    n_min = argv.get("n_min", 12)
     if argv.build_db or shape not in lins_db.db:
         print("lins_db.build_db...", end='', flush=True)
         lins_db.build_db(shape, index)
@@ -416,6 +419,14 @@ def build_codes():
             #print(code)
             print("/", end='', flush=True)
             continue
+
+        if code.n > n_max:
+            print(code, "too big")
+            break
+
+        if code.n < n_min:
+            print(code, "skip")
+            continue
     
         print("\nidx=%d"%idx, end=' ', flush=True)
 
@@ -425,14 +436,20 @@ def build_codes():
         css = CSSCode(Matrix.parse(hx), Matrix.parse(hz))
         d = css.get_distance()
         print("[[%d, %d, %d]]"%(css.n, css.k, css.d))
+        print(css.Hx.sum(1))
+        print(css.Hz.sum(1))
+        if css.d <= 2:
+            continue
         
         result, x_checks = find_bare_schedule(css, "X")
         assert result == 'sat'
         #print(x_checks)
+        print("X")
 
         result, z_checks = find_bare_schedule(css, "Z")
         assert result == 'sat'
         #print(z_checks)
+        print("Z")
 
         logicals = []
         for lx in css.Lx:
@@ -445,6 +462,86 @@ def build_codes():
         found.append( (css, x_checks+z_checks, logicals) )
 
     return found
+
+
+def qhap_surface():
+    from qhap.code.csscode import CSSCode, Matrix
+    from qhap.sat import find_bare_schedule, get_distance
+
+    rows = 6
+    cols = 2
+
+    keys = [(i,j,k) for i in range(rows) for j in range(cols) for k in range(2)]
+    keys += [(i,cols,0) for i in range(rows) ]
+    print(keys)
+
+    lookup = {k:v for (v,k) in enumerate(keys)}
+    n = len(keys)
+    print(n)
+
+    def mkop(ks):
+        h = [0]*n
+        for k in ks:
+            h[lookup[k]] = 1
+        return h
+
+    Hx = [
+        mkop([((i-1)%rows, j, 1), (i,j,0), (i,j,1), (i,j+1,0)]) 
+            for i in range(rows)
+            for j in range(cols)
+    ]
+    hx = mkop([(i,0,0) for i in range(rows)] + [(i,cols,0) for i in range(rows)])
+    Hx.append(hx)
+    Hx = Matrix(Hx)
+    assert Hx.rank() == len(Hx)-1
+
+    # left side
+    Hz = [mkop([(i,0,0), (i,0,1), ((i+1)%rows,0,0)]) for i in range(rows)]
+    # right side
+    Hz += [mkop([(i,cols,0), (i,cols-1,1), ((i+1)%rows,cols,0)])
+        for i in range(rows)]
+    # middle cols
+    for j in range(1, cols):
+        Hz += [
+            mkop([(i,j,0), (i,j,1), ((i+1)%rows,j,0), (i,j-1,1)]) 
+            for i in range(rows)]
+
+    Hz = Matrix(Hz)
+    assert Hz.rank() == len(Hz)-1
+    print("Hx =")
+    print(Hx)
+    print("Hz = ")
+    print(Hz, Hz.shape)
+    Hz = Hz.row_reduce()
+    print(Hz, Hz.shape)
+
+    code = CSSCode(Hx, Hz)
+    code.get_distance()
+    print(code)
+    return
+    
+    
+    if 0:
+        print("\nidx=%d"%idx, end=' ', flush=True)
+
+        hx = str(code.Hx)
+        hz = str(code.Hz)
+
+        css = CSSCode(Matrix.parse(hx), Matrix.parse(hz))
+        d = css.get_distance()
+        print("[[%d, %d, %d]]"%(css.n, css.k, css.d))
+        print(css.Hx.sum(1))
+        print(css.Hz.sum(1))
+        
+        result, x_checks = find_bare_schedule(css, "X")
+        assert result == 'sat'
+        #print(x_checks)
+        print("X")
+
+        result, z_checks = find_bare_schedule(css, "Z")
+        assert result == 'sat'
+        #print(z_checks)
+        print("Z")
 
 
 
