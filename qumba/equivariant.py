@@ -783,6 +783,8 @@ def two_block(G, wa=2, wb=2, rand=True):
     trials = argv.get("trials", 100)
     found = set()
 
+    min_k = argv.get("min_k")
+
     fn = sample_two_block
     if argv.search:
         fn = search_two_block
@@ -861,6 +863,8 @@ def two_block(G, wa=2, wb=2, rand=True):
             #print(code)
             #print(code.longstr())
             
+        if min_k is not None and code.k < min_k:
+            continue
 
         code.bz_distance()
         if code.dx <= 2 or code.dz <= 2:
@@ -976,11 +980,13 @@ def main_two_block():
                 L,R = code.LR
                 #print(L)
                 #print(R)
-                #print(strop(code.to_qcode().H))
                 key = (code.n, code.k)
                 other = best.get(key)
                 if other is None or is_better(code, other):
                     best[key] = code
+                    if argv.dump:
+                        print(strop(code.to_qcode().H))
+                        print()
         
             if not best:
                 continue # <------- 
