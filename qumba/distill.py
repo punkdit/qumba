@@ -5126,6 +5126,52 @@ def test_W():
             print(key)
     
 
+def test_limits_of_distill():
+    # See: https://arxiv.org/abs/2610.31115
+    # "The limits of magic-state distillation"
+    ops = """−XZIIZIIIX, +XIZIZIIXI,+ZXZZIIXZI, +ZZXIZXIIZ,−YXYIXIIZZ, −YYXXIIIII,+IZIZZIZII, +IIZZZZIII"""
+    ops = ops.replace(",", " ")
+    ops = ops.split()
+    
+    code = " ".join([o[1:] for o in ops])
+    code = QCode.fromstr(code)
+    
+    from qumba.pauli import fromstr
+    
+    def make_pauli(s):
+        sign, p = s[0], s[1:]
+        assert (sign in "+−")
+        sign = {"+":+1, "−":-1}[sign]
+        op = sign*fromstr(p)
+        return op
+    
+    logops = "+.YX.X.... +XZZZZ....".replace('.', 'I').split()
+    logops = [make_pauli(s) for s in logops]
+    print(logops)
+    
+    stabs = []
+    for s in ops:
+        op = make_pauli(s)
+        stabs.append(op)
+    code = PauliCode(stabs, [], logops)
+    print(code)
+    
+    distill = PauliDistill(code)
+    
+    f = distill.build()
+    top = f.numerator()
+    bot = f.denominator()
+
+    t = top / 16 * (w8**6)
+    print(t)
+    
+    z, zb = t.parent().gens()
+    dt = sage.diff(t, z)
+    print(dt)
+    print(sage.factor(dt))
+
+
+
 
 if __name__ == "__main__":
 

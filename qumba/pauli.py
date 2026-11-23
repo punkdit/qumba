@@ -597,7 +597,7 @@ def test_wenum():
     print("pw =", pw(x=1, y=I, z=z, w=z), end=" " )
     print("\t=", factor(pw(x=1, y=I, z=z, w=z) ))
 
-    return
+    #return
 
     if argv.tgt:
         tgt = eval(argv.tgt, locals())
