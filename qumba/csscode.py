@@ -717,15 +717,19 @@ class CSSCode(object):
         return code
 
     def bz_distance(self):
+        return self.distfind("bz")
+
+    def distfind(self, method="bz", threads=4):
         if self.k == 0 or self.mx==0 or self.mz==0:
             return
+        assert method in "bz cc mitm".split()
         #t0 = time()
         Hx = shortstr(self.Hx).replace("1", "X").replace('.', "I")
         Hz = shortstr(self.Hz).replace("1", "Z").replace('.', "I")
     
         from subprocess import Popen, PIPE
-        #child = Popen("distance --zx".split(), stdin=PIPE, stdout=PIPE)
-        child = Popen("distfind --zx".split(), stdin=PIPE, stdout=PIPE)
+        cmd = "distfind --zx --%s --threads %d" % (method, threads)
+        child = Popen(cmd.split(), stdin=PIPE, stdout=PIPE)
     
         s = "%s\n%s\n"%(Hx, Hz)
         child.stdin.write(s.encode())

@@ -163,7 +163,7 @@ def find_equivariant_sd(X):
             print(".", end="", flush=True)
             continue
 
-        code.bz_distance()
+        code.distfind("cc")
         yield code
 
 
@@ -227,7 +227,7 @@ def unique_css(codes, min_d=3, found=None):
 
         if code.n < 40:
             #print("/", end="", flush=True)
-            dx, dz = code.bz_distance()
+            dx, dz = code.distfind("cc")
             #print("\\", end="", flush=True)
             if code.d < min_d:
                 continue
@@ -474,7 +474,7 @@ def search_equivariant():
                     continue
                 css = code.to_css()
                 if code.n < 40:
-                    css.bz_distance()
+                    css.distfind("cc")
                 code = css.to_qcode()
                 if argv.show:
                     print()
@@ -542,7 +542,7 @@ def find_hecke_random(Ms):
             continue
         if argv.k and css.k != argv.k:
             continue
-        css.bz_distance() # <--- half the time spent here
+        css.distfind("cc") # <--- half the time spent here doing "bz" distfind
         if css.d < 3:
             #print(".", end=" ", flush=True)
             continue
@@ -589,7 +589,7 @@ def find_hecke_exhaustive(Ms):
             continue
         if argv.k and css.k != argv.k:
             continue
-        css.bz_distance() # <--- half the time spent here
+        css.distfind("cc") # <--- half the time spent here doing "bz" distfind
         if css.d < 3:
             #print(".", end=" ", flush=True)
             continue
@@ -839,6 +839,7 @@ def two_block(G, wa=2, wb=2, rand=True):
         return
 
     #print(fn)
+    min_d = argv.get("min_d", 3)
 
     for (L,R) in fn(lb, rb, wa, wb, trials):
         #assert L*R == R*L
@@ -849,11 +850,13 @@ def two_block(G, wa=2, wb=2, rand=True):
         Hz = Hz.linear_independent()
 
         code = CSSCode(Hx=Hx.A, Hz=Hz.A, check=False, build=False)
+
         if code.k == 0:
             continue
         if argv.k and argv.k != code.k:
             continue
 
+        #print(".", end='', flush=True)
         if target is not None:
             if target.k != code.k:
                 continue
@@ -865,61 +868,23 @@ def two_block(G, wa=2, wb=2, rand=True):
             
         if min_k is not None and code.k < min_k:
             continue
+        print("/", end='', flush=True)
 
-        code.bz_distance()
-        if code.dx <= 2 or code.dz <= 2:
+        code.distfind("cc")
+        if code.dx < min_d or code.dz < min_d:
             continue
 
         s = str(code)
         if s in found:
             continue
         found.add(s)
-        #if is_connected(Hx, Hz):
+        #if is_connected(Hx, Hz): # ??
         #    yield code
 
         code.LR = (L,R)
+
+        print()
         yield code
-
-
-def is_connected(Hx, Hz):
-    try:
-        try_is_connected(Hx, Hz)
-    except:
-        print("is_connected: fail")
-        print("Hx:")
-        print(Hx, Hx.shape)
-        print("Hz:")
-        print(Hz, Hz.shape)
-        raise
-
-def try_is_connected(Hx, Hz): # XXX Broken
-    #print("is_connected")
-    Hx = Hx.normal_form()
-    Hz = Hz.normal_form()
-    m, n = Hx.shape
-
-    #print(Hx)
-
-    if Hx[0,0] == 0 and Hz[0,0] == 0:
-        return False
-
-    bdy = [0]
-    rows = set(bdy)
-    while len(bdy):
-        _bdy = []
-        for i0 in bdy:
-            #h = Hx[i0]
-          for h in [Hx[i0], Hz[i0]]:
-            for (j,) in h.where():
-                #print(j)
-                for i1, in Hx[:,j].where():
-                    #print('\t', i1)
-                    if i1 not in rows:
-                        rows.add(int(i1))
-                        _bdy.append(i1)
-        bdy = _bdy
-    #print(rows)
-    return len(rows) == m
 
 
 def main_two_block():
@@ -973,10 +938,9 @@ def main_two_block():
         print("idx=%s G=%r" % (idx, G.desc))
         #continue
         for (wa,wb) in ws:
-            print(G.desc, wa, wb)
+            print("%s: wa=%d, wb=%d"%(G.desc, wa, wb))
             best = {} 
             for code in two_block(G, wa, wb):
-                print("\t", code)
                 L,R = code.LR
                 #print(L)
                 #print(R)
@@ -985,8 +949,12 @@ def main_two_block():
                 if other is None or is_better(code, other):
                     best[key] = code
                     if argv.dump:
-                        print(strop(code.to_qcode().H))
                         print()
+                        print("Hx =")
+                        print(code.Hx)
+                        print("Hz =")
+                        print(code.Hz)
+                print(code)
         
             if not best:
                 continue # <------- 
@@ -1274,7 +1242,7 @@ def test_bicayley():
           for B in Bs:
             code = make_bicayley(G, A, B)
             #print(code)
-            code.bz_distance()
+            code.distfind("cc")
             d = best.get(code.k, 0)
             if code.d > d:
                 print(code, code.d)
@@ -1307,7 +1275,7 @@ def get_stacked(l, idxs, jdxs):
     Hx = A.concatenate(B.t, axis=1)
     Hz = B.concatenate(A.t, axis=1)
     code = CSSCode(Hx=Hx.A, Hz=Hz.A)
-    code.bz_distance()
+    code.distfind("cc")
     print(code.longstr())
     print(code)
     print("-->")
@@ -1317,7 +1285,7 @@ def get_stacked(l, idxs, jdxs):
     H = top.concatenate(bot)
 
     code = CSSCode(Hx=H.A, Hz=H.A)
-    code.bz_distance()
+    code.distfind("cc")
     print(code.longstr())
     print(code)
     return code
