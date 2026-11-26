@@ -424,6 +424,11 @@ class QCode(object):
         code.bz_distance()
         self.d = code.d
 
+    def distfind(self, *arg, **kw):
+        code = self.to_css()
+        code.distfind(*arg, **kw)
+        self.d = code.d
+
     #@cache
     def get_graph(self):
         "encode into a pynauty Graph"

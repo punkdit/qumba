@@ -736,7 +736,11 @@ class CSSCode(object):
         child.stdin.close()
         result = child.stdout.read().decode()
         rval = child.wait()
-        assert rval == 0, "child return %s"%rval
+        if rval != 0:
+            print()
+            print(cmd)
+            print(result)
+            raise AssertionError("child return %s"%rval)
         dz, dx = str(result).split() # argh, swapped !
     
         #print("bz_distance took %.3f seconds" % (time() - t0))

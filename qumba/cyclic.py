@@ -283,19 +283,26 @@ def main_sd():
     else:
         ns = [n]
 
+    method = argv.get("method", "cc")
+    print("method = %r"%(method,))
+
     for n in ns:
+      print("n = %d = %d mod 8"%(n, n%8))
       for v in all_cyclic_gf2(n):
-        H = numpy.array([numpy.array([v[(i+j)%n] for i in range(n)]) for j in range(n)])
-        if dot2(H, H.transpose()).sum():
+        H = Matrix([numpy.array([v[(i+j)%n] for i in range(n)]) for j in range(n)])
+        if (H*H.t).sum():
             #print("/", end="", flush=True)
             continue
-        H = linear_independent(H)
+        H = H.linear_independent()
         code = QCode.build_css(H, H, cyclic=True)
         if code.k == 0 or code.d_upper_bound <= 2:
             continue
+        if argv.debug:
+            print("H =")
+            print(H)
         print(code, end=' ', flush=True)
-        if code.k / code.n > 1/4:
-            code.bz_distance()
+        if code.k / code.n > 1/10 or argv.distance:
+            code.distfind(method=method)
             print(code)
         else:
             print()

@@ -704,7 +704,8 @@ def sample_two_block(lb, rb, wa, wb, trials=None):
 
     assert len(lb) == len(rb)
     idxs = list(range(len(lb)))
-    for trial in range(trials):
+    count = 0
+    while trials is None or count < trials:
 
         shuffle(idxs)
         ll = [lb[i] for i in idxs]
@@ -868,9 +869,10 @@ def two_block(G, wa=2, wb=2, rand=True):
             
         if min_k is not None and code.k < min_k:
             continue
-        print("/", end='', flush=True)
+        #print("/", end='', flush=True)
 
         code.distfind("cc")
+        print(str(code.d), end='', flush=True)
         if code.dx < min_d or code.dz < min_d:
             continue
 
